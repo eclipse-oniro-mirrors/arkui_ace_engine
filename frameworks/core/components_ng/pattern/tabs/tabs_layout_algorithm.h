@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/render/animation_utils.h"
+#include "ui/properties/ng/measure_property.h"
 
 namespace OHOS::Ace::NG {
 
@@ -120,6 +121,9 @@ private:
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& idealSize);
     SizeF MeasureSwiper(const RefPtr<TabsLayoutProperty>& layoutProperty, RefPtr<LayoutWrapper>& swiperWrapper,
         const SizeF& idealSize, const SizeF& tabBarSize, const float dividerWidth);
+    void ApplySafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& swiperWrapper, const SizeF& tabBarSize,
+        float dividerWidth, Axis axis, BarPosition barPosition, float extraPadding);
+    void ResetSafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& swiperWrapper, Axis axis, BarPosition barPosition);
     std::vector<OffsetF> LayoutOffsetList(LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& tabBarWrapper,
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& frameSize) const;
 
@@ -130,6 +134,22 @@ private:
     std::optional<float> ParseBarWidthAndMargin(LayoutWrapper* layoutWrapper, float tabsWidth, float tabsHeight);
     void UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
     void UpdateTopBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
+    void UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const;
+    void ClampFloatingBarOffset(LayoutWrapper* layoutWrapper) const;
+    struct FloatingBarSafeBoundary {
+        float left = 0.0f;
+        float right = 0.0f;
+        float top = 0.0f;
+        float bottom = 0.0f;
+        float expandTop = 0.0f;
+        float expandBottom = 0.0f;
+        float expandLeft = 0.0f;
+        float expandRight = 0.0f;
+    };
+    FloatingBarSafeBoundary GetFloatingBarSafeBoundary(LayoutWrapper* layoutWrapper) const;
+    void ApplyExpandSafeArea(FloatingBarSafeBoundary& boundary, const RefPtr<LayoutProperty>& layoutProperty,
+        PipelineContext* pipeline, float tabsGlobalLeft, float tabsGlobalTop,
+        float tabsGlobalRight, float tabsGlobalBottom) const;
     void LayoutBackgroundMask(LayoutWrapper* layoutWrapper);
 
     void UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible);

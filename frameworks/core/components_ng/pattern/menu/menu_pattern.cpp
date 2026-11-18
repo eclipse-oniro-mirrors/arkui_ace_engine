@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/menu/menu_pattern.h"
 
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
+
 #include "base/perfmonitor/perf_constants.h"
 #include "base/perfmonitor/perf_monitor.h"
 #include "base/subwindow/subwindow_manager.h"
@@ -609,7 +611,7 @@ void MenuPattern::BuildDivider()
     if (!IsSelectOverlayExtensionMenuWithSubMenu()) {
         isNeedDivider_ = false;
     }
-    auto uiNode = AceType::DynamicCast<UINode>(host);
+    RefPtr<UINode> uiNode = host;
     RefPtr<UINode> previousNode = nullptr;
     UpdateMenuItemChildren(uiNode, previousNode);
     RemoveLastNodeDivider(previousNode);
@@ -988,13 +990,13 @@ void MenuPattern::UpdateDividerProperty(
     }
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    const auto& children = GetOptions();
+    auto children = GetOptions();
     auto childCount = children.size();
     auto paramCount = params.size();
     size_t updateCount = std::min(paramCount, childCount);
     auto childIt = children.begin();
     for (size_t i = 0; i < updateCount; i++, childIt++) {
-        const auto& childNode = AceType::DynamicCast<FrameNode>(*childIt);
+        const auto childNode = *childIt;
         CHECK_NULL_VOID(childNode);
         if (i == 0) {
             auto props = childNode->GetPaintProperty<MenuItemPaintProperty>();
@@ -1043,7 +1045,7 @@ void MenuPattern::UpdateSelectOptionTextByIndex(int32_t index, const std::string
         return;
     }
     auto childIt = children.at(index);
-    const auto& childNode = AceType::DynamicCast<FrameNode>(childIt);
+    const auto childNode = childIt;
     CHECK_NULL_VOID(childNode);
     auto optionPattern = childNode->GetPattern<MenuItemPattern>();
     CHECK_NULL_VOID(optionPattern);
@@ -1066,7 +1068,7 @@ void MenuPattern::UpdateSelectOptionIconByIndex(int32_t index, const std::string
         return;
     }
     auto childIt = children.at(index);
-    const auto& childNode = AceType::DynamicCast<FrameNode>(childIt);
+    const auto childNode = childIt;
     CHECK_NULL_VOID(childNode);
     auto optionPattern = childNode->GetPattern<MenuItemPattern>();
     CHECK_NULL_VOID(optionPattern);
@@ -3139,7 +3141,7 @@ void MenuPattern::ShowMenuDisappearAnimation()
 
 void MenuPattern::UpdateClipPath(const RefPtr<LayoutWrapper>& dirty)
 {
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto menuLayoutAlgorithm = DynamicCast<MenuLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(menuLayoutAlgorithm);
@@ -3708,7 +3710,7 @@ RefPtr<UINode> MenuPattern::GetForEachMenuItem(const RefPtr<UINode>& parent, boo
     }
     auto node = GetSyntaxNode(parent);
     CHECK_NULL_RETURN(node, nullptr);
-    auto forEachNode = AceType::DynamicCast<UINode>(node->GetParent());
+    auto forEachNode = node->GetParent();
     if (node->GetTag() == JS_SYNTAX_ITEM_ETS_TAG) {
         CHECK_NULL_RETURN(forEachNode, nullptr);
         auto syntIndex = forEachNode->GetChildIndex(node);
@@ -3736,7 +3738,7 @@ RefPtr<UINode> MenuPattern::GetForEachMenuItem(const RefPtr<UINode>& parent, boo
 
 RefPtr<UINode> MenuPattern::GetOutsideForEachMenuItem(const RefPtr<UINode>& forEachNode, bool next)
 {
-    auto parentForEachNode = AceType::DynamicCast<UINode>(forEachNode->GetParent());
+    auto parentForEachNode = forEachNode->GetParent();
     CHECK_NULL_RETURN(parentForEachNode, nullptr);
     auto forEachIndex = parentForEachNode->GetChildIndex(forEachNode);
     int32_t shift = next ? 1 : -1;
@@ -3927,6 +3929,7 @@ void MenuPattern::UpdateMenuPathParams(std::optional<MenuPathParams> pathParams)
 
 void MenuPattern::OnDetachFromMainTree()
 {
+    ReportCapiSubMenuEvent(GetHost(), false);
     auto wrapperNode = GetMenuWrapper();
     CHECK_NULL_VOID(wrapperNode);
     auto pattern = wrapperNode->GetPattern<MenuWrapperPattern>();

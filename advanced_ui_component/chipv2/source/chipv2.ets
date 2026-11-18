@@ -687,8 +687,8 @@ export struct ChipV2 {
     this.smListener.off('change');
     this.mdListener.off('change');
     this.lgListener.off('change');
-    if (this.environmentCallbackID) {
-      this.getUIContext()?.getHostContext()?.getApplicationContext().off('environment', this.environmentCallbackID);
+    if (this.environmentCallbackID !== undefined) {
+      this.getUIContext()?.getHostContext()?.getApplicationContext()?.off('environment', this.environmentCallbackID);
       this.environmentCallbackID = void 0;
     }
   }

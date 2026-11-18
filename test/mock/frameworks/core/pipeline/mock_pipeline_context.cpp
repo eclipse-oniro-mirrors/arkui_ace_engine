@@ -578,6 +578,25 @@ void PipelineContext::RemoveWindowStateChangedCallback(int32_t nodeId)
     onWindowStateChangedCallbacks_.erase(nodeId);
 }
 
+void PipelineContext::AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback)
+{
+    onWindowVisibilityChangedCallbacks_.emplace(nodeId, callback);
+}
+
+void PipelineContext::RemoveWindowVisibilityChangedCallback(int32_t nodeId)
+{
+    onWindowVisibilityChangedCallbacks_.erase(nodeId);
+}
+
+void PipelineContext::OnWindowVisibilityChanged(bool isVisible)
+{
+    for (const auto& entry : onWindowVisibilityChangedCallbacks_) {
+        if (entry.second) {
+            entry.second(isVisible);
+        }
+    }
+}
+
 void PipelineContext::AddNodesToNotifyMemoryLevel(int32_t nodeId) {}
 
 void PipelineContext::RemoveNodesToNotifyMemoryLevel(int32_t nodeId) {}
@@ -2157,7 +2176,10 @@ bool PipelineContext::GetIsRequestVsync()
 
 RectF PipelineContext::GetRootRect()
 {
-    return {};
+    CHECK_NULL_RETURN(rootNode_, RectF());
+    auto geometryNode = rootNode_->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, RectF());
+    return geometryNode->GetFrameRect();
 }
 
 void PipelineContext::SetAreaChangeNodeMinDepth(int32_t depth) {}
@@ -2243,7 +2265,19 @@ void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId)
 
 void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node) {}
 
+void PipelineContext::RegisterPageContextNode(const RefPtr<FrameNode>& node) {}
+
 void PipelineContext::UnregisterMaterialNode(int32_t nodeId) {}
+
+void PipelineContext::UnregisterPageContextNode(int32_t nodeId) {}
+
+void PipelineContext::ReportPageContextStats(
+    int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex)
+{}
+
+void PipelineContext::AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source) {}
+
+void PipelineContext::ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source) {}
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {

@@ -145,7 +145,7 @@ float TabContentModelNG::CalculateEllipseRtlPositionX(const RefPtr<FrameNode>& b
     }
     return eightVpPx - circleWidth;
 }
-// Schedule a post-render task to adjust ellipse badge position.
+// Schedule an after-layout task to adjust ellipse badge position.
 // The badge node wraps the contentChild (icon+text column); badge frame width = content width.
 // positionX positions the badge circle (text child) relative to the badge frame's left edge.
 // LTR: circle LEFT edge = content RIGHT edge - 8vp  →  positionX = badgeWidth - 8vp
@@ -155,7 +155,7 @@ void TabContentModelNG::ScheduleEllipsePositionAdjustment(const RefPtr<FrameNode
 {
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
-    pipeline->AddAfterRenderTask([weakBadge = WeakPtr<FrameNode>(badgeNode)]() {
+    pipeline->AddAfterLayoutTask([weakBadge = WeakPtr<FrameNode>(badgeNode)]() {
         auto badgeNode = weakBadge.Upgrade();
         CHECK_NULL_VOID(badgeNode);
         auto badgeGeometry = badgeNode->GetGeometryNode();
@@ -405,15 +405,19 @@ void TabContentModelNG::Create(std::function<void()>&& deepRenderFunc)
     };
     ACE_LAYOUT_SCOPED_TRACE("Create[%s][self:%d]", TAB_CONTENT_ITEM_ETS_TAG, nodeId);
     ACE_UINODE_TRACE(nodeId);
+    auto* elementRegister = ElementRegister::GetInstance();
+    auto existingNode = elementRegister ? elementRegister->GetUINodeById(nodeId) : nullptr;
     auto frameNode = TabContentNode::GetOrCreateTabContentNode(TAB_CONTENT_ITEM_ETS_TAG, nodeId,
         [shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(std::move(deepRender))]() {
             return AceType::MakeRefPtr<TabContentPattern>(shallowBuilder);
         });
     stack->Push(frameNode);
-    auto tabTheme = frameNode->GetTheme<TabTheme>(true);
-    CHECK_NULL_VOID(tabTheme);
-    SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
-    ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    if (!existingNode) {
+        auto tabTheme = frameNode->GetTheme<TabTheme>(true);
+        CHECK_NULL_VOID(tabTheme);
+        SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
+        ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    }
     if (SystemProperties::ConfigChangePerform()) {
         auto tabsLayoutProperty = frameNode->GetLayoutProperty<TabContentLayoutProperty>();
         CHECK_NULL_VOID(tabsLayoutProperty);
@@ -431,13 +435,17 @@ void TabContentModelNG::Create()
     int32_t nodeId = stack->ClaimNodeId();
     ACE_LAYOUT_SCOPED_TRACE("Create[%s][self:%d]", TAB_CONTENT_ITEM_ETS_TAG, nodeId);
     ACE_UINODE_TRACE(nodeId);
+    auto* elementRegister = ElementRegister::GetInstance();
+    auto existingNode = elementRegister ? elementRegister->GetUINodeById(nodeId) : nullptr;
     auto frameNode = TabContentNode::GetOrCreateTabContentNode(
         TAB_CONTENT_ITEM_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<TabContentPattern>(nullptr); });
     stack->Push(frameNode);
-    auto tabTheme = frameNode->GetTheme<TabTheme>(true);
-    CHECK_NULL_VOID(tabTheme);
-    SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
-    ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    if (!existingNode) {
+        auto tabTheme = frameNode->GetTheme<TabTheme>(true);
+        CHECK_NULL_VOID(tabTheme);
+        SetTabBar(tabTheme->GetDefaultTabBarName(), "", std::nullopt, nullptr, true); // Set default tab bar.
+        ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, Text, tabTheme->GetDefaultTabBarName());
+    }
 }
 
 RefPtr<FrameNode> TabContentModelNG::CreateFrameNode(int32_t nodeId)
@@ -583,7 +591,6 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     bool isTopFloating = tabLayoutProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM) ==
         TabBarLayoutStyle::TOP;
     if (isTopFloating) {
-        linearLayoutProperty->UpdateFlexDirection(FlexDirection::ROW);
         linearLayoutProperty->UpdateSpace(0.0_vp);
         linearLayoutProperty->UpdateCrossAxisAlign(FlexAlign::CENTER);
         linearLayoutProperty->SetIsVertical(false);
@@ -636,16 +643,6 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     auto columnFocusHub = columnNode->GetFocusHub();
     if (columnFocusHub) {
         columnFocusHub->SetFocusDependence(FocusDependence::SELF);
-    }
-
-    // Apply defaultVisibility for this single bottom tab bar item
-    const auto& defaultVisibility = tabContentPattern->GetDefaultVisibility();
-    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-    auto columnProperty = columnNode->GetLayoutProperty();
-    if (tabsPattern && columnProperty) {
-        auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
-        bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
-        columnProperty->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
     }
 
     // Create tab bar with content.
@@ -719,16 +716,20 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         layoutProperty->UpdatePadding(topPadding);
     } else if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         layoutProperty->UpdatePadding(padding);
-        auto accessibilityProperty = columnNode->GetAccessibilityProperty<AccessibilityProperty>();
-        accessibilityProperty->SetAccessibilityGroup(true);
-        auto id = tabContentPattern->GetId();
-        columnNode->UpdateInspectorId(id);
     } else {
         auto tabBarItemPadding = tabTheme->GetSubTabItemPadding();
         auto subTabItemHorizontalPadding_ = tabTheme->GetSubTabItemHorizontalPadding();
         layoutProperty->UpdatePadding({ CalcLength(subTabItemHorizontalPadding_),
             CalcLength(subTabItemHorizontalPadding_), CalcLength(tabBarItemPadding),
             CalcLength(tabBarItemPadding), {}, {} });
+    }
+
+    if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
+        layoutProperty->UpdatePadding(padding);
+        auto accessibilityProperty = columnNode->GetAccessibilityProperty<AccessibilityProperty>();
+        accessibilityProperty->SetAccessibilityGroup(true);
+        auto id = tabContentPattern->GetId();
+        columnNode->UpdateInspectorId(id);
     }
 
     bool isFrameNode = tabBarStyle == TabBarStyle::SUBTABBATSTYLE && tabContentPattern->HasSubTabBarStyleNode();
@@ -846,7 +847,7 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         textLayoutProperty->UpdateFontSize(tabTheme->GetBottomTabTextSize());
     }
     if (isTopFloating) {
-        textLayoutProperty->UpdateFontSize(tabTheme->GetTopTabTextSize());
+        textLayoutProperty->UpdateFontSize(tabTheme->GetSubTitleM());
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
     } else if (tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
@@ -2071,6 +2072,80 @@ void TabContentModelNG::SetDefaultVisibility(FrameNode* node, const NG::TabConte
     auto pattern = node->GetPattern<TabContentPattern>();
     CHECK_NULL_VOID(pattern);
     pattern->SetDefaultVisibility(defaultVisibility);
+}
+
+void TabContentModelNG::SetSidebarSection(FrameNode* node, const SidebarSection& section)
+{
+    CHECK_NULL_VOID(node);
+    auto pattern = node->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    // Validate titleStyle: out-of-range values fall back to default (STANDARD = 0).
+    auto validatedSection = section;
+    if (static_cast<int32_t>(validatedSection.titleStyle) < 0 ||
+        static_cast<int32_t>(validatedSection.titleStyle) >
+            static_cast<int32_t>(SidebarSectionTitleStyle::EMPHASIZED)) {
+        validatedSection.titleStyle = SidebarSectionTitleStyle::STANDARD;
+    }
+    pattern->SetSidebarSection(validatedSection);
+    if (validatedSection.resourceTitleObject) {
+        CreateSidebarSectionTitleWithResourceObj(node, validatedSection.resourceTitleObject);
+    } else {
+        pattern->RemoveResObj("tabContent.sidebarSectionTitle");
+    }
+}
+
+void TabContentModelNG::CreateSidebarSectionTitleWithResourceObj(
+    FrameNode* frameNode, const RefPtr<ResourceObject>& resObj)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    const std::string key = "tabContent.sidebarSectionTitle";
+    pattern->RemoveResObj(key);
+    CHECK_NULL_VOID(resObj);
+
+    auto&& updateFunc = [weak = AceType::WeakClaim(frameNode)](const RefPtr<ResourceObject>& resObj) {
+        auto node = weak.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto pattern = node->GetPattern<TabContentPattern>();
+        CHECK_NULL_VOID(pattern);
+        auto section = pattern->GetSidebarSection();
+        if (!section.has_value()) {
+            return;
+        }
+        std::string result;
+        ResourceParseUtils::ParseResString(resObj, result);
+        section->title = result;
+        pattern->SetSidebarSection(section.value());
+        // Navigate: TabContent node → Swiper node → Tabs node.
+        // node->GetParent() returns the Swiper, NOT the sidebar tab list node.
+        auto swiperNode = AceType::DynamicCast<FrameNode>(node->GetParent());
+        CHECK_NULL_VOID(swiperNode);
+        auto tabsNode = AceType::DynamicCast<TabsNode>(swiperNode->GetParent());
+        CHECK_NULL_VOID(tabsNode);
+        auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+        CHECK_NULL_VOID(tabsPattern);
+        // If a customization sectionMap overrides this tab's section, the
+        // customization path owns the title — skip RebuildSections here.
+        int32_t tabIndex = swiperNode->GetChildIndex(node);
+        if (tabIndex >= 0) {
+            const auto& cust = tabsPattern->GetAppliedTabViewCustomization();
+            if (cust.has_value() && cust.value().sectionMap.count(tabIndex) > 0) {
+                return;
+            }
+        }
+        // Traverse down: Tabs → SideBar node → tab list node → tab list pattern.
+        auto sideBarNode = tabsPattern->GetSideBarNode();
+        CHECK_NULL_VOID(sideBarNode);
+        auto sideBarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
+        CHECK_NULL_VOID(sideBarPattern);
+        auto tabListNode = sideBarPattern->GetTabListNode();
+        CHECK_NULL_VOID(tabListNode);
+        auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+        CHECK_NULL_VOID(tabListPattern);
+        tabListPattern->RebuildSections();
+    };
+    pattern->AddResObj(key, resObj, std::move(updateFunc));
 }
 
 void TabContentModelNG::SetTabBarBuilder(FrameNode* node, TabBarBuilderFunc&& builder)

@@ -17,8 +17,10 @@
 #include "core/common/event_manager.h"
 
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
+#include "core/components_ng/gestures/recognizers/exclusive_recognizer.h"
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
 #include "core/common/event_dump.h"
+#include "base/utils/system_properties.h"
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/common/mock_window.h"
@@ -125,7 +127,7 @@ HWTEST_F(EventManagerTestNg, EventManagerTest063, TestSize.Level1)
 
 /**
  * @tc.name: EventManagerTest064
- * @tc.desc: Test LogTouchTestResultRecognizers
+ * @tc.desc: Test GetTouchTestResultRecognizers
  * @tc.type: FUNC
  */
 HWTEST_F(EventManagerTestNg, EventManagerTest064, TestSize.Level1)
@@ -138,8 +140,8 @@ HWTEST_F(EventManagerTestNg, EventManagerTest064, TestSize.Level1)
     ASSERT_NE(eventManager, nullptr);
 
     /**
-     * @tc.steps: step2. Call LogTouchTestResultRecognizers.
-     * @tc.expected: ret is false.
+     * @tc.steps: step2. Collect information for a recognizer attached to a frame node.
+     * @tc.expected: The returned information contains the recognizer type and node tag.
      */
     TouchEvent event;
     event.type = TouchType::DOWN;
@@ -152,8 +154,25 @@ HWTEST_F(EventManagerTestNg, EventManagerTest064, TestSize.Level1)
     auto pageNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 1, pagePattern);
     panHorizontal->AttachFrameNode(pageNode);
     resultList.emplace_back(panHorizontal);
-    eventManager->LogTouchTestResultRecognizers(resultList, 1);
+    auto recognizerInfo = eventManager->GetTouchTestResultRecognizers(resultList);
     EXPECT_FALSE(panHorizontal->isFlushTouchEventsEnd_);
+
+    auto stackNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG, 2, AceType::MakeRefPtr<Pattern>());
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 3, AceType::MakeRefPtr<Pattern>());
+    panHorizontal->AttachFrameNode(stackNode);
+    auto columnPan = AceType::MakeRefPtr<PanRecognizer>(
+        DEFAULT_PAN_FINGER, PanDirection { PanDirection::HORIZONTAL }, DEFAULT_PAN_DISTANCE.ConvertToPx());
+    columnPan->AttachFrameNode(columnNode);
+    std::list<RefPtr<NGGestureRecognizer>> groupedRecognizers = { columnPan };
+    resultList.emplace_back(AceType::MakeRefPtr<ExclusiveRecognizer>(std::move(groupedRecognizers)));
+    EXPECT_EQ(eventManager->GetTouchTestResultRecognizers(resultList), "TTHRTI:3:S,C;");
+
+    EXPECT_TRUE(eventManager->GetTouchTestResultInfo(event, pageNode).empty());
+    eventManager->touchTestResults_[event.id] = { panHorizontal, columnPan };
+    auto nodeInfo = eventManager->GetTouchTestResultInfo(event, pageNode);
+    EXPECT_NE(nodeInfo.find("T: S"), std::string::npos);
+    EXPECT_EQ(nodeInfo.find("Stack"), std::string::npos);
+    EXPECT_EQ(nodeInfo.find("Column"), std::string::npos);
 }
 
 /**
@@ -1112,14 +1131,14 @@ HWTEST_F(EventManagerTestNg, DispatchTouchCancelToRecognizer, TestSize.Level1)
     const uint8_t targetCnt = 2; // defines 2 touch target;
     const uint8_t fingerCnt = 2; // defines 2 fingers;
     RefPtr<TouchEventActuator> targetRefs[targetCnt];
-    using TouchRecoginerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+    using TouchRecoginerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
     TouchRecoginerTarget items[targetCnt];
     int32_t fingers[fingerCnt] = { 0, 1 };
     for (int32_t i = 0; i < targetCnt; ++i) {
         targetRefs[i] = AceType::MakeRefPtr<TouchEventActuator>();
         for (auto& finger : fingers) {
             touchTestResult[finger].emplace_front(targetRefs[i]);
-            items[i].emplace_back(finger, touchTestResult[finger].begin());
+            items[i].emplace_back(finger, *touchTestResult[finger].begin());
         }
     }
     eventManager->lastTouchEvent_.sourceType = SourceType::TOUCH;
@@ -1143,7 +1162,7 @@ HWTEST_F(EventManagerTestNg, DispatchTouchCancelToRecognizer_ItemsEmpty, TestSiz
     auto eventManager = AceType::MakeRefPtr<EventManager>();
     auto& touchTestResult = eventManager->touchTestResults_;
     RefPtr<TouchEventActuator> target = AceType::MakeRefPtr<TouchEventActuator>();
-    using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+    using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
 
     TouchTestResult resultList;
     resultList.push_back(target);
@@ -1700,5 +1719,228 @@ HWTEST_F(EventManagerTestNg, CheckMousePendingRecognizersState010, TestSize.Leve
 
     eventManager->CheckMousePendingRecognizersState(event);
     EXPECT_TRUE(eventManager->mousePendingRecognizers_.empty());
+}
+
+/**
+ * @tc.name: LogTouchTestResult001
+ * @tc.desc: Test LogTouchTestResult with all branch combinations of nodeInfo and recognizerInfo.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, LogTouchTestResult001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+
+    TouchTestResult resultList;
+    auto panRecognizer = AceType::MakeRefPtr<PanRecognizer>(
+        DEFAULT_PAN_FINGER, PanDirection { PanDirection::HORIZONTAL }, DEFAULT_PAN_DISTANCE.ConvertToPx());
+    ASSERT_NE(panRecognizer, nullptr);
+    auto stackNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
+    panRecognizer->AttachFrameNode(stackNode);
+    resultList.emplace_back(panRecognizer);
+    eventManager->touchTestResults_[1] = resultList;
+
+    auto recognizerInfo = eventManager->GetTouchTestResultRecognizers(resultList);
+    EXPECT_FALSE(recognizerInfo.empty());
+    size_t resultsSizeBefore = eventManager->touchTestResults_.size();
+
+    eventManager->LogTouchTestResult(1, "nodeInfo", "");
+    eventManager->LogTouchTestResult(1, "", recognizerInfo);
+    eventManager->LogTouchTestResult(1, "nodeInfo", recognizerInfo);
+    eventManager->LogTouchTestResult(1, "", "");
+
+    EXPECT_EQ(eventManager->touchTestResults_.size(), resultsSizeBefore);
+}
+
+/**
+ * @tc.name: GetTouchTestResultRecognizersCommercialLogDisabled
+ * @tc.desc: Test GetTouchTestResultRecognizers with empty result when commercial log is disabled
+ *           (line 728 else-if branch entered).
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, GetTouchTestResultRecognizersCommercialLogDisabled, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    bool backup = SystemProperties::aceCommercialLogEnable_;
+    SystemProperties::aceCommercialLogEnable_ = false;
+    auto result = eventManager->GetTouchTestResultRecognizers({});
+    EXPECT_TRUE(result.empty());
+    SystemProperties::aceCommercialLogEnable_ = backup;
+}
+
+/**
+ * @tc.name: GetTouchTestResultRecognizersCommercialLogEnabled
+ * @tc.desc: Test GetTouchTestResultRecognizers with empty result when commercial log is enabled
+ *           (line 728 else-if branch skipped).
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, GetTouchTestResultRecognizersCommercialLogEnabled, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    bool backup = SystemProperties::aceCommercialLogEnable_;
+    SystemProperties::aceCommercialLogEnable_ = true;
+    auto result = eventManager->GetTouchTestResultRecognizers({});
+    EXPECT_TRUE(result.empty());
+    SystemProperties::aceCommercialLogEnable_ = backup;
+}
+
+/**
+ * @tc.name: BuildInputLogRecognizerInfoUnknownTag001
+ * @tc.desc: Test BuildInputLogRecognizerInfo with a node tag not in TAG_ABBREVIATIONS.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, BuildInputLogRecognizerInfoUnknownTag001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    bool backupCommercialLog = SystemProperties::aceCommercialLogEnable_;
+    SystemProperties::aceCommercialLogEnable_ = false;
+    TouchTestResult resultList;
+    auto panRecognizer = AceType::MakeRefPtr<PanRecognizer>(
+        DEFAULT_PAN_FINGER, PanDirection { PanDirection::HORIZONTAL }, DEFAULT_PAN_DISTANCE.ConvertToPx());
+    ASSERT_NE(panRecognizer, nullptr);
+    auto customNode = FrameNode::CreateFrameNode("CustomTag", 10, AceType::MakeRefPtr<Pattern>());
+    panRecognizer->AttachFrameNode(customNode);
+    resultList.emplace_back(panRecognizer);
+    auto recognizerInfo = eventManager->GetTouchTestResultRecognizers(resultList);
+    EXPECT_EQ(recognizerInfo, "TTHRTI:3:CustomTag;");
+    SystemProperties::aceCommercialLogEnable_ = backupCommercialLog;
+}
+
+/**
+ * @tc.name: BuildInputLogRecognizerInfoMultipleNodes001
+ * @tc.desc: Test BuildInputLogRecognizerInfo with multiple nodes including known and unknown tags.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, BuildInputLogRecognizerInfoMultipleNodes001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    bool backupCommercialLog = SystemProperties::aceCommercialLogEnable_;
+    SystemProperties::aceCommercialLogEnable_ = false;
+    TouchTestResult resultList;
+    auto clickRecognizer = AceType::MakeRefPtr<ClickRecognizer>();
+    ASSERT_NE(clickRecognizer, nullptr);
+    auto stackNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
+    auto customNode = FrameNode::CreateFrameNode("CustomTag", 2, AceType::MakeRefPtr<Pattern>());
+    clickRecognizer->AttachFrameNode(stackNode);
+    auto clickRecognizer2 = AceType::MakeRefPtr<ClickRecognizer>();
+    ASSERT_NE(clickRecognizer2, nullptr);
+    clickRecognizer2->AttachFrameNode(customNode);
+    resultList.emplace_back(clickRecognizer);
+    resultList.emplace_back(clickRecognizer2);
+    auto recognizerInfo = eventManager->GetTouchTestResultRecognizers(resultList);
+    EXPECT_EQ(recognizerInfo, "TTHRTI:1:S,CustomTag;");
+    SystemProperties::aceCommercialLogEnable_ = backupCommercialLog;
+}
+
+/**
+ * @tc.name: AppendInputLogStateHistory001
+ * @tc.desc: Test AppendInputLogStateHistory Down/Move/Up branches via LogTouchTestRecognizerStates.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, AppendInputLogStateHistory001, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+
+    NG::EventTree eventTree;
+    NG::FrameNodeSnapshot frameNodeSnap;
+    frameNodeSnap.nodeId = 100;
+    frameNodeSnap.tag = V2::BUTTON_ETS_TAG;
+    eventTree.hitTestTree.emplace_back(std::move(frameNodeSnap));
+
+    auto gestureSnapshot = AceType::MakeRefPtr<GestureSnapshot>();
+    gestureSnapshot->type = "ClickRecognizer";
+    gestureSnapshot->nodeId = 100;
+    gestureSnapshot->stateHistory.emplace_back(StateRecord("TouchDown", "extra_down", "waiting", "reject", 0));
+    gestureSnapshot->stateHistory.emplace_back(StateRecord("TouchMove", "", "active", "accept", 0));
+    gestureSnapshot->stateHistory.emplace_back(StateRecord("TouchUp", "", "success", "done", 0));
+
+    eventTree.gestureTree[1].emplace_back(gestureSnapshot);
+    eventManager->eventTree_.eventTreeList.emplace_back(std::move(eventTree));
+
+    auto& stateHistory = eventManager->eventTree_.eventTreeList.back().gestureTree[1].back()->stateHistory;
+    size_t sizeBefore = stateHistory.size();
+    size_t treeListSizeBefore = eventManager->eventTree_.eventTreeList.size();
+
+    eventManager->LogTouchTestRecognizerStates(1);
+
+    EXPECT_EQ(stateHistory.size(), sizeBefore);
+    EXPECT_EQ(eventManager->eventTree_.eventTreeList.size(), treeListSizeBefore);
+}
+
+/**
+ * @tc.name: AppendInputLogStateHistory002
+ * @tc.desc: Test AppendInputLogStateHistory with empty stateHistory and empty eventTreeList.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, AppendInputLogStateHistory002, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+
+    size_t treeListSizeBefore = eventManager->eventTree_.eventTreeList.size();
+    eventManager->LogTouchTestRecognizerStates(1);
+    EXPECT_EQ(eventManager->eventTree_.eventTreeList.size(), treeListSizeBefore);
+
+    NG::EventTree eventTree;
+    NG::FrameNodeSnapshot frameNodeSnap;
+    frameNodeSnap.nodeId = 100;
+    frameNodeSnap.tag = V2::BUTTON_ETS_TAG;
+    eventTree.hitTestTree.emplace_back(std::move(frameNodeSnap));
+
+    auto gestureSnapshot = AceType::MakeRefPtr<GestureSnapshot>();
+    gestureSnapshot->type = "PanRecognizer";
+    gestureSnapshot->nodeId = 100;
+
+    eventTree.gestureTree[1].emplace_back(gestureSnapshot);
+    eventManager->eventTree_.eventTreeList.emplace_back(std::move(eventTree));
+
+    auto& stateHistory = eventManager->eventTree_.eventTreeList.back().gestureTree[1].back()->stateHistory;
+    ASSERT_EQ(stateHistory.size(), 0);
+
+    eventManager->LogTouchTestRecognizerStates(1);
+    EXPECT_EQ(stateHistory.size(), 0);
+}
+
+/**
+ * @tc.name: AppendInputLogStateHistory003
+ * @tc.desc: Test AppendInputLogStateHistory with extraInfo for Move and Cancel procedures.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, AppendInputLogStateHistory003, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+
+    NG::EventTree eventTree;
+    NG::FrameNodeSnapshot frameNodeSnap;
+    frameNodeSnap.nodeId = 200;
+    frameNodeSnap.tag = V2::TEXT_ETS_TAG;
+    eventTree.hitTestTree.emplace_back(std::move(frameNodeSnap));
+
+    auto gestureSnapshot = AceType::MakeRefPtr<GestureSnapshot>();
+    gestureSnapshot->type = "SwipeRecognizer";
+    gestureSnapshot->nodeId = 200;
+    gestureSnapshot->stateHistory.emplace_back(StateRecord("Down", "", "waiting", "reject", 0));
+    gestureSnapshot->stateHistory.emplace_back(StateRecord("Move", "move_extra", "active", "accept", 0));
+    gestureSnapshot->stateHistory.emplace_back(StateRecord("Cancel", "cancel_extra", "fail", "reject", 0));
+
+    eventTree.gestureTree[2].emplace_back(gestureSnapshot);
+    eventManager->eventTree_.eventTreeList.emplace_back(std::move(eventTree));
+
+    auto& stateHistory = eventManager->eventTree_.eventTreeList.back().gestureTree[2].back()->stateHistory;
+    size_t sizeBefore = stateHistory.size();
+
+    eventManager->LogTouchTestRecognizerStates(2);
+
+    EXPECT_EQ(stateHistory.size(), sizeBefore);
+    EXPECT_EQ(stateHistory.front().procedure, "Down");
+    EXPECT_EQ(stateHistory.front().extraInfo, "");
+    EXPECT_EQ(stateHistory.back().procedure, "Cancel");
+    EXPECT_EQ(stateHistory.back().extraInfo, "cancel_extra");
 }
 } // namespace OHOS::Ace::NG

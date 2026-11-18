@@ -2743,7 +2743,7 @@ typedef enum {
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
      * .value[0].f32: line spacing, in fp.\n
      * <li>?.object: Optional. Pointer to {@link OH_ArkUI_NativeModule_LineSpacingOptions} object for line spacing
-     * options. Available since API version 26.0.0.
+     * options. Available since API version 26.0.1.
      * Use {@link OH_ArkUI_NativeModule_LineSpacingOptions_Create} to create and
      * {@link OH_ArkUI_NativeModule_LineSpacingOptions_Destroy} to destroy the object.</li>
      * </ul>
@@ -2752,7 +2752,7 @@ typedef enum {
      * <ul>
      * <li>.value[0].f32: line spacing, in fp.</li>
      * <li>.object: pointer to {@link OH_ArkUI_NativeModule_LineSpacingOptions} object for line spacing options.
-     * Available since API version 26.0.0.</li>
+     * Available since API version 26.0.1.</li>
      * </ul>
      *
      */
@@ -3285,6 +3285,8 @@ typedef enum {
      * .value[2].f32: radius of the upper right corner, in vp. \n
      * .value[3].f32: radius of the lower left corner, in vp. \n
      * .value[4].f32: radius of the lower right corner, in vp. \n
+     * .value[5]?.f32: text background border width, in vp. Optional. The default value is <b>0</b>. This parameter is supported since API version 26.1.0. \n
+     * .value[6]?.u32: text background border color, in 0xARGB format. Optional. The default value is <b>0x00000000</b> (transparent). This parameter is supported since API version 26.1.0. \n
      * \n
      * Format of the return value {@link ArkUI_AttributeItem}:\n
      * .value[0].u32: color of the text background, in 0xARGB format. \n
@@ -3292,6 +3294,8 @@ typedef enum {
      * .value[2].f32: radius of the upper right corner, in vp. \n
      * .value[3].f32: radius of the lower left corner, in vp. \n
      * .value[4].f32: radius of the lower right corner, in vp. \n
+     * .value[5].f32: text background border width, in vp. This parameter is supported since API version 26.1.0. \n
+     * .value[6].u32: text background border color, in 0xARGB format. This parameter is supported since API version 26.1.0. \n
      *
      */
     NODE_SPAN_TEXT_BACKGROUND_STYLE,
@@ -8304,7 +8308,7 @@ typedef enum {
      *
      * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
      * <ul>
-     * <li>.value[0].i32 Whether to enable scrolling with keyboard arrow keys, 0: no, 1: yes. The default value is 1.
+     * <li>.value[0].i32 Whether to enable scrolling with keyboard arrow keys, 0: no, 1: yes. The default value is 0.
      * </li>
      * </ul>
      *
@@ -9494,6 +9498,11 @@ typedef enum {
      * If value[3] is negative, it will offset further towards the top.
      * This parameter is supported since API version 23. \n
      *
+     * .value[4]?.i32: fast scroll mode for WaterFlow. The value <b>0</b> disables optimization, <b>1</b> skips
+     * intermediate item measurement, and <b>2</b> skips intermediate item creation and measurement.
+     * Other values disable optimization. The default value is <b>0</b>. This option takes effect only when
+     * .value[1] is <b>1</b> and the layout mode is SLIDING_WINDOW, and then .value[3] is converted from vp once.
+     * This parameter is supported since API version 26.1.0. \n
      */
     NODE_WATER_FLOW_SCROLL_TO_INDEX,
 
@@ -10340,6 +10349,32 @@ typedef enum {
      * @since 26.0.0
      */
     NODE_PICKER_ITEM_HEIGHT = 1018005,
+
+    /**
+     * @brief Text style of the selected item in the picker component. This attribute can be set, reset, and
+     * obtained as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.object: text style of the selected item. The parameter type is {@link ArkUI_PickerComponentTextStyle}.
+     * Use {@link OH_ArkUI_PickerComponentTextStyle_Create} to create the instance, set properties through
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetColor}, {@link OH_ArkUI_PickerComponentTextStyle_SetFontSize},
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetFontWeight}, {@link OH_ArkUI_PickerComponentTextStyle_SetMinFontSize},
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize}, and {@link OH_ArkUI_PickerComponentTextStyle_SetOverflow},
+     * and then pass the pointer to **.object**. After the setting is complete, call
+     * {@link OH_ArkUI_PickerComponentTextStyle_Dispose} to dispose of the instance. When not set, the system default
+     * style is used.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.object: text style of the selected item. The parameter type is {@link ArkUI_PickerComponentTextStyle}.</li>
+     * </ul>
+     *
+     * @ingroup Picker
+     * @since 26.1.0
+     */
+    NODE_PICKER_SELECTED_TEXT_STYLE = 1018007,
 
     /**
      * @brief Sets the digital crown sensitivity of the ArcList component. This attribute can be set, reset, and obtained as
@@ -14540,14 +14575,17 @@ int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
 
 /**
  * @brief Sets the overlay position compensation from an adopted child to its adopt parent. The compensation
- * represents the aggregate effect of the render-only nodes between them. A point is first translated by
- * @p compensationOffset and then transformed by @p compensationTransform. The child must have been adopted with
+ * represents the aggregate effect of the render-only nodes between them. @p compensationOffset is the aggregate
+ * layout offset used by calculations that do not apply transforms. @p compensationTransform is the complete
+ * transform, including that layout offset, used by transform-aware calculations. A calculation uses only the
+ * representation appropriate to its coordinate semantics. The child must have been adopted with
  * {@link OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN}.
  *
  * @param adoptedChild The adopted child node on which the compensation is stored.
- * @param compensationOffset The aggregate x/y offset, in px, of the intermediate render-only nodes.
- * @param compensationTransform The aggregate transform of the intermediate render-only nodes. The matrix is copied
- * by this call.
+ * @param compensationOffset The aggregate untransformed x/y layout offset, in px, of the intermediate render-only
+ * nodes.
+ * @param compensationTransform The complete aggregate transform of the intermediate render-only nodes, including
+ * their layout offset. The matrix is copied by this call.
  * @return Error code.
  *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
  *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid.
@@ -15332,6 +15370,70 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_GetChildMountPolicy(ArkUI_NodeHandle node,
  * @since 26.1.0
  */
 ArkUI_ErrorCode OH_ArkUI_NodeUtils_SetUiDvsyncSwitch(ArkUI_ContextHandle context, bool enable);
+
+/**
+ * @brief Registers an inspector tree getter callback on the specified node.
+ *
+ * component tree information to the ArkUI inspector. When the inspector traverses the
+ * component tree and encounters a node with a registered callback, it invokes
+ * <b>getInspectorTree</b> to obtain the external component subtree and merges the result
+ * into the complete inspector tree output.
+ *
+ * one more inspector tree getter callback can be registered for the same node.
+ * @see {@link OH_ArkUI_NativeModule_UnregisterInspectorTreeGetter} for unregister inspector tree getter.
+ *
+ * @param node [in] Indicates the host node of the third-party framework.
+ *              Only <b>ARKUI_NODE_XCOMPONENT</b> and <b>ARKUI_NODE_CUSTOM</b>
+ *              and <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b> nodes are supported.
+ * @param userData [in] Indicates the custom data to be saved. This value is passed back
+ *                  as the <b>userData</b> parameter when the <b>getInspectorTree</b> 
+ *                  callback is invoked.
+ * @param getInspectorTree [in] Indicates the callback function invoked by the inspector
+ *                          to obtain the component subtree of the third-party framework.
+ *                          The <b>inspectorTree</b> output should be a JSON string
+ *                          in a format consistent with the ArkUI inspector output.
+ *                          The memory for the string is allocated by the callback
+ *                          implementation and should be freed by the caller using
+ *                          <b>free()</b>.
+ * @return Error code.
+ *         <ul><li>{@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         </li><li>{@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} Failed to initialize the CAPI.
+ *         </li><li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} Function parameter exception,
+ *         or the node type is not <b>ARKUI_NODE_XCOMPONENT</b> or <b>ARKUI_NODE_CUSTOM</b>
+ *         or <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b>
+ *         or getInspectorTree is null.</li></ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_RegisterInspectorTreeGetter(ArkUI_NodeHandle node,
+    void* userData, void (*getInspectorTree)(void* userData, char** inspectorTree));
+
+/**
+ * @brief Unregister the inspector tree getter callback on the specified node.
+ *
+ * After unregistration, the inspector will no longer invoke the callback
+ * when traversing this node. The <b>userData</b> previously passed to
+ * {@link OH_ArkUI_NativeModule_RegisterInspectorTreeGetter} is not released
+ * by this function; the caller is responsible for freeing it.
+ *
+ * @param node [in] Indicates the target node. Only <b>ARKUI_NODE_XCOMPONENT</b> and
+ *              <b>ARKUI_NODE_CUSTOM</b> and <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b> nodes are supported.
+ * @param getInspectorTree [in] Indicates the callback function pointer to unregister. This must be
+ *                          the same function pointer that was passed to
+ *                          {@link OH_ArkUI_NativeModule_RegisterInspectorTreeGetter} during
+ *                          registration. If the pointer does not match any registered callback
+ *                          on the node, the operation has no effect. If the pointer is null, all callbacks
+ *                          of the node will be unregistered.
+ * @return Error code.
+ *         <ul><li>{@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         </li><li>{@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} Failed to initialize the CAPI.
+ *         </li><li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} Function parameter exception,
+ *         or the node type is not <b>ARKUI_NODE_XCOMPONENT</b> or <b>ARKUI_NODE_CUSTOM</b>
+ *         or <b>ARKUI_NODE_XCOMPONENT_TEXTURE</b>
+ *         or getInspectorTree is not registered.</li></ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UnregisterInspectorTreeGetter(ArkUI_NodeHandle node,
+    void (*getInspectorTree)(void* userData, char** inspectorTree));
 
 #ifdef __cplusplus
 }

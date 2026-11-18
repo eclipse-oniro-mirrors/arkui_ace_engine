@@ -41,7 +41,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto paintProperty = MakeRefPtr<DragBarPaintProperty>();
-        paintProperty->PaintProperty::UpdatePaintProperty(AceType::DynamicCast<PaintProperty>(this));
+        paintProperty->PaintProperty::UpdatePaintProperty(this);
         paintProperty->propPanelMode_ = ClonePanelMode();
         paintProperty->propBarLeftPoint_ = CloneBarLeftPoint();
         paintProperty->propBarCenterPoint_ = CloneBarCenterPoint();

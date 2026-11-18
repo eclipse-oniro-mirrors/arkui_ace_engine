@@ -359,6 +359,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_GetNavDestinationAniParam(ArkUI_NodeHandle
 int32_t OH_ArkUI_NativeModule_GetDrawableDescriptorFromAniValue(
     ani_env* env, ani_object value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetDrawableDescriptorFromAniValue");
     CHECK_NULL_RETURN_WITH_MESSAGE(env, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "env is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(value, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "value is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
@@ -383,6 +384,7 @@ int32_t OH_ArkUI_NativeModule_GetDrawableDescriptorFromAniValue(
 int32_t OH_ArkUI_NativeModule_GetDrawableDescriptorFromResourceAniValue(
     ani_env* env, ani_object value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetDrawableDescriptorFromResourceAniValue");
     CHECK_NULL_RETURN_WITH_MESSAGE(env, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "env is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(value, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "value is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,

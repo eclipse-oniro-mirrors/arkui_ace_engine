@@ -685,7 +685,7 @@ bool SliderPattern::InitAccessibilityVirtualNode()
     UpdateStepAccessibilityVirtualNode();
     UpdateParentNodeSize();
     parentAccessibilityNode_->SetAccessibilityNodeVirtual();
-    parentAccessibilityNode_->SetAccessibilityVirtualNodeParent(AceType::DynamicCast<NG::UINode>(host));
+    parentAccessibilityNode_->SetAccessibilityVirtualNodeParent(host);
     parentAccessibilityNode_->SetFirstAccessibilityVirtualNode();
 
     FrameNode::ProcessOffscreenNode(parentAccessibilityNode_);
@@ -3297,6 +3297,27 @@ void SliderPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
     }
 }
 
+void SliderPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.interactionInfo) {
+        return;
+    }
+    auto paintProperty = GetPaintProperty<SliderPaintProperty>();
+    CHECK_NULL_VOID(paintProperty);
+    if (paintProperty->HasValue()) {
+        json->Put("value", std::to_string(paintProperty->GetValue().value()).c_str());
+    }
+    if (paintProperty->HasMin()) {
+        json->Put("min", std::to_string(paintProperty->GetMin().value()).c_str());
+    }
+    if (paintProperty->HasMax()) {
+        json->Put("max", std::to_string(paintProperty->GetMax().value()).c_str());
+    }
+    if (paintProperty->HasStep()) {
+        json->Put("step", std::to_string(paintProperty->GetStep().value()).c_str());
+    }
+}
+
 void SliderPattern::DumpSubInfo(RefPtr<SliderPaintProperty> paintProperty)
 {
     auto layoutProperty = GetLayoutProperty<SliderLayoutProperty>();
@@ -3414,6 +3435,11 @@ bool SliderPattern::ParseCommand(const std::string& command, float& value)
     }
     value = static_cast<float>(valueJson->GetDouble());
     return true;
+}
+
+CommandResult SliderPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onSliderChange" }, CommandErrorType::EXECUTE_FAIL);
 }
 
 int32_t SliderPattern::OnInjectionEvent(const std::string& command)
@@ -4300,12 +4326,14 @@ void SliderPattern::ApplyDragFrameNodeSystemMaterial()
     float dipScale = static_cast<float>(pipeline->GetDipScale());
     auto renderContext = dragFrameNode_->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    auto filter = renderContext->CreateFrostedGlassFilter(dragFrameMaterialParam, dipScale);
+    auto filter = renderContext->CreateFrostedGlassFilter(dragFrameMaterialParam, dipScale, nullptr);
     if (filter) {
         renderContext->SetMaterialWithQualityLevel(filter, UiMaterialFilterQuality::DEFAULT);
         auto shadow = MaterialUtils::GetImmersiveShadow(dipScale * 0.8);
         shadow.SetColor(Color(0x1F050505));
         renderContext->UpdateBackShadow(shadow);
+
+        pipeline->AddTaskOverlayNodeMaterialArea(dragFrameNode_, "Slider HandleHighGradeLongPress");
     }
     ResetHostMaterialEffects();
 }
@@ -4335,7 +4363,9 @@ void SliderPattern::ResetHostMaterialEffectsInner()
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
 
-    MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
+    if (!MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr)) {
+        ViewAbstract::SetSystemMaterialImmediate(AceType::RawPtr(host), nullptr);
+    }
     renderContext->UpdateUiMaterialFilter(nullptr);
 
     auto preBackgroundColor = renderContext->GetPreBackgroundColor();
@@ -4496,7 +4526,7 @@ void SliderPattern::HandleHighGradeLongPress()
 
     auto blockRadius = GetBlockRadius();
     UpdateMaterialNodePosition(circleCenter_.GetX(), circleCenter_.GetY(), blockRadius, false);
-    
+
     auto frameRC = dragFrameNode_->GetRenderContext();
     CHECK_NULL_VOID(frameRC);
 

@@ -16,8 +16,6 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_BASE_LAYOUT_GRID_SYSTEM_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_BASE_LAYOUT_GRID_SYSTEM_MANAGER_H
 
-#include <mutex>
-
 #include "base/geometry/dimension.h"
 #include "base/memory/ace_type.h"
 #include "core/components/common/layout/grid_layout_info.h"
@@ -77,9 +75,6 @@ public:
 
 private:
     GridSystemManager() = default;
-
-    static GridSystemManager* instance_;
-    static std::mutex mutex_;
 
     ACE_DISALLOW_COPY_AND_MOVE(GridSystemManager);
 };

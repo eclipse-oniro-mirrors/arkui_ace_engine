@@ -67,6 +67,7 @@ class FocusHub;
 class LayoutWrapperNode;
 class FrameNode;
 class CustomNode;
+struct InspectorGetterEntry;
 
 struct ExtraInfo {
     std::string page;
@@ -245,6 +246,14 @@ public:
         return false;
     }
 
+    // Determine if the node can host an external inspector subtree getter
+    // (registration-time host-type policy). CustomNode overrides this to
+    // return true; XComponent hosts are identified by tag instead.
+    virtual bool IsInspectorSubtreeHost() const
+    {
+        return false;
+    }
+
     void UpdateModalUiextensionCount(bool addNode);
 
     int32_t TotalChildCount() const;
@@ -305,9 +314,11 @@ public:
 
     int32_t GetChildIndexById(int32_t id);
 
-    RefPtr<UINode> GetParent() const
+    // Cross the adopt boundary only when explicitly requested; ordinary parents take precedence.
+    RefPtr<UINode> GetParent(bool crossAdoptBoundary = false) const
     {
-        return parent_.Upgrade();
+        auto parent = parent_.Upgrade();
+        return parent || !crossAdoptBoundary ? parent : adoptParent_.Upgrade();
     }
 
     RefPtr<UINode> GetAdoptParent() const
@@ -373,12 +384,10 @@ public:
     void DumpSimplifyTreeBase(std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTreeNode(std::shared_ptr<JsonValue>& current, ParamConfig config);
-#ifndef CROSS_PLATFORM
     void DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<JsonValue>& current,
         bool onlyNeedVisible, ParamConfig config = ParamConfig(),
         std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker = nullptr,
         double parentFinalOpacity = DEFAULT_NODE_OPACITY);
-#endif
     virtual bool IsContextTransparent();
 
     bool DumpTreeById(int32_t depth, const std::string& id, bool hasJson = false);
@@ -869,6 +878,17 @@ public:
     int32_t GetInstanceId() const
     {
         return instanceId_;
+    }
+
+    // External inspector-tree getter entry bound to this node (managed by
+    // InspectorTreeProviderRegistry; lifecycle follows the node).
+    InspectorGetterEntry* GetInspectorGetterEntry() const
+    {
+        return inspectorGetterEntry_;
+    }
+    void SetInspectorGetterEntry(InspectorGetterEntry* entry)
+    {
+        inspectorGetterEntry_ = entry;
     }
 
     static std::set<std::string> GetLayoutTags()
@@ -1379,11 +1399,9 @@ protected:
 private:
     struct RectCullingState;
 
-#ifndef CROSS_PLATFORM
     void DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr<JsonValue>& current, bool onlyNeedVisible,
         ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
         double parentFinalOpacity, const RectCullingState& rectCullingState);
-#endif
     RectCullingState CreateRectCullingState(bool onlyNeedVisible, ParamConfig config);
     RectCullingState CreateChildRectCullingState(const RectCullingState& rectCullingState);
     bool IsCulledByRect(const RectCullingState& rectCullingState, bool hasInspectableChildren);
@@ -1471,6 +1489,7 @@ private:
     bool isNodeAdapter_ = false;
 
     int32_t restoreId_ = -1;
+    InspectorGetterEntry* inspectorGetterEntry_ = nullptr;
 
     bool useOffscreenProcess_ = false;
 

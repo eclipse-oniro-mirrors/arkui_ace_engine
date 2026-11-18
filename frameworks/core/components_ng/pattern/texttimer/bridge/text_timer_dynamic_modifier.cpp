@@ -222,14 +222,16 @@ void SetFormat(ArkUINodeHandle node, ArkUI_CharPtr format)
     std::regex pattern("(([YyMdD]+))");
     if (std::regex_search(formatStr, result, pattern)) {
         if (!result.empty()) {
-            formatStr = DEFAULT_FORMAT;
+            TextTimerModelNG::ResetFormat(frameNode);
+            return;
         }
     }
 
     std::string target = "HmsS:.";
     for (auto ch : formatStr) {
         if (target.find(ch) == std::string::npos) {
-            formatStr = DEFAULT_FORMAT;
+            TextTimerModelNG::ResetFormat(frameNode);
+            return;
         }
     }
 
@@ -244,7 +246,7 @@ void ResetFormat(ArkUINodeHandle node)
 {
     auto* frameNode = GetFrameNode(node);
     CHECK_NULL_VOID(frameNode);
-    TextTimerModelNG::SetFormat(frameNode, DEFAULT_FORMAT);
+    TextTimerModelNG::ResetFormat(frameNode);
 }
 
 void SetTextShadow(ArkUINodeHandle node, struct ArkUITextShadowStruct* shadows, ArkUI_Uint32 length)

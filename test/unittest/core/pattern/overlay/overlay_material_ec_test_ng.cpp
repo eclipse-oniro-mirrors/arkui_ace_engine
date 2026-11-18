@@ -127,7 +127,9 @@ void OverlayMaterialECTestNg::SetUpTestCase()
 
 void OverlayMaterialECTestNg::TearDownTestCase()
 {
-    MockPipelineContext::GetCurrent()->themeManager_ = nullptr;
+    if (auto* mockPipeCtx = MockPipelineContext::GetCurrent().GetRawPtr()) {
+        mockPipeCtx->themeManager_ = nullptr;
+    }
     MockPipelineContext::TearDown();
     MockContainer::TearDown();
 }
@@ -892,7 +894,8 @@ HWTEST_F(OverlayMaterialECTestNg, MaterialUtilsIsMaterialEnabled001, TestSize.Le
 HWTEST_F(OverlayMaterialECTestNg, ImmersiveMaterialConfig001, TestSize.Level1)
 {
     ImmersiveMaterialConfig config;
-    EXPECT_EQ(config.materialColor, Color());
+    // materialColor is std::optional<Color>, default nullopt (see ui_material.h)
+    EXPECT_EQ(config.materialColor, std::nullopt);
     EXPECT_FALSE(config.colorInvert);
     EXPECT_TRUE(config.applyShadow);
     EXPECT_FLOAT_EQ(config.dipScale, 1.0f);
@@ -913,6 +916,25 @@ HWTEST_F(OverlayMaterialECTestNg, ImmersiveMaterialConfig002, TestSize.Level1)
 
     config1.materialColor = Color(0xFFFF0000);
     EXPECT_FALSE(config1 == config2);
+}
+
+/**
+ * @tc.name: ImmersiveMaterialConfig_ColorBlendModeNotEqual
+ * @tc.desc: Test operator== returns false when only colorBlendMode differs
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayMaterialECTestNg, ImmersiveMaterialConfig_ColorBlendModeNotEqual, TestSize.Level1)
+{
+    ImmersiveMaterialConfig config1;
+    ImmersiveMaterialConfig config2;
+    EXPECT_TRUE(config1 == config2);
+
+    config1.colorBlendMode = MaterialColorBlendMode::TINTED_GLASS;
+    config2.colorBlendMode = MaterialColorBlendMode::LINEAR_MIX;
+    EXPECT_FALSE(config1 == config2);
+
+    config2.colorBlendMode = MaterialColorBlendMode::TINTED_GLASS;
+    EXPECT_TRUE(config1 == config2);
 }
 
 /**
@@ -1344,13 +1366,16 @@ HWTEST_F(OverlayMaterialECTestNg, OverlayManagerDismissTarget002, TestSize.Level
  */
 HWTEST_F(OverlayMaterialECTestNg, SheetManagerSetDismissSheet001, TestSize.Level1)
 {
-    EXPECT_EQ(SheetManager::GetInstance().GetDismissSheet(), 0);
+    // NOTE: SheetManager is a process-wide singleton; other suites in this binary may have
+    // left a non-zero value (order dependent). Verify the write/read-back roundtrip instead
+    // of asserting the initial state.
+    auto originDismissId = SheetManager::GetInstance().GetDismissSheet();
 
     SheetManager::GetInstance().SetDismissSheet(42);
     EXPECT_EQ(SheetManager::GetInstance().GetDismissSheet(), 42);
 
-    // cleanup
-    SheetManager::GetInstance().SetDismissSheet(0);
+    // cleanup: restore previous value
+    SheetManager::GetInstance().SetDismissSheet(originDismissId);
 }
 
 /**
@@ -1708,7 +1733,7 @@ HWTEST_F(OverlayMaterialECTestNg, MaterialUtilsGetUiMaterialShaderECSub001, Test
 {
     ImmersiveMaterialConfig config;
     std::shared_ptr<Rosen::RSNGShaderBase> shader;
-    bool result = MaterialUtils::GetUiMaterialShaderECSub(config, shader);
+    bool result = MaterialUtils::GetUiMaterialShaderECSub(config, shader, nullptr);
     EXPECT_FALSE(result);
 }
 

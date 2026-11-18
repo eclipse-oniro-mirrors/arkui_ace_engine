@@ -1516,8 +1516,8 @@ HWTEST_F(ScrollBarTestNg, IsFreeScrollTest002, TestSize.Level1)
 
 /**
  * @tc.name: ScrollBarInteractiveBranch001
- * @tc.desc: Rect ScrollBar GetScrollBarInteractive returns true/false purely from scrollBarInteractive_, covering
- *           the shapeMode_ == ShapeMode::ROUND false branch of the || expression.
+ * @tc.desc: Rect ScrollBar GetScrollBarInteractive returns true/false from scrollBarInteractive_, covering the
+ *           shapeMode_ == ShapeMode::RECT branch of the ternary expression.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollBarTestNg, ScrollBarInteractiveBranch001, TestSize.Level1)
@@ -1534,15 +1534,58 @@ HWTEST_F(ScrollBarTestNg, ScrollBarInteractiveBranch001, TestSize.Level1)
     auto scrollBar = pattern_->scrollBar_;
     EXPECT_EQ(scrollBar->GetShapeMode(), ShapeMode::RECT);
 
-    // scrollBarInteractive_=true, shapeMode!=ROUND -> true
+    // RECT + scrollBarInteractive_=true -> true
     scrollBar->SetScrollBarInteractive(true);
     EXPECT_TRUE(scrollBar->GetScrollBarInteractive());
 
-    // scrollBarInteractive_=false, shapeMode!=ROUND -> false (the ROUND-branch is not taken)
+    // RECT + scrollBarInteractive_=false -> false
     scrollBar->SetScrollBarInteractive(false);
     EXPECT_FALSE(scrollBar->GetScrollBarInteractive());
 
     Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: ScrollBarInteractiveByShapeMode001
+ * @tc.desc: Only RECT ScrollBar is controlled by scrollBarInteractive_; ROUND and DEFAULT stay interactive.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarTestNg, ScrollBarInteractiveByShapeMode001, TestSize.Level1)
+{
+    auto scrollBar = AceType::MakeRefPtr<ScrollBar>();
+    ASSERT_NE(scrollBar, nullptr);
+
+    scrollBar->SetScrollBarInteractive(false);
+    scrollBar->SetShapeMode(ShapeMode::RECT);
+    EXPECT_FALSE(scrollBar->GetScrollBarInteractive());
+
+    scrollBar->SetShapeMode(ShapeMode::ROUND);
+    EXPECT_TRUE(scrollBar->GetScrollBarInteractive());
+
+    scrollBar->SetShapeMode(ShapeMode::DEFAULT);
+    EXPECT_TRUE(scrollBar->GetScrollBarInteractive());
+
+    scrollBar->SetScrollBarInteractive(true);
+    scrollBar->SetShapeMode(ShapeMode::RECT);
+    EXPECT_TRUE(scrollBar->GetScrollBarInteractive());
+}
+
+/**
+ * @tc.name: ScrollBarInteractiveByShapeMode002
+ * @tc.desc: ROUND and DEFAULT ScrollBars stay interactive when scrollBarInteractive_ is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarTestNg, ScrollBarInteractiveByShapeMode002, TestSize.Level1)
+{
+    auto scrollBar = AceType::MakeRefPtr<ScrollBar>();
+    ASSERT_NE(scrollBar, nullptr);
+    scrollBar->SetScrollBarInteractive(true);
+
+    scrollBar->SetShapeMode(ShapeMode::ROUND);
+    EXPECT_TRUE(scrollBar->GetScrollBarInteractive());
+
+    scrollBar->SetShapeMode(ShapeMode::DEFAULT);
+    EXPECT_TRUE(scrollBar->GetScrollBarInteractive());
 }
 
 /**

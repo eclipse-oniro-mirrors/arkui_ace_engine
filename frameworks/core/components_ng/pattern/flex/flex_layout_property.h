@@ -78,7 +78,7 @@ protected:
     void Clone(RefPtr<LayoutProperty> property) const override
     {
         auto value = DynamicCast<FlexLayoutProperty>(property);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFlexLayoutAttribute_ = CloneFlexLayoutAttribute();
         value->propWrapLayoutAttribute_ = CloneWrapLayoutAttribute();
     }

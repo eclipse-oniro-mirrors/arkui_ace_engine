@@ -67,8 +67,6 @@ public:
     ModalUIExtensionCallbacks GetModalUIExtensionCallbacks(bool firstTry);
 #endif
     static void BuildAppbar(RefPtr<PipelineBase> pipleline);
-    static void RegistAppBarNodeBuilder(
-        std::function<RefPtr<FrameNode>(NG::AppBarView* appBar, const RefPtr<FrameNode>& stage)> appBarNodeBuilder);
     static int32_t AddRectChangeListener(
         const RefPtr<PipelineContext>& pipelineContext, std::function<void(const RectF& rect)>&& listener);
     static void RemoveRectChangeListener(const RefPtr<PipelineContext>& pipelineContext, int32_t id);
@@ -125,7 +123,6 @@ private:
 
     WeakPtr<FrameNode> atomicService_;
     RefPtr<FrameNode> contentStage_;
-    static std::function<RefPtr<FrameNode>(NG::AppBarView* appBar, const RefPtr<FrameNode>& stage)> appBarNodeBuilder_;
     int64_t lastRectChangeTime_ = 0;
     void* rectChangeCallbackRef_ = nullptr;
     RectCallbackDeleter rectCallbackDeleter_ = nullptr;

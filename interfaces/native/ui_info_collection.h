@@ -73,6 +73,51 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectVisualProperti
     OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectFunctionalProperties(
     OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+/**
+ * Filters fully occluded nodes out of the returned tree.
+ *
+ * Filtering is disabled by default and can be enabled only for visible-tree requests. Enabling occlusion
+ * filtering may add substantial computational overhead to collection. Disabling this option does not disable
+ * visibility, clipping, off-screen, or fully transparent node filtering.
+ *
+ * The occluder opacity threshold is configured separately by
+ * OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold. Changing this option does not change
+ * that threshold.
+ *
+ * @param request [in] The request to configure. It must not be NULL.
+ * @param enabled [in] true to enable occlusion filtering; false to disable it.
+ * @return <ul>
+ *     <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the option is set successfully. Setting false for a full-tree
+ *         request also succeeds.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if request is NULL.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED} if enabled is true for a full-tree
+ *         request. The request remains unchanged. Use a visible-tree request to enable this option.</li>
+ *     </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+/**
+ * Sets the minimum final opacity for a node to participate as an occluder.
+ *
+ * The default value is 1.0. The option is supported only for visible-tree requests. A target node is removed
+ * only when the union of qualifying occluder regions fully covers its effective visible region.
+ *
+ * This threshold does not take effect unless the filter option is enabled by
+ * OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterOccludedNodes.
+ *
+ * @param request [in] UI tree collection request.
+ * @param threshold [in] The opacity threshold in the range [0.0, 1.0].
+ * @return <ul>
+ *     <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the threshold is set successfully.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if the request is NULL.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_PARAM_OUT_OF_RANGE} if the threshold is outside the valid range.</li>
+ *     <li>{@link ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED} if the request is for a full tree.</li>
+ *     </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetOcclusionOpacityThreshold(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, float threshold);
 
 /** UI thread only. Failure clears a valid output slot; no partial tree is returned. */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentGetTreeJson(ArkUI_ContextHandle context,

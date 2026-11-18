@@ -100,12 +100,14 @@ function loadComponent(): ComponentObj | undefined {
             super(value);
         }
         applyPeer(node: any, reset: boolean): void {
+            const progress = getUINativeModule().progress;
+            const value = this.value;
             if (reset) {
-                getUINativeModule().progress.resetProgressInitialize(node);
+                progress.resetProgressInitialize(node);
             }
             else {
-                getUINativeModule().progress.setProgressInitialize(
-                    node, this.value.value, this.value.total, this.value.style, this.value.type);
+                progress.setProgressInitialize(
+                    node, value.value, value.total, value.style, value.type);
             }
         }
     }
@@ -149,35 +151,37 @@ function loadComponent(): ComponentObj | undefined {
 
     class ProgressStyleModifier extends ModifierWithKey<any> {
         applyPeer(node: any, reset: boolean): void {
+            const progress = getUINativeModule().progress;
             if (reset) {
-                getUINativeModule().progress.resetProgressStyle(node);
+                progress.resetProgressStyle(node);
             }
             else {
-                let strokeWidth = this.value?.strokeWidth;
-                let scaleCount = this.value?.scaleCount;
-                let scaleWidth = this.value?.scaleWidth;
-                let enableSmoothEffect = this.value?.enableSmoothEffect;
-                let borderColor = this.value?.borderColor;
-                let borderWidth = this.value?.borderWidth;
-                let content = this.value?.content;
+                const value = this.value;
+                let strokeWidth = value?.strokeWidth;
+                let scaleCount = value?.scaleCount;
+                let scaleWidth = value?.scaleWidth;
+                let enableSmoothEffect = value?.enableSmoothEffect;
+                let borderColor = value?.borderColor;
+                let borderWidth = value?.borderWidth;
+                let content = value?.content;
                 let fontSize;
                 let fontWeight;
                 let fontFamily;
                 let fontStyle;
-                if (this.value?.font) {
-                    fontSize = this.value.font.size;
-                    fontWeight = this.value.font.weight;
-                    fontFamily = this.value.font.family;
-                    fontStyle = this.value.font.style;
+                if (value?.font) {
+                    fontSize = value.font.size;
+                    fontWeight = value.font.weight;
+                    fontFamily = value.font.family;
+                    fontStyle = value.font.style;
                 }
-                let fontColor = this.value?.fontColor;
-                let enableScanEffect = this.value?.enableScanEffect;
-                let showDefaultPercentage = this.value?.showDefaultPercentage;
-                let shadow = this.value?.shadow;
-                let status = this.value?.status;
-                let strokeRadius = this.value?.strokeRadius;
-                let borderRadius = this.value?.borderRadius;
-                getUINativeModule().progress.setProgressStyle(node, strokeWidth, scaleCount,
+                let fontColor = value?.fontColor;
+                let enableScanEffect = value?.enableScanEffect;
+                let showDefaultPercentage = value?.showDefaultPercentage;
+                let shadow = value?.shadow;
+                let status = value?.status;
+                let strokeRadius = value?.strokeRadius;
+                let borderRadius = value?.borderRadius;
+                progress.setProgressStyle(node, strokeWidth, scaleCount,
                     scaleWidth, enableSmoothEffect, borderColor, borderWidth, content, fontSize,
                     fontWeight, fontFamily, fontStyle, fontColor, enableScanEffect, showDefaultPercentage,
                     shadow, status, strokeRadius, borderRadius);

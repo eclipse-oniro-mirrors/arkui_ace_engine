@@ -390,6 +390,26 @@ int32_t OH_NativeXComponent_DetachNativeRootNode(
         component->DetachNativeRootNode(root->uiNodeHandle), OH_NATIVEXCOMPONENT_RESULT_SUCCESS, __FUNCTION__);
 }
 
+int32_t OH_NativeXComponent_RegisterSurfaceShowCallback(
+    OH_NativeXComponent* component, void (*callback)(OH_NativeXComponent* component, void* window))
+{
+    if (component == nullptr || callback == nullptr) {
+        return ReturnNativeXComponentParamError(__FUNCTION__, "component or callback is null");
+    }
+    return ReturnResultWithFunctionName(
+        component->RegisterSurfaceShowCallback(callback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS, __FUNCTION__);
+}
+
+int32_t OH_NativeXComponent_RegisterSurfaceHideCallback(
+    OH_NativeXComponent* component, void (*callback)(OH_NativeXComponent* component, void* window))
+{
+    if (component == nullptr || callback == nullptr) {
+        return ReturnNativeXComponentParamError(__FUNCTION__, "component or callback is null");
+    }
+    return ReturnResultWithFunctionName(
+        component->RegisterSurfaceHideCallback(callback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS, __FUNCTION__);
+}
+
 int32_t OH_NativeXComponent_RegisterUIInputEventCallback(OH_NativeXComponent* component,
     void (*callback)(OH_NativeXComponent* component, ArkUI_UIInputEvent* event, ArkUI_UIInputEvent_Type type),
     ArkUI_UIInputEvent_Type type)
@@ -411,26 +431,6 @@ int32_t OH_NativeXComponent_SetNeedSoftKeyboard(OH_NativeXComponent* component, 
     }
     return ReturnResultWithFunctionName(
         component->SetNeedSoftKeyboard(needSoftKeyboard), OH_NATIVEXCOMPONENT_RESULT_SUCCESS, __FUNCTION__);
-}
-
-int32_t OH_NativeXComponent_RegisterSurfaceShowCallback(
-    OH_NativeXComponent* component, void (*callback)(OH_NativeXComponent* component, void* window))
-{
-    if (component == nullptr || callback == nullptr) {
-        return ReturnNativeXComponentParamError(__FUNCTION__, "component or callback is null");
-    }
-    return ReturnResultWithFunctionName(
-        component->RegisterSurfaceShowCallback(callback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS, __FUNCTION__);
-}
-
-int32_t OH_NativeXComponent_RegisterSurfaceHideCallback(
-    OH_NativeXComponent* component, void (*callback)(OH_NativeXComponent* component, void* window))
-{
-    if (component == nullptr || callback == nullptr) {
-        return ReturnNativeXComponentParamError(__FUNCTION__, "component or callback is null");
-    }
-    return ReturnResultWithFunctionName(
-        component->RegisterSurfaceHideCallback(callback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS, __FUNCTION__);
 }
 
 int32_t OH_NativeXComponent_RegisterOnTouchInterceptCallback(
@@ -996,6 +996,18 @@ int32_t OH_ArkUI_SurfaceHolder_SetSurfaceConfig(
     config->surfaceHolders_.insert(surfaceHolder);
     return ReturnResultWithFunctionName(
         surfaceHolder->SetSurfaceConfig(config), OHOS::Ace::ERROR_CODE_NO_ERROR, __FUNCTION__);
+}
+
+int32_t OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle(
+    OH_NativeXComponent* component, bool isVisibilityLifecycle)
+{
+    CHECK_UI_THREAD("OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle");
+    if (component == nullptr) {
+        return ReturnArkUIParamError(__FUNCTION__, "component is null");
+    }
+    return ReturnResultWithFunctionName(
+        component->EnableSurfaceVisibilityLifecycle(isVisibilityLifecycle),
+        OHOS::Ace::ERROR_CODE_NO_ERROR, __FUNCTION__);
 }
 
 #ifdef __cplusplus

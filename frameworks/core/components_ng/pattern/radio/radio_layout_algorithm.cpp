@@ -114,9 +114,7 @@ void RadioLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 void RadioLayoutAlgorithm::InitializeParam(const RefPtr<FrameNode>& host)
 {
     CHECK_NULL_VOID(host);
-    auto pipeline = host->GetContext();
-    CHECK_NULL_VOID(pipeline);
-    auto radioTheme = pipeline->GetTheme<RadioTheme>();
+    auto radioTheme = host->GetTheme<RadioTheme>(true);
     CHECK_NULL_VOID(radioTheme);
     defaultWidth_ = radioTheme->GetWidth().ConvertToPx();
     defaultHeight_ = radioTheme->GetHeight().ConvertToPx();

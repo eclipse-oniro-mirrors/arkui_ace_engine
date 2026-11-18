@@ -800,13 +800,13 @@ static ani_object AnimatorTransferStatic(ani_env *aniEnv, ani_object, ani_object
         return animatorObj;
     }
     if (ANI_OK != aniEnv->FindClass(className, &cls)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] find class fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] find class fail");
         return animatorObj;
     }
 
     ani_method ctor;
     if (ANI_OK != aniEnv->Class_FindMethod(cls, "<ctor>", nullptr, &ctor)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] find method fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] find method fail");
         return animatorObj;
     }
 
@@ -833,7 +833,11 @@ static ani_object AnimatorTransferStatic(ani_env *aniEnv, ani_object, ani_object
     animatorResult->SetMotion(motion);
     animatorResult->SetAnimatorOption(option);
     animatorResult->SetAnimator(animator);
-    aniEnv->Object_New(cls, ctor, &animatorObj, reinterpret_cast<ani_long>(animatorResult));
+    if (ANI_OK != aniEnv->Object_New(cls, ctor, &animatorObj, reinterpret_cast<ani_long>(animatorResult))) {
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] AnimatorTransfer create animatorResult fail");
+        delete animatorResult;
+        return animatorObj;
+    }
     return animatorObj;
 }
 
@@ -890,19 +894,28 @@ static void JSSetExpectedFrameRateRange(ani_env *env, ani_object obj, ani_object
     animator->SetExpectedFrameRateRange(frameRateRange);
 }
 
+static void NativeDestroy([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class cls, ani_long ptr)
+{
+    auto animatorResult = reinterpret_cast<AnimatorResult*>(ptr);
+    if (animatorResult == nullptr) {
+        return;
+    }
+    delete animatorResult;
+}
+
 ani_object ANICreate(ani_env *env, [[maybe_unused]] ani_object object, [[maybe_unused]] ani_object aniOption)
 {
     ani_object animatorObj = {};
     static const char *className = "@ohos.animator.AnimatorResultInner";
     ani_class cls;
     if (ANI_OK != env->FindClass(className, &cls)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] find class fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] find class fail");
         return animatorObj;
     }
 
     ani_method ctor;
     if (ANI_OK != env->Class_FindMethod(cls, "<ctor>", nullptr, &ctor)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] find method fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] find method fail");
         return animatorObj;
     }
 
@@ -919,7 +932,7 @@ ani_object ANICreate(ani_env *env, [[maybe_unused]] ani_object object, [[maybe_u
 
     // bind end with front object
     if (ANI_OK != env->Object_New(cls, ctor, &animatorObj, reinterpret_cast<ani_long>(animatorResult))) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] create animatorResult fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] create animatorResult fail");
         delete animatorResult;
         return animatorObj;
     }
@@ -1121,7 +1134,7 @@ ani_status BindAnimator(ani_env *env)
     static const char *className = "@ohos.animator.Animator";
     ani_class cls;
     if (ANI_OK != env->FindClass(className, &cls)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] Bind Animator fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] Bind Animator fail");
         return ANI_ERROR;
     }
 
@@ -1132,7 +1145,7 @@ ani_status BindAnimator(ani_env *env)
     };
 
     if (ANI_OK != env->Class_BindStaticNativeMethods(cls, methods.data(), methods.size())) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] Bind Animator static method fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] Bind Animator static method fail");
         return ANI_ERROR;
     };
     return ANI_OK;
@@ -1143,7 +1156,7 @@ ani_status BindAnimatorResult(ani_env *env)
     static const char *className = "@ohos.animator.AnimatorResultInner";
     ani_class cls;
     if (ANI_OK != env->FindClass(className, &cls)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] bind animator result fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] bind animator result fail");
         return ANI_ERROR;
     }
 
@@ -1165,15 +1178,16 @@ ani_status BindAnimatorResult(ani_env *env)
     };
 
     std::array staticMethods = {
-        ani_native_function{ "nativeTransferStatic", nullptr, reinterpret_cast<void*>(AnimatorTransferStatic)}
+        ani_native_function{ "nativeTransferStatic", nullptr, reinterpret_cast<void*>(AnimatorTransferStatic)},
+        ani_native_function{ "nativeDestroy", nullptr, reinterpret_cast<void*>(NativeDestroy)}
     };
 
     if (ANI_OK != env->Class_BindNativeMethods(cls, methods.data(), methods.size())) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] bind native method fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] bind native method fail");
         return ANI_ERROR;
     };
     if (ANI_OK != env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size())) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] bind static native static method fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] bind static native static method fail");
         return ANI_ERROR;
     };
     return ANI_OK;
@@ -1184,7 +1198,7 @@ ani_status BindSimpleAnimatorOptions(ani_env *env)
     static const char *className = "@ohos.animator.SimpleAnimatorOptions";
     ani_class cls;
     if (ANI_OK != env->FindClass(className, &cls)) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] bind SimpleAnimatorOptions result fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] bind SimpleAnimatorOptions result fail");
         return ANI_ERROR;
     }
 
@@ -1206,7 +1220,7 @@ ani_status BindSimpleAnimatorOptions(ani_env *env)
         };
 
     if (ANI_OK != env->Class_BindNativeMethods(cls, methods.data(), methods.size())) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "[ANI] bind SimpleAnimatorOptions native method fail");
+        TAG_LOGE(AceLogTag::ACE_ANIMATION, "[ANI] bind SimpleAnimatorOptions native method fail");
         return ANI_ERROR;
     };
     return ANI_OK;

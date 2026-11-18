@@ -110,9 +110,12 @@ class RecycleManager;
 class BackPressHandlerManager;
 class DragDropManager;
 class MaterialProcessor;
+enum class PageLogContainerType : int32_t;
 class DynamicComponentSafeManager;
 class EnvironmentManager;
 enum class FocusActiveReason : int32_t;
+enum class ExecutionState;
+enum class ProcessResult;
 
 enum class MockFlushEventType : int32_t {
     REJECT = -1,
@@ -272,7 +275,10 @@ public:
     // if return false, then this event needs platform to handle it.
     bool OnNonPointerEvent(const NonPointerEvent& event) override;
 
+    ProcessResult ProcessCommand(const std::string& command,
+        const std::function<void(ExecutionState)>& completion);
     void ProcessCommand(const std::string& command);
+    void ProcessCommandWithResult(const std::string& command, const std::function<void(const CommandResult&)>& finish);
 
     // ReDispatch KeyEvent from Web process.
     void ReDispatch(KeyEvent& keyEvent);
@@ -590,6 +596,12 @@ public:
 
     void RemoveWindowStateChangedCallback(int32_t nodeId);
 
+    void AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback);
+
+    void RemoveWindowVisibilityChangedCallback(int32_t nodeId);
+
+    void OnWindowVisibilityChanged(bool isVisible);
+
     void AddWindowFocusChangedCallback(int32_t nodeId);
 
     void RemoveWindowFocusChangedCallback(int32_t nodeId);
@@ -840,6 +852,8 @@ public:
     bool IsDragging() const override;
     void SetIsDragging(bool isDragging) override;
 
+    void SetTouchPadEventEnabled(bool enabled);
+
     void ResetDragging() override;
     const RefPtr<PostEventManager>& GetPostEventManager();
 
@@ -897,6 +911,11 @@ public:
     const RefPtr<ForceSplitManager>& GetForceSplitManager() const;
 
     const RefPtr<HandednessManager>& GetHandednessManager() const;
+
+    // Runtime control of the force split transPages behavior. Non-virtual forwarding
+    // helpers keep bridges free of direct force_split_manager.h includes.
+    void SetTransPageEnabled(bool enabled);
+    bool IsTransPageEnabled() const;
 
     const RefPtr<RecoverableManager>& GetRecoverableManager() const;
 
@@ -1346,6 +1365,13 @@ public:
     void RegisterMaterialNode(const RefPtr<FrameNode>& node);
     void UnregisterMaterialNode(int32_t nodeId);
 
+    void RegisterPageContextNode(const RefPtr<FrameNode>& node);
+    void UnregisterPageContextNode(int32_t nodeId);
+    void ReportPageContextStats(int32_t targetContainerId, PageLogContainerType type, int32_t tabIndex = -1);
+
+    void AddTaskOverlayNodeMaterialArea(const RefPtr<FrameNode>& targetNode, const std::string& source);
+    void ReportOverlayNodeMaterialArea(const RefPtr<FrameNode>& host, const std::string& source = "");
+
 protected:
     void StartWindowSizeChangeAnimate(int32_t width, int32_t height, WindowSizeChangeReason type,
         const std::shared_ptr<Rosen::RSTransaction>& rsTransaction = nullptr,
@@ -1474,6 +1500,8 @@ private:
     void CompensateTouchMoveEventBeforeDown(std::list<TouchEvent>& touchEvents);
 
     void DispatchMouseToTouchEvent(const MouseEvent& event, const RefPtr<FrameNode>& node);
+
+    void FinishOnMouseEvent(const MouseEvent& event, const MouseEvent& dispatchEvent, const RefPtr<FrameNode>& node);
 
     void CompensateMouseMoveEvent(const MouseEvent& event, const RefPtr<FrameNode>& node);
 
@@ -1774,6 +1802,7 @@ private:
     bool isRightMouseMappingActive_ = false;
     std::function<void()> onRightMouseMappingCancel_;
     std::unique_ptr<NG::UITreeRequestState> uiTreeRequestState_;
+    std::map<int32_t, std::function<void(bool)>> onWindowVisibilityChangedCallbacks_;
 };
 
 /**

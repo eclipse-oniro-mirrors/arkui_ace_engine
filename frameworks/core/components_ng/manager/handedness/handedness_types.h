@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_HANDEDNESS_HANDEDNESS_TYPES_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_HANDEDNESS_HANDEDNESS_TYPES_H
 
+#include <string>
+
 namespace OHOS::Ace::NG {
 
 /// 弹窗跟手布局模式（与前端 HandednessFollowMode 对应）
@@ -25,12 +27,34 @@ enum class HandednessFollowMode {
     FOLLOW_GRIP_HAND = 2,   // 跟随握持手位置
 };
 
+inline std::string HandednessFollowModeToString(HandednessFollowMode mode)
+{
+    static const std::string modes[] = { "HandednessFollowMode.NONE",
+        "HandednessFollowMode.FOLLOW_ANCHOR", "HandednessFollowMode.FOLLOW_GRIP_HAND" };
+    auto index = static_cast<int32_t>(mode);
+    if (index >= static_cast<int32_t>(HandednessFollowMode::NONE) &&
+        index <= static_cast<int32_t>(HandednessFollowMode::FOLLOW_GRIP_HAND)) {
+        return modes[index];
+    }
+    return modes[static_cast<int32_t>(HandednessFollowMode::NONE)];
+}
+
 /// 弹窗水平对齐侧别（FOLLOW_GRIP_HAND 模式返回值）
 enum class PopupSide {
     LEFT = 0,
     CENTER = 1,
     RIGHT = 2,
 };
+
+inline std::string PopupSideToString(PopupSide side)
+{
+    static const std::string sides[] = { "PopupSide.LEFT", "PopupSide.CENTER", "PopupSide.RIGHT" };
+    auto index = static_cast<int32_t>(side);
+    if (index >= static_cast<int32_t>(PopupSide::LEFT) && index <= static_cast<int32_t>(PopupSide::RIGHT)) {
+        return sides[index];
+    }
+    return sides[static_cast<int32_t>(PopupSide::CENTER)];
+}
 
 } // namespace OHOS::Ace::NG
 

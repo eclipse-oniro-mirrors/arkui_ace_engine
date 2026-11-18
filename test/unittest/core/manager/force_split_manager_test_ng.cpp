@@ -589,6 +589,175 @@ HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary002, TestSi
 }
 
 /**
+ * @tc.name: SetTransPageEnabledFalse_DisplaceMode_SkipsTransPageCheck
+ * @tc.desc: Test setTransPageEnabled(false) makes transPages check skipped in displace mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabledFalse_DisplaceMode_SkipsTransPageCheck, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+    manager->SetTransPageEnabled(true);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> transPages = { "AddressEditPage" };
+    manager->SetTransPages(std::move(transPages));
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("OtherPage", "AddressEditPage"));
+}
+
+/**
+ * @tc.name: SetTransPageEnabledTrue_DisplaceMode_RestoresTransPageCheck
+ * @tc.desc: Test setTransPageEnabled(true) restores transPages check in displace mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabledTrue_DisplaceMode_RestoresTransPageCheck, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> transPages = { "AddressEditPage" };
+    manager->SetTransPages(std::move(transPages));
+    manager->SetTransPageEnabled(false);
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+
+    manager->SetTransPageEnabled(true);
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("OtherPage", "AddressEditPage"));
+}
+
+/**
+ * @tc.name: IsTransPageEnabled_ReturnsCorrectValue
+ * @tc.desc: Test isTransPageEnabled returns value consistent with setter and default true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransPageEnabled_ReturnsCorrectValue, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+    manager->SetTransPageEnabled(true);
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_NavigationMode_NoSideEffect
+ * @tc.desc: Test transPage switch does not affect navigation mode pagePairs check
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_NavigationMode_NoSideEffect, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    std::unordered_map<std::string, std::unordered_set<std::string>> pagePairs = {
+        { "home", { "detail" } },
+    };
+    manager->SetPagePairs(std::move(pagePairs));
+
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("home", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("home", "dialog"));
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_FullScreenPagePriority
+ * @tc.desc: Test fullScreenPages check has higher priority than transPage switch
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_FullScreenPagePriority, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> fullScreenPages = { "fullScreen" };
+    manager->SetFullScreenPages(std::move(fullScreenPages));
+    manager->SetTransPageEnabled(false);
+
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("home", "fullScreen"));
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_MultiInstance_Isolated
+ * @tc.desc: Test transPage switch state is isolated between ForceSplitManager instances
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_MultiInstance_Isolated, TestSize.Level1)
+{
+    auto managerA = AceType::MakeRefPtr<ForceSplitManager>();
+    auto managerB = AceType::MakeRefPtr<ForceSplitManager>();
+    ASSERT_NE(managerA, nullptr);
+    ASSERT_NE(managerB, nullptr);
+
+    EXPECT_TRUE(managerA->IsTransPageEnabled());
+    EXPECT_TRUE(managerB->IsTransPageEnabled());
+
+    managerA->SetTransPageEnabled(false);
+    EXPECT_FALSE(managerA->IsTransPageEnabled());
+    EXPECT_TRUE(managerB->IsTransPageEnabled());
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_RapidToggle_FinalValueWins
+ * @tc.desc: Test rapid toggle of transPage switch only the final value takes effect
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_RapidToggle_FinalValueWins, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ForceSplitManager>();
+    ASSERT_NE(manager, nullptr);
+
+    manager->SetTransPageEnabled(false);
+    manager->SetTransPageEnabled(true);
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+
+    manager->SetTransPageEnabled(true);
+    manager->SetTransPageEnabled(false);
+    manager->SetTransPageEnabled(true);
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_DefaultValue_NoRegression
+ * @tc.desc: Test default transPageEnabled value keeps existing displace behavior unchanged
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_DefaultValue_NoRegression, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> transPages = { "dialog", "transparent" };
+    manager->SetTransPages(std::move(transPages));
+
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("home", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("dialog", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("home", "transparent"));
+}
+
+/**
  * @tc.name: ForceSplitManagerConstructor001
  * @tc.desc: Test ForceSplitManager constructor initializes default values
  * @tc.type: FUNC
@@ -1436,4 +1605,436 @@ HWTEST_F(ForceSplitManagerTestNg, FindNearestSnapRatio001, TestSize.Level1)
     result = manager->FindNearestSnapRatio(upperBoundary);
     EXPECT_FLOAT_EQ(result, maxSplitRatio);
 }
+
+/**
+ * @tc.name: SetPageLevelSplitConfig001
+ * @tc.desc: Branch: SetEnablePageLevelSplit / SetPageSplitOptions / SetEnableInheritSplitStrategy
+ *                   / SetPageStack setters and IsPageLevelSplitEnabled getter
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetPageLevelSplitConfig001, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    EXPECT_FALSE(manager->IsPageLevelSplitEnabled());
+    manager->SetEnablePageLevelSplit(true);
+    EXPECT_TRUE(manager->IsPageLevelSplitEnabled());
+
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", true }, { "PageB", false } };
+    manager->SetPageSplitOptions(std::move(pageSplitOptions));
+    EXPECT_EQ(manager->pageSplitOptions_.size(), 2);
+
+    manager->SetEnableInheritSplitStrategy(true);
+    EXPECT_TRUE(manager->enableInheritSplitStrategy_);
+
+    std::vector<std::string> pageStack = { "PageA", "PageB" };
+    manager->SetPageStack(std::move(pageStack));
+    EXPECT_EQ(manager->pageStack_.size(), 2);
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled001
+ * @tc.desc: Branch: if (!enablePageLevelSplit_) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled001, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = false;
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", false } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    EXPECT_FALSE(manager->IsPageSplitDisabled("PageA"));
+    EXPECT_FALSE(manager->IsPageSplitDisabled("UnknownPage"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled002
+ * @tc.desc: Branch: if (it != pageSplitOptions_.end()) { => true
+ *                   explicit option split=true => false, split=false => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled002, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = true;
+    manager->enableInheritSplitStrategy_ = false;
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", true }, { "PageB", false } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    EXPECT_FALSE(manager->IsPageSplitDisabled("PageA"));
+    EXPECT_TRUE(manager->IsPageSplitDisabled("PageB"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled003
+ * @tc.desc: Branch: if (it != pageSplitOptions_.end()) { => false
+ *                   if (!enableInheritSplitStrategy_) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled003, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = true;
+    manager->enableInheritSplitStrategy_ = false;
+    manager->pageSplitOptions_.clear();
+    std::vector<std::string> pageStack = { "PageA", "PageB" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_TRUE(manager->IsPageSplitDisabled("PageB"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled004
+ * @tc.desc: Branch: if (!enableInheritSplitStrategy_) { => false
+ *                   inherit on: upstream explicit split=true => false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled004, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = true;
+    manager->enableInheritSplitStrategy_ = true;
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", true } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    std::vector<std::string> pageStack = { "PageA", "PageB" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_FALSE(manager->IsPageSplitDisabled("PageB"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled005
+ * @tc.desc: Branch: inherit on: upstream explicit split=false => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled005, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = true;
+    manager->enableInheritSplitStrategy_ = true;
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", false } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    std::vector<std::string> pageStack = { "PageA", "PageB" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_TRUE(manager->IsPageSplitDisabled("PageB"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled006
+ * @tc.desc: Branch: inherit on but no upstream carries an explicit option => default no split
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled006, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = true;
+    manager->enableInheritSplitStrategy_ = true;
+    manager->pageSplitOptions_.clear();
+    std::vector<std::string> pageStack = { "PageA", "PageB", "PageC" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_TRUE(manager->IsPageSplitDisabled("PageC"));
+}
+
+/**
+ * @tc.name: GetLastPageStackIndex001
+ * @tc.desc: Branch: GetLastPageStackIndex returns last occurrence index or -1 when absent
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, GetLastPageStackIndex001, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    std::vector<std::string> pageStack = { "PageA", "PageB", "PageA" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_EQ(manager->GetLastPageStackIndex("PageA"), 2);
+    EXPECT_EQ(manager->GetLastPageStackIndex("PageB"), 1);
+    EXPECT_EQ(manager->GetLastPageStackIndex("UnknownPage"), -1);
+}
+
+/**
+ * @tc.name: IsUpstreamPageSplitDisabled001
+ * @tc.desc: Branch: pageName not in stack (index -1) => default no split
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsUpstreamPageSplitDisabled001, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", true } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    std::vector<std::string> pageStack = { "PageA", "PageB" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_TRUE(manager->IsUpstreamPageSplitDisabled("UnknownPage"));
+}
+
+/**
+ * @tc.name: IsUpstreamPageSplitDisabled002
+ * @tc.desc: Branch: nearest upstream with explicit option decides the result
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsUpstreamPageSplitDisabled002, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    // nearest upstream PageB(split=false) wins over farther PageA(split=true)
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", true }, { "PageB", false } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    std::vector<std::string> pageStack = { "PageA", "PageB", "PageC" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_TRUE(manager->IsUpstreamPageSplitDisabled("PageC"));
+}
+
+/**
+ * @tc.name: IsUpstreamPageSplitDisabled003
+ * @tc.desc: Branch: upstreams without explicit option are skipped until one carries an option
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsUpstreamPageSplitDisabled003, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    // PageD and PageC have no option, resolution falls to PageA(split=true)
+    std::unordered_map<std::string, bool> pageSplitOptions = { { "PageA", true } };
+    manager->pageSplitOptions_ = std::move(pageSplitOptions);
+    std::vector<std::string> pageStack = { "PageA", "PageB", "PageC", "PageD" };
+    manager->pageStack_ = std::move(pageStack);
+    EXPECT_FALSE(manager->IsUpstreamPageSplitDisabled("PageD"));
+}
+
+/**
+ * @tc.name: UpdateIsTopPageSplitDisabled001
+ * @tc.desc: Branch: if (isTopPageSplitDisabled_ == isTopPageSplitDisabled) { => false
+ *                   state change returns true, same state returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, UpdateIsTopPageSplitDisabled001, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->isTopPageSplitDisabled_ = true;
+    EXPECT_FALSE(manager->UpdateIsTopPageSplitDisabled(true));
+    EXPECT_TRUE(manager->UpdateIsTopPageSplitDisabled(false));
+    EXPECT_TRUE(manager->isTopPageSplitDisabled_ == false);
+    EXPECT_TRUE(manager->UpdateIsTopPageSplitDisabled(true));
+}
+
+/**
+ * @tc.name: IsTopPageSplitDisabled001
+ * @tc.desc: Branch: return enablePageLevelSplit_ && isTopPageSplitDisabled_
+ *                   flag has no effect unless page-level split control is on
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTopPageSplitDisabled001, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->enablePageLevelSplit_ = false;
+    manager->isTopPageSplitDisabled_ = true;
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+
+    manager->enablePageLevelSplit_ = true;
+    EXPECT_TRUE(manager->IsTopPageSplitDisabled());
+
+    manager->isTopPageSplitDisabled_ = false;
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+
+    manager->enablePageLevelSplit_ = false;
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+}
+
+/**
+ * @tc.name: IsTransitionShouldMovePageToPrimary003
+ * @tc.desc: Branch: if (!enablePageLevelSplit_ && (IsFullScreenPage(from) || IsFullScreenPage(to))) { => false
+ *           fullScreenPages takes no effect when page-level split control is on (navigation mode)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary003, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    manager->enablePageLevelSplit_ = true;
+    std::unordered_map<std::string, std::unordered_set<std::string>> pagePairs = {
+        { "fullScreen", { "detail" } },
+    };
+    manager->SetPagePairs(std::move(pagePairs));
+    std::unordered_set<std::string> fullScreenPages = { "fullScreen" };
+    manager->SetFullScreenPages(std::move(fullScreenPages));
+    // fullScreen gate skipped, page pair decides
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "unknown"));
+}
+
+/**
+ * @tc.name: IsTransitionShouldMovePageToPrimary004
+ * @tc.desc: Branch: if (!enablePageLevelSplit_ && (IsFullScreenPage(from) || IsFullScreenPage(to))) { => false
+ *           fullScreenPages takes no effect when page-level split control is on (displace mode)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary004, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    manager->enablePageLevelSplit_ = true;
+    std::unordered_set<std::string> fullScreenPages = { "fullScreen" };
+    manager->SetFullScreenPages(std::move(fullScreenPages));
+    // fullScreen gate skipped, displace rule decides
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "detail"));
+
+    std::unordered_set<std::string> transPages = { "transparent" };
+    manager->SetTransPages(std::move(transPages));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "transparent"));
+}
+/**
+ * @tc.name: IsPageSplitDisabled007
+ * @tc.desc: Repeated unconfigured names inherit by the last stack position without cycling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled007, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetEnableInheritSplitStrategy(true);
+    manager->SetPageSplitOptions({ { "split", true }, { "fullScreen", false } });
+    manager->SetPageStack({ "split", "default", "fullScreen", "default" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    EXPECT_EQ(manager->GetLastPageStackIndex("default"), 3);
+    manager->SetPageStack({ "fullScreen", "default", "split", "default" });
+    EXPECT_FALSE(manager->IsPageSplitDisabled("default"));
+    manager->SetPageStack({ "default", "default", "default" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled008
+ * @tc.desc: Explicit policy overrides inheritance and an absent or bottom page uses the no-split default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled008, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetEnableInheritSplitStrategy(true);
+    manager->SetPageSplitOptions({ { "split", true }, { "fullScreen", false } });
+    manager->SetPageStack({ "fullScreen", "split" });
+    EXPECT_FALSE(manager->IsPageSplitDisabled("split"));
+    manager->SetPageStack({ "split", "fullScreen" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("fullScreen"));
+    EXPECT_TRUE(manager->IsPageSplitDisabled("missing"));
+    manager->SetPageStack({ "default" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    manager->SetPageStack({});
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    EXPECT_EQ(manager->GetLastPageStackIndex("default"), -1);
+}
+
+/**
+ * @tc.name: SetPageLevelSplitConfig002
+ * @tc.desc: Replacing policies and disabling inheritance do not retain old session results.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetPageLevelSplitConfig002, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetEnableInheritSplitStrategy(true);
+    manager->SetPageSplitOptions({ { "split", true } });
+    manager->SetPageStack({ "split", "default" });
+    EXPECT_FALSE(manager->IsPageSplitDisabled("default"));
+    manager->SetEnableInheritSplitStrategy(false);
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    manager->SetPageSplitOptions({});
+    EXPECT_TRUE(manager->IsPageSplitDisabled("split"));
+    manager->SetEnablePageLevelSplit(false);
+    EXPECT_FALSE(manager->IsPageSplitDisabled("default"));
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+}
+
+/**
+ * @tc.name: IsTransitionShouldMovePageToPrimary005
+ * @tc.desc: Page-level NAVIGATION respects pair direction and ignores legacy fullscreen policy on either page.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary005, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    manager->SetFullScreenPages({ "from", "to" });
+    manager->SetPagePairs({ { "from", { "to" } } });
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("to", "from"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("unknown", "to"));
+    manager->SetEnablePageLevelSplit(false);
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+    manager->SetFullScreenPages({ "to" });
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+    manager->SetFullScreenPages({});
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+}
+
+/**
+ * @tc.name: IsTransitionShouldMovePageToPrimary006
+ * @tc.desc: DISPLACE transPages suppress movement on either side with page-level control on or off.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary006, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    manager->SetTransPages({ "transparent" });
+    for (bool enabled : { false, true }) {
+        manager->SetEnablePageLevelSplit(enabled);
+        EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+        EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("transparent", "to"));
+        EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("from", "transparent"));
+        EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("transparent", "transparent"));
+    }
+}
+
+/**
+ * @tc.name: UpdateIsTopPageSplitDisabled002
+ * @tc.desc: Repeated split notifications are idempotent after both state transitions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, UpdateIsTopPageSplitDisabled002, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    EXPECT_TRUE(manager->IsTopPageSplitDisabled());
+    EXPECT_TRUE(manager->UpdateIsTopPageSplitDisabled(false));
+    EXPECT_FALSE(manager->UpdateIsTopPageSplitDisabled(false));
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+    EXPECT_TRUE(manager->UpdateIsTopPageSplitDisabled(true));
+    EXPECT_FALSE(manager->UpdateIsTopPageSplitDisabled(true));
+    EXPECT_TRUE(manager->IsTopPageSplitDisabled());
+}
+
 } // namespace OHOS::Ace::NG

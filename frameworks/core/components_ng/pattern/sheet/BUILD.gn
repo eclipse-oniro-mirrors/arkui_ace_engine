@@ -53,6 +53,9 @@ build_component_ng("sheet_pattern_ng") {
     deps = [
       "${ace_root}/interfaces/inner_api/ui_session:ui_session",
     ]
+    platform_deps = [
+      "$ace_root/frameworks/core/components_ng/manager/handedness:ace_core_components_handedness_manager_ng",
+    ]
   }
 
   if (is_ohos_standard_system) {

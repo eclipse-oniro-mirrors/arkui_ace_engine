@@ -26,7 +26,10 @@ config("ani_config") {
 #构建ANI库
 ohos_shared_library("observer_ani") {
   shlib_type = "ani"
-  deps = [ "$ace_root/build:libace_compatible" ]
+  deps = [
+    "$ace_root/build:libace_compatible",
+    "$ace_root/frameworks/core:ace_container_scope",
+  ]
   include_dirs = [ "./include" ]
   sources = [ "./src/observer.cpp" ]
   external_deps = [

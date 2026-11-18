@@ -434,6 +434,10 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
     dialogProperties.dialogLevelMode = static_cast<LevelMode>(controllerHandler->levelMode);
     dialogProperties.dialogLevelUniqueId = controllerHandler->levelUniqueId;
     dialogProperties.dialogImmersiveMode = static_cast<ImmersiveMode>(controllerHandler->immersiveMode);
+    if (controllerHandler->adaptToHandedness.has_value()) {
+        dialogProperties.adaptToHandedness =
+            static_cast<HandednessFollowMode>(*controllerHandler->adaptToHandedness);
+    }
     dialogProperties.backgroundBlurStyle = controllerHandler->blurStyle;
     dialogProperties.blurStyleOption = controllerHandler->blurStyleOption;
     dialogProperties.hasInvertColor.hasBlurStyleOptionInactiveColor =
@@ -641,7 +645,7 @@ int32_t ConvertBlurStyle(int32_t originBlurStyle)
     return originBlurStyle;
 }
 
-void openCustomDialogWithNewPipeline(std::function<void(int32_t)>&& callback, DialogProperties dialogProperties)
+void openCustomDialogWithNewPipeline(std::function<void(int32_t)>&& callback, const DialogProperties& dialogProperties)
 {
     TAG_LOGI(AceLogTag::ACE_OVERLAY, "Dialog IsCurrentUseNewPipeline.");
     auto task = [callback = std::move(callback), dialogProperties](
@@ -894,6 +898,13 @@ ArkUI_Int32 SetImmersiveMode(ArkUIDialogHandle controllerHandler, ArkUI_Int32 mo
     return ERROR_CODE_NO_ERROR;
 }
 
+ArkUI_Int32 SetAdaptToHandedness(ArkUIDialogHandle controllerHandler, ArkUI_Int32 mode)
+{
+    CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(controllerHandler, ERROR_CODE_PARAM_INVALID, "controllerHandler is null");
+    controllerHandler->adaptToHandedness = mode;
+    return ERROR_CODE_NO_ERROR;
+}
+
 ArkUI_Int32 SetLevelOrder(ArkUIDialogHandle controllerHandler, ArkUI_Float64 levelOrder)
 {
     CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(controllerHandler, ERROR_CODE_PARAM_INVALID, "controllerHandler is null");
@@ -957,7 +968,7 @@ ArkUI_Int32 OpenCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_In
     auto promptDialogAttr = ParseDialogPropertiesFromProps(dialogProperties);
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
         if (Container::IsCurrentUseNewPipeline()) {
-            openCustomDialogWithNewPipeline(std::move(callback), std::move(dialogProperties));
+            openCustomDialogWithNewPipeline(std::move(callback), dialogProperties);
         } else {
             LOGW("not support old pipeline");
         }

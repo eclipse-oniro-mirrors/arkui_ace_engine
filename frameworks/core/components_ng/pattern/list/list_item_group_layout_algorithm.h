@@ -470,6 +470,8 @@ public:
 
     void ResetLayoutItem(LayoutWrapper* layoutWrapper);
 
+    void UpdateGroupDecodeCacheWindow(LayoutWrapper* groupWrapper, bool groupActive);
+
 private:
     float CalculateLaneCrossOffset(float crossSize, float childCrossSize);
     bool NeedReserveEditModeCheckBoxSpace() const;

@@ -33,6 +33,7 @@ struct WebPatternProperty {
     ACE_DEFINE_PROPERTY_GROUP_ITEM(FileAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(OnLineImageAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(DomStorageAccessEnabled, bool);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(VisitedLinkPersistEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(ImageAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(MixedMode, MixedModeContent);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BypassVsyncCondition, WebBypassVsyncCondition);

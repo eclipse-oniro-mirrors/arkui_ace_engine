@@ -23,6 +23,21 @@
 #include "core/event/key_event.h"
 
 namespace OHOS::Ace {
+namespace {
+void CopyTouchInputProvenance(const TouchEvent& source, TouchEvent& destination)
+{
+    destination.isInjected = source.isInjected;
+    destination.isAgent = source.isAgent;
+    destination.agentWindowId = source.agentWindowId;
+    destination.callingUid = source.callingUid;
+    destination.hasSafSessionId = source.hasSafSessionId;
+    destination.safSessionId = source.safSessionId;
+    destination.isPrivacyMode = source.isPrivacyMode;
+    destination.isStylusMouseMode = source.isStylusMouseMode;
+    destination.isScreenLocked = source.isScreenLocked;
+}
+} // namespace
+
 void TouchPoint::CovertId()
 {
     if (sourceTool == SourceTool::PEN) {
@@ -298,15 +313,14 @@ TouchEvent TouchEvent::CloneWith(float scale, float offsetX, float offsetY, std:
     event.targetDisplayId = targetDisplayId;
     event.sourceType = sourceType;
     event.sourceTool = sourceTool;
+    event.primitiveSourceTool = primitiveSourceTool;
     event.touchEventId = touchEventId;
     event.isInterpolated = isInterpolated;
     event.pointers = std::move(pointers);
     event.pointerEvent = std::move(pointerEvent);
     event.originalId = originalId;
     event.pressedKeyCodes_ = pressedKeyCodes_;
-    event.isInjected = isInjected;
-    event.isPrivacyMode = isPrivacyMode;
-    event.isScreenLocked = isScreenLocked;
+    CopyTouchInputProvenance(*this, event);
     event.inputXDeltaSlope = inputXDeltaSlope;
     event.inputYDeltaSlope = inputYDeltaSlope;
     event.eventType = UIInputEventType::TOUCH;
@@ -502,7 +516,13 @@ TouchEvent TouchEvent::UpdatePointers() const
         .SetPointerEvent(pointerEvent)
         .SetOriginalId(originalId)
         .SetIsPassThroughMode(isPassThroughMode)
+        .SetIsInjected(isInjected)
         .SetOperatingHand(operatingHand);
+    event.isAgent = isAgent;
+    event.agentWindowId = agentWindowId;
+    event.callingUid = callingUid;
+    event.hasSafSessionId = hasSafSessionId;
+    event.safSessionId = safSessionId;
     event.pointers.emplace_back(std::move(point));
     return event;
 }
@@ -610,6 +630,14 @@ void TouchCallBackInfo::SetTimeStamp(const TimeStamp& time)
 TimeStamp TouchCallBackInfo::GetTimeStamp() const
 {
     return time_;
+}
+
+Offset TouchLocationInfo::GetCurrentLocalLocation() const
+{
+    if (currentLocalLocationGetter_) {
+        return currentLocalLocationGetter_();
+    }
+    return localLocation_;
 }
 
 TouchLocationInfo& TouchLocationInfo::SetGlobalLocation(const Offset& globalLocation)
@@ -967,6 +995,11 @@ void TouchEventInfo::SetPointerEvent(const std::shared_ptr<MMI::PointerEvent>& p
 const std::shared_ptr<MMI::PointerEvent>& TouchEventInfo::GetPointerEvent() const
 {
     return pointerEvent_;
+}
+
+bool TouchEventInfo::IsAgent() const
+{
+    return InputManager::IsAgentEvent(pointerEvent_);
 }
 
 void TouchEventInfo::SetTouchEventsEnd(bool isTouchEventsEnd)

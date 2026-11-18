@@ -20,7 +20,9 @@
 #include "base/utils/system_properties.h"
 #include "core/common/ace_engine.h"
 #include "core/common/ai/text_translation_adapter.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/common/share/text_share_adapter.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components/select/select_theme.h"
 #include "core/components/text_overlay/text_overlay_theme.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_animation_utils.h"
@@ -570,7 +572,8 @@ void BaseTextSelectOverlay::RevertLocalPointWithTransform(OffsetF& point)
         auto rectOffset = renderContext->GetPaintRectWithoutTransform().GetOffset();
         localPoint = localPoint - rectOffset;
         if (!nodeStack.empty()) {
-            nodeStack.top()->RevertAdoptedCompensationFromPoint(localPoint);
+            FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(
+                nodeStack.top().GetRawPtr(), localPoint);
         }
     }
     point.SetX(localPoint.GetX());
@@ -602,8 +605,9 @@ OffsetF BaseTextSelectOverlay::GetPaintOffsetWithoutTransform()
         CHECK_NULL_RETURN(renderContext, OffsetF());
         offset += renderContext->GetPaintRectWithoutTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->IsAdopted() && parent->UseAdoptedCompensation()) {
-            offset += parent->GetAdoptedCompensationOffset();
+        if (ancestor && parent->IsAdopted() &&
+            FrameNodeAdoptedCompensation::UseAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }
@@ -740,8 +744,8 @@ VectorF BaseTextSelectOverlay::GetHostScale()
             scaleY *= std::abs(transform.scale[1]);
         }
         auto ancestor = host->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && host->HasAdoptedCompensation()) {
-            auto compensationScale = host->GetAdoptedCompensationScale();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(host.GetRawPtr())) {
+            auto compensationScale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(host.GetRawPtr());
             scaleX *= std::abs(compensationScale.x);
             scaleY *= std::abs(compensationScale.y);
         }
@@ -838,8 +842,8 @@ bool BaseTextSelectOverlay::CheckHandleCanPaintInHost(const RectF& firstRect, co
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
         if (ancestor) {
-            parent->ApplyAdoptedCompensationToPoints(firstPoints);
-            parent->ApplyAdoptedCompensationToPoints(secondPoints);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(parent.GetRawPtr(), firstPoints);
+            FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoints(parent.GetRawPtr(), secondPoints);
         }
         parent = ancestor;
     }
@@ -1386,7 +1390,8 @@ bool BaseTextSelectOverlay::IsHandleInParentSafeAreaPadding(const RectF& firstRe
         secondHandlePaint += context->GetPaintRectWithTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
         if (ancestor) {
-            auto compensationOffset = parent->GetTransformedAdoptedCompensationOffset();
+            auto compensationOffset =
+                FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
             firstHandlePaint += compensationOffset;
             secondHandlePaint += compensationOffset;
         }
@@ -1584,6 +1589,13 @@ void BaseTextSelectOverlay::FillMenuShowCameraInput(SelectMenuInfo& menuInfo, bo
     menuInfo.showCameraInput = !isSelected && isSupportCameraInput && !hasCustomKeyboard;
 }
 
+void BaseTextSelectOverlay::FillMenuShowTranslateInput(SelectMenuInfo& menuInfo, bool isSelected,
+    bool isContentRestricted, bool hasCustomKeyboard)
+{
+    menuInfo.showTranslateInput = !isSelected && !isContentRestricted && !hasCustomKeyboard &&
+        TextSystemMenu::IsShowTranslateInput() && IsCurrentInputMethodDefaultIme();
+}
+
 void BaseTextSelectOverlay::FillMenuVisibility(SelectMenuInfo& menuInfo, bool hasText, bool showCameraInput,
     bool isShowAutoFill, bool isSelectionMenuHidden, SelectOverlayDirtyFlag dirtyFlag)
 {
@@ -1592,7 +1604,8 @@ void BaseTextSelectOverlay::FillMenuVisibility(SelectMenuInfo& menuInfo, bool ha
     if (IsUsingMouse()) {
         menuInfo.menuIsShow = !isSelectionMenuHidden || manager->IsOpen();
     } else {
-        menuInfo.menuIsShow = (hasText || IsShowPaste() || showCameraInput || isShowAutoFill)
+        menuInfo.menuIsShow =
+            (hasText || IsShowPaste() || showCameraInput || menuInfo.showTranslateInput || isShowAutoFill)
             && !isSelectionMenuHidden && IsShowMenu();
     }
     menuInfo.menuDisable = isSelectionMenuHidden;

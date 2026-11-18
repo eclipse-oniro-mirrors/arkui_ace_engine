@@ -15,14 +15,136 @@
 
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 
+#include "base/json/json_util.h"
+#include "base/utils/string_utils.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_layout_algorithm.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+
+// A settled layout is required for the contribution fields: pending layout
+// work must not publish stale numbers.
+bool HasPendingSafeAreaLayout(const FrameNode* node)
+{
+    auto property = node->GetLayoutProperty();
+    CHECK_NULL_RETURN(property, true);
+    auto flag = property->GetPropertyChangeFlag();
+    return node->IsLayoutDirtyMarked() || CheckNeedMeasure(flag) || CheckNeedLayout(flag);
+}
+
+// A cached result and clean owner/carrier are required for both numeric fields.
+// Never use GetOrCreateSafeAreaPadding here: dumping must not populate caches.
+bool HasSettledSafeAreaContribution(const FrameNode* owner, const FrameNode* carrier)
+{
+    auto geometry = owner->GetGeometryNode();
+    return geometry && geometry->GetResolvedSingleSafeAreaPadding() &&
+        !HasPendingSafeAreaLayout(owner) && !HasPendingSafeAreaLayout(carrier);
+}
+
+// Only the new SafeAreaInsetContribution/EffectiveSafeAreaContribution fields use this
+// presentation: numbers fixed to two decimals, missing edges as NA, same edge order as
+// PaddingPropertyF::ToString. Legacy fields keep their original formatters.
+std::string FormatSafeAreaInsetContributionEdge(const std::optional<float>& value)
+{
+    constexpr int32_t CONTRIBUTION_DECIMALS = 2;
+    return value.has_value() ? StringUtils::DoubleToString(value.value(), CONTRIBUTION_DECIMALS) : "NA";
+}
+
+std::string FormatSafeAreaInsetContribution(const PaddingPropertyF& contribution)
+{
+    std::string str;
+    str.append("[").append(FormatSafeAreaInsetContributionEdge(contribution.left));
+    str.append(",").append(FormatSafeAreaInsetContributionEdge(contribution.right));
+    str.append(",").append(FormatSafeAreaInsetContributionEdge(contribution.top));
+    str.append(",").append(FormatSafeAreaInsetContributionEdge(contribution.bottom)).append("]");
+    return str;
+}
+} // namespace
 
 RefPtr<LayoutAlgorithm> SafeAreaInsetPattern::CreateLayoutAlgorithm()
 {
     return MakeRefPtr<SafeAreaInsetLayoutAlgorithm>();
+}
+
+size_t SafeAreaInsetPattern::GetEdgeCount()
+{
+    return SAFE_AREA_INSET_EDGE_COUNT;
+}
+
+RefPtr<UINode> SafeAreaInsetPattern::GetEdgeContent(SafeAreaInsetEdge edge) const
+{
+    // contents_ in the header spells the edge count to avoid including the
+    // full safeAreaInset option definitions there.
+    static_assert(std::tuple_size<decltype(contents_)>::value == SAFE_AREA_INSET_EDGE_COUNT);
+    return contents_[SafeAreaInsetOptions::ToIndex(edge)];
+}
+
+std::unique_ptr<JsonValue> BuildSafeAreaInsetConfig(const FrameNode* owner)
+{
+    auto carrier = owner->GetSafeAreaInsetNode();
+    CHECK_NULL_RETURN(carrier, nullptr);
+    auto pattern = carrier->GetPattern<SafeAreaInsetPattern>();
+    CHECK_NULL_RETURN(pattern, nullptr);
+    auto property = owner->GetLayoutProperty();
+    CHECK_NULL_RETURN(property, nullptr);
+    const auto* options = property->GetSafeAreaInsetState().GetSafeAreaInset();
+    CHECK_NULL_RETURN(options, nullptr);
+    constexpr std::array<const char*, SAFE_AREA_INSET_EDGE_COUNT> EDGE_NAMES = { "top", "end", "bottom", "start" };
+    constexpr std::array<const char*, 3> ALIGNMENTS = { "START", "CENTER", "END" };
+    auto config = JsonUtil::Create(true);
+    bool hasContent = false;
+    for (size_t index = 0; index < EDGE_NAMES.size(); ++index) {
+        auto edge = static_cast<SafeAreaInsetEdge>(index);
+        const auto& option = options->GetEdge(edge);
+        auto content = pattern->GetEdgeContent(edge);
+        if (!option || !content) {
+            continue;
+        }
+        auto value = JsonUtil::Create(true);
+        value->Put("contentNodeId", content->GetId());
+        value->Put("spacing", option->spacing.ToString().c_str());
+        auto alignment = static_cast<size_t>(option->alignment);
+        value->Put("alignment", alignment < ALIGNMENTS.size() ? ALIGNMENTS[alignment] : "UNKNOWN");
+        config->Put(EDGE_NAMES[index], value);
+        hasContent = true;
+    }
+    return hasContent ? std::move(config) : nullptr;
+}
+
+std::unique_ptr<JsonValue> BuildSafeAreaInsetDumpInfo(const FrameNode* node)
+{
+    auto carrier = node->GetSafeAreaInsetNode();
+    if (carrier) {
+        auto info = JsonUtil::Create(true);
+        info->Put("SafeAreaInsetContainerNodeId", carrier->GetId());
+        if (HasSettledSafeAreaContribution(node, AceType::RawPtr(carrier))) {
+            info->Put("EffectiveSafeAreaContribution",
+                FormatSafeAreaInsetContribution(*node->GetGeometryNode()->GetResolvedSingleSafeAreaPadding()).c_str());
+        }
+        return info;
+    }
+    if (node->GetTag() != SAFE_AREA_INSET_CONTAINER_TAG) {
+        return nullptr;
+    }
+    auto owner = AceType::DynamicCast<FrameNode>(node->GetParent());
+    CHECK_NULL_RETURN(owner, nullptr);
+    auto ownerCarrier = owner->GetSafeAreaInsetNode();
+    if (AceType::RawPtr(ownerCarrier) != node) {
+        return nullptr;
+    }
+    auto config = BuildSafeAreaInsetConfig(AceType::RawPtr(owner));
+    CHECK_NULL_RETURN(config, nullptr);
+    auto info = JsonUtil::Create(true);
+    info->Put("SafeAreaInset", config);
+    if (HasSettledSafeAreaContribution(AceType::RawPtr(owner), node)) {
+        info->Put("SafeAreaInsetContribution",
+            FormatSafeAreaInsetContribution(
+                owner->GetLayoutProperty()->GetSafeAreaInsetState().GetSafeAreaInsetContribution())
+                .c_str());
+    }
+    return info;
 }
 
 bool SafeAreaInsetPattern::SetEdgeContent(SafeAreaInsetEdge edge, const RefPtr<UINode>& content)

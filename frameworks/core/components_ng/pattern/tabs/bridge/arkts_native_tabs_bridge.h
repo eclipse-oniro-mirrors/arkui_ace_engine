@@ -18,6 +18,7 @@
 
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_api_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_common_bridge.h"
+#include "core/components_ng/pattern/tabs/tabs_model.h"
 
 namespace OHOS::Ace::NG {
 class TabsBridge : public CommonBridge {
@@ -131,6 +132,8 @@ public:
     static ArkUINativeModuleValue ResetSidebarBottomBar(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetSidebarSearchable(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetSidebarSearchable(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetShowSidebarControlButton(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue ResetShowSidebarControlButton(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetBarDisplayModeBreakpoint(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetBarDisplayModeBreakpoint(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnBarDisplayModeChange(ArkUIRuntimeCallInfo* runtimeCallInfo);
@@ -151,12 +154,19 @@ public:
     static ArkUINativeModuleValue ResetTabSidebarBackgroundBlurStyle(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetTabSidebarDivider(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetTabSidebarDivider(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue MarkUserSetSafeAreaOpts(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetTabViewCustomization(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue ResetTabViewCustomization(ArkUIRuntimeCallInfo* runtimeCallInfo);
 
 private:
     static void ParseCustomContentTransition(
         EcmaVM* vm, ArkUINodeHandle nativeNode, const Local<JSValueRef>& transitionFunc, bool isJsView);
     static std::optional<Dimension> ParseBarFloatingDimension(
         EcmaVM* vm, Local<JSValueRef> value, RefPtr<ResourceObject>& resObj);
+    template <typename ParametersType>
+    static void ParseBarFloatingOffset(EcmaVM* vm, Local<JSValueRef> offsetVal,
+        ParametersType& parameters,
+        RefPtr<ResourceObject>& offsetXObj, RefPtr<ResourceObject>& offsetYObj);
 };
 } // namespace OHOS::Ace::NG
 

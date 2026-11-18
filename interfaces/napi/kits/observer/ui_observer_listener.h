@@ -44,6 +44,7 @@ struct RouterPageInfoNG;
 struct SwiperContentInfo;
 struct TabContentInfo;
 struct TextChangeEventInfo;
+struct NodeSensitiveInputInfo;
 enum class GestureActionPhase;
 enum class GestureListenerType;
 enum class NodeRenderState;
@@ -78,6 +79,11 @@ public:
     void OnTabContentStateChange(const NG::TabContentInfo& tabContentInfo);
     void OnTabChange(const NG::TabContentInfo& tabContentInfo);
     void OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::NodeRenderState nodeRenderState);
+    void OnNodeSensitiveInput(NG::FrameNode* frameNode, const NG::NodeSensitiveInputInfo& info);
+    void ResetNodeSensitiveInputCallback()
+    {
+        callback_.Reset();
+    }
     void OnNavDestinationSwitch(const NG::NavDestinationSwitchInfo& switchInfo, napi_value context);
     void OnTextChangeEvent(const NG::TextChangeEventInfo& info);
     void OnRouterPageSizeChange(const NG::RouterPageInfoNG& info, napi_value context = nullptr);

@@ -4111,6 +4111,44 @@ HWTEST_F(ListFastScrollerTestNg, FastScrollLargeGroupCenter001, TestSize.Level1)
     EXPECT_NEAR(pattern_->GetTotalOffset(), 5 * ITEM_MAIN_SIZE - alignedTop, 0.1f);
 }
 
+/**
+ * @tc.name: FastScrollReentrantSpringFinish001
+ * @tc.desc: Finishing an old spring frame cannot cancel a replacement request issued by onWillScroll.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollerTestNg, FastScrollReentrantSpringFinish001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(1000);
+    CreateDone();
+    auto replace = std::make_shared<bool>(true);
+    eventHub_->SetOnWillScroll([this, replace](Dimension offset, ScrollState, ScrollSource) {
+        if (*replace) {
+            *replace = false;
+            pattern_->ScrollToIndexFastScroll(100, true, ScrollAlign::START, 0.0f,
+                FastScrollMode::SKIP_CREATE_AND_MEASURE);
+            return ScrollFrameResult { .offset = Dimension(0.0f) };
+        }
+        return ScrollFrameResult { .offset = offset };
+    });
+    MockAnimationManager::GetInstance().SetTicks(1);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    MockAnimationManager::GetInstance().Tick();
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    EXPECT_EQ(pattern_->GetFastScrollRequest()->index, 100);
+    EXPECT_FALSE(pattern_->fastScrollSkip_);
+    FlushUITasks();
+    for (int32_t tick = 0; tick < 20 && !MockAnimationManager::GetInstance().AllFinished(); ++tick) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+    }
+    EXPECT_TRUE(MockAnimationManager::GetInstance().AllFinished());
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_NEAR(GetChildY(frameNode_, 100), 0.0f, 0.2f);
+}
+
 void ListScrollerTestNg::CreateGroupWithSettingChildrenMainSize(int32_t groupNumber)
 {
     for (int32_t index = 0; index < groupNumber; ++index) {

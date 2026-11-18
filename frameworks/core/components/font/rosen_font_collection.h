@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_FONT_ROSEN_FONT_COLLECTION_H
 
 #include <future>
+#include <mutex>
 #include <vector>
 #include <unordered_set>
 
@@ -58,6 +59,7 @@ private:
 
     bool isZawgyiMyanmar_ = false;
     std::once_flag fontFlag_;
+    std::mutex fontMutex_;
 
     static RosenFontCollection instance;
 };

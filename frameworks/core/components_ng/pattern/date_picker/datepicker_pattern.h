@@ -628,6 +628,11 @@ public:
 
     static const std::string& GetSolarDay(uint32_t day);
 
+    // Format solar month and day together via ICU so the locale's own separator
+    // and field order apply (e.g. "10月15日", "Oct 15", "15. Okt"). Avoids hardcoding
+    // a language list to decide the separator.
+    static const std::string& GetSolarMonthDay(uint32_t month, uint32_t day);
+
     static const std::string& GetLunarMonth(uint32_t month, bool isLeap);
 
     static const std::string& GetLunarDay(uint32_t day);
@@ -809,6 +814,7 @@ public:
     void UpdateDateOrder();
     bool IsNotSetStartEndDate();
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     static bool ReportDateChangeEvent(int32_t nodeId, const std::string& compName,
         const std::string& eventName, const std::string& eventData);
     static bool ReportDialogDateChangeEvent(int32_t nodeId, const std::string& compName,
@@ -950,6 +956,7 @@ private:
     static std::unordered_map<uint32_t, std::string> years_;       // year from 1900 to 2100,count is 201
     static std::unordered_map<uint32_t, std::string> solarMonths_; // solar month from 1 to 12,count is 12
     static std::unordered_map<uint32_t, std::string> solarDays_;   // solar day from 1 to 31, count is 31
+    static std::unordered_map<uint32_t, std::string> solarMonthDays_; // solar month-day combined
     static std::unordered_map<uint32_t, std::string> lunarMonths_; // lunar month from 1 to 24, count is 24
     static std::unordered_map<uint32_t, std::string> lunarDays_;   // lunar day from 1 to 30, count is 30
     static std::vector<std::string> tagOrder_;    // year month day tag order

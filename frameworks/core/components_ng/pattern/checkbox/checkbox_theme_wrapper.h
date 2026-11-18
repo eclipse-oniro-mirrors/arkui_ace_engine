@@ -44,7 +44,7 @@ public:
             if (!themeConstants) {
                 return wrapper;
             }
-            ParsePattern(themeConstants, AceType::DynamicCast<CheckboxTheme>(wrapper));
+            ParsePattern(themeConstants, RefPtr<CheckboxTheme>(wrapper));
             return wrapper;
         }
     };

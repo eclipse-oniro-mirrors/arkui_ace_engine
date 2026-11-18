@@ -32,7 +32,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<DepthComponentLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propBackgroundSource_ = CloneBackgroundSource();
         value->propCameraParams_ = CloneCameraParams();
         value->propLightParams_ = CloneLightParams();

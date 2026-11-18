@@ -166,7 +166,7 @@ int32_t GetTextLineHeight(const RefPtr<FrameNode>& textNode)
     auto textLayoutWrapper = textNode->CreateLayoutWrapper();
     CHECK_NULL_RETURN(textLayoutWrapper, 0);
     textLayoutWrapper->Measure(layoutConstraint);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(textLayoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = textLayoutWrapper->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, 0);
     auto textLayoutAlgorithm = AceType::DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textLayoutAlgorithm, 0);
@@ -267,9 +267,9 @@ bool BubbleView::HandleLowEndImmersiveMaterialForBubble(
         CHECK_NULL_RETURN(copiedOptions, false);
         copiedOptions->materialColor = backgroundColor;
         renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(copiedMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(bubbleNode), AceType::RawPtr(copiedMaterial));
     } else {
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
     }
     return true;
 }

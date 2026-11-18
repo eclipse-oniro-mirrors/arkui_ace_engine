@@ -77,7 +77,7 @@ private:
         uint32_t ignoreMask = 0;
         void* cookie = nullptr;
         CapiSink sink = nullptr;
-        // Cached END payloads contain data only; subscriptions never retain the target node.
+        // Accepted activity for both listener modes, independent of START delivery; never retains the target node.
         std::map<std::pair<int32_t, uint32_t>, std::shared_ptr<const std::string>> starts;
         void (*release)(void*) = nullptr;
         ~CapiSubscription()

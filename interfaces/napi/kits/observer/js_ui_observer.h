@@ -75,6 +75,8 @@ private:
     napi_value ProcessAfterPanEndUnRegister(napi_env env, napi_callback_info info);
     napi_value ProcessNodeRenderStateRegister(napi_env env, napi_callback_info info);
     napi_value ProcessNodeRenderStateUnRegister(napi_env env, napi_callback_info info);
+    napi_value ProcessNodeSensitiveInputRegister(napi_env env, napi_callback_info info);
+    napi_value ProcessNodeSensitiveInputUnRegister(napi_env env, napi_callback_info info);
     napi_value ProcessTextChangeEventRegister(napi_env env, napi_callback_info info);
     napi_value ProcessTextChangeEventUnRegister(napi_env env, napi_callback_info info);
     napi_value ProcessSwiperContentUpdateRegister(napi_env env, napi_callback_info info);
@@ -97,6 +99,7 @@ private:
     bool isDestinationSwitchHandleFuncSetted_ = false;
     bool isTextChangeEventHandleFuncSetted_ = false;
     bool isSwiperContentUpdateHandleFuncSetted_ = false;
+    bool isNodeSensitiveInputHandleFuncSetted_ = false;
     bool isRouterPageSizeChangeHandleFuncSetted_ = false;
     bool isNavDestinationSizeChangeHandleFuncSetted_ = false;
     bool isNavDestinationSizeChangeByUniqueIdHandleFuncSetted_ = false;

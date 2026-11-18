@@ -36,7 +36,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SelectLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propShowInSubWindow_ = CloneShowInSubWindow();
         value->propShowDefaultSelectedIcon_ = CloneShowDefaultSelectedIcon();
         return value;

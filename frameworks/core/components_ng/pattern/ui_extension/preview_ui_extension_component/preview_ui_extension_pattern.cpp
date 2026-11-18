@@ -119,6 +119,7 @@ void PreviewUIExtensionPattern::OnConnect()
     host->AddChild(contentNode_, 0);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     surfaceNode->CreateNodeInRenderThread();
+    isUeaConnecting_ = true;
     FireOnRemoteReadyCallback();
     auto focusHub = host->GetFocusHub();
     bool isFocused = focusHub && focusHub->IsCurrentFocus();
@@ -213,6 +214,7 @@ void PreviewUIExtensionPattern::FireOnRemoteReadyCallback()
     auto suec = weakSecurityUIExtension.Upgrade();
     eventHub->FireOnRemoteReadyCallback(
         MakeRefPtr<NG::SecurityUIExtensionProxy>(sessionWrapper_, suec));
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
 }
 
 void PreviewUIExtensionPattern::FireOnErrorCallback(
@@ -308,6 +310,9 @@ void PreviewUIExtensionPattern::DumpInfo()
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     DumpLog::GetInstance().AddDesc(std::string("eventProxy: ").append(eventProxyStr));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_)
+        .append(", lastSentBrandColorStr: ").append(lastSentBrandColorStr_).append(", isUeaConnecting: ")
+        .append(std::to_string(isUeaConnecting_)));
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -356,6 +361,9 @@ void PreviewUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     json->Put("eventProxy: ", eventProxyStr.c_str());
+    json->Put("brandColorStr: ", brandColorStr_.c_str());
+    json->Put("lastSentBrandColorStr: ", lastSentBrandColorStr_.c_str());
+    json->Put("isUeaConnecting: ", std::to_string(isUeaConnecting_).c_str());
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);

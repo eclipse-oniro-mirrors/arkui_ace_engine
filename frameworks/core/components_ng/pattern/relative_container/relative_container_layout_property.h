@@ -33,7 +33,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<RelativeContainerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propBarrier_ = CloneBarrier();
         value->propGuideline_ = CloneGuideline();
         return value;

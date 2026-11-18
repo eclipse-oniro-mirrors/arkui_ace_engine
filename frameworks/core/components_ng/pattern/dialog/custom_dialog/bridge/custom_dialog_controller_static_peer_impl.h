@@ -84,6 +84,7 @@ public:
     void SetSystemMaterial(Opt_uiMaterial_Material systemMaterial);
     void SetDistortionMode(Opt_DistortionMode distortionMode);
     void SetEdgeLightMode(Opt_EdgeLightMode edgeLightMode);
+    void SetAdaptToHandedness(Opt_HandednessFollowMode adaptToHandedness);
 
     DialogProperties GetDialogProperties() const;
 

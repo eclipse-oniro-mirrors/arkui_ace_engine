@@ -1757,6 +1757,197 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest069, TestSize.Level1
 }
 
 /**
+ * @tc.name: PipelineContextSevenTest090
+ * @tc.desc: Test FlushReload on a font-only update with the animation policy disabled:
+ *           the only-font decision holds and the reload task still completes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest090, TestSize.Level1)
+{
+    AssertValidContext();
+    auto rootBackup = context_->rootNode_;
+    context_->rootNode_ = FrameNode::CreateFrameNodeWithTree(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<RootPattern>());
+    auto stageManagerBackup = context_->stageManager_;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(context_->rootNode_);
+    context_->onShow_ = true;
+    ConfigurationChange config;
+    config.fontUpdate = true;
+    config.fontAnimationEnabled = false;
+    EXPECT_TRUE(config.OnlyFontChange());
+    bool afterTaskExecuted = false;
+    context_->AddAfterReloadAnimationTask([&afterTaskExecuted]() { afterTaskExecuted = true; });
+    context_->FlushReload(config, true);
+    EXPECT_FALSE(context_->isReloading_);
+    // The animation-free branch defers nothing, so it does not drain the after-reload-animation
+    // tasks of the animation lifecycle.
+    EXPECT_FALSE(afterTaskExecuted);
+    EXPECT_NE(context_->stageManager_->GetStageNode(), nullptr);
+    EXPECT_NE(context_->rootNode_, nullptr);
+    // Drain the sentinel for the shared fixture.
+    context_->OnFlushReloadFinish();
+    EXPECT_TRUE(afterTaskExecuted);
+    EXPECT_TRUE(context_->afterReloadAnimationTasks_.empty());
+    context_->stageManager_ = stageManagerBackup;
+    context_->onShow_ = false;
+    context_->rootNode_ = rootBackup;
+}
+
+/**
+ * @tc.name: PipelineContextSevenTest091
+ * @tc.desc: Test OnlyFontChange and FlushReload completion when the configuration mixes
+ *           fontUpdate with any other update flag, so the animation must be kept.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest091, TestSize.Level1)
+{
+    AssertValidContext();
+    auto rootBackup = context_->rootNode_;
+    context_->rootNode_ = FrameNode::CreateFrameNodeWithTree(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<RootPattern>());
+    auto stageManagerBackup = context_->stageManager_;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(context_->rootNode_);
+    context_->onShow_ = true;
+    const std::vector<std::function<void(ConfigurationChange&)>> mixtures = {
+        [](ConfigurationChange& config) { config.colorModeUpdate = true; },
+        [](ConfigurationChange& config) { config.languageUpdate = true; },
+        [](ConfigurationChange& config) { config.directionUpdate = true; },
+        [](ConfigurationChange& config) { config.dpiUpdate = true; },
+        [](ConfigurationChange& config) { config.iconUpdate = true; },
+        [](ConfigurationChange& config) { config.skinUpdate = true; },
+        [](ConfigurationChange& config) { config.fontScaleUpdate = true; },
+        [](ConfigurationChange& config) { config.fontWeightScaleUpdate = true; },
+        [](ConfigurationChange& config) { config.hotReloadUpdate = true; },
+        [](ConfigurationChange& config) { config.hotReloadFullRebuild = true; },
+    };
+    for (const auto& mixture : mixtures) {
+        ConfigurationChange config;
+        config.fontUpdate = true;
+        config.fontAnimationEnabled = false;
+        mixture(config);
+        EXPECT_FALSE(config.OnlyFontChange());
+        bool afterTaskExecuted = false;
+        context_->AddAfterReloadAnimationTask([&afterTaskExecuted]() { afterTaskExecuted = true; });
+        context_->FlushReload(config, false);
+        EXPECT_TRUE(afterTaskExecuted);
+        EXPECT_TRUE(context_->afterReloadAnimationTasks_.empty());
+        EXPECT_FALSE(context_->isReloading_);
+    }
+    context_->stageManager_ = stageManagerBackup;
+    context_->onShow_ = false;
+    context_->rootNode_ = rootBackup;
+}
+
+/**
+ * @tc.name: PipelineContextSevenTest092
+ * @tc.desc: Test that font-only updates keep the reload transition when the animation policy
+ *           is defaulted or explicitly true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest092, TestSize.Level1)
+{
+    AssertValidContext();
+    auto rootBackup = context_->rootNode_;
+    context_->rootNode_ = FrameNode::CreateFrameNodeWithTree(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<RootPattern>());
+    auto stageManagerBackup = context_->stageManager_;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(context_->rootNode_);
+    context_->onShow_ = true;
+    ConfigurationChange defaultPolicyConfig;
+    defaultPolicyConfig.fontUpdate = true;
+    EXPECT_TRUE(defaultPolicyConfig.fontAnimationEnabled);
+    EXPECT_TRUE(defaultPolicyConfig.OnlyFontChange());
+    context_->FlushReload(defaultPolicyConfig, false);
+    EXPECT_FALSE(context_->isReloading_);
+    ConfigurationChange enabledPolicyConfig;
+    enabledPolicyConfig.fontUpdate = true;
+    enabledPolicyConfig.fontAnimationEnabled = true;
+    context_->FlushReload(enabledPolicyConfig, false);
+    EXPECT_FALSE(context_->isReloading_);
+    context_->stageManager_ = stageManagerBackup;
+    context_->onShow_ = false;
+    context_->rootNode_ = rootBackup;
+}
+
+/**
+ * @tc.name: PipelineContextSevenTest093
+ * @tc.desc: Test FlushReload applies the one-shot animation policy per call: a disabled
+ *           font-only reload does not leak into the next font-only reload with default policy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest093, TestSize.Level1)
+{
+    AssertValidContext();
+    auto rootBackup = context_->rootNode_;
+    context_->rootNode_ = FrameNode::CreateFrameNodeWithTree(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<RootPattern>());
+    auto stageManagerBackup = context_->stageManager_;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(context_->rootNode_);
+    context_->onShow_ = true;
+    ConfigurationChange disabledConfig;
+    disabledConfig.fontUpdate = true;
+    disabledConfig.fontAnimationEnabled = false;
+    bool firstTaskExecuted = false;
+    context_->AddAfterReloadAnimationTask([&firstTaskExecuted]() { firstTaskExecuted = true; });
+    context_->FlushReload(disabledConfig, false);
+    EXPECT_FALSE(firstTaskExecuted);
+    // Drain the sentinel for the shared fixture.
+    context_->OnFlushReloadFinish();
+    EXPECT_TRUE(firstTaskExecuted);
+    EXPECT_TRUE(context_->afterReloadAnimationTasks_.empty());
+    ConfigurationChange defaultConfig;
+    defaultConfig.fontUpdate = true;
+    EXPECT_TRUE(defaultConfig.fontAnimationEnabled);
+    bool secondTaskExecuted = false;
+    context_->AddAfterReloadAnimationTask([&secondTaskExecuted]() { secondTaskExecuted = true; });
+    context_->FlushReload(defaultConfig, false);
+    EXPECT_TRUE(secondTaskExecuted);
+    EXPECT_TRUE(context_->afterReloadAnimationTasks_.empty());
+    EXPECT_FALSE(context_->isReloading_);
+    context_->stageManager_ = stageManagerBackup;
+    context_->onShow_ = false;
+    context_->rootNode_ = rootBackup;
+}
+
+/**
+ * @tc.name: PipelineContextSevenTest094
+ * @tc.desc: Test FlushReload finishes a full font-only reload without animation completely:
+ *           reload state is reset, completion tasks are drained and the page stays usable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest094, TestSize.Level1)
+{
+    AssertValidContext();
+    auto rootBackup = context_->rootNode_;
+    context_->rootNode_ = FrameNode::CreateFrameNodeWithTree(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<RootPattern>());
+    auto stageManagerBackup = context_->stageManager_;
+    context_->stageManager_ = AceType::MakeRefPtr<StageManager>(context_->rootNode_);
+    context_->onShow_ = true;
+    ConfigurationChange config;
+    config.fontUpdate = true;
+    config.fontAnimationEnabled = false;
+    bool afterTaskExecuted = false;
+    context_->AddAfterReloadAnimationTask([&afterTaskExecuted]() { afterTaskExecuted = true; });
+    context_->FlushReload(config, true);
+    EXPECT_FALSE(context_->isReloading_);
+    EXPECT_FALSE(afterTaskExecuted);
+    EXPECT_NE(context_->stageManager_->GetStageNode(), nullptr);
+    EXPECT_NE(context_->rootNode_, nullptr);
+    // Drain the sentinel for the shared fixture.
+    context_->OnFlushReloadFinish();
+    EXPECT_TRUE(afterTaskExecuted);
+    EXPECT_TRUE(context_->afterReloadAnimationTasks_.empty());
+    // The page stays usable after the animation-free reload: a further reload still completes.
+    context_->FlushReload(config, true);
+    EXPECT_FALSE(context_->isReloading_);
+    EXPECT_NE(context_->rootNode_, nullptr);
+    context_->stageManager_ = stageManagerBackup;
+    context_->onShow_ = false;
+    context_->rootNode_ = rootBackup;
+}
+
+/**
  * @tc.name: PipelineContextSevenTest070
  * @tc.desc: Test TriggerIdleCallback when idleCallbackFuncs is empty,
  *           covering branch (idleCallbackFuncs_.empty()) as true.

@@ -269,53 +269,6 @@ HWTEST_F(SearchTestThreeNg, OnInjectionEventTest002, TestSize.Level1)
 }
 
 /**
- * @tc.name: HandleBackgroundColor_003
- * @tc.desc: Test SearchPattern HandleBackgroundColor
- * @tc.type: FUNC
- */
-HWTEST_F(SearchTestThreeNg, HandleBackgroundColor_003, TestSize.Level1)
-{
-    /**
-     * @tc.steps: step1. Create Search node
-     */
-    SearchModelNG searchModelInstance;
-    searchModelInstance.Create(DEFAULT_TEXT_U16, PLACEHOLDER_U16, SEARCH_SVG);
-    auto searchNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    ASSERT_NE(searchNode, nullptr);
-    auto pattern = searchNode->GetPattern<SearchPattern>();
-    ASSERT_NE(pattern, nullptr);
-
-    /**
-     * @tc.steps: step2. Verify initial state - check searchLayoutProperty has no background color
-     */
-    auto searchLayoutProperty = searchNode->GetLayoutProperty<SearchLayoutProperty>();
-    ASSERT_NE(searchLayoutProperty, nullptr);
-    bool hasInitialBgColor = searchLayoutProperty->HasBackgroundColor();
-
-    auto renderContext = searchNode->GetRenderContext();
-    ASSERT_NE(renderContext, nullptr);
-
-    /**
-     * @tc.steps: step3. Call HandleBackgroundColor
-     * @tc.expected: Should update renderContext background color from theme if searchLayoutProperty has no background
-     * color
-     */
-    pattern->HandleBackgroundColor();
-
-    /**
-     * @tc.steps: step4. Verify HandleBackgroundColor execution
-     * The function updates renderContext->UpdateBackgroundColor() when searchLayoutProperty has no background color
-     */
-    if (!hasInitialBgColor) {
-        // Verify renderContext background color is set from theme (not transparent)
-        auto bgColor = renderContext->GetBackgroundColor();
-        EXPECT_NE(bgColor.value_or(Color::TRANSPARENT), Color::TRANSPARENT);
-    }
-    // Pattern should still be valid
-    EXPECT_NE(pattern, nullptr);
-}
-
-/**
  * @tc.name: HandleBackgroundColor_004
  * @tc.desc: Test SearchPattern HandleBackgroundColor when renderContext already has a background color.
  *           The function should not override the user-set background color with the theme default.

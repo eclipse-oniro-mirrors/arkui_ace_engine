@@ -832,27 +832,6 @@ enum class ModifierKey {
     ALT = 2,
 };
 
-enum class FunctionKey {
-    ESC = 0,
-    F1 = 1,
-    F2 = 2,
-    F3 = 3,
-    F4 = 4,
-    F5 = 5,
-    F6 = 6,
-    F7 = 7,
-    F8 = 8,
-    F9 = 9,
-    F10 = 10,
-    F11 = 11,
-    F12 = 12,
-    TAB = 13,
-    DPAD_UP = 14,
-    DPAD_DOWN = 15,
-    DPAD_LEFT = 16,
-    DPAD_RIGHT = 17,
-};
-
 enum class ObscuredReasons {
     PLACEHOLDER = 0,
 };
@@ -900,6 +879,7 @@ enum class ImmersiveStrategy : int32_t {
     AVOID_WINDOW_CONTROLS = 6,
     BIND_SHEET_EXPAND_SAFE_AREA = 7,
     NAVIGATION_EXPAND_SAFE_AREA = 8,
+    TABS_EXPAND_SAFE_AREA = 9,
 };
 
 enum class SwipeActionState : uint32_t {

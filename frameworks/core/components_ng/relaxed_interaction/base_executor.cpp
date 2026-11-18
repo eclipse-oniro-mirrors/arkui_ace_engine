@@ -15,6 +15,8 @@
 
 #include "core/components_ng/relaxed_interaction/base_executor.h"
 
+#include "base/log/log_wrapper.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/relaxed_interaction/frame_node_finder.h"
 #include "core/components_ng/relaxed_interaction/utils/workflow_dumper.h"
 
@@ -26,6 +28,14 @@ FrameNodeMatch BaseExecutor::FindFrameNode(
     FrameNodeFinder finder(context_, pred);
     auto result = finder.FindAt(static_cast<float>(x), static_cast<float>(y));
     if (result.GetNode()) {
+        const auto& security = UiCommandSecurityGate::GetContext();
+        if (UiCommandSecurityGate::IsCommandDenied(result.GetNode(), security.needSecurityAuth)) {
+            UiCommandSecurityGate::ReportDeniedCommand(result.GetNode(), security);
+            TAG_LOGW(AceLogTag::ACE_UIEVENT, "Executor %{public}s refused by security gate at target node",
+                GetType().c_str());
+            failureState_ = ExecutionState::SECURITY_DENIED;
+            return FrameNodeMatch();
+        }
         WorkflowDumper::GetInstance().AddLog(
             "Found frame node " + result.GetNode()->ToString() + " for executor " + GetType());
     } else {
@@ -33,6 +43,25 @@ FrameNodeMatch BaseExecutor::FindFrameNode(
     }
 
     return result;
+}
+
+bool BaseExecutor::IsTargetDeniedAt(double x, double y)
+{
+    const auto& security = UiCommandSecurityGate::GetContext();
+    if (!security.needSecurityAuth) {
+        return false;
+    }
+    FrameNodeFinder finder(
+        context_, [](const RefPtr<NGGestureRecognizer>&) { return true; });
+    auto result = finder.FindAt(static_cast<float>(x), static_cast<float>(y));
+    auto node = result.GetNode();
+    if (!UiCommandSecurityGate::IsCommandDenied(node, security.needSecurityAuth)) {
+        return false;
+    }
+    UiCommandSecurityGate::ReportDeniedCommand(node, security);
+    TAG_LOGW(AceLogTag::ACE_UIEVENT, "Executor %{public}s refused by security gate at target node",
+        GetType().c_str());
+    return true;
 }
 
 } // namespace OHOS::Ace::NG

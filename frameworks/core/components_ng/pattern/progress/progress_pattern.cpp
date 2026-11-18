@@ -38,7 +38,7 @@ bool ProgressPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirt
     if (config.skipMeasure || dirty->SkipMeasureContent()) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto progressLayoutAlgorithm = DynamicCast<ProgressLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(progressLayoutAlgorithm, false);
@@ -608,13 +608,12 @@ void ProgressPattern::OnLanguageConfigurationUpdate()
     auto progressLayoutProperty = GetLayoutProperty<ProgressLayoutProperty>();
     CHECK_NULL_VOID(progressLayoutProperty);
     bool isRtl = progressLayoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
-    if (isRightToLeft_ == isRtl) {
-        return;
+    if (isRightToLeft_ != isRtl) {
+        CHECK_NULL_VOID(progressModifier_);
+        progressModifier_->SetIsRightToLeft(isRtl);
+        isRightToLeft_ = isRtl;
     }
-    CHECK_NULL_VOID(progressModifier_);
-    progressModifier_->SetIsRightToLeft(isRtl);
-    host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
-    isRightToLeft_ = isRtl;
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 FocusPattern ProgressPattern::GetFocusPattern() const

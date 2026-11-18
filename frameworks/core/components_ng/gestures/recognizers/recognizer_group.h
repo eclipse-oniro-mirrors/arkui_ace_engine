@@ -183,7 +183,7 @@ public:
                 group->CollectResponseLinkRecognizersRecursively(responseLinkResult);
                 continue;
             }
-            auto recognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(item);
+            auto recognizer = item;
             if (recognizer) {
                 responseLinkResult.emplace_back(recognizer);
             }

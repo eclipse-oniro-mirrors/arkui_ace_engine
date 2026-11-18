@@ -635,6 +635,7 @@ void WindowScene::OnActivation()
         self->session_->SetShowRecent(false);
         auto host = self->GetHost();
         CHECK_NULL_VOID(host);
+
         if (self->destroyed_) {
             self->destroyed_ = false;
             self->RemoveChild(host, self->startingWindow_, self->startingWindowName_);
@@ -653,19 +654,16 @@ void WindowScene::OnActivation()
             host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         } else if (showingInRecents &&
             self->session_->GetSessionState() == Rosen::SessionState::STATE_DISCONNECT && self->snapshotWindow_) {
-            self->RemoveChild(host, self->snapshotWindow_, self->snapshotWindowName_);
-            self->snapshotWindow_.Reset();
-            self->session_->SetNeedSnapshot(true);
-            self->SetSubSessionVisible();
-            if (self->session_->IsPrelaunch()) {
-                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
-                self->CreateBlankWindow(self->startingWindow_);
-                self->isPrelaunch_.store(true, std::memory_order_release);
+            if (self->session_->GetTryUseSnapshot() && self->session_->HasPersistentSnapshot()) {
+                TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE,
+                    "OnActivation tryUseSnapshot id: %{public}d, keep snapshot window",
+                    self->session_->GetPersistentId());
+                self->session_->SetNeedSnapshot(true);
+                self->SetSubSessionVisible();
+                host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
             } else {
-                self->CreateStartingWindow();
+                self->ReplaceSnapshotWithStartingWindow();
             }
-            self->AddChild(host, self->startingWindow_, self->startingWindowName_);
-            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         } else if (self->startingWindow_ &&
             self->session_->GetSessionState() != Rosen::SessionState::STATE_DISCONNECT) {
             auto surfaceNode = self->session_->GetSurfaceNode();
@@ -684,6 +682,25 @@ void WindowScene::OnActivation()
     auto pipelineContext = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipelineContext);
     pipelineContext->PostAsyncEvent(std::move(uiTask), "ArkUIWindowSceneActivation", TaskExecutor::TaskType::UI);
+}
+
+void WindowScene::ReplaceSnapshotWithStartingWindow()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    RemoveChild(host, snapshotWindow_, snapshotWindowName_);
+    snapshotWindow_.Reset();
+    session_->SetNeedSnapshot(true);
+    SetSubSessionVisible();
+    if (session_->IsPrelaunch()) {
+        TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "OnActivation CreateBlankWindow");
+        CreateBlankWindow(startingWindow_);
+        isPrelaunch_.store(true, std::memory_order_release);
+    } else {
+        CreateStartingWindow();
+    }
+    AddChild(host, startingWindow_, startingWindowName_);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void WindowScene::DisposeSnapshotAndBlankWindow()

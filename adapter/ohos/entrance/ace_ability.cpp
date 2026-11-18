@@ -231,7 +231,7 @@ void AceAbility::OnStart(const Want& want, sptr<AAFwk::SessionInfo> sessionInfo)
             LOGE("ability start set application info failed,it may cause exception");
             return;
         }
-        AceApplicationInfo::GetInstance().SetUid(IPCSkeleton::GetCallingUid());
+        AceApplicationInfo::GetInstance().SetUid(IPCSkeleton::GetCallingAppUid());
         AceApplicationInfo::GetInstance().SetPid(IPCSkeleton::GetCallingRealPid());
         ImageFileCache::GetInstance().SetImageCacheFilePath(cacheDir);
         ImageFileCache::GetInstance().SetCacheFileInfo();

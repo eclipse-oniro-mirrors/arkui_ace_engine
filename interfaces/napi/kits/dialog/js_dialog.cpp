@@ -20,6 +20,7 @@
 #include "base/log/log.h"
 #include "base/memory/referenced.h"
 #include "base/subwindow/subwindow_manager.h"
+#include "base/utils/napi_scope_raii.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
@@ -101,14 +102,16 @@ napi_value JSPresentDialog(napi_env env, napi_callback_info info)
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
+                ScopeRAII scope(context->env);
+                if (!scope) {
+                    TAG_LOGE(AceLogTag::ACE_DIALOG, "JSPresentDialog failed to open the scope of the handle.");
+                    return;
+                }
                 if (context->deferred) {
                     RejectPromise(context->env, context->deferred,
                         "Internal error.", ERROR_CODE_INTERNAL_ERROR);
                     context->deferred = nullptr;
                 }
-                napi_close_handle_scope(context->env, scope);
             },
             TaskExecutor::TaskType::JS, "ArkUIDialogShowNoDelegate");
         context = nullptr;
@@ -216,14 +219,16 @@ napi_value JSPresentCustomDialog(napi_env env, napi_callback_info info)
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
+                ScopeRAII scope(context->env);
+                if (!scope) {
+                    TAG_LOGE(AceLogTag::ACE_DIALOG, "JSPresentCustomDialog failed to open the scope of the handle.");
+                    return;
+                }
                 if (context->deferred) {
                     RejectPromise(context->env, context->deferred,
                         "Internal error.", ERROR_CODE_INTERNAL_ERROR);
                     context->deferred = nullptr;
                 }
-                napi_close_handle_scope(context->env, scope);
             },
             TaskExecutor::TaskType::JS, "ArkUIDialogOpenCustomNoDelegate");
         context = nullptr;
@@ -359,14 +364,16 @@ napi_value JSDismissDialog(napi_env env, napi_callback_info info)
                     if (context == nullptr) {
                         return;
                     }
-                    napi_handle_scope scope = nullptr;
-                    napi_open_handle_scope(context->env, &scope);
+                    ScopeRAII scope(context->env);
+                    if (!scope) {
+                        TAG_LOGE(AceLogTag::ACE_DIALOG, "JSDismissDialog failed to open the scope of the handle.");
+                        return;
+                    }
                     if (context->deferred) {
                         RejectPromise(context->env, context->deferred,
                             "Internal error.", ERROR_CODE_INTERNAL_ERROR);
                         context->deferred = nullptr;
                     }
-                    napi_close_handle_scope(context->env, scope);
                 },
                 TaskExecutor::TaskType::JS, "ArkUIDialogDismissNoDelegate");
             context = nullptr;
@@ -394,16 +401,18 @@ napi_value JSDismissDialog(napi_env env, napi_callback_info info)
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
-                if (context->deferred) {
-                    RejectPromise(context->env, context->deferred,
-                        "Internal error.", ERROR_CODE_INTERNAL_ERROR);
-                    context->deferred = nullptr;
-                }
-                napi_close_handle_scope(context->env, scope);
-            },
-            TaskExecutor::TaskType::JS, "ArkUIDialogDismissByNodeNoDelegate");
+                    ScopeRAII scope(context->env);
+                    if (!scope) {
+                        TAG_LOGE(AceLogTag::ACE_DIALOG, "JSDismissDialog failed to open the scope of the handle.");
+                        return;
+                    }
+                    if (context->deferred) {
+                        RejectPromise(context->env, context->deferred,
+                            "Internal error.", ERROR_CODE_INTERNAL_ERROR);
+                        context->deferred = nullptr;
+                    }
+                },
+                TaskExecutor::TaskType::JS, "ArkUIDialogDismissByNodeNoDelegate");
         context = nullptr;
         return result;
     }

@@ -82,6 +82,7 @@ class ResponseRegion;
 class UiMaterial;
 struct ImmersiveOptions;
 struct ImmersiveMaterialConfig;
+enum class VibrancyMode : int8_t;
 }
 
 namespace OHOS::Ace::NG {
@@ -90,7 +91,6 @@ class UINode;
 struct AttractionEffect;
 using TransitionFinishCallback = std::function<void(bool)>;
 using OnNeedSoftkeyboardFunc = std::function<bool()>;
-using SafeAreaInsetContentArray = std::array<RefPtr<UINode>, SAFE_AREA_INSET_EDGE_COUNT>;
 struct ACE_FORCE_EXPORT OptionParam {
     std::string value;
     std::string icon;
@@ -257,9 +257,6 @@ public:
     static void SetSafeAreaPadding(FrameNode* frameNode, const PaddingProperty& value);
     static void ResetSafeAreaPadding();
     static void ResetSafeAreaPadding(FrameNode* frameNode);
-    static void SetSafeAreaInset(
-        FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents);
-    static void ResetSafeAreaInset(FrameNode* frameNode);
     static void CheckSafeAreaPaddingLPX(const PaddingProperty& value);
     static void CheckNodeSafeAreaPaddingLPX(FrameNode* frameNode, const PaddingProperty& value);
     static void CheckNodeSafeAreaPaddingLPX(RefPtr<OHOS::Ace::NG::FrameNode> frameNode, const PaddingProperty& value);
@@ -509,6 +506,7 @@ public:
     static void SetMouseResponseRegion(const std::vector<DimensionRect> &mouseResponseRegion);
     static void SetTouchable(bool touchable);
     static void SetHitTestMode(HitTestMode hitTestMode);
+    static void SetAgentControlMode(const std::optional<AgentControlMode>& mode);
     static void SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnTouchTestFunc(FrameNode* frameNode, NG::OnChildTouchTestFunc&& onChildTouchTest);
     static void SetOnFocusAxisEvent(OnFocusAxisEventFunc&& onFocusAxisCallback);
@@ -793,6 +791,7 @@ public:
     static void SetTransformMatrix(FrameNode* frameNode, const Matrix4& matrix);
     static void SetTransform3DMatrix(FrameNode* frameNode, const Matrix4& matrix);
     static void SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode);
+    static void SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode);
     static void SetOpacity(FrameNode* frameNode, double opacity);
     static void SetOpacity(FrameNode* frameNode, double opacity, const RefPtr<ResourceObject>& resObj);
     static void UpdateBackgroundBlurStyle(
@@ -976,6 +975,7 @@ public:
     static void SetBlendApplyType(FrameNode* frameNode, BlendApplyType blendApplyType);
     static void SetBlender(FrameNode* frameNode, const OHOS::Rosen::Blender* blender);
     static void ResetBlender(FrameNode* frameNode);
+    static void SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode);
     static void SetMonopolizeEvents(FrameNode* frameNode, bool monopolizeEvents);
     static void SetDraggable(FrameNode* frameNode, bool draggable);
     static void SetHoverEffect(FrameNode* frameNode, HoverEffectType hoverEffect);
@@ -984,6 +984,8 @@ public:
     static void SetEnableClickSoundEffect(FrameNode* frameNode, bool enabled);
     static void SetKeyboardShortcut(FrameNode* frameNode, const std::string& value,
         const std::vector<ModifierKey>& keys, std::function<void()>&& onKeyboardShortcutAction);
+    static void RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+        const std::vector<ModifierKey>& keys);
 
     static void SetOnAppear(FrameNode* frameNode, std::function<void()> &&onAppear);
     static void SetOnDisappear(FrameNode* frameNode, std::function<void()> &&onDisappear);

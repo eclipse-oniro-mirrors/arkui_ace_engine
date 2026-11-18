@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
@@ -262,19 +263,107 @@ HWTEST_F(TextFieldPatternTestThree, GetPreviewTextRects002, TestSize.Level0)
 }
 
 /**
- * @tc.name: GetPreviewTextStyle001
- * @tc.desc: test testInput text GetPreviewTextStyle001
+ * @tc.name: GetPreviewStyling001
+ * @tc.desc: test testInput text GetPreviewStyling001
  * @tc.type: FUNC
  */
-HWTEST_F(TextFieldPatternTestThree, GetPreviewTextStyle001, TestSize.Level0)
+HWTEST_F(TextFieldPatternTestThree, GetPreviewStyling001, TestSize.Level0)
 {
     CreateTextField(DEFAULT_TEXT);
     GetFocus();
 
     pattern_->ReceivePreviewTextStyle("normal");
-    EXPECT_EQ(pattern_->GetPreviewTextStyle(), PreviewTextStyle::NORMAL);
+    EXPECT_EQ(pattern_->GetPreviewStyling().underlineShape, PreviewTextStyle::NORMAL);
     pattern_->ReceivePreviewTextStyle("underline");
-    EXPECT_EQ(pattern_->GetPreviewTextStyle(), PreviewTextStyle::UNDERLINE);
+    EXPECT_EQ(pattern_->GetPreviewStyling().underlineShape, PreviewTextStyle::UNDERLINE);
+}
+
+/**
+ * @tc.name: ReceivePreviewTextStyle_EmptyStyle_002
+ * @tc.desc: test ReceivePreviewTextStyle with empty style (no SetPreviewTextStyling)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_EmptyStyle_002, TestSize.Level0)
+{
+    CreateTextField(DEFAULT_TEXT);
+    GetFocus();
+
+    auto before = pattern_->GetPreviewStyling().underlineShape;
+    pattern_->ReceivePreviewTextStyle("");
+    EXPECT_EQ(pattern_->GetPreviewStyling().underlineShape, before);
+}
+
+/**
+ * @tc.name: ReceivePreviewTextStyle_ApiVersion26_003
+ * @tc.desc: test ReceivePreviewTextStyle with API version >= 26 and no caret color flag by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_ApiVersion26_003, TestSize.Level0)
+{
+    CreateTextField(DEFAULT_TEXT);
+    GetFocus();
+
+    int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
+    auto paintProperty = pattern_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->ResetCaretColorFlagByUser();
+
+    pattern_->ReceivePreviewTextStyle("underline");
+    auto styling = pattern_->GetPreviewStyling();
+    EXPECT_EQ(styling.underlineShape, PreviewTextStyle::UNDERLINE);
+    EXPECT_FALSE(styling.underlineColor.has_value());
+
+    MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
+}
+
+/**
+ * @tc.name: ReceivePreviewTextStyle_ApiVersion26_FlagSet_005
+ * @tc.desc: test ReceivePreviewTextStyle with API >= 26 and caret color flag set by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_ApiVersion26_FlagSet_005, TestSize.Level0)
+{
+    CreateTextField(DEFAULT_TEXT);
+    GetFocus();
+
+    int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
+    auto paintProperty = pattern_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCursorColor(Color::BLUE);
+    paintProperty->UpdateCaretColorFlagByUser(true);
+
+    pattern_->ReceivePreviewTextStyle("underline");
+    auto styling = pattern_->GetPreviewStyling();
+    EXPECT_EQ(styling.underlineShape, PreviewTextStyle::UNDERLINE);
+    EXPECT_FALSE(styling.underlineColor.has_value());
+
+    MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
+}
+
+/**
+ * @tc.name: ReceivePreviewTextStyle_ApiVersionLow_004
+ * @tc.desc: test ReceivePreviewTextStyle with API version < 26 (uses paintProperty color)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestThree, ReceivePreviewTextStyle_ApiVersionLow_004, TestSize.Level0)
+{
+    CreateTextField(DEFAULT_TEXT);
+    GetFocus();
+
+    int32_t backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    auto paintProperty = pattern_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateCursorColor(Color::BLUE);
+
+    pattern_->ReceivePreviewTextStyle("underline");
+    auto styling = pattern_->GetPreviewStyling();
+    EXPECT_EQ(styling.underlineShape, PreviewTextStyle::UNDERLINE);
+    EXPECT_FALSE(styling.underlineColor.has_value());
+
+    MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
 }
 
 /**
@@ -897,7 +986,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest001, TestSize.Level1)
      * @tc.steps: step2. DynamicCast pattern to ICleanNodeHost.
      * @tc.expected: interface pointer is valid and basic methods don't crash.
      */
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_NE(hostInterface->GetHost(), nullptr);
     EXPECT_FALSE(hostInterface->IsDragging());
@@ -925,7 +1014,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest002, TestSize.Level1)
     /**
      * @tc.steps: step2. verify interface getters reflect layout property values.
      */
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::CONSTANT);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
@@ -1027,7 +1116,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest005, TestSize.Level1)
         model.SetCancelButtonSymbol(false);
     });
     ASSERT_NE(pattern_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
 
     /**
@@ -1076,7 +1165,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest006, TestSize.Level1)
     /**
      * @tc.steps: step3. verify all interface getters return the set values.
      */
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCancelIconColor(), Color::RED);
     EXPECT_EQ(hostInterface->GetCancelIconSrc(), "/test/icon.svg");
@@ -1106,7 +1195,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest007, TestSize.Level1)
         model.SetCancelButtonSymbol(false);
     });
     ASSERT_NE(pattern_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
 
     /**
@@ -1137,7 +1226,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest007, TestSize.Level1)
     layoutProperty_->UpdateIconSrc("/test/cancel.png");
     layoutProperty_->UpdateBundleName("com.test.bn");
     layoutProperty_->UpdateModuleName("mod");
-    hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
 
     /**
@@ -1213,7 +1302,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest009, TestSize.Level1)
         model.SetCancelButtonSymbol(false);
     });
     ASSERT_NE(pattern_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_FALSE(hostInterface->IsContentEmpty());
 

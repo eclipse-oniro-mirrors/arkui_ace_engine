@@ -16,7 +16,6 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_LAYOUTS_LAYOUT_PROPERTY_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_LAYOUTS_LAYOUT_PROPERTY_H
 
-#include <array>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -53,6 +52,8 @@ struct PositionProperty;
 struct SafeAreaExpandOpts;
 class GeometryTransition;
 struct SafeAreaInsets;
+struct SafeAreaInsetOptions;
+class SafeAreaInsetState;
 using BiasPair = std::pair<float, float>;
 using ChainWeightPair = std::pair<std::optional<float>, std::optional<float>>; // <horizontal,vertical>
 
@@ -109,14 +110,14 @@ public:
     void UpdatePadding(const PaddingProperty& value);
     void UpdateSafeAreaPadding(const PaddingProperty& value);
     void ResetSafeAreaPadding();
-    bool HasSafeAreaInset() const;
-    void CheckLocalizedSafeAreaInset(const TextDirection& direction);
-    const SafeAreaInsetResolvedEdge& GetResolvedSafeAreaInsetEdge(SafeAreaInsetEdge edge) const;
+    // safeAreaInset state is owned opaquely; the state class and its accessors live in
+    // safe_area_inset_property.h and their bodies in layout_property.cpp.
+    const SafeAreaInsetState& GetSafeAreaInsetState() const;
+    SafeAreaInsetState& EnsureSafeAreaInsetState();
     void UpdateSafeAreaInset(const SafeAreaInsetOptions& value);
     void ResetSafeAreaInset();
-    const std::optional<SafeAreaInsetOptions>& GetSafeAreaInset() const;
     void UpdateSafeAreaInsetContribution(const PaddingPropertyF& value);
-    const PaddingPropertyF& GetSafeAreaInsetContribution() const;
+    void CheckLocalizedSafeAreaInset(const TextDirection& direction);
     bool HasSafeAreaPaddingSource() const;
     bool HasEffectiveSafeAreaPadding();
 
@@ -384,9 +385,8 @@ private:
     std::pair<std::vector<std::string>, std::vector<std::string>> calcMinSizeRpn_;
     std::pair<std::vector<std::string>, std::vector<std::string>> calcMaxSizeRpn_;
     std::unique_ptr<PaddingProperty> safeAreaPadding_;
-    std::optional<SafeAreaInsetOptions> safeAreaInset_;
-    std::array<SafeAreaInsetResolvedEdge, SAFE_AREA_INSET_EDGE_COUNT> resolvedSafeAreaInsetEdges_;
-    PaddingPropertyF safeAreaInsetContribution_;
+    // Opaque safeAreaInset state; complete type and accessors live in safe_area_inset_property.h.
+    std::unique_ptr<SafeAreaInsetState> safeAreaInsetState_;
     std::unique_ptr<PaddingProperty> padding_;
     std::unique_ptr<MarginProperty> margin_;
     std::optional<MarginPropertyF> marginResult_;

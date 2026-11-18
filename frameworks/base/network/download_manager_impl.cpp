@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <atomic>
+
 #include "hilog/log.h"
 #include "http_client.h"
 #include "net_conn_client.h"
@@ -486,8 +488,11 @@ private:
         }
         if (!downloadCondition->downloadSuccess.has_value()) {
             LOGI("Sync Task of netstack with url [%{private}s] maximum waiting period exceed", url.c_str());
+            downloadCallback.failCallback("Sync download timeout",
+                { ImageErrorCode::GET_IMAGE_SYNC_HTTP_FAILED, "sync download timeout" }, false, instanceId);
+            return true;
         }
-        if (downloadCondition->downloadSuccess.value_or(false)) {
+        if (downloadCondition->downloadSuccess.value()) {
             downloadCallback.successCallback(std::move(downloadCondition->dataOut), false, instanceId);
         } else {
             downloadCallback.failCallback(downloadCondition->errorMsg, downloadCondition->errorInfo, false, instanceId);
@@ -576,7 +581,7 @@ private:
     }
 
     std::mutex mutex_;
-    bool initialized_ = false;
+    std::atomic<bool> initialized_ = false;
     bool isCurl_ = false;
 };
 

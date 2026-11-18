@@ -285,6 +285,20 @@ public:
     static Color GetCounterTextColor(FrameNode* frameNode);
     static Color GetCounterTextOverflowColor(FrameNode* frameNode);
 
+    // ===== auto fill properties (static methods with FrameNode*) =====
+    static void SetEnableAutoFill(FrameNode* frameNode, bool enableAutoFill);
+    static void ResetEnableAutoFill(FrameNode* frameNode);
+    static bool GetEnableAutoFill(FrameNode* frameNode);
+    static void SetContentType(FrameNode* frameNode, const TextContentType& value);
+    static void ResetContentType(FrameNode* frameNode);
+    static TextContentType GetContentType(FrameNode* frameNode);
+    static void SetPasswordRules(FrameNode* frameNode, const std::string& passwordRules);
+    static void ResetPasswordRules(FrameNode* frameNode);
+    static std::string GetPasswordRules(FrameNode* frameNode);
+    static void SetEnableAutoFillAnimation(FrameNode* frameNode, bool enableFillAnimation);
+    static void ResetEnableAutoFillAnimation(FrameNode* frameNode);
+    static bool GetEnableAutoFillAnimation(FrameNode* frameNode);
+
     // ===== border methods (static methods with FrameNode*) =====
     static void SetBorderWidth(FrameNode* frameNode, const BorderWidthProperty& borderWidth);
     static void SetBorderRadius(FrameNode* frameNode, const BorderRadiusProperty& borderRadius);

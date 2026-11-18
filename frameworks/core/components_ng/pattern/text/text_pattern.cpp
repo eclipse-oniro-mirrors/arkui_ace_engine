@@ -39,6 +39,7 @@
 #include "base/utils/utf_helper.h"
 #include "base/utils/utils.h"
 #include "core/common/ace_engine_ext.h"
+#include "core/common/ai/text_ai_utils.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/common/clipboard/clipboard_proxy.h"
@@ -52,6 +53,7 @@
 #include "core/components/common/properties/text_style_parser.h"
 #include "core/components/common/properties/text_style_gradient.h"
 #include "core/components_ng/base/geometry_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/gestures/recognizers/gesture_recognizer.h"
 #include "core/components_ng/manager/select_content_overlay/selection_container.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
@@ -1736,11 +1738,15 @@ bool TextPattern::ParseCommand(const std::string& command)
         }
         ReportCommandResult(host->GetId(), "Text.onCopyComplete");
     } else {
-        TAG_LOGE(AceLogTag::ACE_TEXT, "OnInjectionEvent unknown cmd : %{public}s, nodeId : %{public}d",
-            cmd.c_str(), host->GetId());
+        TAG_LOGE(AceLogTag::ACE_TEXT, "OnInjectionEvent unknown cmd nodeId : %{public}d", host->GetId());
         return false;
     }
     return true;
+}
+
+CommandResult TextPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "selectText", "copy" });
 }
 
 int32_t TextPattern::OnInjectionEvent(const std::string& command)
@@ -1799,11 +1805,43 @@ bool TextPattern::PrepareAIMenuOptions(
         selectedAiEntityNum++;
         if (selectedAiEntityNum > MAX_SELECTED_AI_ENTITY) {
             break;
-        } else {
-            aiMenuOptions[spanIter->second.type] = spanIter->second;
         }
+        // Skip phone number entity if no phone call app exists (e.g. wifi-only device)
+        if (!CheckPhoneCallAppExist(spanIter->second)) {
+            continue;
+        }
+        aiMenuOptions[spanIter->second.type] = spanIter->second;
     }
     return selectedAiEntityNum == MAX_SELECTED_AI_ENTITY;
+}
+
+bool TextPattern::CheckPhoneCallAppExist(const AISpan& aiSpan)
+{
+    if (aiSpan.type != TextDataDetectType::PHONE_NUMBER) {
+        return true;
+    }
+    auto callPhoneFuncName = TextAiUtils::GetCallPhoneFuncName();
+    if (callPhoneFuncName.empty()) {
+        return false;
+    }
+    auto typeIter = TEXT_DETECT_MAP.find(aiSpan.type);
+    if (typeIter == TEXT_DETECT_MAP.end()) {
+        return true;
+    }
+    if (!selectDetectorAdapter_) {
+        return true;
+    }
+    const auto& menuActions = selectDetectorAdapter_->textDetectResult_.menuOptionAndAction;
+    auto actionIter = menuActions.find(typeIter->second);
+    if (actionIter == menuActions.end() || actionIter->second.empty()) {
+        return false;
+    }
+    for (const auto& [actionName, func] : actionIter->second) {
+        if (actionName == callPhoneFuncName) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void TextPattern::UpdateAIMenuOptions()
@@ -5336,7 +5374,7 @@ bool TextPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
         dataDetectorAdapter_->aiSpanRects_.clear();
     }
 
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textLayoutAlgorithm, false);
@@ -5905,8 +5943,12 @@ void TextPattern::OnVisibleChange(bool isVisible)
             GetDataDetectorAdapter()->aiDetectDelayTask_.Cancel();
         }
     } else {
-        if (CanStartAITask()) {
-            GetDataDetectorAdapter()->StartAITask();
+        if (CanStartAITask() && !GetDataDetectorAdapter()->aiDetectInitialized_) {
+            ParseOriText(textForDisplay_);
+            if (!GetDataDetectorAdapter()->aiDetectInitialized_) {
+                GetDataDetectorAdapter()->textForAI_ = textForDisplay_;
+                GetDataDetectorAdapter()->StartAITask();
+            }
         }
     }
 }
@@ -8351,8 +8393,8 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
     offset = renderContext->GetPaintRectWithTransform().GetOffset();
-    if (parent && host->HasAdoptedCompensation()) {
-        offset += host->GetTransformedAdoptedCompensationOffset();
+    if (parent && FrameNodeAdoptedCompensation::HasAdoptedCompensation(host.GetRawPtr())) {
+        offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(host.GetRawPtr());
     }
     while (parent) {
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
@@ -8363,8 +8405,8 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
         CHECK_NULL_RETURN(parentRenderContext, nullptr);
         offset += parentRenderContext->GetPaintRectWithTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            offset += parent->GetTransformedAdoptedCompensationOffset();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetTransformedAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }

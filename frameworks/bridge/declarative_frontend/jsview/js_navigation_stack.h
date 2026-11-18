@@ -137,7 +137,6 @@ public:
     void SetNeedBuildNewInstance(int32_t index, bool need) override;
     void SetIsEntryByIndex(int32_t index, bool isEntry) override;
 
-    std::string GetStringifyParamByIndex(int32_t index) const override;
     std::string GetSerializedParamSafely(int32_t index) const override;
     std::string GetSerializedParamForRecovery(int32_t index) const override;
     void SetPathArray(const std::vector<NG::NavdestinationRecoveryInfo>& navdestinationsInfo) override;

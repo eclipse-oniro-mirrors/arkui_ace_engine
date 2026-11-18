@@ -74,8 +74,11 @@ std::string BadgeComposedElement::GetBadgePosition(void) const
         return std::string("-");
     }
     auto badgeComponent = renderBadge->GetBadgeComponent();
+    if (!badgeComponent) {
+        return std::string("-");
+    }
     if (!badgeComponent->IsPositionXy()) {
-        switch (renderBadge->GetBadgeComponent()->GetBadgePosition()) {
+        switch (badgeComponent->GetBadgePosition()) {
             case BadgePosition::RIGHT_TOP:
                 return std::string("BadgePosition.RightTop");
             case BadgePosition::RIGHT:
@@ -88,12 +91,8 @@ std::string BadgeComposedElement::GetBadgePosition(void) const
         return std::string("-");
     } else {
         auto jsonValue = JsonUtil::Create(true);
-        if (renderBadge) {
-            if (badgeComponent) {
-                jsonValue->Put("x", badgeComponent->GetBadgePositionX().ToString().c_str());
-                jsonValue->Put("y", badgeComponent->GetBadgePositionY().ToString().c_str());
-            }
-        }
+        jsonValue->Put("x", badgeComponent->GetBadgePositionX().ToString().c_str());
+        jsonValue->Put("y", badgeComponent->GetBadgePositionY().ToString().c_str());
         return jsonValue->ToString();
     }
 }

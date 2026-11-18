@@ -141,7 +141,7 @@ HWTEST_F(GridScrollLayoutTestThreeNg, GetResetMode001, TestSize.Level1)
     CreateFixedItems(40);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto layoutAlgorithm =
         AceType::DynamicCast<GridScrollLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto* wrapper = AceType::RawPtr(frameNode_);

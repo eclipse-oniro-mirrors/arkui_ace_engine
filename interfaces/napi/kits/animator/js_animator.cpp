@@ -358,7 +358,7 @@ static napi_value JSReset(napi_env env, napi_callback_info info)
         NapiThrow(env, "Internal error. Animator is null in AnimatorResult.", ERROR_CODE_INTERNAL_ERROR);
         return nullptr;
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator reset, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator reset, id:%{public}d", animator->GetId());
     if (option->iterations == ANIMATION_REPEAT_INFINITE && option->duration == 0) {
         ACE_ENGINE_HISTOGRAM_BOOLEAN("@ohos.animator.reset", 1);
     }
@@ -474,7 +474,7 @@ static napi_value JSPause(napi_env env, napi_callback_info info)
     if (!animator) {
         return nullptr;
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator pause, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator pause, id:%{public}d", animator->GetId());
     animator->Pause();
     napi_value result;
     napi_get_null(env, &result);
@@ -520,7 +520,7 @@ static napi_value JSReverse(napi_env env, napi_callback_info info)
             return nullptr;
         }
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator reverse, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator reverse, id:%{public}d", animator->GetId());
     animator->Reverse();
     napi_value result;
     napi_get_null(env, &result);
@@ -710,7 +710,7 @@ static napi_value SetOnfinish(napi_env env, napi_callback_info info)
     napi_create_reference(env, onfinish, 1, &onfinishRef);
     animatorResult->SetOnfinishRef(onfinishRef);
     animator->ClearStopListeners();
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator set onFinish, id:%{public}d", animator->GetId());
+    TAG_LOGD(AceLogTag::ACE_ANIMATION, "jsAnimator set onFinish, id:%{public}d", animator->GetId());
     animator->AddStopListener([env, onfinishRef, id = animator->GetId()] {
         ScopeRAII scope(env);
         if (!scope) {
@@ -727,7 +727,7 @@ static napi_value SetOnfinish(napi_env env, napi_callback_info info)
             return;
         }
         ACE_SCOPED_TRACE("jsAnimator finishCallback, id:%d", id);
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator set onFinish, id:%{public}d", id);
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator call onFinish, id:%{public}d", id);
         result = napi_call_function(env, NULL, onfinish, 0, NULL, &ret);
         if (result != napi_ok) {
             TAG_LOGW(

@@ -3634,4 +3634,67 @@ HWTEST_F(ListPatternTestNg, PublicDumpWaterFlowReverseIsUnique, TestSize.Level1)
     }
 }
 
+/**
+ * @tc.name: CreateNodePaintMethodWithoutRenderContext001
+ * @tc.desc: CreateNodePaintMethod returns the paint method when the render context is missing
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, CreateNodePaintMethodWithoutRenderContext001, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    CreateListItems();
+    CreateDone();
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(frameNode_->GetRenderContext(), nullptr);
+
+    /**
+     * @tc.steps: step1. Drop the render context and create the paint method again
+     * @tc.expected: the paint method is returned instead of dereferencing the null render context
+     */
+    const auto savedRenderContext = frameNode_->renderContext_;
+    frameNode_->renderContext_ = nullptr;
+    auto paint = pattern_->CreateNodePaintMethod();
+    frameNode_->renderContext_ = savedRenderContext;
+    EXPECT_NE(paint, nullptr);
+
+    /**
+     * @tc.steps: step2. Create the paint method with the render context restored
+     * @tc.expected: the paint method is created as usual
+     */
+    ASSERT_NE(frameNode_->GetRenderContext(), nullptr);
+    EXPECT_NE(pattern_->CreateNodePaintMethod(), nullptr);
+}
+
+/**
+ * @tc.name: FindChildFocusNodeByIndexWithoutListProperty001
+ * @tc.desc: FindChildFocusNodeByIndex returns null when the list layout property is missing
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, FindChildFocusNodeByIndexWithoutListProperty001, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    CreateListItems();
+    CreateDone();
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(frameNode_->GetLayoutProperty<ListLayoutProperty>(), nullptr);
+
+    /**
+     * @tc.steps: step1. Drop the layout property and find a child focus node
+     * @tc.expected: null is returned instead of dereferencing the null list layout property
+     */
+    const auto savedProperty = frameNode_->layoutProperty_;
+    frameNode_->layoutProperty_ = nullptr;
+    EXPECT_EQ(frameNode_->GetLayoutProperty<ListLayoutProperty>(), nullptr);
+    auto focusHub = pattern_->FindChildFocusNodeByIndex(0, FocusStep::DOWN, 0);
+    frameNode_->layoutProperty_ = savedProperty;
+    EXPECT_EQ(focusHub.Upgrade(), nullptr);
+
+    /**
+     * @tc.steps: step2. Find the child focus node with the layout property restored
+     * @tc.expected: the list layout property is available again and the lookup runs
+     */
+    ASSERT_NE(frameNode_->GetLayoutProperty<ListLayoutProperty>(), nullptr);
+    pattern_->FindChildFocusNodeByIndex(0, FocusStep::DOWN, 0);
+}
+
 } // namespace OHOS::Ace::NG

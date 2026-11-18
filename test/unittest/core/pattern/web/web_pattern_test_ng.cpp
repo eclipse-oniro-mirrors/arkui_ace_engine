@@ -16,7 +16,6 @@
 #include <gmock/gmock.h>
 
 #include "gtest/gtest.h"
-#include "test/unittest/core/pattern/web/mock_web_delegate.h"
 
 #define private public
 #define protected public
@@ -27,10 +26,12 @@
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/pattern/stage/page_info.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/unittest/core/pattern/web/mock_web_delegate.h"
 #undef protected
 #undef private
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
 #include "base/log/dump_log.h"
 #include "base/base64/base64_util.h"
@@ -2372,6 +2373,226 @@ HWTEST_F(WebPatternTestNg, GetDragOffset_003, TestSize.Level1)
     auto ret = webPattern->GetDragOffset();
     EXPECT_EQ(ret.GetX(), 10);
     EXPECT_EQ(ret.GetY(), 20);
+#endif
+}
+
+/**
+ * @tc.name: RunJsInit_001
+ * @tc.desc: RunJsInit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, RunJsInit_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    std::string jsonData = R"({
+        "registerObjectName":"obj",
+        "registerFunctionName":"func",
+        "translateScript":"script",
+        "initScript":"init"
+    })";
+    std::function<void(std::string)> dummyCallback = [](std::string) {};
+    webPattern->isRegisterJsObject_ = false;
+    // GetTranslateText posts a task that parses JSON, sets needTranslate=true and invokes RunJsInit.
+    // MockTaskExecutor runs the posted task synchronously, so assertions can follow immediately.
+    webPattern->GetTranslateText(jsonData, dummyCallback, false);
+
+    EXPECT_TRUE(webPattern->isRegisterJsObject_);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 2u);
+    EXPECT_NE(webPattern->systemDocumentStartScripts_.find("script"),
+        webPattern->systemDocumentStartScripts_.end());
+    EXPECT_NE(webPattern->systemDocumentStartScripts_.find("init"),
+        webPattern->systemDocumentStartScripts_.end());
+    ASSERT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 2u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "script");
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[1], "init");
+
+    // Reset the translate global state (needTranslate / scripts) so later cases are not polluted.
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->EndTranslate();
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: RunJsInit_002
+ * @tc.desc: RunJsInit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, RunJsInit_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    std::string jsonData = R"({
+        "registerObjectName":"obj",
+        "registerFunctionName":"func",
+        "translateScript":"script",
+        "initScript":"init"
+    })";
+    std::function<void(std::string)> dummyCallback = [](std::string) {};
+    webPattern->isRegisterJsObject_ = false;
+    webPattern->GetTranslateText(jsonData, dummyCallback, false);
+    ASSERT_TRUE(webPattern->isRegisterJsObject_);
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.size(), 2u);
+
+    // Second invocation: isRegisterJsObject_ is already true, so the registration block is skipped.
+    webPattern->RunJsInit();
+    EXPECT_TRUE(webPattern->isRegisterJsObject_);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.size(), 2u);
+
+    // Reset the translate global state (needTranslate / scripts) so later cases are not polluted.
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->EndTranslate();
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: SendTranslateResult_001
+ * @tc.desc: SendTranslateResult.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, SendTranslateResult_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    std::string jscode = "test code";
+    webPattern->SendTranslateResult(jscode);
+    ASSERT_NE(webPattern->delegate_, nullptr);
+#endif
+}
+
+/**
+ * @tc.name: EndTranslate_001
+ * @tc.desc: EndTranslate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, EndTranslate_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    webPattern->isRegisterJsObject_ = true;
+    webPattern->EndTranslate();
+    EXPECT_TRUE(webPattern->isRegisterJsObject_);
+#endif
+}
+
+/**
+ * @tc.name: EndTranslate_002
+ * @tc.desc: EndTranslate removes the system DocumentStart JS and resets registration state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, EndTranslate_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->isRegisterJsObject_ = true;
+    ScriptItems sysItems;
+    sysItems["sys_script"] = { "*" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysOrder;
+    sysOrder.push_back("sys_script");
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysOrder);
+    ASSERT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.size(), 1u);
+
+    // EndTranslate posts a task that removes the system DocumentStart JS and unregisters the
+    // JS object. MockTaskExecutor runs it synchronously, so assertions can follow immediately.
+    webPattern->EndTranslate();
+
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptRegexItems_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_FALSE(webPattern->isRegisterJsObject_);
+
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: GetCurrentLanguage_001
+ * @tc.desc: GetCurrentLanguage.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, GetCurrentLanguage_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    std::string expected = "";
+    std::string result = webPattern->GetCurrentLanguage();
+    EXPECT_EQ(result, expected);
 #endif
 }
 

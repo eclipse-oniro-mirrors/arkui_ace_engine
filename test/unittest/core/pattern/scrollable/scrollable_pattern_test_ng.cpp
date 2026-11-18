@@ -36,6 +36,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_method.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 
 namespace OHOS::Ace::NG {
 using namespace testing;
@@ -2532,4 +2533,82 @@ HWTEST_F(ScrollablePatternTestNg, RefreshCoordinationNestedScroll001, TestSize.L
     scrollable->ProcessScrollMotion(20.0f, SCROLL_FROM_ANIMATION);
     EXPECT_TRUE(scrollable->scrollPause_);
 }
+
+/**
+ * @tc.name: ContentChangeOnScrollStartNotOnTree001
+ * @tc.desc: Test ContentChangeOnScrollStart returns early when keyNode is not on main tree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollablePatternTestNg, ContentChangeOnScrollStartNotOnTree001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Set up pipeline context and enable content change detection.
+     * @tc.expected: ContentChangeManager is not nullptr.
+     */
+    MockPipelineContext::SetUp();
+    auto context = MockPipelineContext::GetCurrent();
+    ASSERT_NE(context, nullptr);
+    auto mgr = context->GetContentChangeManager();
+    ASSERT_NE(mgr, nullptr);
+    ContentChangeConfig config;
+    mgr->SetContentChangeConfig(config);
+
+    /**
+     * @tc.steps: step2. Create a scrollable frame node but do NOT attach to main tree.
+     * @tc.expected: IsOnMainTree() returns false.
+     */
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, 500, pattern);
+    ASSERT_NE(frameNode, nullptr);
+    EXPECT_FALSE(frameNode->IsOnMainTree());
+
+    /**
+     * @tc.steps: step3. Call ContentChangeOnScrollStart with node not on tree.
+     * @tc.expected: IsScrolling() remains false (early return, no registration).
+     */
+    pattern->ContentChangeOnScrollStart(frameNode);
+    EXPECT_FALSE(mgr->IsScrolling());
+
+    MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: ContentChangeOnScrollStartOnTree001
+ * @tc.desc: Test ContentChangeOnScrollStart registers node when keyNode is on main tree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollablePatternTestNg, ContentChangeOnScrollStartOnTree001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Set up pipeline context and enable content change detection.
+     * @tc.expected: ContentChangeManager is not nullptr.
+     */
+    MockPipelineContext::SetUp();
+    auto context = MockPipelineContext::GetCurrent();
+    ASSERT_NE(context, nullptr);
+    auto mgr = context->GetContentChangeManager();
+    ASSERT_NE(mgr, nullptr);
+    ContentChangeConfig config;
+    mgr->SetContentChangeConfig(config);
+
+    /**
+     * @tc.steps: step2. Create a scrollable frame node and attach to main tree.
+     * @tc.expected: IsOnMainTree() returns true after AttachToMainTree.
+     */
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, 501, pattern);
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->AttachToMainTree(false, AceType::RawPtr(context));
+    EXPECT_TRUE(frameNode->IsOnMainTree());
+
+    /**
+     * @tc.steps: step3. Call ContentChangeOnScrollStart with node on tree.
+     * @tc.expected: IsScrolling() returns true (node registered in scrollingNodes_).
+     */
+    pattern->ContentChangeOnScrollStart(frameNode);
+    EXPECT_TRUE(mgr->IsScrolling());
+
+    MockPipelineContext::TearDown();
+}
+
 } // namespace OHOS::Ace::NG

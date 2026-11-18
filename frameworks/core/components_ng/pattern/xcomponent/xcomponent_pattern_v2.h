@@ -81,6 +81,9 @@ protected:
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     void OnWindowHide() override;
     void OnWindowShow() override;
+    void OnVisibilityLifecycleCreate() override;
+    void OnVisibilityLifecycleDestroy() override;
+    bool IsSurfaceLifecycleReady() const override;
     void OnRebuildFrame() override;
     void OnModifyDone() override;
     void DumpInfo() override;
@@ -99,7 +102,7 @@ private:
     void XComponentSizeChange(const RectF& surfaceRect);
     void OnSurfaceChanged(const RectF& surfaceRect);
     std::shared_ptr<Rosen::RSUIContext> GetRSUIContext(const RefPtr<FrameNode>& frameNode);
-    void FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode);
+    void FlushRemoveChild();
     std::shared_ptr<Rosen::RSTransactionHandler> GetRSTransactionHandler(const RefPtr<FrameNode>& frameNode);
 
     void OnSurfaceShow();
@@ -117,6 +120,7 @@ private:
 
     bool autoInitialize_ = true;
     bool isInitialized_ = false;
+    bool hasSurfaceInitialized_ = false;
     bool isLifecycleInterfaceCalled_ = false;
     bool usesSuperMethod_ = false;
     bool needNotifySizeChanged_ = false;

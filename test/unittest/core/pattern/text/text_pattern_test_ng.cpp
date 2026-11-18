@@ -250,7 +250,14 @@ HWTEST_F(TextPatternTestNg, GetSpansInfo003, TestSize.Level1)
     int32_t start = 5;
     int32_t end = 1;
     std::int32_t realEnd = 0;
+    /*
+        step1: get spans info
+    */
     GetSpansMethod method = GetSpansMethod::GETSPANS;
+    
+    /*
+        step2: get spans info
+    */
     textPattern->GetSpansInfo(start, end, method);
     EXPECT_EQ(realEnd, 0);
 

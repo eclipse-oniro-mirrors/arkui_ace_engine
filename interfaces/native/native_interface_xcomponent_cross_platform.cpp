@@ -764,6 +764,13 @@ int32_t OH_ArkUI_SurfaceHolder_SetSurfaceConfig(
     return surfaceHolder->SetSurfaceConfig(config);
 }
 
+int32_t OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle(
+    OH_NativeXComponent* component, bool isVisibilityLifecycle)
+{
+    return component ? component->EnableSurfaceVisibilityLifecycle(isVisibilityLifecycle)
+                     : OHOS::Ace::ERROR_CODE_PARAM_INVALID;
+}
+
 #ifdef __cplusplus
 };
 #endif

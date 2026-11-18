@@ -17,6 +17,7 @@
 #include "text_input_base.h"
 #include "core/components_ng/pattern/search/search_pattern.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/common/ace_application_info.h"
 
 namespace OHOS::Ace::NG {
 
@@ -1067,5 +1068,383 @@ HWTEST_F(TextFieldPatternTestSeven, GetUnderlinePadding007, TestSize.Level0)
     auto padding = pattern_->GetUnderlinePadding(theme, true, true);
     EXPECT_EQ(padding.Left(), theme->GetPadding().Left());
     EXPECT_EQ(padding.Right(), theme->GetPadding().Right());
+}
+
+/**
+ * @tc.name: GetUnderlinePadding008
+ * @tc.desc: Test GetUnderlinePadding when api target version is less than VERSION_EIGHTEEN
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, GetUnderlinePadding008, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Create TextField in underline and password mode with a low api version
+     */
+    auto backupApiVersion = AceApplicationInfo::GetInstance().GetApiTargetVersion();
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    CreateTextField(DEFAULT_TEXT, "", [](TextFieldModelNG model) {
+        model.SetInputStyle(InputStyle::DEFAULT);
+        model.SetShowUnderline(true);
+        model.SetType(TextInputType::VISIBLE_PASSWORD);
+    });
+    ASSERT_NE(pattern_, nullptr);
+    auto theme = GetTheme();
+    ASSERT_NE(theme, nullptr);
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(backupApiVersion);
+
+    /**
+     * @tc.steps: step2. Set RTL direction and call GetUnderlinePadding with both flags true
+     * @tc.expected: Should return theme's underline padding directly when api version is low
+     */
+    layoutProperty_->UpdateLayoutDirection(TextDirection::RTL);
+    auto padding = pattern_->GetUnderlinePadding(theme, true, true);
+    EXPECT_EQ(padding.Left(), theme->GetUnderlinePadding().Left());
+    EXPECT_EQ(padding.Right(), theme->GetUnderlinePadding().Right());
+}
+
+/**
+ * @tc.name: GetUnderlinePadding009
+ * @tc.desc: Test GetUnderlinePadding when pattern has no host node
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, GetUnderlinePadding009, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Create a standalone pattern without host node
+     */
+    auto pattern = AceType::MakeRefPtr<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto theme = GetTheme();
+    ASSERT_NE(theme, nullptr);
+
+    /**
+     * @tc.steps: step2. Call GetUnderlinePadding
+     * @tc.expected: Should return theme's underline padding when host is null
+     */
+    auto padding = pattern->GetUnderlinePadding(theme, true, true);
+    EXPECT_EQ(padding.Left(), theme->GetUnderlinePadding().Left());
+    EXPECT_EQ(padding.Right(), theme->GetUnderlinePadding().Right());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor001
+ * @tc.desc: Test OnThemeScopeUpdateColor when pattern has no host node
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a standalone pattern without host node
+     */
+    auto pattern = AceType::MakeRefPtr<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Should return false when host is null
+     */
+    EXPECT_FALSE(pattern->OnThemeScopeUpdateColor(nullptr, nullptr, theme));
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor002
+ * @tc.desc: Test OnThemeScopeUpdateColor when paint property is nullptr
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and a theme
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor with null paint property
+     * @tc.expected: Should return false
+     */
+    EXPECT_FALSE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, nullptr, theme));
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor003
+ * @tc.desc: Test OnThemeScopeUpdateColor when text field theme is nullptr
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and get paint property
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor with null theme
+     * @tc.expected: Should return false
+     */
+    EXPECT_FALSE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, nullptr));
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor004
+ * @tc.desc: Test selected background color update when theme selected color alpha equals DEFAULT_ALPHA
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and a theme whose selected color alpha is DEFAULT_ALPHA
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->selectedColor_ = Color(0xFF112233);
+    EXPECT_FALSE(paintProperty->HasSelectedBackgroundColor());
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Selected color should be changed with default opacity
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_TRUE(paintProperty->HasSelectedBackgroundColor());
+    EXPECT_EQ(paintProperty->GetSelectedBackgroundColorValue(), Color(0xFF112233).ChangeOpacity(0.2));
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor005
+ * @tc.desc: Test selected background color update when theme selected color alpha is not DEFAULT_ALPHA
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and a theme whose selected color alpha is not DEFAULT_ALPHA
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->selectedColor_ = Color(0x80112233);
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Selected color should be used directly without opacity change
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_TRUE(paintProperty->HasSelectedBackgroundColor());
+    EXPECT_EQ(paintProperty->GetSelectedBackgroundColorValue(), Color(0x80112233));
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor006
+ * @tc.desc: Test OnThemeScopeUpdateColor when selected background color is set by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and set selected background color flag by user
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->selectedColor_ = Color(0xFF112233);
+    paintProperty->UpdateSelectedBackgroundColorFlagByUser(true);
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Selected background color should not be updated and result is false
+     */
+    EXPECT_FALSE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_FALSE(paintProperty->HasSelectedBackgroundColor());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor007
+ * @tc.desc: Test counter border with theme over counter color when border width is not set by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField, get focus and enable counter border style
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    GetFocus();
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->overCounterColor_ = Color(0xFF0000FF);
+    pattern_->showCountBorderStyle_ = true;
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Inner border should use theme's over counter color
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_TRUE(paintProperty->HasInnerBorderWidth());
+    EXPECT_TRUE(paintProperty->HasInnerBorderColor());
+    EXPECT_EQ(paintProperty->GetInnerBorderColorValue(), Color(0xFF0000FF));
+    EXPECT_TRUE(paintProperty->HasSelectedBackgroundColor());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor008
+ * @tc.desc: Test counter border with counter text overflow color when border width is not set by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor008, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField, get focus, enable counter style and set counter overflow color
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    GetFocus();
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->overCounterColor_ = Color(0xFF0000FF);
+    layoutProperty_->UpdateCounterTextOverflowColor(Color(0xFF123456));
+    pattern_->showCountBorderStyle_ = true;
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Inner border color should use user's counter text overflow color
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_TRUE(paintProperty->HasInnerBorderWidth());
+    EXPECT_EQ(paintProperty->GetInnerBorderColorValue(), Color(0xFF123456));
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor009
+ * @tc.desc: Test counter border with theme over counter color when border width is set by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor009, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField, get focus, enable counter style and set border width by user
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    GetFocus();
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->overCounterColor_ = Color(0xFF00FF00);
+    pattern_->showCountBorderStyle_ = true;
+    paintProperty->UpdateBorderWidthFlagByUser(BorderWidthProperty {});
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Border color should be updated through render context and inner border width not touched
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_FALSE(paintProperty->HasInnerBorderWidth());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor010
+ * @tc.desc: Test counter border with counter overflow color when border width is set by user
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor010, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField, get focus, enable counter style, set border width and overflow color by user
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    GetFocus();
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    theme->overCounterColor_ = Color(0xFF00FF00);
+    layoutProperty_->UpdateCounterTextOverflowColor(Color(0xFF123456));
+    pattern_->showCountBorderStyle_ = true;
+    paintProperty->UpdateBorderWidthFlagByUser(BorderWidthProperty {});
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Border color should use user's counter overflow color through render context
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_FALSE(paintProperty->HasInnerBorderWidth());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor011
+ * @tc.desc: Test counter border not updated when counter style is enabled but has no focus
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor011, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and enable counter style without focus
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+    pattern_->showCountBorderStyle_ = true;
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Counter border should not be updated without focus
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_FALSE(paintProperty->HasInnerBorderWidth());
+    EXPECT_TRUE(paintProperty->HasSelectedBackgroundColor());
+}
+
+/**
+ * @tc.name: OnThemeScopeUpdateColor012
+ * @tc.desc: Test counter border not updated when focus is got but counter style is disabled
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, OnThemeScopeUpdateColor012, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and get focus without counter style
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    GetFocus();
+    auto paintProperty = frameNode_->GetPaintProperty<TextFieldPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto theme = AceType::MakeRefPtr<TextFieldTheme>();
+    ASSERT_NE(theme, nullptr);
+
+    /**
+     * @tc.steps: step2. Call OnThemeScopeUpdateColor
+     * @tc.expected: Counter border should not be updated without counter style
+     */
+    EXPECT_TRUE(pattern_->OnThemeScopeUpdateColor(layoutProperty_, paintProperty, theme));
+    EXPECT_FALSE(paintProperty->HasInnerBorderWidth());
+    EXPECT_TRUE(paintProperty->HasSelectedBackgroundColor());
 }
 }

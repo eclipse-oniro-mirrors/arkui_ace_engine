@@ -20,6 +20,7 @@
 
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/text/text_event_hub.h"
+#include "core/common/ai/text_ai_utils.h"
 
 namespace OHOS::Ace::NG {
 
@@ -1283,5 +1284,130 @@ HWTEST_F(TextTwelveTestNg, TextSelectOverlayOnHandleGlobalTouchEvent, TestSize.L
      * Both TOUCH and TOUCH_PAD sources satisfy IsTouchUp() when TouchType is UP.
      */
     EXPECT_TRUE(textPattern->GetTextSelector().SelectNothing());
+}
+
+/**
+ * @tc.name: CheckPhoneCallAppExist_001
+ * @tc.desc: Test CheckPhoneCallAppExist with non-phone entity (should return true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTwelveTestNg, CheckPhoneCallAppExist_001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    AISpan aiSpan;
+    aiSpan.type = TextDataDetectType::URL;
+    EXPECT_TRUE(pattern->CheckPhoneCallAppExist(aiSpan));
+
+    aiSpan.type = TextDataDetectType::EMAIL;
+    EXPECT_TRUE(pattern->CheckPhoneCallAppExist(aiSpan));
+}
+
+/**
+ * @tc.name: CheckPhoneCallAppExist_002
+ * @tc.desc: Test CheckPhoneCallAppExist with phone entity and empty funcName (wifi-only default)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTwelveTestNg, CheckPhoneCallAppExist_002, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    TextAiUtils::SetCallPhoneFuncNameForTest("");
+    AISpan aiSpan;
+    aiSpan.type = TextDataDetectType::PHONE_NUMBER;
+    EXPECT_FALSE(pattern->CheckPhoneCallAppExist(aiSpan));
+}
+
+/**
+ * @tc.name: CheckPhoneCallAppExist_003
+ * @tc.desc: Test CheckPhoneCallAppExist with phone entity, funcName set, adapter null
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTwelveTestNg, CheckPhoneCallAppExist_003, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    TextAiUtils::SetCallPhoneFuncNameForTest("Call");
+    pattern->selectDetectorAdapter_ = nullptr;
+    AISpan aiSpan;
+    aiSpan.type = TextDataDetectType::PHONE_NUMBER;
+    EXPECT_TRUE(pattern->CheckPhoneCallAppExist(aiSpan));
+    TextAiUtils::SetCallPhoneFuncNameForTest("");
+}
+
+/**
+ * @tc.name: CheckPhoneCallAppExist_004
+ * @tc.desc: Test CheckPhoneCallAppExist with phone entity, no menu actions for phone type
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTwelveTestNg, CheckPhoneCallAppExist_004, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    TextAiUtils::SetCallPhoneFuncNameForTest("Call");
+    RefPtr<DataDetectorAdapter> adapter = AceType::MakeRefPtr<DataDetectorAdapter>();
+    pattern->selectDetectorAdapter_ = adapter;
+    AISpan aiSpan;
+    aiSpan.type = TextDataDetectType::PHONE_NUMBER;
+    EXPECT_FALSE(pattern->CheckPhoneCallAppExist(aiSpan));
+    TextAiUtils::SetCallPhoneFuncNameForTest("");
+}
+
+/**
+ * @tc.name: CheckPhoneCallAppExist_005
+ * @tc.desc: Test CheckPhoneCallAppExist with phone entity, matching action found
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTwelveTestNg, CheckPhoneCallAppExist_005, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    TextAiUtils::SetCallPhoneFuncNameForTest("Call");
+    RefPtr<DataDetectorAdapter> adapter = AceType::MakeRefPtr<DataDetectorAdapter>();
+    FuncVariant func = std::function<std::string()>([]() { return ""; });
+    adapter->textDetectResult_.menuOptionAndAction["phoneNum"] = { { "Call", func } };
+    pattern->selectDetectorAdapter_ = adapter;
+    AISpan aiSpan;
+    aiSpan.type = TextDataDetectType::PHONE_NUMBER;
+    EXPECT_TRUE(pattern->CheckPhoneCallAppExist(aiSpan));
+    TextAiUtils::SetCallPhoneFuncNameForTest("");
+}
+
+/**
+ * @tc.name: CheckPhoneCallAppExist_006
+ * @tc.desc: Test CheckPhoneCallAppExist with phone entity, non-matching action
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTwelveTestNg, CheckPhoneCallAppExist_006, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    TextAiUtils::SetCallPhoneFuncNameForTest("Call");
+    RefPtr<DataDetectorAdapter> adapter = AceType::MakeRefPtr<DataDetectorAdapter>();
+    FuncVariant func = std::function<std::string()>([]() { return ""; });
+    adapter->textDetectResult_.menuOptionAndAction["phoneNum"] = { { "Copy", func } };
+    pattern->selectDetectorAdapter_ = adapter;
+    AISpan aiSpan;
+    aiSpan.type = TextDataDetectType::PHONE_NUMBER;
+    EXPECT_FALSE(pattern->CheckPhoneCallAppExist(aiSpan));
+    TextAiUtils::SetCallPhoneFuncNameForTest("");
 }
 } // namespace OHOS::Ace::NG

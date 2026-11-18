@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include "base/memory/ace_type.h"
 #include "core/common/force_split/force_split_constants.h"
@@ -97,6 +98,43 @@ public:
         return fullScreenPages_.find(name) != fullScreenPages_.end();
     }
 
+    void SetEnablePageLevelSplit(bool enablePageLevelSplit)
+    {
+        enablePageLevelSplit_ = enablePageLevelSplit;
+    }
+    bool IsPageLevelSplitEnabled() const
+    {
+        return enablePageLevelSplit_;
+    }
+    void SetPageSplitOptions(std::unordered_map<std::string, bool>&& pageSplitOptions)
+    {
+        pageSplitOptions_ = std::move(pageSplitOptions);
+    }
+    void SetEnableInheritSplitStrategy(bool enableInheritSplitStrategy)
+    {
+        enableInheritSplitStrategy_ = enableInheritSplitStrategy;
+    }
+    void SetPageStack(std::vector<std::string>&& pageStack)
+    {
+        pageStack_ = std::move(pageStack);
+    }
+    bool IsPageSplitDisabled(const std::string& pageName) const;
+    bool IsUpstreamPageSplitDisabled(const std::string& pageName) const;
+    bool UpdateIsTopPageSplitDisabled(bool isTopPageSplitDisabled)
+    {
+        if (isTopPageSplitDisabled_ == isTopPageSplitDisabled) {
+            return false;
+        }
+        isTopPageSplitDisabled_ = isTopPageSplitDisabled;
+        return true;
+    }
+    bool IsTopPageSplitDisabled() const
+    {
+        // no effect unless page-level split control is on; default disabled before
+        // the first top page notification so startup stays in stack layout
+        return enablePageLevelSplit_ && isTopPageSplitDisabled_;
+    }
+
     void SetSplitDividerColor(std::optional<Color> light, std::optional<Color> dark)
     {
         splitDividerColorLight_ = light;
@@ -137,6 +175,32 @@ public:
     bool GetDialogSupportSplit() const
     {
         return dialogSupportSplit_;
+    }
+
+    void SetLastTouchedColumnType(ForceSplitPageColumnType columnType)
+    {
+        lastTouchedColumnType_ = columnType;
+    }
+
+    ForceSplitPageColumnType GetLastTouchedColumnType() const
+    {
+        return lastTouchedColumnType_;
+    }
+
+    // Marks that a Navigation-internal split already recorded the fine-grained touched column for the
+    // current touch. The Navigation hit-test listener fires before the page-level touch callback in the
+    // same dispatch round; the page callback consumes this flag and skips its coarse whole-page record,
+    // otherwise it would overwrite the Navigation column with the page-level one.
+    void MarkNavigationColumnRecorded()
+    {
+        navigationColumnRecorded_ = true;
+    }
+
+    bool ConsumeNavigationColumnRecorded()
+    {
+        bool recorded = navigationColumnRecorded_;
+        navigationColumnRecorded_ = false;
+        return recorded;
     }
 
     void SetWideSplitRatio(const std::optional<float> ratio)
@@ -204,6 +268,14 @@ public:
     {
         transPages_ = std::move(transPages);
     }
+    void SetTransPageEnabled(bool enabled)
+    {
+        transPageEnabled_ = enabled;
+    }
+    bool IsTransPageEnabled() const
+    {
+        return transPageEnabled_;
+    }
     bool IsTransPage(const std::string& name) const;
     bool CanPushPageToPrimary() const;
     bool IsTransitionShouldMovePageToPrimary(const std::string& from, const std::string& to) const;
@@ -218,6 +290,7 @@ private:
     bool IsTopFullScreenPage();
     bool IsWindowConditionMatched();
     bool HasForceSplitTargetNavigation();
+    int32_t GetLastPageStackIndex(const std::string& pageName) const;
     void FlushArkUIHook();
     void NotifyMediaQueryUpdate();
     float CalcCurrentSplitRatio();
@@ -233,6 +306,8 @@ private:
     bool isForceSplitEnable_ = false;
     bool isRouter_ = false;
     bool dialogSupportSplit_ = true;
+    ForceSplitPageColumnType lastTouchedColumnType_ = ForceSplitPageColumnType::NONE;
+    bool navigationColumnRecorded_ = false;
     std::unordered_set<std::string> fullScreenPages_;
     std::string homePageName_;
     std::string relatedPageName_;
@@ -249,6 +324,7 @@ private:
     ForceSplitBehaviorMode behaviorMode_ = ForceSplitBehaviorMode::NAVIGATION;
     std::unordered_map<std::string, std::unordered_set<std::string>> pagePairs_;
     std::unordered_set<std::string> transPages_;
+    bool transPageEnabled_ = true;
     std::unordered_map<int32_t, std::function<void()>> forceSplitListeners_;
     std::unordered_map<int32_t, std::function<void(float)>> forceSplitRatioListeners_;
     std::unordered_map<int32_t, std::function<void(bool isDraggable)>> isDraggableListeners_;
@@ -257,6 +333,17 @@ private:
     bool disableNavForceSplitInternal_ = false;
     std::optional<Color> splitDividerColorLight_;
     std::optional<Color> splitDividerColorDark_;
+    // master switch of page-level split control
+    bool enablePageLevelSplit_ = false;
+    // page name -> split(true means the page uses split layout)
+    std::unordered_map<std::string, bool> pageSplitOptions_;
+    // whether pages without an explicit option follow the upstream page's split state
+    bool enableInheritSplitStrategy_ = false;
+    // current page navigation stack(from bottom to top), used for upstream queries
+    std::vector<std::string> pageStack_;
+    // cached state: whether the current top page has split disabled(default true
+    // until the first top page notification, only meaningful when feature is on)
+    bool isTopPageSplitDisabled_ = true;
 };
 } // namespace OHOS::Ace::NG
 

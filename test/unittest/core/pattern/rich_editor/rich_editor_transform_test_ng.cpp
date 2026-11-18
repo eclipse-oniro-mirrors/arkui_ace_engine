@@ -14,7 +14,6 @@
  */
 
 #include "test/unittest/core/pattern/rich_editor/rich_editor_common_test_ng.h"
-#include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/manager/select_content_overlay/select_content_overlay_manager.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
@@ -752,5 +751,31 @@ HWTEST_F(RichEditorTransformTestNg, ChangeHandleHeightWithTransform001, TestSize
     textSelector.secondHandle = RectF(0, 10, 5, 50);
     richEditorPattern->selectOverlay_->ChangeHandleHeight(event, false);
     EXPECT_FLOAT_EQ(textSelector.secondHandle.GetY(), touchY - 25.0f);
+}
+
+/**
+ * @tc.name: ChangeLastRichTextRect001
+ * @tc.desc: Test ChangeLastRichTextRect / GetLastTextRect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTransformTestNg, ChangeLastRichTextRect001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->richTextRect_ = RectF(1, 2, 3, 4);
+    pattern->ChangeLastRichTextRect();
+    EXPECT_EQ(pattern->GetLastTextRect(), RectF(1, 2, 3, 4));
+}
+
+/**
+ * @tc.name: GetPageTranslateNodeId001
+ * @tc.desc: Test GetPageTranslateNodeId returns host id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorTransformTestNg, GetPageTranslateNodeId001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetPageTranslateNodeId(), richEditorNode_->GetId());
 }
 }

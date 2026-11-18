@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Huawei Device Co., Ltd.
+ * Copyright (c) 2022-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -593,7 +593,7 @@ class AnimationImpl<Value> implements TimeAnimation<Value> {
                     ? (2 + this.lastState) * this.duration
                     : this.lastState > 0
                         ? this.lastState * this.duration
-                        : (0 - this.delay) // add delay for the state 0 only
+                        : (0.0 - this.delay) // add delay for the state 0 only
             )
         }
     }

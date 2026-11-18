@@ -45,6 +45,7 @@ enum class BatchDiagnosticReason {
     COMMAND_EXECUTION_FAILED,
     TASK_EXECUTOR_UNAVAILABLE,
     POST_TASK_FAILED,
+    SECURITY_DENIED,
 };
 
 enum class BatchCommandSummary {
@@ -71,6 +72,7 @@ struct BatchCommandItem {
     BatchCommandSummary commandSummary = BatchCommandSummary::INVALID_OBJECT;
     int32_t valueLength = -1;
     std::string canonicalCommand;
+    std::string nodeKey;
 };
 
 struct BatchParseResult {
@@ -79,12 +81,15 @@ struct BatchParseResult {
     size_t commandCount = 0;
     std::vector<BatchCommandItem> items;
     std::vector<BatchDiagnostic> diagnostics;
+    // Includes invalid and duplicate keys, in input order, for the callback entry only.
+    std::vector<BatchCommandItem> resultItems;
 };
 
 enum class BatchTargetStatus {
     READY,
     NOT_FOUND,
     UNSUPPORTED_TYPE,
+    SECURITY_DENIED,
 };
 
 struct BatchResolvedTarget {
@@ -109,6 +114,9 @@ class UiSessionBatchCommand final {
 public:
     static BatchParseResult Parse(const std::string& command);
     static bool Dispatch(const std::string& command, const BatchDispatchCallbacks& callbacks);
+    // Called on the UI thread; legacy Dispatch keeps its scheduling and diagnostics.
+    static std::string ExecuteWithResult(const BatchParseResult& parsed,
+        const std::function<BatchResolvedTarget(int32_t)>& resolveTarget);
     static const char* GetReasonName(BatchDiagnosticReason reason);
     static const char* GetSummaryName(BatchCommandSummary summary);
 };

@@ -40,6 +40,7 @@ if (is_host_product) {
       "water_flow_misc_test.cpp",
       "water_flow_property_test.cpp",
       "water_flow_regular_test.cpp",
+      "water_flow_scroll_placeholder_test_ng.cpp",
       "water_flow_top_down_test.cpp",
     ]
     sources += CONTENT_CLIP_SRC
@@ -58,6 +59,7 @@ if (is_host_product) {
       "water_flow_misc_test.cpp",
       "water_flow_property_test.cpp",
       "water_flow_regular_test.cpp",
+      "water_flow_scroll_placeholder_test_ng.cpp",
       "water_flow_top_down_test.cpp",
     ]
     sources += CONTENT_CLIP_SRC
@@ -120,6 +122,7 @@ if (is_host_product) {
     defines = [ "TEST_WATER_FLOW_SW" ]
     sources = [
       "water_flow_estimation_test.cpp",
+      "water_flow_fast_scroll_test_ng.cpp",
       "water_flow_layout_utils_test.cpp",
       "water_flow_regular_test.cpp",
       "water_flow_segment_common_test.cpp",
@@ -139,6 +142,7 @@ if (is_host_product) {
     defines = [ "TEST_WATER_FLOW_SW" ]
     sources = [
       "water_flow_estimation_test.cpp",
+      "water_flow_fast_scroll_test_ng.cpp",
       "water_flow_layout_utils_test.cpp",
       "water_flow_regular_test.cpp",
       "water_flow_segment_common_test.cpp",

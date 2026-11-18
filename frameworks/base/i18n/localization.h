@@ -138,6 +138,7 @@ public:
     }
 
     bool LocalizeNumber(const std::string &inputNum, std::string &outputNum, const int32_t precision = -1);
+    std::string LocalizeDigits(const std::string& numStr);
 
     std::string GetLanguage();
     std::string GetLanguageTag();
@@ -161,12 +162,32 @@ public:
     std::string FormatDuration(uint32_t duration, const std::string& format);
 
     /**
-     * For formatting date time. For example: 2020/03/30 08:00:00.
+     * Same as FormatDuration, but additionally localizes the decimal separator (the '.' in
+     * patterns like "HH:mm:ss.SS") to the locale-specific decimal symbol. Intended for
+     * TextTimer so that locales such as Arabic render the seconds/milliseconds separator
+     * with the proper symbol (e.g. U+066B).
+     * @param duration    The value used to set the duration, the range is 0 to 90,000.
+     * @param format      the pattern for the format. For example: HH:mm:ss.SS.
+     * @return local format duration with localized decimal separator.
+     */
+    std::string FormatDurationLocalized(uint32_t duration, const std::string& format);
+
+    /**
+     * For formatting date time. For example: 2020/03/30 08:00:00.
      * @param dateTime    The value of date time.
      * @param format      the pattern for the format.
      * @return local format date time.
      */
     const std::string FormatDateTime(DateTime dateTime, const std::string& format);
+
+    /**
+     * Same as FormatDateTime, but aligns the hour field width in the getBestPattern result
+     * with the caller's format ("HH"/"hh" => 2 digits, "H"/"h" => 1 digit).
+     * @param dateTime    The value of date time.
+     * @param format      the pattern for the format.
+     * @return local format date time with adjusted hour leading zero.
+     */
+    const std::string FormatDateTimeMatchHourField(DateTime dateTime, const std::string& format);
 
     /**
      * For formatting date time.
@@ -258,7 +279,23 @@ public:
     std::string NumberFormat(double number);
 
     /**
-     * Gets alphabet strings. For example: "A", "B", etc.
+     * For formatting an integer with locale-aware digits (e.g. "٥" in ar). Intended for
+     * callers that always pass integer values (such as Badge count / Gauge limit value) so
+     * they no longer go through the double overload.
+     * @param number the integer to be formatted.
+     * @return local format integer.
+     */
+    std::string NumberFormat(int32_t number);
+
+    /**
+     * For formatting percent. For example: "50%", "%50" (tr-TR), "٥٠٪" (ar-SA).
+     * @param number the percent value (0..100), caller should truncate to integer.
+     * @return local format percent.
+     */
+    std::string FormatPercent(int32_t number);
+
+    /**
+     * Gets alphabet strings. For example: "A", "B", etc.
      * @return the alphabet string vector.
      */
     std::vector<std::u16string> GetIndexAlphabet();

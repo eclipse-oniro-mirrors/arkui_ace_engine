@@ -21,6 +21,7 @@
 #include "base/utils/macros.h"
 #include "event_handler.h"
 #include "event_runner.h"
+#include "ui_content_proxy_error_code.h"
 
 namespace OHOS::Ace {
 class IUiContentService;
@@ -45,6 +46,8 @@ public:
     void HandleGetCurrentPageName(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleSendCommand(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleSendBatchSetText(sptr<IUiContentService> service, std::vector<std::string> params);
+    void HandleSendBatchSetTextWithFinishCallback(sptr<IUiContentService> service, std::vector<std::string> params);
+    void HandleSendCommandWithFinishCallback(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleRegisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleUnregisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params);
@@ -80,6 +83,9 @@ private:
 
     UiSaService();
     bool EnsureConnected(const sptr<IUiContentService>& service);
+    std::string BuildWebInfoRequestFromParams(const std::vector<std::string>& params);
+    void SaveWebInfoResultToFile(const std::string& request, const std::string& result, WebRequestErrorCode code);
+    static std::string GetWebInfoDumpFileName(const std::string& request);
 
     using DumpHandler = void(UiSaService::*)(sptr<IUiContentService>, std::vector<std::string>);
     static const std::map<std::string, DumpHandler> DUMP_MAP;

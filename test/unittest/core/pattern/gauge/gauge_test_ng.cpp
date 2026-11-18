@@ -1450,7 +1450,7 @@ HWTEST_F(GaugeTestNg, SetLimitFontSize001, TestSize.Level0)
     gaugeLayoutAlgorithm->Measure(nullptr);
     MockPipelineContext::pipeline_->SetMinPlatformVersion(static_cast<int32_t>(PlatformVersion::VERSION_TEN));
     gaugeLayoutAlgorithm->Measure(AceType::RawPtr(layoutWrapper));
-    EXPECT_TRUE(AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode()));
+    EXPECT_TRUE(layoutWrapper->GetHostNode());
 }
 
 /**
@@ -1545,13 +1545,13 @@ HWTEST_F(GaugeTestNg, Layout002, TestSize.Level0)
      * @tc.cases: case1 Layout and compare it with the expected value.
      */
     gaugeLayoutAlgorithm->Layout(AceType::RawPtr(layoutWrapper));
-    EXPECT_TRUE(AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode()));
+    EXPECT_TRUE(layoutWrapper->GetHostNode());
 
     /**
      * @tc.cases: case1 CheckDescriptionIsImageNode and compare it with the expected value.
      */
     gaugeLayoutAlgorithm->CheckDescriptionIsImageNode(layoutWrapper);
-    EXPECT_TRUE(AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode()));
+    EXPECT_TRUE(layoutWrapper->GetHostNode());
 }
 
 /**

@@ -2407,4 +2407,91 @@ HWTEST_F(BubbleTestFourNg, ArrowMemberVariablesTest030, TestSize.Level1)
     EXPECT_NE(algorithm1->defaultP2EndY_.Value(), algorithm2->defaultP2EndY_.Value());
 }
 
+/**
+ * @tc.name: BubblePaintMethodPaintBorderNoBorder001
+ * @tc.desc: Test PaintBorder early return when border_ has no value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestFourNg, BubblePaintMethodPaintBorderNoBorder001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create the BubblePaintMethod without setting border edge.
+     */
+    RefPtr<BubblePaintMethod> bubblePaintMethod = AceType::MakeRefPtr<BubblePaintMethod>();
+    ASSERT_NE(bubblePaintMethod, nullptr);
+
+    TestProperty testProperty;
+    RefPtr<FrameNode> frameNode = CreateBubbleNode(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    geometryNode->SetFrameSize(SizeF(CONTAINER_WIDTH, CONTAINER_HEIGHT));
+    auto bubblePaintProperty = frameNode->GetPaintProperty<BubbleRenderProperty>();
+    ASSERT_NE(bubblePaintProperty, nullptr);
+    PaintWrapper* paintWrapper = new PaintWrapper(nullptr, geometryNode, bubblePaintProperty);
+    ASSERT_NE(paintWrapper, nullptr);
+
+    /**
+     * @tc.steps: step2. Call PaintBorder and verify no drawing happens.
+     * @tc.expected: step2. DrawRoundRect is not invoked because border_ is empty.
+     */
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, DrawRoundRect(_)).Times(Exactly(0));
+    bubblePaintMethod->PaintBorder(canvas, paintWrapper);
+
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: BubblePaintMethodUpdateArrowOffsetLeftRightTopBottom001
+ * @tc.desc: Test UpdateArrowOffset sets ARROW_HALF_PERCENT_VALUE for LEFT/RIGHT/TOP/BOTTOM.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestFourNg, BubblePaintMethodUpdateArrowOffsetLeftRightTopBottom001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create the BubblePaintMethod.
+     */
+    RefPtr<BubblePaintMethod> bubblePaintMethod = AceType::MakeRefPtr<BubblePaintMethod>();
+    ASSERT_NE(bubblePaintMethod, nullptr);
+
+    /**
+     * @tc.steps: step2. Call UpdateArrowOffset with nullopt for LEFT/RIGHT/TOP/BOTTOM.
+     * @tc.expected: step2. arrowOffset_ equals ARROW_HALF_PERCENT_VALUE (0.5).
+     */
+    bubblePaintMethod->UpdateArrowOffset(std::nullopt, Placement::LEFT);
+    EXPECT_FLOAT_EQ(bubblePaintMethod->arrowOffset_.Value(), 0.5);
+
+    bubblePaintMethod->UpdateArrowOffset(std::nullopt, Placement::RIGHT);
+    EXPECT_FLOAT_EQ(bubblePaintMethod->arrowOffset_.Value(), 0.5);
+
+    bubblePaintMethod->UpdateArrowOffset(std::nullopt, Placement::TOP);
+    EXPECT_FLOAT_EQ(bubblePaintMethod->arrowOffset_.Value(), 0.5);
+
+    bubblePaintMethod->UpdateArrowOffset(std::nullopt, Placement::BOTTOM);
+    EXPECT_FLOAT_EQ(bubblePaintMethod->arrowOffset_.Value(), 0.5);
+}
+
+/**
+ * @tc.name: BubblePaintMethodGetBorderOffsetNoDoubleBorder001
+ * @tc.desc: Test GetBorderOffset returns 0.0 when double border disabled and no gradient.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BubbleTestFourNg, BubblePaintMethodGetBorderOffsetNoDoubleBorder001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create the BubblePaintMethod and PopupTheme.
+     */
+    RefPtr<BubblePaintMethod> bubblePaintMethod = AceType::MakeRefPtr<BubblePaintMethod>();
+    ASSERT_NE(bubblePaintMethod, nullptr);
+    RefPtr<PopupTheme> popupTheme = AceType::MakeRefPtr<PopupTheme>();
+    ASSERT_NE(popupTheme, nullptr);
+
+    /**
+     * @tc.steps: step2. Call GetBorderOffset when double border is disabled and no gradient.
+     * @tc.expected: step2. borderOffset is 0.0.
+     */
+    float result = bubblePaintMethod->GetBorderOffset(popupTheme);
+    EXPECT_FLOAT_EQ(result, 0.0f);
+}
+
 } // namespace OHOS::Ace::NG

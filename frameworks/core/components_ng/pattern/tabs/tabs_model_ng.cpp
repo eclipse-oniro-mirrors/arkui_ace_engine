@@ -509,6 +509,17 @@ void TabsModelNG::SetBarOverlap(bool barOverlap)
     SetBarBackgroundBlurStyle(option);
 }
 
+void TabsModelNG::SetBarOverlapMode(BarOverlapMode barOverlapMode)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarOverlapMode, barOverlapMode);
+
+    BlurStyleOption option;
+    if (barOverlapMode == BarOverlapMode::STACK || barOverlapMode == BarOverlapMode::SAFE_AREA_PADDING) {
+        option.blurStyle = BlurStyle::COMPONENT_THICK;
+    }
+    SetBarBackgroundBlurStyle(option);
+}
+
 void TabsModelNG::SetOnChange(std::function<void(const BaseEventInfo*)>&& onChange)
 {
     auto tabsNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
@@ -1111,6 +1122,26 @@ void TabsModelNG::SetBarOverlap(FrameNode* frameNode, bool barOverlap)
     SetBarBackgroundBlurStyle(frameNode, option);
 }
 
+void TabsModelNG::SetBarOverlapMode(FrameNode* frameNode, BarOverlapMode barOverlapMode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarOverlapMode, barOverlapMode, frameNode);
+
+    BlurStyleOption option;
+    if (barOverlapMode == BarOverlapMode::STACK || barOverlapMode == BarOverlapMode::SAFE_AREA_PADDING) {
+        option.blurStyle = BlurStyle::COMPONENT_THICK;
+    }
+    SetBarBackgroundBlurStyle(frameNode, option);
+}
+
+void TabsModelNG::ResetBarOverlapMode(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_RESET_NODE_LAYOUT_PROPERTY_WITH_FLAG(TabsLayoutProperty, BarOverlapMode,
+        PROPERTY_UPDATE_MEASURE, frameNode);
+    BlurStyleOption option;
+    SetBarBackgroundBlurStyle(frameNode, option);
+}
+
 void TabsModelNG::SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar)
 {
     CHECK_NULL_VOID(frameNode);
@@ -1320,6 +1351,26 @@ void TabsModelNG::SetOnCustomAnimation(FrameNode* frameNode, TabsCustomAnimation
     auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
     CHECK_NULL_VOID(swiperPattern);
     swiperPattern->SetTabsCustomContentTransition(std::move(onCustomAnimation));
+}
+
+void TabsModelNG::SetTabViewCustomization(FrameNode* frameNode, const TabViewCustomization& customization)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    // Store as incoming customization. The diff check and sidebar rebuild
+    // are deferred to TabsPattern::OnModifyDone, where all properties are
+    // fully resolved.
+    pattern->SetTabViewCustomization(customization);
+}
+
+void TabsModelNG::ResetTabViewCustomization(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    // Store the reset as incoming. Diff and rebuild happen in OnModifyDone.
+    pattern->ResetTabViewCustomization();
 }
 
 void TabsModelNG::SetClipEdge(FrameNode* frameNode, bool clipEdge)
@@ -2777,6 +2828,21 @@ void TabsModelNG::SetSidebarSearchableOptions(FrameNode* frameNode, const TabsSi
     tabsPattern->SetTabsSidebarSearchableOptions(options);
 }
 
+void TabsModelNG::SetShowSidebarControlButton(bool showControlButton)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetShowSidebarControlButton(frameNode, showControlButton);
+}
+
+void TabsModelNG::SetShowSidebarControlButton(FrameNode* frameNode, bool showControlButton)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetShowSidebarControlButton(showControlButton);
+}
+
 void TabsModelNG::SetBarDisplayModeBreakpoint(const TabBarDisplayModeBreakpoint& breakpoint)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
@@ -2892,5 +2958,15 @@ void TabsModelNG::SetSidebarDividerColorByUser(FrameNode* frameNode, bool isByUs
 {
     CHECK_NULL_VOID(frameNode);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, SidebarDividerColorSetByUser, isByUser, frameNode);
+}
+
+void TabsModelNG::MarkUserSetSafeAreaOpts(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabPattern);
+    tabPattern->MarkUserSetSafeAreaOpts();
 }
 } // namespace OHOS::Ace::NG

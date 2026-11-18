@@ -42,7 +42,6 @@ constexpr bool DEFAULT_COUNT_DOWN = false;
 constexpr double MAX_COUNT_DOWN = 86400000.0;
 const std::string DEFAULT_STR = "-1";
 const char* TEXTTIMER_NODEPTR_OF_UINODE = "nodePtr_";
-const std::string DEFAULT_FORMAT = "HH:mm:ss.SS";
 } // namespace
 
 bool IsEmptyJsString(const Local<JSValueRef>& arg, panda::ecmascript::EcmaVM* vm)
@@ -318,12 +317,6 @@ ArkUINativeModuleValue TextTimerBridge::SetFormat(ArkUIRuntimeCallInfo* runtimeC
     CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));
     bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     if (!secondArg->IsString(vm)) {
-        if (isJsView) {
-            if (!secondArg->IsUndefined()) {
-                nodeModifiers->getTextTimerModifier()->setFormat(nativeNode, DEFAULT_FORMAT.c_str());
-            }
-            return panda::JSValueRef::Undefined(vm);
-        }
         nodeModifiers->getTextTimerModifier()->resetFormat(nativeNode);
         return panda::JSValueRef::Undefined(vm);
     }
@@ -333,14 +326,16 @@ ArkUINativeModuleValue TextTimerBridge::SetFormat(ArkUIRuntimeCallInfo* runtimeC
         std::regex pattern("(([YyMdD]+))");
         if (std::regex_search(format, result, pattern)) {
             if (!result.empty()) {
-                format = DEFAULT_FORMAT;
+                nodeModifiers->getTextTimerModifier()->resetFormat(nativeNode);
+                return panda::JSValueRef::Undefined(vm);
             }
         }
 
         std::string target = "HmsS:.";
         for (auto ch : format) {
             if (target.find(ch) == std::string::npos) {
-                format = DEFAULT_FORMAT;
+                nodeModifiers->getTextTimerModifier()->resetFormat(nativeNode);
+                return panda::JSValueRef::Undefined(vm);
             }
         }
 

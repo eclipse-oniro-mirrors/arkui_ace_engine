@@ -20,19 +20,20 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
+#include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/rich_editor/color_mode_processor.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_base_controller.h"
- 
+
 using namespace testing;
 using namespace testing::ext;
- 
+
 namespace OHOS::Ace::NG {
 class RichEditorColorModeTestNg : public RichEditorCommonTestNg {
 public:
     void SetUp() override;
     void TearDown() override;
 };
- 
+
 void RichEditorColorModeTestNg::SetUp()
 {
     MockPipelineContext::SetUp();
@@ -51,13 +52,13 @@ void RichEditorColorModeTestNg::SetUp()
     richEditorPattern->CreateNodePaintMethod();
     richEditorNode_->GetGeometryNode()->SetContentSize({});
 }
- 
+
 void RichEditorColorModeTestNg::TearDown()
 {
     richEditorNode_ = nullptr;
     MockParagraph::TearDown();
 }
- 
+
 /**
  * @tc.name: GetColorMode001
  * @tc.desc: Test RichEditorPattern::GetColorMode when host node exists and has local color mode
@@ -68,13 +69,13 @@ HWTEST_F(RichEditorColorModeTestNg, GetColorMode001, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto result = richEditorPattern->GetColorMode();
     // When host exists, GetColorMode returns host's GetLocalColorMode() or context's GetLocalColorMode()
     EXPECT_TRUE(result == ColorMode::COLOR_MODE_UNDEFINED || result == ColorMode::LIGHT ||
         result == ColorMode::DARK);
 }
- 
+
 /**
  * @tc.name: GetColorMode002
  * @tc.desc: Test RichEditorPattern::GetColorMode returns correct mode when context has local color mode set
@@ -85,18 +86,18 @@ HWTEST_F(RichEditorColorModeTestNg, GetColorMode002, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto context = richEditorPattern->GetContext();
     ASSERT_NE(context, nullptr);
     context->SetLocalColorMode(ColorMode::DARK);
- 
+
     auto result = richEditorPattern->GetColorMode();
     EXPECT_NE(result, ColorMode::DARK);
- 
+
     // Reset
     context->SetLocalColorMode(ColorMode::COLOR_MODE_UNDEFINED);
 }
- 
+
 /**
  * @tc.name: GetColorMode003
  * @tc.desc: Test RichEditorPattern::GetColorMode returns LIGHT when context local mode is LIGHT
@@ -107,18 +108,18 @@ HWTEST_F(RichEditorColorModeTestNg, GetColorMode003, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto context = richEditorPattern->GetContext();
     ASSERT_NE(context, nullptr);
     context->SetLocalColorMode(ColorMode::LIGHT);
- 
+
     auto result = richEditorPattern->GetColorMode();
     EXPECT_NE(result, ColorMode::LIGHT);
- 
+
     // Reset
     context->SetLocalColorMode(ColorMode::COLOR_MODE_UNDEFINED);
 }
- 
+
 /**
  * @tc.name: GetDisplayColorMode001
  * @tc.desc: Test RichEditorPattern::GetDisplayColorMode when GetColorMode returns UNDEFINED
@@ -130,18 +131,18 @@ HWTEST_F(RichEditorColorModeTestNg, GetDisplayColorMode001, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     // Ensure GetColorMode returns COLOR_MODE_UNDEFINED
     auto context = richEditorPattern->GetContext();
     ASSERT_NE(context, nullptr);
     context->SetLocalColorMode(ColorMode::COLOR_MODE_UNDEFINED);
- 
+
     // MockContainer default color mode is LIGHT
     MockContainer::SetMockColorMode(ColorMode::LIGHT);
     auto result = richEditorPattern->GetDisplayColorMode();
     EXPECT_EQ(result, ColorMode::LIGHT);
 }
- 
+
 /**
  * @tc.name: GetDisplayColorMode002
  * @tc.desc: Test RichEditorPattern::GetDisplayColorMode when GetColorMode returns UNDEFINED
@@ -153,19 +154,19 @@ HWTEST_F(RichEditorColorModeTestNg, GetDisplayColorMode002, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto context = richEditorPattern->GetContext();
     ASSERT_NE(context, nullptr);
     context->SetLocalColorMode(ColorMode::COLOR_MODE_UNDEFINED);
- 
+
     MockContainer::SetMockColorMode(ColorMode::DARK);
     auto result = richEditorPattern->GetDisplayColorMode();
     EXPECT_EQ(result, ColorMode::DARK);
- 
+
     // Reset mock color mode
     MockContainer::SetMockColorMode(ColorMode::LIGHT);
 }
- 
+
 /**
  * @tc.name: GetDisplayColorMode003
  * @tc.desc: Test RichEditorPattern::GetDisplayColorMode when GetColorMode returns a defined mode
@@ -177,21 +178,21 @@ HWTEST_F(RichEditorColorModeTestNg, GetDisplayColorMode003, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto context = richEditorPattern->GetContext();
     ASSERT_NE(context, nullptr);
     context->SetLocalColorMode(ColorMode::DARK);
- 
+
     // Even if container mode is LIGHT, GetDisplayColorMode should return DARK
     // because GetColorMode returns a defined mode (not UNDEFINED)
     MockContainer::SetMockColorMode(ColorMode::LIGHT);
     auto result = richEditorPattern->GetDisplayColorMode();
     EXPECT_NE(result, ColorMode::DARK);
- 
+
     // Reset
     context->SetLocalColorMode(ColorMode::COLOR_MODE_UNDEFINED);
 }
- 
+
 /**
  * @tc.name: UpdateOriginCaretColor002
  * @tc.desc: Test FloatingCaretState::UpdateOriginCaretColor with LIGHT mode
@@ -203,12 +204,12 @@ HWTEST_F(RichEditorColorModeTestNg, UpdateOriginCaretColor002, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto& floatingCaretState = richEditorPattern->floatingCaretState_;
     floatingCaretState.UpdateOriginCaretColor(ColorMode::LIGHT);
     EXPECT_EQ(floatingCaretState.originCaretColor, Color(0x4D000000));
 }
- 
+
 /**
  * @tc.name: UpdateOriginCaretColor003
  * @tc.desc: Test FloatingCaretState::UpdateOriginCaretColor with COLOR_MODE_UNDEFINED
@@ -220,13 +221,13 @@ HWTEST_F(RichEditorColorModeTestNg, UpdateOriginCaretColor003, TestSize.Level0)
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     auto& floatingCaretState = richEditorPattern->floatingCaretState_;
     floatingCaretState.UpdateOriginCaretColor(ColorMode::COLOR_MODE_UNDEFINED);
     // COLOR_MODE_UNDEFINED is not DARK, so defaults to semi-transparent black
     EXPECT_EQ(floatingCaretState.originCaretColor, Color(0x4D000000));
 }
- 
+
 /**
  * @tc.name: RichEditorBaseControllerGetColorMode002
  * @tc.desc: Test RichEditorBaseController::GetColorMode returns UNDEFINED when pattern is null
@@ -239,7 +240,7 @@ HWTEST_F(RichEditorColorModeTestNg, RichEditorBaseControllerGetColorMode002, Tes
     auto result = baseController->GetColorMode();
     EXPECT_EQ(result, ColorMode::COLOR_MODE_UNDEFINED);
 }
- 
+
 /**
  * @tc.name: ColorModeProcessorVersion001
  * @tc.desc: Test ColorModeProcessor constructor skips logic when API target version < VERSION_TWENTY_SIX
@@ -251,18 +252,18 @@ HWTEST_F(RichEditorColorModeTestNg, ColorModeProcessorVersion001, TestSize.Level
     auto backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
     MockContainer::Current()->SetApiTargetVersion(
         static_cast<int32_t>(PlatformVersion::VERSION_TWENTY));
- 
+
     // ColorModeProcessor should skip initialization when version < VERSION_TWENTY_SIX
     ColorModeProcessor processor(ColorMode::DARK);
     // No crash expected, processor simply skips the version check
     // Destructor should also skip restoration
     EXPECT_NE(MockContainer::Current()->GetApiTargetVersion(),
         static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
- 
+
     // Reset
     MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
 }
- 
+
 /**
  * @tc.name: ColorModeProcessorVersion002
  * @tc.desc: Test ColorModeProcessor constructor activates when API target version >= VERSION_TWENTY_SIX
@@ -274,16 +275,16 @@ HWTEST_F(RichEditorColorModeTestNg, ColorModeProcessorVersion002, TestSize.Level
     auto backupApiVersion = MockContainer::Current()->GetApiTargetVersion();
     MockContainer::Current()->SetApiTargetVersion(
         static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
- 
+
     // ColorModeProcessor should attempt initialization when version >= VERSION_TWENTY_SIX
     ColorModeProcessor processor(ColorMode::DARK);
     EXPECT_EQ(MockContainer::Current()->GetApiTargetVersion(),
         static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
- 
+
     // Reset
     MockContainer::Current()->SetApiTargetVersion(backupApiVersion);
 }
- 
+
 /**
  * @tc.name: GetDisplayColorModeFallback001
  * @tc.desc: Test GetDisplayColorMode falls back to Container::CurrentColorMode (LIGHT by default)
@@ -295,18 +296,18 @@ HWTEST_F(RichEditorColorModeTestNg, GetDisplayColorModeFallback001, TestSize.Lev
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
- 
+
     // Ensure context returns UNDEFINED
     auto context = richEditorPattern->GetContext();
     ASSERT_NE(context, nullptr);
     context->SetLocalColorMode(ColorMode::COLOR_MODE_UNDEFINED);
- 
+
     // Default mock container color mode is LIGHT
     MockContainer::SetMockColorMode(ColorMode::LIGHT);
     auto displayMode = richEditorPattern->GetDisplayColorMode();
     EXPECT_EQ(displayMode, ColorMode::LIGHT);
 }
- 
+
 /**
  * @tc.name: InitFloatingCaretColorMode001
  * @tc.desc: Test that RichEditorPattern init uses GetDisplayColorMode for UpdateOriginCaretColor
@@ -320,11 +321,11 @@ HWTEST_F(RichEditorColorModeTestNg, InitFloatingCaretColorMode001, TestSize.Leve
     // In init, UpdateOriginCaretColor(GetDisplayColorMode()) is called
     // With DARK container mode, caret color should be semi-transparent white
     EXPECT_EQ(pattern->floatingCaretState_.originCaretColor, Color(0x4DFFFFFF));
- 
+
     // Reset
     MockContainer::SetMockColorMode(ColorMode::LIGHT);
 }
- 
+
 /**
  * @tc.name: InitFloatingCaretColorMode002
  * @tc.desc: Test that RichEditorPattern init uses GetDisplayColorMode with LIGHT mode
@@ -336,5 +337,121 @@ HWTEST_F(RichEditorColorModeTestNg, InitFloatingCaretColorMode002, TestSize.Leve
     auto pattern = AceType::MakeRefPtr<RichEditorPattern>();
     // With LIGHT container mode, caret color should be semi-transparent black
     EXPECT_EQ(pattern->floatingCaretState_.originCaretColor, Color(0x4D000000));
+}
+
+/**
+ * @tc.name: OnColorModeChange001
+ * @tc.desc: Test OnColorModeChange with cancelButtonDirty_ true and null cleanNodeResponseArea_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, OnColorModeChange001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->cancelButtonDirty_ = true;
+    pattern->cleanNodeResponseArea_ = nullptr;
+    pattern->OnColorModeChange(1);
+    EXPECT_FALSE(pattern->cancelButtonDirty_);
+}
+
+/**
+ * @tc.name: OnColorModeChange002
+ * @tc.desc: Test OnColorModeChange with cancelButtonDirty_ false skips refresh branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, OnColorModeChange002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->cancelButtonDirty_ = false;
+    pattern->OnColorModeChange(0);
+    EXPECT_FALSE(pattern->cancelButtonDirty_);
+}
+
+/**
+ * @tc.name: UpdateLayoutPropertyColor001
+ * @tc.desc: Test UpdateLayoutPropertyColor with theme present updates text color.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateLayoutPropertyColor001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    pattern->UpdateLayoutPropertyColor();
+    auto layoutProperty = richEditorNode_->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    EXPECT_TRUE(layoutProperty->HasTextColor());
+}
+
+/**
+ * @tc.name: UpdateSpanNodeByColorMode001
+ * @tc.desc: Test UpdateSpanNodeByColorMode early return when isSpanStringMode_ is true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateSpanNodeByColorMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = true;
+    pattern->UpdateSpanNodeByColorMode();
+    EXPECT_TRUE(pattern->isSpanStringMode_);
+}
+
+/**
+ * @tc.name: UpdateSpanNodeByColorMode002
+ * @tc.desc: Test UpdateSpanNodeByColorMode with null content host returns early.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateSpanNodeByColorMode002, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->contentPattern_ = nullptr;
+    pattern->UpdateSpanNodeByColorMode();
+    EXPECT_FALSE(pattern->isSpanStringMode_);
+}
+
+/**
+ * @tc.name: UpdateSpanNodeByColorMode003
+ * @tc.desc: Test UpdateSpanNodeByColorMode iterates span nodes and updates colors.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateSpanNodeByColorMode003, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    pipeline->SetThemeManager(themeManager);
+    EXPECT_CALL(*themeManager, GetTheme(_))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    AddSpan(u"abc");
+    pattern->isSpanStringMode_ = false;
+    pattern->UpdateSpanNodeByColorMode();
+    EXPECT_FALSE(pattern->isSpanStringMode_);
+}
+
+/**
+ * @tc.name: UpdateStyledStringByColorMode001
+ * @tc.desc: Test UpdateStyledStringByColorMode early return when not in span string mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, UpdateStyledStringByColorMode001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSpanStringMode_ = false;
+    pattern->UpdateStyledStringByColorMode();
+    EXPECT_FALSE(pattern->isSpanStringMode_);
 }
 } // namespace OHOS::Ace::NG

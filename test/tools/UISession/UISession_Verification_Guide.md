@@ -294,7 +294,13 @@ hdc shell hidumper -s 16666 -a "GetCurrentAbilityLanguageInfo"
 
 **日志确认**：各 handler 使用 `LOGI` 输出带固定 tag 的结果，例如 `[GetVisibleInspectorTree]`、`[ContentChangeManager]`、`[ComponentChangeEvent]`、`[GetWebInfoByRequest]`。
 
-**文件确认**：`GetVisibleInspectorTree -tofile` 保存 `arkui_tree_*.json`，`RegisterContentChangeCallback ... -tofile` 保存 `arkui_simpleTree_*.json`，`GetWebInfoByRequest <webId> RequestArkWebDomTree` 保存 `arkweb_tree_*.json`，目录均为 `/data/service/el1/public/ui_sa/`。
+**文件确认**：`GetVisibleInspectorTree -tofile` 保存 `arkui_tree_*.json`，`RegisterContentChangeCallback ... -tofile` 保存 `arkui_simpleTree_*.json`，`GetWebInfoByRequest <webId> RequestArkWebDomTree` 保存 `arkweb_tree_*.json`，`RegisterPageSceneRules ... -tofile` 保存 `page_scene_event_*.json`，目录均为 `/data/service/el1/public/ui_sa/`。
+
+**文件名规则**：统一为 `<前缀>_<毫秒时间戳>.json`（首个文件与改造前完全一致，例如 `page_scene_event_2026-11-09_17-22-37.123.json`）。同一毫秒内出现第二个及以后的同名文件时，在扩展名前追加两位补零序号：`..._123_01.json`、`..._123_02.json`。落盘前用 `O_EXCL` 预占文件名，已存在就换下一个后缀重试，因此同一毫秒内的多次上报（例如一个事件命中两条 PageScene 规则）会各自生成一个文件，不再互相覆盖；同一毫秒内 `.json` < `_01` < `_02`，字典序即落盘顺序。验证时不要只按“最后一个文件”判断，应按后缀逐个检查。
+
+**PageScene 同名覆盖回归验证**：先用 `-tofile` 注册规则（可用 `-dual` 让两个 ruleSet 共用同一个事件回调），持续触发页面事件，然后执行
+`hdc shell "ls -l /data/service/el1/public/ui_sa/page_scene_event_*.json"`。
+预期：同一毫秒内的多次上报产生 `....123.json`、`....123_01.json` 等多个文件，每个文件内容只包含各自 ruleSet 的 `hits`/`exits`；若仍然只有一个文件，说明该落盘路径没有走 `ReserveUniqueFilePath`。
 
 **页面翻译确认**：`GetPageTranslateText` 日志应出现 `[GetPageTranslateText] result=0` 和至少一条 `nodeId/textLen/version`；`StartPageTranslate` 后新增上树或内容变化节点应继续出现 `[StartPageTranslate] nodeId=...` 摘要；`SendPageTranslateResult` 应出现 `[SendPageTranslateResult] result=0`；`ResetPageTranslate` / `EndPageTranslate` 后可通过 `GetVisibleInspectorTree -tofile` 对比是否恢复原文。
 

@@ -62,6 +62,25 @@ static std::string ParseCommand(const std::string& command)
     return json->GetString("cmd");
 }
 
+CommandResult CounterPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setCounterOnInc", "setCounterOnDec" },
+        CommandErrorType::EXECUTE_FAIL, [this](const std::unique_ptr<JsonValue>& json) {
+        auto host = GetHost();
+        auto id = json->GetString("cmd") == "setCounterOnInc" ? GetAddId() : GetSubId();
+        auto child = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(host->GetChildIndexById(id)));
+        if (!child) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto hub = child->GetEventHub<EventHub>();
+        auto gesture = child->GetOrCreateGestureEventHub();
+        if (!hub || !hub->IsEnabled() || !gesture || !gesture->GetClickEvent()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t CounterPattern::OnInjectionEvent(const std::string& command)
 {
     std::string cmdType = ParseCommand(command);

@@ -74,6 +74,15 @@ public:
         }
     }
 
+    // Whether a developer-visible touch callback is bound to this node. Framework-internal
+    // listeners (pressed state, focus, menu and other component-internal touch tasks) also
+    // live in touchEvents_, so they must not be mistaken for a developer callback: the
+    // PageScene RESPONSE scene only recognizes operations whose developer callback is bound.
+    bool HasDeveloperTouchCallback() const
+    {
+        return userCallback_ != nullptr || onTouchEventCallback_ != nullptr || commonTouchEventCallback_ != nullptr;
+    }
+
     void OnFlushTouchEventsBegin() override;
     void OnFlushTouchEventsEnd() override;
 
@@ -134,6 +143,8 @@ public:
     bool HandleEvent(const TouchEvent& point) override;
     bool HandleInteractionEvent(const TouchEvent& point) override;
 
+    static TouchEventInfo CreateInputEventInfo(const TouchEvent& event, const RefPtr<FrameNode>& node);
+
     void SetFrameNodeCommonOnTouchEvent(TouchEventFunc&& callback)
     {
         if (commonTouchEventCallback_) {
@@ -167,6 +178,7 @@ private:
     void PublishSearchClickCandidate(const TouchEvent& point);
     bool ShouldResponse() override;
     void TriggerCallBacks(TouchEventInfo& event);
+    void PublishDeveloperResponse(TouchEventInfo& event);
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     void ReportTouchEventToUISession(const TouchEventInfo& event);
 #endif

@@ -426,6 +426,9 @@ export class ArkUIAniModule {
     native static _DestroyWindowFreeContainer(instanceId: KInt): void
 
     // for UIContext
+    native static _RegisterApplicationShortcut(value: string, modifiers: KInt,
+        callback: (instanceId: KInt) => void): KInt
+    native static _UnregisterApplicationShortcut(registrationId: KInt): void
     native static _GetCallingScopeUIContext(): KInt
     native static _GetLastFocusedUIContext(): KInt
     native static _GetLastForegroundUIContext(): KInt
@@ -462,6 +465,7 @@ export class ArkUIAniModule {
     native static _Common_isWindowInfoInitialized(instanceId: KInt): boolean
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
+    native static _Common_IsTransPageEnabled(instanceId: KInt): boolean
 
     // for transfer
     native static _createTouchEventAccessorWithPointer(input: KPointer): KPointer
@@ -484,6 +488,7 @@ export class ArkUIAniModule {
     native static _CanvasRenderer_GetCanvasDensity(peerPtr: KPointer): number
     native static _GetSystemDensity(): number
     native static _CanvasRenderer_GetImageData(peerPtr: KPointer, sx: number, sy: number, sw: number, sh: number): Uint8ClampedArray
+    native static _CanvasRenderer_GetPixelMap(peerPtr: KPointer, sx: number, sy: number, sw: number, sh: number): image.PixelMap | undefined
     native static _CanvasRenderer_PutImageData0(peerPtr: KPointer, array: Uint8ClampedArray, dx: number, dy: number, width: KInt, height: KInt): void
     native static _CanvasRenderer_PutImageData1(peerPtr: KPointer, array: Uint8ClampedArray, dx: number, dy: number, width: KInt, height: KInt,
         dirtyX: number, dirtyY: number, dirtyWidth: number, dirtyHeight: number): void
@@ -584,4 +589,17 @@ export class ArkUIAniModule {
     native static _ModalUIExtensionProxyOnSyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
     native static _ModalUIExtensionProxyOffAsyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
     native static _ModalUIExtensionProxyOffSyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
+
+    // for PlaceholderRegister (scroll placeholder template registry). The
+    // engine face is the ArkUIAniPlaceholderRegisterModifier of libace.
+    // release is the detached-root destroy callback: the engine invokes it with
+    // the raw product pointer whenever the registry drops a product.
+    native static _PlaceholderRegisterRegister(id: string, builder: Object, execution: Object,
+        release: (ptr: KPointer) => void): int32;
+    native static _PlaceholderRegisterUnregister(id: string): void;
+    native static _PlaceholderRegisterIsRegistered(id: string): boolean;
+    // Product hand-off of one isolated execution: the execution closure pops
+    // the built subtree root from its isolated view stack and publishes the
+    // pointer here, so the value never depends on ani primitive return boxing.
+    native static _PlaceholderRegisterPublishProduct(ptr: KPointer): void;
 }

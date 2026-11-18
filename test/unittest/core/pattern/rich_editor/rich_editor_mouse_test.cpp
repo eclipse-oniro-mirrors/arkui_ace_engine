@@ -423,9 +423,12 @@ HWTEST_F(RichEditorMouseTest, RichEditorPatternTestInitMouseEvent001, TestSize.L
     auto hoverEventActuator = inputHub->hoverEventActuator_;
     ASSERT_NE(hoverEventActuator, nullptr);
     auto hoverInputEvents = hoverEventActuator->inputEvents_;
+    HoverInfo hoverInfo;
     for (auto input : hoverInputEvents) {
-        CHECK_NULL_CONTINUE(input);
-        (*input)(true);
+        auto onHoverFunc = input->GetOnHoverFunc();
+        if (onHoverFunc) {
+            onHoverFunc(true, hoverInfo);
+        }
     }
 
     ASSERT_EQ(richEditorPattern->mouseEventInitialized_, true);
@@ -1426,5 +1429,32 @@ HWTEST_F(RichEditorMouseTest, HandleImageHoverEvent002, TestSize.Level0)
     richEditorPattern->HandleImageHoverEvent(mouseInfo);
 
     EXPECT_EQ(richEditorPattern->lastHoverSpanItem_, nullptr);
+}
+
+/**
+ * @tc.name: RestoreDefaultMouseState001
+ * @tc.desc: Test RestoreDefaultMouseState.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorMouseTest, RestoreDefaultMouseState001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->RestoreDefaultMouseState();
+    EXPECT_FALSE(pattern->isMousePressed_);
+}
+
+/**
+ * @tc.name: ResetIsMousePressed001
+ * @tc.desc: Test ResetIsMousePressed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorMouseTest, ResetIsMousePressed001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isMousePressed_ = true;
+    pattern->ResetIsMousePressed();
+    EXPECT_FALSE(pattern->isMousePressed_);
 }
 }

@@ -14,6 +14,7 @@
  */
 #include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/ui_node.h"
+#include "core/components_ng/base/inspector_tree_provider_registry.h"
 
 #include <optional>
 #include <queue>
@@ -30,6 +31,7 @@
 #include "core/common/premake_scope.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/ui_node_gc.h"
 #include "core/components_ng/export_texture_info/export_texture_info.h"
@@ -149,6 +151,9 @@ UINode::UINode(std::string_view tag, int32_t nodeId, bool isRoot)
 
 UINode::~UINode()
 {
+    // Release the external inspector-tree getter entry bound to this node
+    // (registration lifetime follows the node by construction).
+    InspectorTreeProviderRegistry::ReleaseNodeEntry(this);
     --count_;
 #ifdef UICAST_COMPONENT_SUPPORTED
     do {
@@ -511,7 +516,7 @@ bool UINode::RemoveAdoptedChild(const RefPtr<FrameNode>& child)
         return false;
     }
     adoptedChildren_.erase(iter);
-    child->SetUseAdoptedCompensation(false);
+    FrameNodeAdoptedCompensation::SetUseAdoptedCompensation(child.GetRawPtr(), false);
     child->SetIsAdopted(false);
     child->SetAdoptParent(nullptr);
     return true;
@@ -1697,7 +1702,6 @@ bool UINode::IsCulledByRect(const RectCullingState& rectCullingState, bool hasIn
     return !hasInspectableChildren;
 }
 
-#ifndef CROSS_PLATFORM
 void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr<JsonValue>& current,
     bool onlyNeedVisible, ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity, const RectCullingState& rectCullingState)
@@ -1870,8 +1874,6 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
         config.collectionState->traversalRoot = previousRoot;
     }
 }
-
-#endif
 
 void UINode::DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current)
 {
@@ -3542,6 +3544,8 @@ void InitializeTreeRequest(
     state.accessibility = options.accessibility;
     state.visual = options.visual;
     state.functional = options.functional;
+    state.filterOccludedNodes = options.filterOccludedNodes;
+    state.occlusionOpacityThreshold = options.occlusionOpacityThreshold;
     state.deliver = [completion](uint64_t requestId, int32_t result, const char* data, uint32_t size) {
         ArkUITreeCompletion copy = completion;
         copy.deliver(copy, requestId, result, data, size);
@@ -3561,6 +3565,8 @@ ArkUITreeOptions GetPendingTreeOptions(const UITreeRequestState& pending)
     options.accessibility = pending.accessibility;
     options.visual = pending.visual;
     options.functional = pending.functional;
+    options.filterOccludedNodes = pending.filterOccludedNodes;
+    options.occlusionOpacityThreshold = pending.occlusionOpacityThreshold;
     return options;
 }
 
@@ -3603,6 +3609,9 @@ ParamConfig CreateTreeConfig(const ArkUITreeOptions& options, TreeCollectionStat
     config.filterPureLayout = options.filterPureLayout;
     config.visualProperties = options.visual;
     config.functionalProperties = options.functional;
+    // Only a VISIBLE request can enable occlusion; the setters reject it for FULL requests.
+    config.filterOccludedNodes = !config.cacheNodes && options.filterOccludedNodes;
+    config.occlusionOpacityThreshold = options.occlusionOpacityThreshold;
     config.collectionState = &state;
     config.dumpMode = TreeDumpMode::PUBLIC_TREE;
     return config;
@@ -3622,6 +3631,15 @@ bool ShouldPruneNode(
 {
     if (!config.collectionState || !visible || !node) {
         return false;
+    }
+    if (config.collectionState->occlusionEnabled) {
+        const auto& decisions = config.collectionState->occlusionDecisions;
+        const auto& keepIds = config.collectionState->occlusionKeepIds;
+        auto occluded = decisions.find(node->GetId());
+        if (occluded != decisions.end() && occluded->second == OcclusionDecision::OCCLUDED &&
+            keepIds.find(node->GetId()) == keepIds.end()) {
+            return true;
+        }
     }
     auto& snapshots = config.collectionState->visibility;
     if (auto found = snapshots.find(AceType::RawPtr(node)); found != snapshots.end()) {
@@ -3857,11 +3875,7 @@ int32_t CollectUITree(int32_t instanceId, const ArkUITreeOptions* options, char*
     if (!tree || !tree->IsValid()) {
         return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
     }
-#ifdef CROSS_PLATFORM
-    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
-#else
     pipeline->CollectInspectorTreeInto(tree, !config.cacheNodes, config);
-#endif
     if (state.GetError()) {
         return state.GetError();
     }

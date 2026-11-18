@@ -239,7 +239,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
     auto frameNodePeer = reinterpret_cast<FrameNodePeer*>(peer);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(frameNodePeer);
     CHECK_NULL_RETURN(peerNode, false);
-    auto currentUINodeRef = AceType::DynamicCast<NG::UINode>(peerNode);
+    RefPtr<NG::UINode> currentUINodeRef = peerNode;
     CHECK_NULL_RETURN(currentUINodeRef, false);
     CHECK_NODE_ON_VALID_THREAD_RETURN(AceType::RawPtr(currentUINodeRef), false);
 
@@ -257,8 +257,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             TouchEvent touchEvent;
             BuilderNodeOpsAccessor::GetTouchEventFromProxy(event->value0, touchEvent, false);
             touchEvent.isNewReferee = useCompetition ? false : true;
-            result = useCompetition ? postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent))
-                                    : postEventManager->PostTouchEvent(node, std::move(touchEvent));
+            result = postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent));
             break;
         }
         case SELECTOR_ID_1: {
@@ -269,8 +268,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             mouseEvent.isNewReferee = useCompetition ? false : true;
-            result = useCompetition ? postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent))
-                                    : postEventManager->PostMouseEvent(node, std::move(mouseEvent));
+            result = postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent));
             break;
         }
         case SELECTOR_ID_2: {
@@ -281,8 +279,7 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
             axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
             axisEvent.isNewReferee = useCompetition ? false : true;
-            result = useCompetition ? postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent))
-                                    : postEventManager->PostAxisEvent(node, std::move(axisEvent));
+            result = postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent));
             break;
         }
         default:
@@ -298,7 +295,7 @@ Ark_Boolean DispatchKeyEventImpl(Ark_FrameNode peer, Ark_KeyEvent event)
     auto frameNodePeer = reinterpret_cast<FrameNodePeer*>(peer);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(frameNodePeer);
     CHECK_NULL_RETURN(peerNode, false);
-    auto currentUINodeRef = AceType::DynamicCast<NG::UINode>(peerNode);
+    RefPtr<NG::UINode> currentUINodeRef = peerNode;
     CHECK_NULL_RETURN(currentUINodeRef, false);
     CHECK_NODE_ON_VALID_THREAD_RETURN(AceType::RawPtr(currentUINodeRef), false);
 
@@ -334,7 +331,7 @@ Ark_Int32 AppendChildImpl(Ark_FrameNode peer,
         peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     }
     CHECK_NULL_RETURN(peerNode, ERROR_CODE_PARAM_INVALID);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_RETURN(currentUINodeRef, ERROR_CODE_PARAM_INVALID);
 
     // Thread validation for multithread support
@@ -344,7 +341,7 @@ Ark_Int32 AppendChildImpl(Ark_FrameNode peer,
         childPeerNode = FrameNodePeer::GetFrameNodeByPeer(child);
     }
     CHECK_NULL_RETURN(childPeerNode, ERROR_CODE_PARAM_INVALID);
-    auto childNode = AceType::DynamicCast<UINode>(childPeerNode);
+    RefPtr<UINode> childNode = childPeerNode;
     CHECK_NULL_RETURN(childNode, ERROR_CODE_PARAM_INVALID);
     if (childNode->IsAdopted()) {
         return ERROR_CODE_NODE_IS_ADOPTED;
@@ -363,7 +360,7 @@ Ark_Int32 InsertChildAfterImpl(Ark_NativePointer peer,
     auto peerNodePeer = reinterpret_cast<FrameNodePeer*>(peer);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peerNodePeer);
     CHECK_NULL_RETURN(peerNode, ERROR_CODE_PARAM_INVALID);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_RETURN(currentUINodeRef, ERROR_CODE_PARAM_INVALID);
 
     // Thread validation for multithread support
@@ -371,7 +368,7 @@ Ark_Int32 InsertChildAfterImpl(Ark_NativePointer peer,
     auto childPeerNodePeer = reinterpret_cast<FrameNodePeer*>(child);
     auto childPeerNode = FrameNodePeer::GetFrameNodeByPeer(childPeerNodePeer);
     CHECK_NULL_RETURN(childPeerNode, ERROR_CODE_PARAM_INVALID);
-    auto childNode = AceType::DynamicCast<UINode>(childPeerNode);
+    RefPtr<UINode> childNode = childPeerNode;
     if (childNode->IsAdopted()) {
         return ERROR_CODE_NODE_IS_ADOPTED;
     }
@@ -382,7 +379,7 @@ Ark_Int32 InsertChildAfterImpl(Ark_NativePointer peer,
     if (sibling) {
         auto siblingPeer = reinterpret_cast<FrameNodePeer*>(sibling);
         auto siblingPeerNode = FrameNodePeer::GetFrameNodeByPeer(siblingPeer);
-        auto siblingNode = AceType::DynamicCast<UINode>(siblingPeerNode);
+        RefPtr<UINode> siblingNode = siblingPeerNode;
         index = currentUINodeRef->GetChildIndex(siblingNode);
     }
 
@@ -395,14 +392,14 @@ void RemoveChildImpl(Ark_FrameNode peer,
 {
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_VOID(peerNode);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_VOID(currentUINodeRef);
 
     // Thread validation for multithread support
     CHECK_NODE_ON_VALID_THREAD_VOID(AceType::RawPtr(currentUINodeRef));
     auto nodePeer = FrameNodePeer::GetFrameNodeByPeer(child);
     CHECK_NULL_VOID(nodePeer);
-    auto childNode = AceType::DynamicCast<UINode>(nodePeer);
+    RefPtr<UINode> childNode = nodePeer;
     CHECK_NULL_VOID(childNode);
 
     currentUINodeRef->RemoveChild(childNode);
@@ -412,7 +409,7 @@ void ClearChildrenImpl(Ark_FrameNode peer)
 {
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_VOID(peerNode);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_VOID(currentUINodeRef);
 
     // Thread validation for multithread support
@@ -474,7 +471,7 @@ Ark_NativePointer GetFirstChildImpl(Ark_FrameNode peer)
     peerNode->GetAllChildrenWithBuild(false);
     auto child = peerNode->GetFrameNodeChildByIndex(0, false, true);
     CHECK_NULL_RETURN(child, nullptr);
-    return FrameNodePeer::Create(AceType::DynamicCast<FrameNode>(child));
+    return FrameNodePeer::Create(child);
 }
 
 RefPtr<FrameNode> GetParentNode(RefPtr<FrameNode> nodeRef)
@@ -553,7 +550,7 @@ void DisposeImpl(Ark_FrameNode peer)
 {
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_VOID(peerNode);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_VOID(currentUINodeRef);
 
     // Thread validation for multithread support
@@ -1113,14 +1110,14 @@ Ark_Int32 MoveToImpl(Ark_FrameNode peer,
     auto indexInt = Converter::Convert<int32_t>(index);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, ERROR_CODE_PARAM_INVALID);
-    auto moveNode = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> moveNode = peerNode;
     CHECK_NULL_RETURN(moveNode, ERROR_CODE_PARAM_INVALID);
     if (moveNode->IsAdopted()) {
         return ERROR_CODE_NODE_IS_ADOPTED;
     }
     auto targetParentPeerNode = FrameNodePeer::GetFrameNodeByPeer(targetParent);
     CHECK_NULL_RETURN(targetParentPeerNode, ERROR_CODE_PARAM_INVALID);
-    auto toNode = AceType::DynamicCast<UINode>(targetParentPeerNode);
+    RefPtr<UINode> toNode = targetParentPeerNode;
     CHECK_NULL_RETURN(toNode, ERROR_CODE_PARAM_INVALID);
     static const std::vector<const char*> nodeTypeArray = {
         OHOS::Ace::V2::STACK_ETS_TAG,
@@ -1228,7 +1225,7 @@ void ReuseImpl(Ark_FrameNode peer)
     CHECK_ON_UI_THREAD_VOID();
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_VOID(peerNode);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_VOID(currentUINodeRef);
 
     currentUINodeRef->OnReuse();
@@ -1238,7 +1235,7 @@ void RecycleImpl(Ark_FrameNode peer)
     CHECK_ON_UI_THREAD_VOID();
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_VOID(peerNode);
-    auto currentUINodeRef = AceType::DynamicCast<UINode>(peerNode);
+    RefPtr<UINode> currentUINodeRef = peerNode;
     CHECK_NULL_VOID(currentUINodeRef);
 
     currentUINodeRef->OnRecycle();
@@ -1283,7 +1280,7 @@ Ark_Boolean CreateAnimationImpl(Ark_FrameNode peer,
     CHECK_ON_UI_THREAD_RETURN(false);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, false);
-    auto frameNode = AceType::DynamicCast<OHOS::Ace::NG::FrameNode>(peerNode);
+    auto frameNode = peerNode;
     CHECK_NULL_RETURN(frameNode, false);
     auto currentId = Container::CurrentIdSafelyWithCheck();
     ContainerScope scope(currentId);
@@ -1320,7 +1317,7 @@ Ark_Boolean CancelAnimationsImpl(Ark_FrameNode peer, const Array_AnimationProper
     CHECK_ON_UI_THREAD_RETURN(false);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, false);
-    auto frameNode = AceType::DynamicCast<OHOS::Ace::NG::FrameNode>(peerNode);
+    auto frameNode = peerNode;
     CHECK_NULL_RETURN(frameNode, false);
     auto containerId = Container::CurrentIdSafelyWithCheck();
     ContainerScope scope(containerId);
@@ -1340,7 +1337,7 @@ Array_F64 GetNodePropertyValueImpl(Ark_FrameNode peer,
     CHECK_ON_UI_THREAD_RETURN({});
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, {});
-    auto frameNode = AceType::DynamicCast<FrameNode>(peerNode);
+    auto frameNode = peerNode;
     CHECK_NULL_RETURN(frameNode, {});
     auto resultVector = ViewAbstractModelStatic::GetRenderNodePropertyValue(
         frameNode.GetRawPtr(), static_cast<AnimationPropertyType>(property));
@@ -1551,7 +1548,7 @@ Ark_Int32 AdoptChildImpl(Ark_FrameNode peer, Ark_FrameNode child)
     CHECK_ON_UI_THREAD_RETURN(0);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, ERROR_CODE_NODE_CAN_NOT_ADOPT_TO);
-    auto currentUINodeRef = AceType::DynamicCast<FrameNode>(peerNode);
+    auto currentUINodeRef = peerNode;
     CHECK_NULL_RETURN(currentUINodeRef, ERROR_CODE_NODE_CAN_NOT_ADOPT_TO);
     bool peerNodeCanAdopt = CheckParentCanAdopt(currentUINodeRef);
     if (!peerNodeCanAdopt) {
@@ -1559,7 +1556,7 @@ Ark_Int32 AdoptChildImpl(Ark_FrameNode peer, Ark_FrameNode child)
     }
     auto childPeerNode = FrameNodePeer::GetFrameNodeByPeer(child);
     CHECK_NULL_RETURN(childPeerNode, ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED);
-    auto childNodeRef = AceType::DynamicCast<FrameNode>(childPeerNode);
+    auto childNodeRef = childPeerNode;
     CHECK_NULL_RETURN(childNodeRef, ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED);
     bool childCanBeAdopted = CheckChildCanBeAdopted(childNodeRef);
     if (!childCanBeAdopted) {
@@ -1577,12 +1574,12 @@ Ark_Int32 RemoveAdoptedChildImpl(Ark_FrameNode peer, Ark_FrameNode child)
     CHECK_ON_UI_THREAD_RETURN(0);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
-    auto currentUINodeRef = AceType::DynamicCast<FrameNode>(peerNode);
+    auto currentUINodeRef = peerNode;
     CHECK_NULL_RETURN(currentUINodeRef, ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
 
     auto childPeerNode = FrameNodePeer::GetFrameNodeByPeer(child);
     CHECK_NULL_RETURN(childPeerNode, ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
-    auto childNodeRef = AceType::DynamicCast<FrameNode>(childPeerNode);
+    auto childNodeRef = childPeerNode;
     CHECK_NULL_RETURN(childNodeRef, ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
 
     if (!childNodeRef->IsAdopted()) {
@@ -1611,7 +1608,7 @@ Ark_InteractionEventBindingInfo GetInteractionEventBindingInfoImpl(Ark_FrameNode
     if (eventType != Ark_EventQueryType::ARK_EVENT_QUERY_TYPE_ON_CLICK) {
         return info;
     }
-    auto frameNode = AceType::DynamicCast<FrameNode>(peerNode);
+    auto frameNode = peerNode;
     CHECK_NULL_RETURN(frameNode, info);
     auto bindingInfo = frameNode->GetInteractionEventBindingInfo();
     info.baseEventRegistered = bindingInfo.baseEventRegistered;
@@ -1625,7 +1622,7 @@ Ark_Boolean IsOnRenderTreeImpl(Ark_FrameNode peer)
     CHECK_ON_UI_THREAD_RETURN(false);
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_RETURN(peerNode, false);
-    auto frameNode = AceType::DynamicCast<FrameNode>(peerNode);
+    auto frameNode = peerNode;
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, false);
     return renderContext->IsOnRenderTree();
@@ -1635,7 +1632,7 @@ void ApplyAttributesFinishImpl(Ark_FrameNode peer)
     CHECK_ON_UI_THREAD_VOID();
     auto peerNode = FrameNodePeer::GetFrameNodeByPeer(peer);
     CHECK_NULL_VOID(peerNode);
-    auto frameNode = AceType::DynamicCast<FrameNode>(peerNode);
+    auto frameNode = peerNode;
     CHECK_NULL_VOID(frameNode);
     frameNode->MarkModifyDone();
 }

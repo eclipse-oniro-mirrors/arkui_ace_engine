@@ -154,6 +154,12 @@ Ark_TextMenuItemId GetPasswordVaultImpl()
     peer->id = "OH_DEFAULT_PASSWORD_VAULT";
     return peer;
 }
+Ark_TextMenuItemId GetTRANSLATE_INPUTImpl()
+{
+    auto peer = ConstructImpl();
+    peer->id = "OH_DEFAULT_TRANSLATE_INPUT";
+    return peer;
+}
 } // TextMenuItemIdAccessor
 const GENERATED_ArkUITextMenuItemIdAccessor* GetTextMenuItemIdAccessor()
 {
@@ -181,6 +187,7 @@ const GENERATED_ArkUITextMenuItemIdAccessor* GetTextMenuItemIdAccessor()
         TextMenuItemIdAccessor::GetAskAIImpl,
         TextMenuItemIdAccessor::GetAutoFillImpl,
         TextMenuItemIdAccessor::GetPasswordVaultImpl,
+        TextMenuItemIdAccessor::GetTRANSLATE_INPUTImpl,
     };
     return &TextMenuItemIdAccessorImpl;
 }

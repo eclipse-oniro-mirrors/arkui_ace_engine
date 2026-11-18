@@ -25,9 +25,105 @@
 #include "core/components/common/properties/placement.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 
+#include "core/components_ng/manager/handedness/handedness_manager.h"
+#include "core/common/window_size_breakpoint.h"
+#include "core/pipeline_ng/pipeline_context.h"
+
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t DOUBLE_SIZE = 2;
+
+float GetHostWindowWidth(const RefPtr<FrameNode>& host)
+{
+    float windowWidth = 0.0f;
+    auto parent = host->GetParent();
+    if (parent) {
+        auto parentFrameNode = AceType::DynamicCast<FrameNode>(parent);
+        if (parentFrameNode && parentFrameNode->GetGeometryNode()) {
+            windowWidth = parentFrameNode->GetGeometryNode()->GetFrameSize().Width();
+        }
+    }
+    return windowWidth;
+}
+
+bool TryResolveSubwindowHandedness(const RefPtr<FrameNode>& host, bool showInSubWindow,
+    RefPtr<HandednessManager>& handednessMgr, RefPtr<WindowManager>& windowManager, float& windowWidth)
+{
+    if (!showInSubWindow) {
+        return true;
+    }
+    auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
+    CHECK_NULL_RETURN(sheetWrapper, false);
+    auto sheetWrapperPattern = sheetWrapper->GetPattern<SheetWrapperPattern>();
+    CHECK_NULL_RETURN(sheetWrapperPattern, false);
+    if (sheetWrapperPattern->ShowInUEC()) {
+        return true;
+    }
+    auto parentContainerId =
+        SubwindowManager::GetInstance()->GetParentContainerId(sheetWrapperPattern->GetSubWindowId());
+    ContainerScope scope(parentContainerId);
+    auto container = AceEngine::Get().GetContainer(parentContainerId);
+    CHECK_NULL_RETURN(container, false);
+    auto mainWindowContext = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_RETURN(mainWindowContext, false);
+    handednessMgr = mainWindowContext->GetHandednessManager();
+    CHECK_NULL_RETURN(handednessMgr, false);
+    windowManager = mainWindowContext->GetWindowManager();
+    CHECK_NULL_RETURN(windowManager, false);
+    windowWidth = sheetWrapperPattern->GetMainWindowRect().Width();
+    return true;
+}
+
+std::optional<PopupSide> ResolveHandednessSide(HandednessFollowMode mode,
+    const RefPtr<HandednessManager>& handednessMgr, const RefPtr<WindowManager>& windowManager,
+    float windowWidth)
+{
+    if (mode == HandednessFollowMode::FOLLOW_ANCHOR) {
+        auto [nodeId, anchorCenter] = handednessMgr->QueryAnchorPosition();
+        if (nodeId < 0) {
+            return std::nullopt;
+        }
+        auto widthBp = windowManager->GetWidthBreakpointCallback();
+        if (widthBp == WidthBreakpoint::WIDTH_MD) {
+            return anchorCenter.GetX() < windowWidth / DOUBLE_SIZE ? PopupSide::LEFT : PopupSide::RIGHT;
+        }
+        if (widthBp != WidthBreakpoint::WIDTH_LG && widthBp != WidthBreakpoint::WIDTH_XL &&
+            widthBp != WidthBreakpoint::WIDTH_XXL) {
+            return std::nullopt;
+        }
+        float oneThird = windowWidth / 3.0f;
+        if (anchorCenter.GetX() < oneThird) {
+            return PopupSide::LEFT;
+        }
+        if (anchorCenter.GetX() < oneThird * DOUBLE_SIZE) {
+            return PopupSide::CENTER;
+        }
+        return PopupSide::RIGHT;
+    }
+    if (mode == HandednessFollowMode::FOLLOW_GRIP_HAND) {
+        return handednessMgr->QueryPopupSideByHoldingHand();
+    }
+    return std::nullopt;
+}
+
+std::optional<float> ResolveOffsetBySide(const RefPtr<FrameNode>& host, PopupSide side,
+    float windowWidth, float sheetWidth)
+{
+    if (side == PopupSide::CENTER) {
+        return std::nullopt;
+    }
+    auto sheetPattern = host->GetPattern<SheetPresentationPattern>();
+    CHECK_NULL_RETURN(sheetPattern, std::nullopt);
+    auto marginOpt = sheetPattern->GetSheetMiniDeviceMarginWidth();
+    if (!marginOpt.has_value()) {
+        return std::nullopt;
+    }
+    float marginPx = marginOpt.value().ConvertToPx();
+    if (side == PopupSide::LEFT) {
+        return marginPx;
+    }
+    return windowWidth - sheetWidth - marginPx;
+}
 } // namespace
 
 void SheetPresentationLayoutAlgorithm::InitParameter(LayoutWrapper* layoutWrapper)
@@ -77,7 +173,7 @@ float SheetPresentationLayoutAlgorithm::CalculateSheetHeightInOtherScenes(
     if (isWaterfallWindowMode_) {
         auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
         CHECK_NULL_RETURN(sheetWrapper, height);
-        auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+        auto sheetWrapperNode = sheetWrapper;
         CHECK_NULL_RETURN(sheetWrapperNode, height);
         maxUpSheetHeight = foldCreaseRect.Top() - sheetWrapperNode->GetPositionToScreen().GetY() -
                            DOUBLE_SIZE * (SHEET_BLANK_MINI_HEIGHT.ConvertToPx());
@@ -113,7 +209,7 @@ void SheetPresentationLayoutAlgorithm::CalculateSheetOffsetInOtherScenes(LayoutW
     if (isWaterfallWindowMode_) {
         auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
         CHECK_NULL_VOID(sheetWrapper);
-        auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+        auto sheetWrapperNode = sheetWrapper;
         CHECK_NULL_VOID(sheetWrapperNode);
         upScreenHeight = foldCreaseRect.Top() - sheetWrapperNode->GetPositionToScreen().GetY();
         topStartOffsetY = 0.0f;
@@ -247,14 +343,15 @@ void SheetPresentationLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         if ((sheetType_ == SheetType::SHEET_CENTER || sheetType_ == SheetType::SHEET_POPUP ||
             (sheetType_ == SheetType::SHEET_BOTTOM_OFFSET))
             && (sheetStyle_.sheetHeight.sheetMode.value_or(SheetMode::LARGE) == SheetMode::AUTO)) {
-            auto secondChild = AceType::DynamicCast<LayoutWrapper>(scrollNode);
+            RefPtr<LayoutWrapper> secondChild = scrollNode;
             CHECK_NULL_VOID(secondChild);
             auto&& scrollChild = secondChild->GetAllChildrenWithBuild();
             auto builder = scrollChild.front();
             CHECK_NULL_VOID(builder);
             auto builderGeometryNode = builder->GetGeometryNode();
             CHECK_NULL_VOID(builderGeometryNode);
-            sheetHeight_ = sheetPattern->GetTitleBuilderHeight() + builderGeometryNode->GetFrameSize().Height();
+            sheetHeight_ =
+                sheetPattern->GetTitleBuilderHeightStackMode() + builderGeometryNode->GetFrameSize().Height();
             float sheetMaxHeight = sheetMaxHeight_;
             if (SheetInSplitWindow()) {
                 auto pipelineContext = PipelineContext::GetCurrentContext();
@@ -301,11 +398,44 @@ void SheetPresentationLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     }
 }
 
+float SheetPresentationLayoutAlgorithm::ComputeHandednessOffsetX(LayoutWrapper* layoutWrapper, float defaultCenterX)
+{
+    CHECK_NULL_RETURN(layoutWrapper, defaultCenterX);
+    auto mode = sheetStyle_.adaptToHandedness.value_or(HandednessFollowMode::NONE);
+    if (mode == HandednessFollowMode::NONE) {
+        return defaultCenterX;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, defaultCenterX);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, defaultCenterX);
+    auto handednessMgr = pipeline->GetHandednessManager();
+    CHECK_NULL_RETURN(handednessMgr, defaultCenterX);
+    auto windowManager = pipeline->GetWindowManager();
+    CHECK_NULL_RETURN(windowManager, defaultCenterX);
+
+    float windowWidth = GetHostWindowWidth(host);
+    if (LessOrEqual(windowWidth, 0.0f)) {
+        windowWidth = sheetMaxWidth_;
+    }
+    bool showInSubWindow = sheetStyle_.showInSubWindow.value_or(false);
+    if (!TryResolveSubwindowHandedness(host, showInSubWindow, handednessMgr, windowManager, windowWidth)) {
+        return defaultCenterX;
+    }
+
+    auto side = ResolveHandednessSide(mode, handednessMgr, windowManager, windowWidth);
+    if (!side.has_value() || LessOrEqual(windowWidth, sheetWidth_)) {
+        return defaultCenterX;
+    }
+    return ResolveOffsetBySide(host, side.value(), windowWidth, sheetWidth_).value_or(defaultCenterX);
+}
+
 void SheetPresentationLayoutAlgorithm::ComputeCenterStyleOffset(LayoutWrapper* layoutWrapper)
 {
     auto showInSubWindow = sheetStyle_.showInSubWindow.value_or(false);
     if (!showInSubWindow) {
         sheetOffsetX_ = (sheetMaxWidth_ - sheetWidth_) / DOUBLE_SIZE;
+        sheetOffsetX_ = ComputeHandednessOffsetX(layoutWrapper, sheetOffsetX_);
         return;
     }
     auto host = layoutWrapper->GetHostNode();
@@ -339,6 +469,7 @@ void SheetPresentationLayoutAlgorithm::ComputeCenterOffsetForUECSubwindow(
     auto host = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(host);
     sheetOffsetX_ = (sheetMaxWidth_ - sheetWidth_) / DOUBLE_SIZE;
+    sheetOffsetX_ = ComputeHandednessOffsetX(layoutWrapper, sheetOffsetX_);
     sheetOffsetY_ = (sheetMaxHeight_ - sheetHeight_) / DOUBLE_SIZE;
 }
 
@@ -371,6 +502,7 @@ void SheetPresentationLayoutAlgorithm::ComputeCenterOffsetForNotUECSubwindow(Lay
     auto subwindowRootRect = subWindowContext->GetRootRect();
     sheetOffsetY_ = (subwindowRootRect.Height() - sheetFrameSize.Height()) / DOUBLE_SIZE;
     sheetOffsetX_ = (subwindowRootRect.Width()  - sheetFrameSize.Width()) / DOUBLE_SIZE;
+    sheetOffsetX_ = ComputeHandednessOffsetX(layoutWrapper, sheetOffsetX_);
 
     OffsetF windowAnchoroffset;
     auto sheetTheme = mainWindowContext->GetTheme<SheetTheme>();
@@ -530,42 +662,9 @@ void SheetPresentationLayoutAlgorithm::LayoutScrollNode(const NG::OffsetF& trans
     auto geometryNode = scrollWrapper->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
     geometryNode->SetMarginFrameOffset(offset);
+    sheetPattern->UpdateSafeAreaPaddingClip(
+        scrollNode->GetPaintProperty<ScrollablePaintProperty>(), titleBarHoverMode, offset.GetY() - translate.GetY());
     scrollWrapper->Layout();
-    UpdateSafeAreaPaddingClip(host, scrollNode->GetPaintProperty<ScrollablePaintProperty>(), titleBarHoverMode,
-        offset.GetY() - translate.GetY());
-}
-
-void SheetPresentationLayoutAlgorithm::UpdateSafeAreaPaddingClip(const RefPtr<FrameNode>& host,
-    const RefPtr<ScrollablePaintProperty>& scrollPaintProps, SheetTitleBarHoverMode hoverMode, float top)
-{
-    CHECK_NULL_VOID(host);
-    CHECK_NULL_VOID(scrollPaintProps);
-    auto hostLayoutProperty = host->GetLayoutProperty();
-    CHECK_NULL_VOID(hostLayoutProperty);
-    if (hoverMode == SheetTitleBarHoverMode::SAFE_AREA_PADDING) {
-        const auto& existing = hostLayoutProperty->GetSafeAreaPaddingProperty();
-        bool needUpdate =
-            !existing || !existing->top.has_value() || !NearEqual(existing->top->GetDimension().Value(), top);
-        if (needUpdate) {
-            PaddingProperty safeAreaPadding;
-            safeAreaPadding.left = CalcLength(0.0);
-            safeAreaPadding.right = CalcLength(0.0);
-            safeAreaPadding.top = CalcLength(top);
-            safeAreaPadding.bottom = std::nullopt;
-            hostLayoutProperty->UpdateSafeAreaPadding(safeAreaPadding);
-            host->ResetSafeAreaPadding();
-        }
-        const auto& clip = scrollPaintProps->GetContentClip();
-        if (!clip.has_value() || clip->first != ContentClipMode::SAFE_AREA) {
-            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::SAFE_AREA, nullptr));
-        }
-    } else if (hostLayoutProperty->GetSafeAreaPaddingProperty()) {
-        hostLayoutProperty->ResetSafeAreaPadding();
-        host->ResetSafeAreaPadding();
-        if (scrollPaintProps->GetContentClip().has_value()) {
-            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::BOUNDARY, nullptr));
-        }
-    }
 }
 
 void SheetPresentationLayoutAlgorithm::LayoutDragBar(const NG::OffsetF& translate, LayoutWrapper* layoutWrapper)

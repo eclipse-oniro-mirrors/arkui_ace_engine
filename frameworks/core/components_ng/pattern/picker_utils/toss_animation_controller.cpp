@@ -45,7 +45,7 @@ void TossAnimationController::SetStart(double y)
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<PickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     auto isTouchBreak = column->GetTouchBreakStatus();
     if (isTouchBreak == false) {
@@ -73,7 +73,7 @@ bool TossAnimationController::Play()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_RETURN(ref, false);
-    auto column = AceType::DynamicCast<PickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_RETURN(column, false);
     auto timeDiff = timeEnd_ - timeStart_;
     if (timeDiff < MIN_TIME) {
@@ -92,7 +92,7 @@ void TossAnimationController::StartSpringMotion()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<PickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     auto columnNode = column->GetHost();
     CHECK_NULL_VOID(columnNode);
@@ -144,7 +144,7 @@ void TossAnimationController::StopTossAnimation()
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
     CHECK_NULL_VOID(ref->property_);
-    auto column = AceType::DynamicCast<PickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     column->SetTossStatus(false);
     AnimationOption option;
@@ -213,7 +213,7 @@ void TossAnimationController::CreatePropertyCallback()
     auto weak = AceType::WeakClaim(this);
     auto ref = weak.Upgrade();
     CHECK_NULL_VOID(ref);
-    auto column = AceType::DynamicCast<PickerColumnPattern>(ref->column_.Upgrade());
+    auto column = ref->column_.Upgrade();
     CHECK_NULL_VOID(column);
     auto propertyCallback = [weak, column](float position) {
         auto isTouchBreak = column->GetTouchBreakStatus();

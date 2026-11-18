@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/list/list_pattern.h"
 
+#include <cmath>
 #include <limits>
 #include <set>
 #include <vector>
@@ -27,6 +28,7 @@
 #include "base/log/log_wrapper.h"
 #include "base/utils/multi_thread.h"
 #include "base/utils/system_properties.h"
+#include "base/utils/time_util.h"
 #include "base/memory/referenced.h"
 #include "core/animation/curves.h"
 #include "core/common/vibrator/vibrator_utils.h"
@@ -218,6 +220,13 @@ void ListPattern::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
             // Selector replacement invalidates in-flight placeholder work of this
             // host; the new provider's decisions start from a clean queue.
             manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::RE_REGISTER);
+            manager->SetPostFlushCallback(host->GetId(),
+                [weak = AceType::WeakClaim(this)] {
+                    auto pattern = weak.Upgrade();
+                    if (pattern) {
+                        pattern->SweepStaleScrollPlaceholderShells();
+                    }
+                });
         }
     }
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
@@ -244,6 +253,7 @@ void ListPattern::ResetScrollPlaceholder()
     auto* context = host->GetContext();
     CHECK_NULL_VOID(context);
     const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    manager->ClearPostFlushCallback(host->GetId());
     CHECK_NULL_VOID(manager);
     // Pending placeholder real-builds of this host turn stale immediately; the
     // manager never calls back into a detached pattern.
@@ -394,19 +404,52 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         }
     }
     if (options.size.has_value()) {
-        // The provider size is a plain northbound number, so it carries the ArkTS
-        // Length convention (vp). CalcLength's single-argument constructor defaults
-        // to DimensionUnit::PX, which would reserve 100 physical px for a
-        // {width:100, height:100} option (one third of the intended 100vp slot on a
-        // 3.16-density screen), so the unit must be stated explicitly here.
+        // Options carry unit-preserving Dimensions (bridges map plain numbers to vp;
+        // strings keep PERCENT/PX/...). Pass through untranslated so PERCENT resolves
+        // against the List cross-axis constraint at measure.
+        // The scroll_placeholder_types.h contract — invalid dimensions are ignored in
+        // favor of the component's own estimate — is enforced here: the layout chain
+        // clamps a negative ideal size to 0 and passes a NaN through untouched, so a
+        // non-finite or non-positive value never reaches the ideal size at all.
+        // A finite raw value can still overflow at px normalization (e.g.
+        // Number.MAX_VALUE vp: NormalizeToPx x density then static_cast<float> yields
+        // +Infinity) and poison the List scroll geometry, so those dimensions are
+        // dropped too. percentReference 0 keeps PERCENT finite (it still resolves
+        // against the List cross-axis at measure); a nullopt px (calc without rpnexp)
+        // stays on the existing passthrough path.
+        auto isValidDimension = [&shell](const Dimension& dim) {
+            if (!std::isfinite(dim.Value()) || LessNotEqual(dim.Value(), 0.0)) {
+                return false;
+            }
+            auto px = ConvertToPx(CalcLength(dim), ScaleProperty::CreateScaleProperty(shell->GetContext()),
+                0.0f, {});
+            return !px.has_value() || std::isfinite(px.value());
+        };
         CalcSize idealSize;
+        bool hasUsableDimension = false;
         if (options.size->width.has_value()) {
-            idealSize.SetWidth(CalcLength(options.size->width.value(), DimensionUnit::VP));
+            const auto& width = options.size->width.value();
+            if (isValidDimension(width)) {
+                idealSize.SetWidth(CalcLength(width));
+                hasUsableDimension = true;
+            } else {
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPlaceholder suggested size dropped as unusable: dim=%{public}s", width.ToString().c_str());
+            }
         }
         if (options.size->height.has_value()) {
-            idealSize.SetHeight(CalcLength(options.size->height.value(), DimensionUnit::VP));
+            const auto& height = options.size->height.value();
+            if (isValidDimension(height)) {
+                idealSize.SetHeight(CalcLength(height));
+                hasUsableDimension = true;
+            } else {
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPlaceholder suggested size dropped as unusable: dim=%{public}s", height.ToString().c_str());
+            }
         }
-        shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+        if (hasUsableDimension) {
+            shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+        }
     }
     // Node-as-wrapper: the list algorithm will drive this shell through
     // FrameNode::Measure directly. The measure flag is consumed by that first
@@ -477,6 +520,15 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
 std::optional<ScrollPlaceholderOptions> ListPattern::PredictScrollPlaceholderDefer(
     const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
 {
+    // Placeholder deferral is a scroll-time feature. The initial viewport (no scroll
+    // event yet) and a settled list must always build real items: deferring there
+    // mounts invisible shells the real-build queue can never deliver on (the startup
+    // frame is the one frame that is guaranteed to be over budget).
+    constexpr int64_t SCROLL_ACTIVE_WINDOW_NS = 200000000; // 200ms, covers fling frame gaps
+    int64_t nowNs = GetSysTimestamp();
+    if (lastScrollCallbackNs_ <= 0 || nowNs - lastScrollCallbackNs_ > SCROLL_ACTIVE_WINDOW_NS) {
+        return std::nullopt;
+    }
     ScrollPlaceholderPredictParams params;
     params.componentType = ScrollPlaceholderComponentType::LIST;
     params.hostNodeId = host->GetId();
@@ -586,6 +638,22 @@ bool ListPattern::HasScrollPlaceholderItem(int32_t index) const
     return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
 }
 
+namespace {
+// Placeholder commit/sweep visibility margin: covers typical cachedCount prefetch
+// bands without consulting each component's cached-count plumbing. A deferred build
+// whose index fell outside the window is dropped — the index falls back to the normal
+// acquisition and re-defers on demand if the user scrolls back.
+constexpr int32_t SCROLL_PH_RANGE_MARGIN = 10;
+
+bool InScrollPhVisibleRange(int32_t start, int32_t end, int32_t index)
+{
+    if (start < 0 || end < 0 || index < 0) {
+        return true; // range unknown (pre-first-layout): fail open
+    }
+    return index >= start - SCROLL_PH_RANGE_MARGIN && index <= end + SCROLL_PH_RANGE_MARGIN;
+}
+} // namespace
+
 bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
 {
     // Framed real-build closure (UI thread, pipeline OnIdle flush). The real item
@@ -612,6 +680,16 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
         scrollPlaceholderItems_.erase(iter);
         return false;
     }
+    // Visibility guard: a storm can leave a task queued for an index the viewport has
+    // long left behind (the queue itself has no scroll-position cleanup). Committing
+    // it would mount a full off-screen item and force a host re-measure for content
+    // the user may never revisit; retire the shell — the index re-defers through the
+    // normal path if the user scrolls back.
+    if (!InScrollPhVisibleRange(startIndex_, endIndex_, index)) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
     // A real child already present at the index (built through the normal path
     // after a data change): keep it, retire the placeholder. Deferral-blind probe —
     // plain GetChildByIndex would still see this index's own shell without the
@@ -622,24 +700,94 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
         return false;
     }
     ACE_SCOPED_TRACE("ScrollPlaceholder::BuildReal hostId:%d index:%d", host->GetId(), index);
+    // Take the entry out FIRST: the acquisition below re-enters
+    // CreateScrollPlaceholderShell, whose dedup check must not resolve to our own shell.
+    ScrollPlaceholderItemInfo info = iter->second;
+    scrollPlaceholderItems_.erase(iter);
     auto realWrapper = host->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true);
     if (!realWrapper) {
-        // Keep the placeholder; the item rebuilds through the layout path.
+        // The queue task is consumed either way: retire the orphan shell so future
+        // acquisitions take the normal path instead of hitting the shell forever.
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
         return false;
     }
     // Transaction: the real node is in the tree; the remeasure re-lays the item
-    // range (anchors follow the existing item size-change rules). The shell stays
+    // range (anchors follow the existing item-size change rules). The shell stays
     // mounted until that layout completes, then the reconcile retires it (content
     // back to the pool, shell unmounted outside the transaction).
-    retiringPlaceholderShells_.emplace_back(iter->second.shell, iter->second.templateId);
-    scrollPlaceholderItems_.erase(iter);
+    // Retire the shell NOW, in the same idle flush. The flush runs outside the
+    // layout transaction, so the structural removal (children list mutation,
+    // content back to the pool) is safe here, and the real item paints correctly
+    // from its first frame — observed on device: during a load-heavy fling decay
+    // the committed rows rendered complete while their shells still overlapped
+    // them, because the deferred retirement waited for a later layout round that
+    // measure breaks stretched out over several frames. Keeping the shell
+    // mounted only ever produced placeholder-over-real frames.
+    RetireScrollPlaceholderShell(info.shell, info.templateId);
+    // The stale-shell drain runs from the manager's post-flush hook (registered
+    // in SetScrollPlaceholder), right after each flush iteration at frame
+    // cadence — see SweepStaleScrollPlaceholderShells.
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     return true;
+}
+
+void ListPattern::SweepStaleScrollPlaceholderShells()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    int32_t examined = 0;
+    int32_t retired = 0;
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        ++examined;
+        const bool realExists =
+            host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr;
+        const bool outOfWindow = !InScrollPhVisibleRange(startIndex_, endIndex_, iter->first);
+        if (!realExists && !outOfWindow) {
+            ++iter;
+            continue;
+        }
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "idle sweep retire idx=%{public}d realExists=%{public}d outOfWindow=%{public}d",
+            iter->first, static_cast<int32_t>(realExists), static_cast<int32_t>(outOfWindow));
+        ++retired;
+        if (outOfWindow) {
+            manager->CancelRealBuildTask(host->GetId(), iter->first,
+                ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        }
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
+    if (examined > 0) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "idle sweep ran: examined=%{public}d retired=%{public}d", examined, retired);
+    }
 }
 
 void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
 {
     CHECK_NULL_VOID(shell);
+    // The structural removal below only reaches the RS render tree through a later
+    // host RebuildRenderContextTree — RemoveChild/DetachFromMainTree raise the sync
+    // flag, and no consumer is guaranteed to pick it up for the shell within the
+    // same frame (the mirror note in scroll_placeholder_shell_mount.h
+    // MountPlaceholderShellOnHost documents the same gap from the mount side).
+    // Until that rebuild runs, the retired shell's RS node keeps painting at its
+    // last-synced geometry, surfacing as one-frame placeholder-over-real overlap
+    // ghosts while the decay replacement phase retires shells at frame cadence.
+    // Hide the render output at the context level instead: the opacity update rides
+    // the modifier path straight onto the RS node and takes effect in the next
+    // submitted transaction no matter when the structural sync lands (same pattern
+    // as menu_wrapper_pattern's instant hide). Shells are one-shot nodes — the
+    // instance pool only ever recycles content subtrees — so the hide never needs
+    // revoking.
+    auto renderContext = shell->GetRenderContext();
+    if (renderContext) {
+        renderContext->UpdateOpacity(0.0);
+        shell->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+    }
     mountedPlaceholderShells_.erase(shell);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -673,24 +821,119 @@ void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, c
     shell->DetachFromMainTree();
 }
 
-void ListPattern::ReconcileScrollPlaceholderItems()
+void ListPattern::SweepScrollPlaceholderOutOfRange(int32_t start, int32_t end)
+{
+    // Scroll-driven hygiene for the framed real-build queue: a fast fling can defer
+    // more items than the viewport will ever revisit. Queued tasks whose index left
+    // the window (plus margin) can no longer render near the user — drop the task and
+    // retire the shell so the index falls back to the normal acquisition. Without
+    // this the backlog drains for minutes, building items the user has long passed.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    CHECK_NULL_VOID(manager);
+    manager->SetHostVisibleRange(host->GetId(), start, end);
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        const int32_t index = iter->first;
+        if (InScrollPhVisibleRange(start, end, index)) {
+            ++iter;
+            continue;
+        }
+        manager->CancelRealBuildTask(host->GetId(), index, ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        iter = scrollPlaceholderItems_.erase(iter);
+    }
+}
+
+void ListPattern::SyncScrollPlaceholderShellCoverage(int32_t index, ScrollPlaceholderItemInfo& info)
+{
+    // Runs on UI-thread layout rounds only, from ReconcileScrollPlaceholderItems
+    // right after the layout swap: by then itemPosition_ mirrors exactly the
+    // indices the just-finished round's fill loops covered, and List applies a
+    // scroll offset by re-laying exactly those entries
+    // (ListLayoutAlgorithm::Layout: per entry, frame position = content position -
+    // currentOffset_). A shell whose index left that coverage (the fill loops
+    // moved past it during a fast scroll) never gets repositioned - its node keeps
+    // the last-synced host-space position, an on-screen stale position it keeps
+    // painting while the real rows scroll past (the zero-frame-count shell is
+    // invisible to the index-space recycling that reclaims real items), until its
+    // retirement (flush/commit cadence) catches up several layout rounds later.
+    // Suppress the render output for exactly that window - same mechanism as the
+    // retirement hide: the opacity update rides the modifier path onto the RS node
+    // and lands in the same frame's render flush, so the frozen shell paints no
+    // stale-geometry frame at all. Restore as soon as coverage returns: the round
+    // that covers the index again also re-positions it. Idempotent - only
+    // transitions flip the render dirty flag.
+    const auto& shell = info.shell;
+    CHECK_NULL_VOID(shell);
+    auto renderContext = shell->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    const bool covered = itemPosition_.find(index) != itemPosition_.end();
+    if (covered != info.frozenHidden) {
+        return;
+    }
+    if (covered) {
+        info.frozenHidden = false;
+        renderContext->UpdateOpacity(1.0);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell coverage-restored: index=%{public}d", index);
+    } else {
+        info.frozenHidden = true;
+        renderContext->UpdateOpacity(0.0);
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell frozen-hidden: index=%{public}d", index);
+    }
+    shell->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+}
+
+void ListPattern::ReconcileScrollPlaceholderItems(int32_t layoutStart, int32_t layoutEnd)
 {
     // Layout-round reconcile: placeholders whose index already holds a
-    // real child (normal-path rebuild after data change) or fell out of range are
-    // dropped; shells of committed items are retired after the replacement
-    // layout finished (removed outside the transaction, per the commit ordering).
+    // real child (normal-path rebuild after data change) or fell out of the
+    // just-finished layout round's window are dropped; shells of committed
+    // items are retired after the replacement layout finished (removed
+    // outside the transaction, per the commit ordering). The out-of-window
+    // drop runs before the frame reaches the screen: an index the fill loops
+    // no longer visit keeps its shell geometry frozen at stale viewport
+    // coordinates, so a scrollbar jump would otherwise paint the previous
+    // window's shells on top of the new content until a later event-path
+    // sweep (ProcessEvent) caught up.
+    // The out-of-window drop keeps the ±SCROLL_PH_RANGE_MARGIN band on purpose
+    // (commit visibility guard / cache-band prefetch), so during a fast fling a
+    // frozen shell can stay pending inside that band for several layout rounds
+    // — each round painting it at its frozen on-screen position while the real
+    // rows scroll past (the device overlap frames). The coverage sync below
+    // closes that visual window: a shell the current round's fill loops no
+    // longer cover (its index left itemPosition_) never paints stale geometry
+    // even while it keeps waiting in the band.
     // The orphan sweep at the end also runs with both tables empty: an empty
     // table with a mounted shell is exactly the residual it exists to catch.
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     int32_t totalCount = host->GetTotalChildCount();
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // -1/-1 (empty itemPosition_, pre-first-layout) means unknown coverage:
+    // fail open like the window range below and leave every shell as-is.
+    const bool coverageKnown = layoutStart >= 0 && layoutEnd >= 0;
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
         if (iter->second.shell) {
             LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
         }
+        if (coverageKnown) {
+            SyncScrollPlaceholderShellCoverage(iter->first, iter->second);
+        }
+        bool outOfWindow = !InScrollPhVisibleRange(layoutStart, layoutEnd, iter->first);
         bool drop = iter->first >= totalCount ||
             (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
-        if (drop) {
+        if (drop || outOfWindow) {
+            if (outOfWindow && manager) {
+                // Mirror the event-path sweep: the queued real-build of an index
+                // the layout window left behind is dropped with the shell.
+                manager->CancelRealBuildTask(host->GetId(), iter->first,
+                    ScrollPlaceholderCancelReason::OUT_OF_RANGE);
+            }
             RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
             iter = scrollPlaceholderItems_.erase(iter);
         } else {
@@ -909,10 +1152,7 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    // Scroll placeholder layout-round reconcile: retire shells whose replacement
-    // layout finished and drop placeholders overtaken by real children.
-    ReconcileScrollPlaceholderItems();
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto listLayoutAlgorithm = DynamicCast<ListLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(listLayoutAlgorithm, false);
@@ -926,6 +1166,13 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
         jumpIndex_.reset();
     }
     itemPosition_ = listLayoutAlgorithm->GetItemPosition();
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished, drop placeholders overtaken by real children and shells
+    // whose index left this layout round's window (their frame geometry froze at
+    // stale viewport coordinates the moment the fill loops stopped visiting them
+    // — a scrollbar jump leaves such shells painted on screen until retired).
+    ReconcileScrollPlaceholderItems(itemPosition_.empty() ? -1 : itemPosition_.begin()->first,
+        itemPosition_.empty() ? -1 : itemPosition_.rbegin()->first);
     cachedItemPosition_ = listLayoutAlgorithm->GetCachedItemPosition();
     laneIdx4Divider_ = listLayoutAlgorithm->GetLaneIdx4Divider();
     maxListItemIndex_ = listLayoutAlgorithm->GetMaxListItemIndex();
@@ -1175,9 +1422,9 @@ RefPtr<NodePaintMethod> ListPattern::CreateNodePaintMethod()
     CHECK_NULL_RETURN(host, paint);
     const auto& geometryNode = host->GetGeometryNode();
     auto renderContext = host->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, paint);
     auto frameRect = renderContext->GetPaintRectWithoutTransform();
     if (!listContentModifier_) {
-        CHECK_NULL_RETURN(renderContext, paint);
         auto size = frameRect.GetSize();
         auto& padding = geometryNode->GetPadding();
         if (padding) {
@@ -1342,6 +1589,7 @@ void ListPattern::ProcessEvent(bool indexChanged, float finalOffset, bool isJump
     auto onJSFrameNodeScrollIndex = listEventHub->GetJSFrameNodeOnListScrollIndex();
     FireOnScrollIndex(indexChanged, onScrollIndex);
     FireOnScrollIndex(indexChanged, onJSFrameNodeScrollIndex);
+    SweepScrollPlaceholderOutOfRange(startIndex_, endIndex_);
     if (startIndexChanged_ || endIndexChanged_) {
         host->OnAccessibilityEvent(AccessibilityEventType::SCROLLING_EVENT, startIndex_, endIndex_);
     }
@@ -2044,6 +2292,7 @@ bool ListPattern::IsOutOfBoundary(bool useCurrentDelta)
 
 bool ListPattern::OnScrollCallback(float offset, int32_t source)
 {
+    lastScrollCallbackNs_ = GetSysTimestamp();
     if (source == SCROLL_FROM_START) {
         auto item = swiperItem_.Upgrade();
         if (item) {
@@ -2692,6 +2941,7 @@ int32_t ListPattern::GetFirstIndex() const
 void ListPattern::ScrollTo(float position)
 {
     StopAnimate();
+    ScheduleCapiScrollCommand(true);
     jumpIndex_.reset();
     targetIndex_.reset();
     currentDelta_ = 0.0f;
@@ -2702,7 +2952,7 @@ void ListPattern::ScrollTo(float position)
     isScrollEnd_ = true;
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    ContentChangeReport(host, ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(host, ContentChangeManager::SCROLL_TO, false);
 }
 
 void ListPattern::ResetScrollToIndexParams()
@@ -3080,6 +3330,9 @@ void ListPattern::ApplyFastScrollPreparationResult(const RefPtr<ListLayoutAlgori
 
 void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, std::optional<float> extraOffset)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     // When snap align scrolling with the mouse wheel, do not interrupt the animation.
     if (!smooth && !lastSnapTargetIndex_.has_value()) {
@@ -3107,7 +3360,7 @@ void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
             jumpIndexInGroup_.reset();
             auto host = GetHost();
             CHECK_NULL_VOID(host);
-            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX);
+            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX, false);
         }
         MarkDirtyNodeSelf();
     }
@@ -3141,6 +3394,9 @@ bool ListPattern::CheckTargetValid(int32_t index, int32_t indexInGroup)
 
 void ListPattern::ScrollToItemInGroup(int32_t index, int32_t indexInGroup, bool smooth, ScrollAlign align)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     if (!smooth) {
         StopAnimate();
@@ -3377,6 +3633,7 @@ void ListPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScrollType 
         }
     } else {
         StopAnimate();
+        ScheduleCapiScrollCommand(false);
         UpdateCurrentOffset(distance, SCROLL_FROM_JUMP);
         isScrollEnd_ = true;
     }
@@ -4973,7 +5230,7 @@ RefPtr<FrameNode> ListPattern::GetSelectableItemAtIndex(int32_t index) const
     }
     auto itemWrapper = host->GetChildByIndex(index + itemStartIndex_);
     CHECK_NULL_RETURN(itemWrapper, nullptr);
-    auto itemNode = AceType::DynamicCast<FrameNode>(itemWrapper->GetHostNode());
+    auto itemNode = itemWrapper->GetHostNode();
     CHECK_NULL_RETURN(itemNode, nullptr);
     auto itemPattern = itemNode->GetPattern<ListItemPattern>();
     if (itemPattern) {
@@ -4991,7 +5248,7 @@ RefPtr<FrameNode> ListPattern::GetSelectableItemAtIndex(int32_t index) const
     auto groupItemWrapper = itemNode->GetChildByIndex(
         resolvedItemInfo->indexInGroup + groupPattern->GetItemStartIndex(), isCache);
     CHECK_NULL_RETURN(groupItemWrapper, nullptr);
-    auto groupItemNode = AceType::DynamicCast<FrameNode>(groupItemWrapper->GetHostNode());
+    auto groupItemNode = groupItemWrapper->GetHostNode();
     if (!groupItemNode) {
         groupItemNode = AceType::DynamicCast<FrameNode>(groupItemWrapper);
     }
@@ -5160,7 +5417,7 @@ SelectableContainerPattern::SwipeSelectStateKey ListPattern::GetSwipeSelectState
     for (int32_t index = startIndex_; index <= endIndex_; ++index) {
         auto itemWrapper = host->GetChildByIndex(index + itemStartIndex_);
         CHECK_NULL_CONTINUE(itemWrapper);
-        auto itemNode = AceType::DynamicCast<FrameNode>(itemWrapper->GetHostNode());
+        auto itemNode = itemWrapper->GetHostNode();
         CHECK_NULL_CONTINUE(itemNode);
         auto itemPattern = itemNode->GetPattern<ListItemPattern>();
         if (itemPattern) {
@@ -5223,7 +5480,7 @@ void ListPattern::BuildSwipeSelectStateKeysInRange(const SwipeSelectStateKey& st
     for (int32_t index = startIndex_; index <= endIndex_; ++index) {
         auto itemWrapper = host->GetChildByIndex(index + itemStartIndex_);
         CHECK_NULL_CONTINUE(itemWrapper);
-        auto itemNode = AceType::DynamicCast<FrameNode>(itemWrapper->GetHostNode());
+        auto itemNode = itemWrapper->GetHostNode();
         CHECK_NULL_CONTINUE(itemNode);
         auto itemPattern = itemNode->GetPattern<ListItemPattern>();
         if (itemPattern) {
@@ -5771,8 +6028,8 @@ WeakPtr<FocusHub> ListPattern::FindChildFocusNodeByIndex(
 {
     auto focusWrapMode = GetFocusWrapMode();
     auto listProperty = GetLayoutProperty<ListLayoutProperty>();
-    auto isVertical = listProperty->GetListDirection().value_or(Axis::VERTICAL) == Axis::VERTICAL;
     CHECK_NULL_RETURN(listProperty, nullptr);
+    auto isVertical = listProperty->GetListDirection().value_or(Axis::VERTICAL) == Axis::VERTICAL;
     // Only for GetNextFocusNodeInList.
     auto listFrame = GetHost();
     CHECK_NULL_RETURN(listFrame, nullptr);
@@ -6565,6 +6822,11 @@ void ListPattern::ReportOnItemListScrollEvent(const std::string& event, int32_t 
     UiSessionManager::GetInstance()->ReportComponentChangeEvent("result", result->ToString(),
         ComponentEventType::COMPONENT_EVENT_SCROLL);
 #endif
+}
+
+CommandResult ListPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
 }
 
 int32_t ListPattern::OnInjectionEvent(const std::string& command)

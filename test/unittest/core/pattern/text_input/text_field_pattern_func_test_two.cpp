@@ -1499,7 +1499,7 @@ HWTEST_F(TextFieldPatternFuncTestTwo, TextPatternFunc077, TestSize.Level1)
     auto host = pattern->GetHost();
     auto nodeId = host->GetId();
     pattern->keyboardOverlay_->customKeyboardMap_.emplace(std::make_pair(nodeId, AceType::RawPtr(keyboardScd)));
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     textFieldManager->TriggerCustomKeyboardAvoid();
     EXPECT_EQ(keyboardScd->GetPattern<KeyboardPattern>()->safeHeight_, 0);
 }

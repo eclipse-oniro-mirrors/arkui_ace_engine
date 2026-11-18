@@ -18,9 +18,10 @@
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_paragraph_manager.h"
 #include "core/components_ng/pattern/text/text_content_modifier.h"
+#include "core/components_ng/pattern/text_field/auto_fill_host.h"
 
 namespace OHOS::Ace::NG {
-class RichEditorContentModifier : public TextContentModifier {
+class RichEditorContentModifier : public TextContentModifier, public IAutoFillContentModifier {
     DECLARE_ACE_TYPE(RichEditorContentModifier, TextContentModifier);
 
 public:
@@ -37,15 +38,36 @@ public:
     void SetClipOffset(OffsetF offset);
     void SetClipSize(SizeF size);
 
+    // IAutoFillContentModifier implementation
+    void SetAutoFillTextScrollOffset(float value) override;
+    void SetAutoFillTranslationOffset(float value) override;
+    void SetAutoFillOriginTextColor(const Color& value) override;
+    void SetAutoFillEmphasizeCharIndex(float value) override;
+    void SetAutoFillDefaultCharIndex(float value) override;
+    void ResetAutoFillProperties() override;
+    void SetDefaultAutoFillProperties();
+
 private:
     void PaintCustomSpan(DrawingContext& drawingContext);
     float AdjustParagraphX(const ParagraphManager::ParagraphInfo& info, const RectF& contentRect);
+    void DoAutoFillDraw(DrawingContext& drawingContext);
+
     RichEditorParagraphManager* const pManager_;
     WeakPtr<OHOS::Ace::NG::Pattern> pattern_;
     RefPtr<PropertyFloat> richTextRectX_;
     RefPtr<PropertyFloat> richTextRectY_;
     RefPtr<AnimatablePropertyOffsetF> clipOffset_;
     RefPtr<AnimatablePropertySizeF> clipSize_;
+
+    // AutoFill animation properties
+    RefPtr<AnimatablePropertyFloat> autoFillTranslationOffset_;
+    RefPtr<AnimatablePropertyFloat> autoFillTextScrollOffset_;
+    RefPtr<AnimatablePropertyFloat> autoFillEmphasizeCharIndex_;
+    RefPtr<AnimatablePropertyFloat> autoFillDefaultCharIndex_;
+    std::optional<Color> autoFillOriginTextColor_;
+    Color autoFillEmphasizeCharTextColor_;
+    Color autoFillDefaultCharInitTextColor_;
+
     ACE_DISALLOW_COPY_AND_MOVE(RichEditorContentModifier);
 };
 } // namespace OHOS::Ace::NG

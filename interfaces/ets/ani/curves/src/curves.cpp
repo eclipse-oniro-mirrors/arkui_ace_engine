@@ -161,6 +161,15 @@ static CurvesObj* unwrapp(ani_env *env, ani_object object)
     return reinterpret_cast<CurvesObj*>(curvesObj);
 }
 
+static void NativeDestroyCurves([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_object aniClass,
+    ani_long ptr)
+{
+    auto* curvesObj = reinterpret_cast<CurvesObj*>(ptr);
+    if (curvesObj != nullptr) {
+        delete curvesObj;
+    }
+}
+
 static ani_double Interpolate(ani_env* env, ani_object object, ani_double fraction)
 {
     auto curveObject = unwrapp(env, object);
@@ -540,6 +549,14 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm *vm, uint32_t *result)
         return ANI_ERROR;
     };
 
+    std::array staticMethodsCurves = {
+        ani_native_function {"nativeDestroy", nullptr, reinterpret_cast<void *>(NativeDestroyCurves)},
+    };
+    if (ANI_OK != env->Class_BindStaticNativeMethods(clsCurves, staticMethodsCurves.data(),
+        staticMethodsCurves.size())) {
+        return ANI_ERROR;
+    }
+
     *result = ANI_VERSION_1;
     return ANI_OK;
-}
+}

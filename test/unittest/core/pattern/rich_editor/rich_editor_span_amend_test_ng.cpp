@@ -123,7 +123,7 @@ void RichEditorSpanAmendTestNg::ConstructSpans(RefPtr<RichEditorPattern> pattern
  * @tc.desc: test AddTextSpan
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorSpanAmendTestNg, AddTextSpan001, TestSize.Level0)
+HWTEST_F(RichEditorSpanAmendTestNg, AddTextSpan001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -143,7 +143,7 @@ HWTEST_F(RichEditorSpanAmendTestNg, AddTextSpan001, TestSize.Level0)
  * @tc.desc: test AddTextSpan
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorSpanAmendTestNg, PlaceholderSpanNodeTest001, TestSize.Level0)
+HWTEST_F(RichEditorSpanAmendTestNg, PlaceholderSpanNodeTest001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -171,7 +171,7 @@ HWTEST_F(RichEditorSpanAmendTestNg, PlaceholderSpanNodeTest001, TestSize.Level0)
  * @tc.desc: test delete span
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorSpanAmendTestNg, SpanAddAndClear001, TestSize.Level0)
+HWTEST_F(RichEditorSpanAmendTestNg, SpanAddAndClear001, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -213,7 +213,7 @@ HWTEST_F(RichEditorSpanAmendTestNg, SpanAddAndClear001, TestSize.Level0)
  * @tc.desc: test delete span
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorSpanAmendTestNg, SpanAddAndClear002, TestSize.Level0)
+HWTEST_F(RichEditorSpanAmendTestNg, SpanAddAndClear002, TestSize.Level1)
 {
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
@@ -262,7 +262,7 @@ HWTEST_F(RichEditorSpanAmendTestNg, SpanAddAndClear002, TestSize.Level0)
  * @tc.desc: test update symbol span
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorSpanAmendTestNg, SymbolTest001, TestSize.Level0)
+HWTEST_F(RichEditorSpanAmendTestNg, SymbolTest001, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. get richEditor controller

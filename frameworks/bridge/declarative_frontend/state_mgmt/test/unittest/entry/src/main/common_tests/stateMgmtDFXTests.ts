@@ -21,8 +21,8 @@ declare class stateMgmtConsole {
 
 declare class stateMgmtDFX {
   static enableProfiler: boolean;
-  static unwrapRawValue<T>(prop: T): T;
-  static dumpDepenetElementV2(dependentElmIds: Set<number> | undefined, isGetElement?: boolean): Object[];
+  static unwrapRawValue<T>(prop: T | ObservedPropertyAbstractPU<T>): T;
+  static dumpDepenetElementV2(dependentElmIds: Set<number> | undefined, isGetElement?: boolean): Array<ElementType | string | ElementInfo>;
 }
 
 declare function setProfilerStatus(profilerStatus: boolean): void;
@@ -31,8 +31,22 @@ declare class ObservedPropertyAbstract<T> {
   getUnmonitored(): T;
 }
 
+declare class ObservedPropertyAbstractPU<T> extends ObservedPropertyAbstract<T> {
+}
+
 declare class ObservedObject {
   static GetRawObject<T>(value: T): T;
+}
+
+type ElementType = {
+  elementId: number;
+  elementTag: string;
+  isCustomNode: boolean;
+};
+
+interface ElementInfo {
+  elementName: string;
+  elementId: number;
 }
 
 declare class ObserveV2 {
@@ -110,6 +124,6 @@ export class StateMgmtDFXTests implements ITestFile {
     eq(stateMgmtDFX.enableProfiler, true);
     setProfilerStatus(false);
     eq(stateMgmtDFX.enableProfiler, false);
-    eq(this.warnCalledCount, 2);
+    eq(StateMgmtDFXTests.warnCalledCount, 2);
   }
 }

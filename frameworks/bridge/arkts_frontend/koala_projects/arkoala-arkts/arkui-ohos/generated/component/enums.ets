@@ -402,7 +402,19 @@ export enum FunctionKey {
     DPAD_UP = 14,
     DPAD_DOWN = 15,
     DPAD_LEFT = 16,
-    DPAD_RIGHT = 17
+    DPAD_RIGHT = 17,
+    CAPS_LOCK = 18,
+    SCROLL_LOCK = 20,
+    PAUSE_BREAK = 21,
+    NUM_LOCK = 22,
+    INSERT = 23,
+    DELETE = 24,
+    HOME = 25,
+    END = 26,
+    PAGE_UP = 27,
+    PAGE_DOWN = 28,
+    ENTER = 29,
+    BACKSPACE = 30
 }
 export enum ImageSpanAlignment {
     BASELINE = 4,
@@ -679,9 +691,9 @@ export enum InputEventInterceptAction {
     CONTINUE = 0,
     BLOCK = 1
 }
-export enum UIMaterialAnimationMode {
-    IMMERSIVE = 0,
-    NONE = 1
+export enum AgentControlMode {
+    ALLOW = 0,
+    DENY = 1
 }
 export enum GestureShortcut {
     PRIMARY = 0

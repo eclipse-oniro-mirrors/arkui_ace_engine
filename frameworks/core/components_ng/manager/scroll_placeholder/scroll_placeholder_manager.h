@@ -81,6 +81,9 @@ public:
 
     // Template registry facade.
     uint64_t RegisterTemplate(const std::string& templateId, ScrollPlaceholderBuilder&& builder);
+    // Installs the product end-of-life notification forwarded to the registry; the ANI
+    // register path uses it to release the detached roots of dropped builder products.
+    void SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier);
     bool UnregisterTemplate(const std::string& templateId);
     bool IsTemplateRegistered(const std::string& templateId) const;
     // Registration probe: synchronously runs one restricted-protocol subtree
@@ -123,6 +126,20 @@ public:
     bool HasPendingRealBuild() const;
     size_t GetPendingRealBuildCount() const;
     void CancelHostRealBuilds(int32_t hostNodeId, ScrollPlaceholderCancelReason reason);
+    // Drops the single queued real-build task of (hostNodeId, index); true when a task was
+    // removed. The CALLER owns the shell lifecycle: the adapter retires the mounted shell
+    // for the index (content pooling + deferral cleanup) alongside this call.
+    bool CancelRealBuildTask(int32_t hostNodeId, int32_t index, ScrollPlaceholderCancelReason reason);
+    // Scroll-position hygiene: adapters report the visible window (their layout's reported
+    // start/end indices) on scroll-index changes. Used to re-band the queue at flush time
+    // (visible-first) so a storm backlog drains viewport-first instead of in enqueue order.
+    void SetHostVisibleRange(int32_t hostId, int32_t start, int32_t end);
+    // Post-flush hook: the host pattern registers a callback that runs once
+    // after each FlushRealBuild iteration completes (outside the task loop,
+    // so queue mutations are safe). Used to drain stale placeholder shells
+    // at frame cadence during a load-heavy decay.
+    void SetPostFlushCallback(int32_t hostId, std::function<void()> callback);
+    void ClearPostFlushCallback(int32_t hostId);
 
     // Lifecycle.
     void Destroy();
@@ -210,6 +227,9 @@ private:
         uint64_t sequence = 0;
         ScrollPlaceholderRealBuildPriority priority = ScrollPlaceholderRealBuildPriority::VISIBLE;
         RealBuildTaskFunc task;
+        // Flush rounds this task survived without a commit; caps the budget requeue
+        // loop, because the cost estimate only calibrates after a successful commit.
+        int32_t requeueCount = 0;
     };
 
     ScrollPlaceholderPredictResult PredictCore(const ScrollPlaceholderPredictParams& params, int64_t frameDeadlineNs) const;
@@ -224,14 +244,23 @@ private:
     // Task body running off the UI thread; never invokes the builder. Every exit path
     // releases its pending slot.
     void RunBackgroundClone(const std::string& templateId, uint64_t generation);
-    void ReleasePendingCloneSlot(const std::string& templateId);
-    // Re-register/unregister invalidates in-flight clone slots of the previous generation;
-    // their late releases are floor-guarded, worst case one extra clone that the pool cap
-    // discards at commit time.
+    // Releases the slot booked for one clone of the given generation. Slots are keyed by
+    // generation on purpose: after a re-register reset, a late release of the superseded
+    // generation finds its own entry gone and becomes a no-op instead of consuming a slot
+    // freshly booked for the current generation.
+    void ReleasePendingCloneSlot(const std::string& templateId, uint64_t templateGeneration);
+    // Re-register/unregister drops the slot bookings of every generation of the template;
+    // clones still in flight of the old generation are stale by the generation guard and
+    // their late releases become no-ops.
     void ResetPendingCloneSlots(const std::string& templateId);
+    // Caller holds cloneMutex_.
+    size_t SumPendingClonesLocked(const std::string& templateId) const;
 
     void RequestFrameIfAlive();
     void PurgeTemplateRealBuilds(const std::string& templateId, ScrollPlaceholderCancelReason reason);
+    // Current-viewport membership for flush-time banding; fail-open (in-range) when the
+    // adapter has not reported a window yet, so pre-first-layout commits keep working.
+    bool InHostVisibleRange(int32_t hostNodeId, int32_t index) const;
 
     // Deferral table key: host id and item index packed into one 64-bit key. Host ids
     // and lazy-container indexes are generated positive int32s, so the packing is
@@ -250,6 +279,16 @@ private:
     ScrollPlaceholderCostModel costModel_;
     ScrollPlaceholderTemplateRegistry registry_;
     std::deque<RealBuildTask> pendingRealBuilds_;
+    std::unordered_map<int32_t, std::function<void()>> postFlushCallbacks_;
+    // Max forced (starvation-escape) commits inside ONE FlushRealBuild invocation. Without
+    // this bound a storm backlog ages past the escape threshold wholesale and one flush
+    // turns into an unbounded UI-thread drain: minutes pinned, no frame in between.
+    static constexpr size_t MAX_FORCED_COMMITS_PER_FLUSH = 8;
+    struct HostVisibleRange {
+        int32_t start = -1;
+        int32_t end = -1;
+    };
+    std::unordered_map<int32_t, HostVisibleRange> hostVisibleRanges_;
     uint64_t nextTaskSequence_ = 0;
     int64_t lastVsyncTimestampNs_ = 0;
     int64_t vsyncPeriodNs_ = 0;
@@ -260,7 +299,11 @@ private:
     // Guards pendingCloneCount_, which is read and written from both the UI thread and the
     // background clone tasks.
     mutable std::mutex cloneMutex_;
-    std::unordered_map<std::string, uint32_t> pendingCloneCount_;
+    // templateId -> (generation -> booked clone slots). The generation key keeps the
+    // in-flight count truthful across a re-register: bookings and releases always meet in
+    // the same generation entry, so a reset cannot let stale releases eat the slots of the
+    // freshly registered generation.
+    std::unordered_map<std::string, std::unordered_map<uint64_t, uint32_t>> pendingCloneCount_;
 
     // (hostId, index) -> mounted shell of a deferred index. Weak so a leaked pattern
     // bookkeeping bug can never keep a retired shell alive through this table.

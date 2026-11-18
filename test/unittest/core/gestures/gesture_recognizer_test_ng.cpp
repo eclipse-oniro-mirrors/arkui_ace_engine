@@ -1844,17 +1844,17 @@ HWTEST_F(GestureRecognizerTestNg, BatchAdjudicateTest002, TestSize.Level1)
      */
     std::vector<RefPtr<NGGestureRecognizer>> longPressRecognizers;
     auto longPressRecognizer = AceType::MakeRefPtr<LongPressRecognizer>(false, true);
-    longPressRecognizers.push_back(AceType::DynamicCast<NGGestureRecognizer>(longPressRecognizer));
+    longPressRecognizers.push_back(longPressRecognizer);
     longPressRecognizers.push_back(nullptr);
     ExclusiveRecognizer excluRecognizer(longPressRecognizers);
-    auto recognizerTest = AceType::DynamicCast<RecognizerGroup>(&excluRecognizer);
+    RecognizerGroup* recognizerTest = &excluRecognizer;
     recognizerTest->refereeState_ = RefereeState::DETECTING;
     PanDirection panDirection;
     panDirection.type = PanDirection::VERTICAL;
     auto panRecognizer = AceType::MakeRefPtr<PanRecognizer>(1, panDirection, 0);
     std::vector<RefPtr<NGGestureRecognizer>> recognizers { panRecognizer };
     auto testRecognizer = AceType::MakeRefPtr<SequencedRecognizer>(recognizers);
-    auto gestureRecognizer = AceType::DynamicCast<NG::NGGestureRecognizer>(testRecognizer);
+    RefPtr<NG::NGGestureRecognizer> gestureRecognizer = testRecognizer;
     recognizerTest->UpdateGestureReferee(AceType::WeakClaim(AceType::RawPtr(referee)));
     recognizerTest->recognizers_.push_back(gestureRecognizer);
     recognizerTest->recognizers_.push_back(nullptr);

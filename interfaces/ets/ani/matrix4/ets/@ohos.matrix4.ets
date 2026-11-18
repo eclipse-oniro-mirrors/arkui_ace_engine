@@ -69,15 +69,46 @@ export default namespace matrix4 {
         ];
     }
 
+    class Matrix4Cleaner {
+        private ptr: long = 0;
+        constructor(ptr: long) { this.ptr = ptr; }
+        clean(): void {
+            if (this.ptr != 0) {
+                Matrix4TransitInner.nativeDestroy(this.ptr);
+                this.ptr = 0;
+            }
+        }
+    }
     class Matrix4TransitInner implements Matrix4Transit {
         private matrix4Object: long = 0;
+        protected cleaner_: Matrix4Cleaner | undefined = undefined;
+        private static destroyRegister: FinalizationRegistry<Matrix4Cleaner> =
+            new FinalizationRegistry<Matrix4Cleaner>(Matrix4TransitInner.cleanCallback);
+        private static unregisterToken: object = new object();
 
         static {
             loadLibrary("matrix4_ani");
         }
 
+        static native nativeDestroy(ptr: long): void;
+
+        static cleanCallback(cleaner: Matrix4Cleaner): void {
+            cleaner.clean();
+        }
+
         constructor(context: long) {
             this.matrix4Object = context;
+            this.registerCleaner(context);
+        }
+        registerCleaner(ptr: long): void {
+            if (this.cleaner_ !== undefined) {
+                this.cleaner_!.clean();
+            }
+            this.cleaner_ = new Matrix4Cleaner(ptr);
+            Matrix4TransitInner.destroyRegister.register(this, this.cleaner_!, Matrix4TransitInner.unregisterToken);
+        }
+        unregisterCleaner(): void {
+            Matrix4TransitInner.destroyRegister.unregister(Matrix4TransitInner.unregisterToken);
         }
 
         static matrixTransferStatic(input: Any): Any {

@@ -54,6 +54,7 @@ inline const std::string UTC_1 = "1000000000000";
 inline const std::string UTC_2 = "2000000000000";
 inline const std::string FORMAT_DATA = "08:00:00";
 inline const std::string FORM_FORMAT = "hh:mm";
+inline const std::string FORM_FORMAT_HIDE = "h:mm";
 inline const std::vector<std::string> FONT_FAMILY_VALUE = { "cursive" };
 const std::string EMPTY_TEXT = "";
 const std::string TEXTCLOCK_CONTENT = "08:00:00";
@@ -174,7 +175,7 @@ HWTEST_F(TextClockTestNG, TextClockTest001, TestSize.Level0)
     textClockLayoutProperty->UpdateTextShadow(errSetShadows);
     EXPECT_EQ(textClockLayoutProperty->GetTextShadow(), errSetShadows);
     EXPECT_EQ(errShadow.GetBlurRadius(),
-        Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TWENTY_SIX) ? -0.1f : 0);
+              Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) ? -0.1f : 0);
 
     FONT_FEATURES_LIST fontFeatures;
     fontFeatures.emplace_back(std::make_pair("ss01", 1));
@@ -329,7 +330,7 @@ HWTEST_F(TextClockTestNG, TextClockTest004, TestSize.Level0)
      * @tc.expected: check whether the value is correct.
      */
     pattern->ParseInputFormat();
-    std::vector<std::string> curDateTime = { "1900", "0", "1", "0", "0", "0", "0", "", "2" };
+    std::vector<std::string> curDateTime = {"1900", "0", "1", "0", "0", "0", "0", "", "2"};
     std::string dateTimeValue = "2023/07/08, 下午8:35:07.007";
     curDateTime = pattern->ParseDateTimeValue(dateTimeValue);
     dateTimeValue = "7/8/2023, 8:35:07.67 am";
@@ -381,7 +382,7 @@ HWTEST_F(TextClockTestNG, TextClockTest005, TestSize.Level0)
      * @tc.expected: check whether the value is correct.
      */
     pattern->ParseInputFormat();
-    std::vector<std::string> curDateTime = { "1900", "0", "1", "0", "0", "0", "0", "", "2" };
+    std::vector<std::string> curDateTime = {"1900", "0", "1", "0", "0", "0", "0", "", "2"};
     std::string dateTimeValue = "2023/07/08, 下午8:35:07.007";
     curDateTime = pattern->ParseDateTimeValue(dateTimeValue);
     dateTimeValue = "7/8/2023, 8:35:07.67 am";
@@ -597,7 +598,7 @@ HWTEST_F(TextClockTestNG, TextClockTest009, TestSize.Level1)
      * @tc.steps: step3. ParseDateTimeValue function is called..
      * @tc.expected: step3. check whether the properties is correct.
      */
-    std::vector<std::string> strVec = { "1900", "0", "1", "0", "0", "0", "0", "", "0", "", "", "", "", "" };
+    std::vector<std::string> strVec = {"1900", "0", "1", "0", "0", "0", "0", "", "0", "", "", "", "", ""};
     std::string strDateTimeValue = "1970.01.01";
     std::vector<std::string> str = pattern->ParseDateTimeValue(strDateTimeValue);
     EXPECT_EQ(str, strVec);
@@ -692,7 +693,7 @@ HWTEST_F(TextClockTestNG, TextClockTest010, TestSize.Level1)
     EXPECT_TRUE(pattern->isForm_);
     // textClockLayoutProperty.format is std::nullopt
     auto format = pattern->GetFormat();
-    EXPECT_EQ(format, FORM_FORMAT);
+    EXPECT_EQ(format, FORM_FORMAT_HIDE);
 
     /**
      * @tc.steps: step5. check time format in card.
@@ -700,10 +701,10 @@ HWTEST_F(TextClockTestNG, TextClockTest010, TestSize.Level1)
      */
     textClockLayoutProperty->UpdateFormat(CLOCK_FORMAT);
     format = pattern->GetFormat();
-    EXPECT_EQ(format, FORM_FORMAT);
+    EXPECT_EQ(format, FORM_FORMAT_HIDE);
     textClockLayoutProperty->UpdateFormat("mm:SS");
     format = pattern->GetFormat();
-    EXPECT_EQ(format, FORM_FORMAT);
+    EXPECT_EQ(format, FORM_FORMAT_HIDE);
     pattern->GetWeek(true, 3);
     pattern->GetWeek(false, 5);
     pattern->ParseInputFormat();
@@ -974,7 +975,7 @@ HWTEST_F(TextClockTestNG, TextClockLayoutPropertyTest001, TestSize.Level1)
     textClockLayoutProperty->UpdateTextShadow(errSetShadows);
     EXPECT_EQ(textClockLayoutProperty->GetTextShadow(), errSetShadows);
     EXPECT_EQ(errShadow.GetBlurRadius(),
-        Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TWENTY_SIX) ? -0.1f : 0);
+        Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) ? -0.1f : 0);
 
     FONT_FEATURES_LIST fontFeatures;
     fontFeatures.emplace_back(std::make_pair("ss01", 1));

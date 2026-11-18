@@ -24,10 +24,13 @@
 #include "core/interfaces/native/node/ui_tree_api.h"
 
 #include <securec.h>
+#include <atomic>
+#include <cmath>
 #include <cstdlib>
 #include <vector>
 
 #include "base/log/log_wrapper.h"
+#include "base/utils/time_util.h"
 #include "interfaces/native/native_type.h"
 #include "interfaces/native/node/config_manager.h"
 
@@ -371,20 +374,26 @@ void DisposeNode(ArkUINodeHandle node)
 {
     auto* uiNode = reinterpret_cast<UINode*>(node);
     if (uiNode && uiNode->GetParent()) {
-        std::string rectInfo = "unavailable";
-        auto* frameNode = AceType::DynamicCast<FrameNode>(uiNode);
-        if (frameNode && frameNode->GetGeometryNode()) {
-            const auto rect = frameNode->GetGeometryNode()->GetFrameRect();
-            rectInfo = std::to_string(rect.Left()) + ", " + std::to_string(rect.Top()) + ", " +
-                std::to_string(rect.Width()) + ", " + std::to_string(rect.Height());
+        constexpr int64_t logMinIntervalNs = 5000000000;
+        static std::atomic<int64_t> lastLogTime { 0 };
+        auto last = lastLogTime.load(std::memory_order_relaxed);
+        const auto now = GetSysTimestamp();
+        if ((last == 0 || now - last >= logMinIntervalNs) &&
+            lastLogTime.compare_exchange_strong(last, now, std::memory_order_relaxed)) {
+            std::string rectInfo = "unavailable";
+            auto* frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+            if (frameNode && frameNode->GetGeometryNode()) {
+                const auto rect = frameNode->GetGeometryNode()->GetFrameRect();
+                rectInfo = std::to_string(std::lround(rect.Left())) + ", " +
+                    std::to_string(std::lround(rect.Top())) + ", " + std::to_string(std::lround(rect.Width())) + ", " +
+                    std::to_string(std::lround(rect.Height()));
+            }
+            const auto& componentId = uiNode->GetInspectorId();
+            const std::string componentInfo = componentId.has_value() ? ", ComponentID: " + componentId.value() : "";
+            LOGI("The node to be disposed still has a parent: nodeId: %{public}d, tag: %{public}s, "
+                "rect [%{public}s]%{public}s",
+                uiNode->GetId(), uiNode->GetTag().c_str(), rectInfo.c_str(), componentInfo.c_str());
         }
-        const auto& componentId = uiNode->GetInspectorId();
-        const std::string componentInfo = componentId.has_value() ? ", ComponentID: " + componentId.value() : "";
-        LOGD("DisposeNode: nodeId: %{public}d, tag: %{public}s, rect [%{public}s]%{public}s",
-            uiNode->GetId(), uiNode->GetTag().c_str(), rectInfo.c_str(), componentInfo.c_str());
-        LOGD("The node to be disposed still has a parent. "
-            "Accessing this node through a NodeHandle obtained by tree traversal after disposal "
-            "may result in undefined behavior, including application crashes.");
     }
     ViewModel::DisposeNode(node);
 }
@@ -2236,6 +2245,14 @@ ArkUI_Bool IsDebugForParallelSet()
     return AceApplicationInfo::GetInstance().IsDebugForParallelSet() ? 1 : 0;
 }
 
+ArkUI_Int32 EnableTouchPadEvent(ArkUI_Bool enabled)
+{
+    auto pipeline = PipelineContext::GetCurrentContext();
+    CHECK_NULL_RETURN(pipeline, ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
+    pipeline->SetTouchPadEventEnabled(enabled);
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
 const ArkUIBasicAPI* GetBasicAPI()
 {
     CHECK_INITIALIZED_FIELDS_BEGIN(); // don't move this line
@@ -2278,6 +2295,7 @@ const ArkUIBasicAPI* GetBasicAPI()
         .isCurrentThreadSafe = IsCurrentThreadSafe,
         .isDebugForParallel = IsDebugForParallel,
         .isDebugForParallelSet = IsDebugForParallelSet,
+        .enableTouchPadEvent = EnableTouchPadEvent,
     };
     CHECK_INITIALIZED_FIELDS_END(basicImpl, 0, 0, 0); // don't move this line
     return &basicImpl;

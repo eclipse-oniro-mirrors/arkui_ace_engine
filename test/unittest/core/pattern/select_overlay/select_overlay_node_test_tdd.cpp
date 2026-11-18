@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Huawei Device Co., Ltd.
+ * Copyright (c) 2024-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <vector>
+
 #include "gtest/gtest.h"
 #include "gtest/internal/gtest-internal.h"
 #define private public
@@ -24,12 +26,16 @@
 #include "base/geometry/ng/offset_t.h"
 #include "base/geometry/ng/point_t.h"
 #include "base/geometry/ng/rect_t.h"
+#include "core/accessibility/accessibility_manager.h"
+#include "core/common/ace_application_info.h"
 #include "core/components/select/select_theme.h"
 #include "core/components/text_overlay/text_overlay_theme.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_node.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_pattern.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_property.h"
+#include "core/pipeline/base/element_register.h"
 #undef protected
 #undef private
 
@@ -669,6 +675,151 @@ HWTEST_F(SelectOverlayNodeTddTest, UpdateSubMenuOptions001, TestSize.Level1)
     auto infoPtr = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
     node->UpdateSubMenuOptions(infoPtr);
     EXPECT_NE(node, nullptr);
+}
+
+class SelectOverlayAccessibilityTddTest : public SelectOverlayNodeTddTest {
+public:
+    void SetUp() override
+    {
+        pipeline_ = MockPipelineContext::GetCurrent();
+        ASSERT_NE(pipeline_, nullptr);
+        auto& appInfo = AceApplicationInfo::GetInstance();
+        accessibilityEnabled_ = appInfo.IsAccessibilityEnabled();
+        screenReadEnabled_ = appInfo.IsAccessibilityScreenReadEnabled();
+        useFlushUITasks_ = pipeline_->UseFlushUITasks();
+
+        info_ = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
+        overlay_ = AceType::MakeRefPtr<SelectOverlayNode>(
+            AceType::MakeRefPtr<SelectOverlayPattern>(info_, SelectOverlayMode::ALL));
+        overlay_->InitializePatternAndContext();
+        overlay_->selectMenu_ = CreateFrameNode("SelectMenu");
+        overlay_->selectMenuInner_ = CreateFrameNode("SelectMenuInner");
+        overlay_->extensionMenu_ = CreateFrameNode(V2::MENU_ETS_TAG);
+        moreButton_ = CreateFrameNode("SelectMoreOrBackButton");
+        firstItem_ = FrameNode::CreateFrameNode(V2::MENU_ITEM_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<MenuItemPattern>());
+        overlay_->selectMenu_->MountToParent(overlay_);
+        overlay_->selectMenuInner_->MountToParent(overlay_->selectMenu_);
+        moreButton_->MountToParent(overlay_->selectMenuInner_);
+        firstItem_->MountToParent(overlay_->extensionMenu_);
+        overlay_->extensionMenu_->MountToParent(overlay_);
+        overlay_->MountToParent(pipeline_->GetRootElement());
+        ASSERT_TRUE(overlay_->IsOnMainTree());
+        overlay_->extensionMenu_->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+        overlay_->isExtensionMenu_ = true;
+        overlay_->isDoingAnimation_ = true;
+        moreButton_->GetAccessibilityProperty<AccessibilityProperty>()->SetAccessibilityFocusState(true);
+
+        appInfo.SetAccessibilityEnabled(true);
+        appInfo.SetAccessibilityScreenReadEnabled(true);
+        pipeline_->SetUseFlushUITasks(true);
+        EXPECT_CALL(*pipeline_, SendEventToAccessibility(_))
+            .WillRepeatedly(Invoke([this](const AccessibilityEvent& event) {
+                if (event.type == AccessibilityEventType::REQUEST_FOCUS) {
+                    focusEvents_.push_back(event);
+                }
+            }));
+    }
+
+    void TearDown() override
+    {
+        if (!pipeline_) {
+            return;
+        }
+        pipeline_->FlushUITasks();
+        if (overlay_) {
+            pipeline_->GetRootElement()->RemoveChild(overlay_);
+        }
+        Mock::VerifyAndClearExpectations(AceType::RawPtr(pipeline_));
+        pipeline_->SetUseFlushUITasks(useFlushUITasks_);
+        AceApplicationInfo::GetInstance().SetAccessibilityScreenReadEnabled(screenReadEnabled_);
+        AceApplicationInfo::GetInstance().SetAccessibilityEnabled(accessibilityEnabled_);
+    }
+
+protected:
+    RefPtr<FrameNode> CreateFrameNode(const std::string& tag)
+    {
+        return FrameNode::CreateFrameNode(
+            tag, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    }
+
+    void SwitchWithBeforeFocusTask(const std::function<void()>& beforeFocus)
+    {
+        overlay_->PlaySelectMenuToExtensionAnimation(RectF(10.0f, 20.0f, 224.0f, 120.0f), [this, beforeFocus]() {
+            pipeline_->AddAfterLayoutTask([this, beforeFocus]() {
+                EXPECT_TRUE(focusEvents_.empty());
+                beforeFocus();
+            });
+        });
+    }
+
+    RefPtr<MockPipelineContext> pipeline_;
+    RefPtr<SelectOverlayNode> overlay_;
+    RefPtr<FrameNode> moreButton_;
+    RefPtr<FrameNode> firstItem_;
+    std::shared_ptr<SelectOverlayInfo> info_;
+    std::vector<AccessibilityEvent> focusEvents_;
+    bool accessibilityEnabled_ = false;
+    bool screenReadEnabled_ = false;
+    bool useFlushUITasks_ = false;
+};
+
+/**
+ * @tc.name: ExtensionMenuAccessibilityFocusAfterLayout
+ * @tc.desc: Make the extension menu available before hiding the focused more button, then focus its first item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayAccessibilityTddTest, ExtensionMenuAccessibilityFocusAfterLayout, TestSize.Level1)
+{
+    bool afterLayoutReached = false;
+    overlay_->PlaySelectMenuToExtensionAnimation(RectF(10.0f, 20.0f, 224.0f, 120.0f), [this, &afterLayoutReached]() {
+        EXPECT_TRUE(overlay_->extensionMenu_->IsVisible());
+        EXPECT_TRUE(overlay_->selectMenu_->IsVisible());
+        EXPECT_TRUE(overlay_->selectMenuInner_->IsVisible());
+        EXPECT_TRUE(moreButton_->GetAccessibilityProperty<AccessibilityProperty>()->GetAccessibilityFocusState());
+        EXPECT_TRUE(focusEvents_.empty());
+        pipeline_->AddAfterLayoutTask([this, &afterLayoutReached]() {
+            EXPECT_TRUE(focusEvents_.empty());
+            EXPECT_FALSE(overlay_->selectMenu_->IsVisible());
+            EXPECT_FALSE(overlay_->selectMenuInner_->IsVisible());
+            EXPECT_TRUE(overlay_->extensionMenu_->IsVisible());
+            afterLayoutReached = true;
+        });
+    });
+
+    EXPECT_TRUE(afterLayoutReached);
+    ASSERT_EQ(focusEvents_.size(), 1u);
+    EXPECT_EQ(focusEvents_.front().nodeId, firstItem_->GetAccessibilityId());
+    pipeline_->FlushUITasks();
+    EXPECT_EQ(focusEvents_.size(), 1u);
+}
+
+/**
+ * @tc.name: ExtensionMenuAccessibilityFocusCancelledWhenClosed
+ * @tc.desc: Do not request focus when the menu closes before the after-layout focus task runs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayAccessibilityTddTest, ExtensionMenuAccessibilityFocusCancelledWhenClosed, TestSize.Level1)
+{
+    SwitchWithBeforeFocusTask([this]() { info_->menuInfo.menuIsShow = false; });
+    EXPECT_FALSE(info_->menuInfo.menuIsShow);
+    EXPECT_TRUE(focusEvents_.empty());
+}
+
+/**
+ * @tc.name: ExtensionMenuAccessibilityFocusCancelledWhenReplaced
+ * @tc.desc: Do not request focus on the old extension menu after it has been replaced.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayAccessibilityTddTest, ExtensionMenuAccessibilityFocusCancelledWhenReplaced, TestSize.Level1)
+{
+    // Keep the old menu alive and attached so cancellation depends on the menu identity check.
+    auto oldMenu = overlay_->extensionMenu_;
+    SwitchWithBeforeFocusTask([this]() { overlay_->extensionMenu_ = CreateFrameNode(V2::MENU_ETS_TAG); });
+    EXPECT_NE(overlay_->extensionMenu_, oldMenu);
+    EXPECT_TRUE(oldMenu->IsOnMainTree());
+    EXPECT_TRUE(oldMenu->IsVisible());
+    EXPECT_TRUE(focusEvents_.empty());
 }
 
 } // namespace OHOS::Ace::NG

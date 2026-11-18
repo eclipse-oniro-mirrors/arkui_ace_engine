@@ -292,6 +292,7 @@ public:
     void OnShadowClipModeUpdate(ShadowClipMode clipMode) override;
     void OnBackBlendModeUpdate(BlendMode blendMode) override;
     void OnBackBlendApplyTypeUpdate(BlendApplyType applyType) override;
+    void OnVibrancyModeUpdate(const VibrancyMode& mode) override;
     void UpdateBorderWidthF(const BorderWidthPropertyF& value) override;
 
     void UpdateMaterialInteractionEffect(float scaleX, float scaleY, float offsetX, float offsetY) override;
@@ -389,6 +390,13 @@ public:
     void SetUnionSpacing(float spacing) override;
 
     RectF GetPaintRectWithTransform() override;
+    bool HasRenderNode() const override;
+
+    static RectF GetPaintRectWithTransform(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
+
+    static Matrix4 GetMatrixWithTransformRotate(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect);
 
     std::pair<RectF, bool> GetPaintRectWithTranslate() override;
 
@@ -416,7 +424,9 @@ public:
     void GetPointTransformRotate(PointF& point) override;
 
     Matrix4 GetMatrixWithTransformRotate() override;
-    Matrix4 GetMatrixWithTransformRotateInner();
+    static Matrix4 GetMatrixWithTransformRotateInner(
+        const std::shared_ptr<Rosen::RSNode>& rsNode, const RectF& paintRect,
+        const std::shared_ptr<Rosen::ModifierNG::RSTransformModifier>& transformModifier);
 
     void GetPointWithTransform(PointF& point) override;
     void GetPointWithTransformInner(PointF& point);
@@ -650,7 +660,7 @@ public:
     void UpdateForegroundFilterDistortionParam(const DistortionParam& param) override;
 
     std::shared_ptr<Rosen::RSNGFilterBase> CreateFrostedGlassFilter(
-        const FrostedGlassParam& param, float dipScale) override;
+        const FrostedGlassParam& param, float dipScale, const ExtraGlassParam* extraParam) override;
 
     void SetBackgroundNGFilterEC(const std::shared_ptr<Rosen::RSNGFilterBase>& materialFilter) override;
     void SetMaterialShaderECSub(const std::shared_ptr<Rosen::RSNGShaderBase>& materialFilter) override;
@@ -1074,7 +1084,7 @@ private:
         const ImageSourceInfo& source, const ParamConfig& config);
 
     void ModifyCustomBackground();
-    bool ShouldSkipAffineTransformation(std::shared_ptr<RSNode>& rsNode);
+    static bool ShouldSkipAffineTransformation(const std::shared_ptr<RSNode>& rsNode);
     void InsertFrameChildBefore(const RefPtr<UINode>& child, const RefPtr<UINode>& nextSibling);
     void RemoveMixedFrameChild(const RefPtr<UINode>& child);
     void NotifyMixedListChanged();

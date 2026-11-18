@@ -23,6 +23,8 @@
 
 namespace OHOS::Ace {
 
+bool IsValidKeyCode(int32_t code);
+
 class KeyEventRecognizer {
 public:
     // This method recognizes events by recording raw key events. If the raw event can be identified as a special

@@ -75,6 +75,7 @@ HWTEST_F(ScrollableTestCore, ContentChangeScrollStartTest001, TestSize.Level1)
     auto pattern = AceType::MakeRefPtr<ListPattern>();
     auto scrollNode = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 421, pattern, true);
     ASSERT_NE(scrollNode, nullptr);
+    scrollNode->AttachToMainTree(false, AceType::RawPtr(pipeline));
     auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     ASSERT_NE(mockUiSessionManager, nullptr);
 
@@ -102,7 +103,8 @@ HWTEST_F(ScrollableTestCore, ContentChangeScrollStartTest001, TestSize.Level1)
  */
 HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortContinuationTest001, TestSize.Level1)
 {
-    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
     auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     for (bool reportStartEvent : { false, true }) {
         ContentChangeConfig config;
@@ -111,6 +113,7 @@ HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortContinuationTest001, TestSi
         auto pattern = AceType::MakeRefPtr<ListPattern>();
         auto node = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 422, pattern, true);
         ASSERT_NE(node, nullptr);
+        node->AttachToMainTree(false, AceType::RawPtr(pipeline));
         EXPECT_CALL(*mockUiSessionManager, ReportContentChangeEvent(ChangeType::SCROLL_START, _))
             .Times(reportStartEvent ? 1 : 0);
         pattern->ContentChangeOnScrollStart(node);
@@ -145,11 +148,13 @@ HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortContinuationTest001, TestSi
  */
 HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortLegacyTest001, TestSize.Level1)
 {
-    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
     manager->StartContentChangeReport(ContentChangeConfig());
     auto pattern = AceType::MakeRefPtr<ListPattern>();
     auto node = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 423, pattern, true);
     ASSERT_NE(node, nullptr);
+    node->AttachToMainTree(false, AceType::RawPtr(pipeline));
     pattern->ContentChangeOnScrollStart(node);
     pattern->scrollStop_ = true;
     pattern->SetScrollAbort(true);

@@ -69,18 +69,53 @@ export interface AnimatorResult {
     setExpectedFrameRateRange(rateRange: ExpectedFrameRateRange) : void;
 }
 
+class AnimatorCleaner {
+    private ptr: long = 0;
+    constructor(ptr: long) {
+        this.ptr = ptr;
+    }
+    clean(): void {
+        if (this.ptr != 0) {
+            AnimatorResultInner.nativeDestroy(this.ptr);
+            this.ptr = 0;
+        }
+    }
+}
+
 class AnimatorResultInner implements AnimatorResult {
 
     static {
         loadLibrary("animator_ani");
     }
 
-    animatorResult:long = 0;
+    private static destroyRegister: FinalizationRegistry<AnimatorCleaner> =
+        new FinalizationRegistry<AnimatorCleaner>(AnimatorResultInner.cleanCallback);
+    private static unregisterToken: object = new object();
+
+    static cleanCallback(cleaner: AnimatorCleaner): void {
+        cleaner.clean();
+    }
+
+    protected cleaner_: AnimatorCleaner | undefined = undefined;
+    animatorResult: long = 0;
     constructor(result:long) {
         if(this.animatorResult == 0){
              this.animatorResult = result;
+             this.registerCleaner(result);
         }
     }
+    registerCleaner(ptr: long): void {
+        if (this.cleaner_ !== undefined) {
+            this.cleaner_!.clean();
+        }
+        this.cleaner_ = new AnimatorCleaner(ptr);
+        AnimatorResultInner.destroyRegister.register(this, this.cleaner_!, AnimatorResultInner.unregisterToken);
+    }
+    unregisterCleaner(): void {
+        AnimatorResultInner.destroyRegister.unregister(AnimatorResultInner.unregisterToken);
+    }
+
+    static native nativeDestroy(ptr: long): void;
     public native play(): void;
     public native reverse(): void;
     public native cancel(): void;

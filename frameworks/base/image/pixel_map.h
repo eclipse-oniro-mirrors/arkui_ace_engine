@@ -153,6 +153,7 @@ public:
     virtual uint32_t WritePixels(const WritePixelsOptions& opts) = 0;
     virtual uint32_t GetInnerColorGamut() const = 0;
     virtual void SetMemoryName(std::string pixelMapName) const = 0;
+    virtual bool ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const = 0;
 };
 
 } // namespace Ace

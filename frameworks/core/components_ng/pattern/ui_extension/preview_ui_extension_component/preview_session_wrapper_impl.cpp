@@ -155,7 +155,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
             if (errcode != OHOS::Rosen::WSError::WS_OK) {
                 taskExecutor->PostTask(
                     [weak, callSessionId] {
-                        auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                        auto pattern = weak.Upgrade();
                         CHECK_NULL_VOID(pattern);
                         if (callSessionId != pattern->GetSessionId()) {
                             LOGW("[AcePreviewUIExtension]foregroundCallback:"
@@ -174,7 +174,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
                 if (errcode != OHOS::Rosen::WSError::WS_OK) {
                     taskExecutor->PostTask(
                         [weak, callSessionId] {
-                            auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                            auto pattern = weak.Upgrade();
                             CHECK_NULL_VOID(pattern);
                             if (callSessionId != pattern->GetSessionId()) {
                                 LOGW("[AcePreviewUIExtension]backgroundCallback:"
@@ -193,10 +193,10 @@ void PreviewSessionWrapperImpl::InitAllCallback()
                 if (errcode != OHOS::Rosen::WSError::WS_OK) {
                     taskExecutor->PostTask(
                         [weak, callSessionId] {
-                            auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
-                            CHECK_NULL_VOID(pattern);
-                            if (callSessionId != pattern->GetSessionId()) {
-                                LOGW("[AcePreviewUIExtension]destructCallback:"
+                        auto pattern = weak.Upgrade();
+                        CHECK_NULL_VOID(pattern);
+                        if (callSessionId != pattern->GetSessionId()) {
+                            LOGW("[AcePreviewUIExtension]destructCallback:"
                                     "The callSessionId(%{public}d) is inconsistent with the curSession(%{public}d)",
                                     callSessionId, pattern->GetSessionId());
                                 return;
@@ -211,7 +211,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
             callSessionId](int32_t code, const AAFwk::Want& want) {
                 taskExecutor->PostTask(
                     [weak, code, want, callSessionId]() {
-                        auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                        auto pattern = weak.Upgrade();
                         CHECK_NULL_VOID(pattern);
                         if (callSessionId != pattern->GetSessionId()) {
                             LOGW("[AcePreviewUIExtension]transferAbilityResult:"
@@ -227,7 +227,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
             taskExecutor = taskExecutor_, callSessionId](const AAFwk::WantParams& params) {
                 taskExecutor->PostTask(
                     [weak, params, callSessionId]() {
-                        auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                        auto pattern = weak.Upgrade();
                         CHECK_NULL_VOID(pattern);
                         if (callSessionId != pattern->GetSessionId()) {
                             LOGW("[AcePreviewUIExtension]transferExtensionData:"
@@ -243,7 +243,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
             taskExecutor = taskExecutor_, callSessionId]() {
                 taskExecutor->PostTask(
                     [weak, callSessionId]() {
-                        auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                        auto pattern = weak.Upgrade();
                         CHECK_NULL_VOID(pattern);
                         if (callSessionId != pattern->GetSessionId()) {
                             LOGW("[AcePreviewUIExtension]notifyRemoteReadyFunc:"
@@ -259,7 +259,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
         taskExecutor = taskExecutor_, callSessionId]() {
             taskExecutor->PostTask(
                 [weak, callSessionId]() {
-                    auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                    auto pattern = weak.Upgrade();
                     CHECK_NULL_VOID(pattern);
                     if (callSessionId != pattern->GetSessionId()) {
                         LOGW("[AcePreviewUIExtension]notifySyncOnFunc:"
@@ -275,7 +275,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
         taskExecutor = taskExecutor_, callSessionId]() {
             taskExecutor->PostTask(
                 [weak, callSessionId]() {
-                    auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                    auto pattern = weak.Upgrade();
                     CHECK_NULL_VOID(pattern);
                     if (callSessionId != pattern->GetSessionId()) {
                         LOGW("[AcePreviewUIExtension]notifyAsyncOnFunc:"
@@ -291,17 +291,17 @@ void PreviewSessionWrapperImpl::InitAllCallback()
         taskExecutor = taskExecutor_, callSessionId]() {
             taskExecutor->PostSyncTask(
                 [weak, callSessionId]() {
-                    auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
-                    CHECK_NULL_VOID(pattern);
-                    if (callSessionId != pattern->GetSessionId()) {
-                        LOGW("[AcePreviewUIExtension]notifyBindModalFunc:"
-                            "The callSessionId(%{public}d) is inconsistent with the curSession(%{public}d)",
-                            callSessionId, pattern->GetSessionId());
-                        return;
-                    }
-                    pattern->FireBindModalCallback();
-                },
-                TaskExecutor::TaskType::UI, "ArkUIPreviewUIExtensionBindModalCallback");
+                auto pattern = weak.Upgrade();
+                CHECK_NULL_VOID(pattern);
+                if (callSessionId != pattern->GetSessionId()) {
+                    LOGW("[AcePreviewUIExtension]notifyBindModalFunc:"
+                        "The callSessionId(%{public}d) is inconsistent with the curSession(%{public}d)",
+                        callSessionId, pattern->GetSessionId());
+                    return;
+                }
+                pattern->FireBindModalCallback();
+            },
+            TaskExecutor::TaskType::UI, "ArkUIPreviewUIExtensionBindModalCallback");
         };
     sessionCallbacks->notifyGetAvoidAreaByTypeFunc_ =
         [instanceId = instanceId_](Rosen::AvoidAreaType type, int32_t apiVersion) -> Rosen::AvoidArea {
@@ -315,7 +315,7 @@ void PreviewSessionWrapperImpl::InitAllCallback()
         [weak = hostPattern_, taskExecutor = taskExecutor_, callSessionId](uint32_t eventId) {
         taskExecutor->PostTask(
             [weak, callSessionId, eventId]() {
-                auto pattern = AceType::DynamicCast<PreviewUIExtensionPattern>(weak.Upgrade());
+                auto pattern = weak.Upgrade();
                 CHECK_NULL_VOID(pattern);
                 if (callSessionId != pattern->GetSessionId()) {
                     LOGW("[AcePreviewUIExtension]notifyExtensionEventFunc: The callSessionId(%{public}d)"
@@ -333,6 +333,8 @@ void PreviewSessionWrapperImpl::InitAllCallback()
 /*********************** Begin: About session ************************************/
 void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
 {
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
     PLATFORM_LOGI("PreviewUIExtension The session is created with bundle = %{public}s, ability = %{public}s",
         want.GetElement().GetBundleName().c_str(), want.GetElement().GetAbilityName().c_str());
     auto container = Platform::AceContainer::GetContainer(instanceId_);
@@ -347,8 +349,9 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     } else {
         parentWindowType = container->GetWindowType();
     }
-    PLATFORM_LOGI("PreviewUIExtension isNotifyOccupiedAreaChange is %{public}d, parentWindowType: %{public}u",
-        isNotifyOccupiedAreaChange_, parentWindowType);
+    auto brandColorStr = pattern->GetBrandColorStr();
+    PLATFORM_LOGI("PreviewUIExtension isNotifyOccupiedAreaChange is %{public}d, parentWindowType: %{public}u, "
+        "brandColorStr: %{public}s", isNotifyOccupiedAreaChange_, parentWindowType, brandColorStr.c_str());
     auto callerToken = container->GetToken();
     auto parentToken = container->GetParentToken();
     Rosen::SessionInfo extensionSessionInfo;
@@ -360,9 +363,11 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     extensionSessionInfo.parentWindowType_ = parentWindowType;
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
+    extensionSessionInfo.brandColorStr_ = brandColorStr;
     SetConnectToRenderInner(container, extensionSessionInfo);
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
+    pattern->SetLastSentBrandColorStr(brandColorStr);
     lifecycleListener_ = std::make_shared<PreviewUIExtensionLifecycleListener>(
         AceType::WeakClaim(this));
     session_->RegisterLifecycleListener(lifecycleListener_);

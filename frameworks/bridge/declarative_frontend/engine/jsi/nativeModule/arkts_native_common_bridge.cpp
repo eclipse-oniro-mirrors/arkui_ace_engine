@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_common_bridge.h"
+#include <array>
+#include <cmath>
 #include <utility>
 
 #include "ark_native_engine.h"
@@ -44,11 +46,14 @@
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/components/progress/progress_theme.h"
+#include "core/event/function_key.h"
 #include "core/event/focus_axis_event.h"
 #include "frameworks/bridge/declarative_frontend/engine/functions/js_accessibility_function.h"
 #include "frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_shape_abstract.h"
 #include "frameworks/core/accessibility/static/accessibility_static_utils.h"
+#include "core/components_ng/base/view_abstract_model_ng.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "frameworks/core/components_ng/pattern/text/span_model_ng.h"
 #ifdef SMART_GESTURE_SUPPORTED
 #include "frameworks/core/components_ng/property/smart_gesture_property.h"
@@ -2754,6 +2759,17 @@ ArkUINativeModuleValue CommonBridge::ResetHitTestBehavior(ArkUIRuntimeCallInfo *
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getCommonModifier()->resetHitTestBehavior(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::SetAgentControlMode(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    auto nativeNode = nodePtr(runtimeCallInfo->GetCallArgRef(0)->ToNativePointer(vm)->Value());
+    auto value = runtimeCallInfo->GetCallArgRef(1);
+    GetArkUINodeModifiers()->getCommonModifier()->setAgentControlMode(
+        nativeNode, value->IsNumber() ? value->Int32Value(vm) : -1);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -5645,6 +5661,102 @@ ArkUINativeModuleValue CommonBridge::ResetSafeAreaPadding(ArkUIRuntimeCallInfo *
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getCommonModifier()->resetSafeAreaPadding(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::SetSafeAreaInset(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto* frameNode = reinterpret_cast<FrameNode*>(nodePtr(firstArg->ToNativePointer(vm)->Value()));
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    Framework::JSCallbackInfo info = Framework::JSCallbackInfo(runtimeCallInfo);
+    if (info.Length() < PARAMETER_LENGTH_SECOND || !info[NUM_1]->IsObject()) {
+        ViewAbstractModelNG::ResetSafeAreaInset(frameNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto optionsObject = JSRef<JSObject>::Cast(info[NUM_1]);
+    auto targetNode = AceType::WeakClaim(frameNode);
+    static constexpr std::array<std::pair<const char*, NG::SafeAreaInsetEdge>, NG::SAFE_AREA_INSET_EDGE_COUNT>
+        EDGE_FIELDS = {
+        std::pair { "top", NG::SafeAreaInsetEdge::TOP },
+        std::pair { "end", NG::SafeAreaInsetEdge::END },
+        std::pair { "bottom", NG::SafeAreaInsetEdge::BOTTOM },
+        std::pair { "start", NG::SafeAreaInsetEdge::START },
+    };
+    NG::SafeAreaInsetOptions options;
+    SafeAreaInsetBuilderArray builders;
+    for (const auto& [field, edge] : EDGE_FIELDS) {
+        auto edgeValue = optionsObject->GetProperty(field);
+        if (edgeValue->IsUndefined() || edgeValue->IsNull() || !edgeValue->IsObject()) {
+            continue;
+        }
+        auto edgeObject = JSRef<JSObject>::Cast(edgeValue);
+        auto contentValue = edgeObject->GetProperty("content");
+        if (!contentValue->IsFunction()) {
+            continue;
+        }
+
+        CalcDimension spacing(0.0, DimensionUnit::VP);
+        auto spacingValue = edgeObject->GetProperty("spacing");
+        if (!spacingValue->IsUndefined() && !spacingValue->IsNull() && spacingValue->IsObject()) {
+            CalcDimension parsedSpacing;
+            auto spacingObject = JSRef<JSObject>::Cast(spacingValue);
+            auto spacingResource = spacingObject->GetProperty("res");
+            if ((spacingResource->IsUndefined() || spacingResource->IsNull()) &&
+                JSViewAbstract::ParseJsLengthMetricsVp(spacingObject, parsedSpacing) &&
+                std::isfinite(parsedSpacing.Value()) && parsedSpacing.IsNonNegative() &&
+                (parsedSpacing.Unit() == DimensionUnit::VP || parsedSpacing.Unit() == DimensionUnit::PX ||
+                    parsedSpacing.Unit() == DimensionUnit::FP || parsedSpacing.Unit() == DimensionUnit::LPX)) {
+                spacing = parsedSpacing;
+            }
+        }
+
+        auto alignment = NG::SafeAreaInsetAlignment::CENTER;
+        auto alignmentValue = edgeObject->GetProperty("alignment");
+        if (alignmentValue->IsNumber()) {
+            auto alignmentNumber = alignmentValue->ToNumber<double>();
+            if (std::isfinite(alignmentNumber) && std::trunc(alignmentNumber) == alignmentNumber &&
+                alignmentNumber >= static_cast<int32_t>(NG::SafeAreaInsetAlignment::START) &&
+                alignmentNumber <= static_cast<int32_t>(NG::SafeAreaInsetAlignment::END)) {
+                alignment = static_cast<NG::SafeAreaInsetAlignment>(static_cast<int32_t>(alignmentNumber));
+            }
+        }
+
+        auto index = NG::SafeAreaInsetOptions::ToIndex(edge);
+        options.edges[index] = NG::SafeAreaInsetEdgeOptions {
+            .spacing = NG::CalcLength(spacing),
+            .alignment = alignment,
+        };
+        auto builderFunc = AceType::MakeRefPtr<JsFunction>(JSRef<JSFunc>::Cast(contentValue));
+        if (!builderFunc) {
+            options.edges[index].reset();
+            continue;
+        }
+        builders[index] = [execCtx = info.GetExecutionContext(), func = std::move(builderFunc), node = targetNode]() {
+            JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+            ACE_SCORING_EVENT("SafeAreaInsetBuilder");
+            PipelineContext::SetCallBackNode(node);
+            func->Execute();
+        };
+    }
+    if (options.Empty()) {
+        ViewAbstractModelNG::ResetSafeAreaInset(frameNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    ViewAbstractModelNG::SetSafeAreaInset(frameNode, options, std::move(builders));
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::ResetSafeAreaInset(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto* frameNode = reinterpret_cast<FrameNode*>(nodePtr(firstArg->ToNativePointer(vm)->Value()));
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ViewAbstractModelNG::ResetSafeAreaInset(frameNode);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -9385,6 +9497,16 @@ ArkUINativeModuleValue CommonBridge::ResetOnTouch(ArkUIRuntimeCallInfo* runtimeC
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue CommonBridge::EnableTouchPadEvent(ArkUIRuntimeCallInfo* info)
+{
+    auto* vm = info->GetVM();
+    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
+    if (pipeline && info->GetCallArgRef(0)->IsBoolean()) {
+        pipeline->SetTouchPadEventEnabled(info->GetCallArgRef(0)->ToBoolean(vm)->Value());
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue CommonBridge::SetChainMode(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -11593,6 +11715,8 @@ Local<panda::ObjectRef> CommonBridge::CreateAxisEventInfo(EcmaVM* vm, AxisInfo* 
         panda::FunctionRef::New(vm, ArkTSUtils::JsHasAxis),
         panda::FunctionRef::New(vm, Framework::JsGetCurrentLocalPosition) };
     auto obj = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
+    obj->Set(vm, panda::StringRef::NewFromUtf8(vm, "rollAngle"),
+        panda::NumberRef::New(vm, infoPtr->GetRollAngle().value_or(0.0f)));
     obj->SetNativePointerFieldCount(vm, 1);
     obj->SetConcurrentNativePointerField(vm, 0, static_cast<void*>(infoPtr), FrameNodeBridge::ReleaseNativePtrFunc,
         (void*)NATIVE_PTR_TAG_AXIS_INFO);

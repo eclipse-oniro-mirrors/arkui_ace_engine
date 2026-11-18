@@ -785,29 +785,40 @@ void addGestureToNodeWithRefCountDecrease(
 
 void removeGestureFromNode(ArkUINodeHandle node, ArkUIGesture* gesture)
 {
+    CHECK_NULL_VOID(node);
+    CHECK_NULL_VOID(gesture);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(gestureHub);
     auto gesturePtr = Referenced::Claim(reinterpret_cast<Gesture*>(gesture));
     gestureHub->RemoveGesture(gesturePtr);
 }
 
 void removeGestureFromNodeByTag(ArkUINodeHandle node, ArkUI_CharPtr gestureTag)
 {
+    CHECK_NULL_VOID(node);
+    CHECK_NULL_VOID(gestureTag);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(gestureHub);
     std::string tag(gestureTag);
     gestureHub->RemoveGesturesByTag(tag);
 }
 
 void clearGestures(ArkUINodeHandle node)
 {
+    CHECK_NULL_VOID(node);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(gestureHub);
     gestureHub->ClearModifierGesture();
 }
 
-// <fingerid, iterator of touchTestResults in eventManager>
-using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::iterator>>;
+// <fingerid, touchTestResults value in eventManager>
+using TouchRecognizerTarget = std::vector<std::pair<int32_t, TouchTestResult::value_type>>;
 using TouchRecognizerMap = std::map<TouchEventTarget*, TouchRecognizerTarget>;
 
 bool IsFingerCollectedByTarget(TouchRecognizerTarget& target, int32_t fingerId)
@@ -834,12 +845,12 @@ void CollectTouchEventTarget(
         }
         auto targetNode = target->GetAttachedNode().Upgrade();
         if (targetNode && targetNode == borderNode) {
-            dict[targetPtr].emplace_back(fingerId, iter);
+            dict[targetPtr].emplace_back(fingerId, target);
             return;
         }
         while (targetNode) {
             if (targetNode == borderNode) {
-                dict[targetPtr].emplace_back(fingerId, iter);
+                dict[targetPtr].emplace_back(fingerId, target);
                 break;
             }
             targetNode = targetNode->GetParentFrameNode();
@@ -994,9 +1005,9 @@ void setGestureInterrupterToNodeWithUserData(
         auto touchRecognizers = CreateTouchRecognizers(AceType::RawPtr(node), info, interruptInfo);
         ArkUI_Int32 result {};
         {
-            LOG_CALLBACK(
-                "ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode / "
-                "ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode",
+            LOG_CALLBACK(userData ?
+                "ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode" :
+                "ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode",
                 interrupter);
             result = interrupter(&interruptInfo);
         }

@@ -131,7 +131,7 @@ void ScreenPattern::UpdateToInputManager(float rotation)
 {
     CHECK_NULL_VOID(screenSession_);
     auto pid = IPCSkeleton::GetCallingRealPid();
-    auto uid = IPCSkeleton::GetCallingUid();
+    auto uid = IPCSkeleton::GetCallingAppUid();
     auto screenId = screenSession_->GetScreenId();
     auto dpi = GetDensityInCurrentResolution() * DOT_PER_INCH;
 

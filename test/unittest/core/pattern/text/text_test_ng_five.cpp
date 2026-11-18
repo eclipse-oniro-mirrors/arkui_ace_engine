@@ -1352,4 +1352,112 @@ HWTEST_F(TextTestNgFive, AllowVisibleAreaCheck001, TestSize.Level1)
     textLayoutProperty->UpdateTextOverflow(TextOverflow::MARQUEE);
     EXPECT_EQ(textPattern->AllowVisibleAreaCheck(), true);
 }
+
+/**
+ * @tc.name: OnVisibleChange006
+ * @tc.desc: Test OnVisibleChange when visible with AI enabled, not initialized, non-JSON text.
+ *           ParseOriText is called but fails (non-JSON), StartAITask should be called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestNgFive, OnVisibleChange006, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(textPattern, nullptr);
+    textPattern->textDetectEnable_ = true;
+    textPattern->enabled_ = true;
+    textPattern->textForDisplay_ = u"hello world";
+    ASSERT_NE(textPattern->GetDataDetectorAdapter(), nullptr);
+    textPattern->dataDetectorAdapter_->aiDetectInitialized_ = false;
+    textPattern->OnVisibleChange(true);
+    EXPECT_FALSE(textPattern->dataDetectorAdapter_->aiDetectInitialized_);
+}
+
+/**
+ * @tc.name: OnVisibleChange007
+ * @tc.desc: Test OnVisibleChange when visible with AI enabled, not initialized, valid JSON text.
+ *           ParseOriText succeeds (sets aiDetectInitialized_=true), StartAITask should NOT be called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestNgFive, OnVisibleChange007, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(textPattern, nullptr);
+    textPattern->textDetectEnable_ = true;
+    textPattern->enabled_ = true;
+    std::string jsonStr = R"({"bundleName":"com.test.app","content":"hello world"})";
+    textPattern->textForDisplay_ = std::u16string(jsonStr.begin(), jsonStr.end());
+    ASSERT_NE(textPattern->GetDataDetectorAdapter(), nullptr);
+    textPattern->dataDetectorAdapter_->aiDetectInitialized_ = false;
+    textPattern->OnVisibleChange(true);
+    EXPECT_TRUE(textPattern->dataDetectorAdapter_->aiDetectInitialized_);
+}
+
+/**
+ * @tc.name: OnVisibleChange008
+ * @tc.desc: Test OnVisibleChange when visible with AI enabled and already initialized.
+ *           The if block should be skipped, neither ParseOriText nor StartAITask called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestNgFive, OnVisibleChange008, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(textPattern, nullptr);
+    textPattern->textDetectEnable_ = true;
+    textPattern->enabled_ = true;
+    textPattern->textForDisplay_ = u"hello world";
+    ASSERT_NE(textPattern->GetDataDetectorAdapter(), nullptr);
+    textPattern->dataDetectorAdapter_->aiDetectInitialized_ = true;
+    textPattern->OnVisibleChange(true);
+    EXPECT_TRUE(textPattern->dataDetectorAdapter_->aiDetectInitialized_);
+}
+
+/**
+ * @tc.name: OnVisibleChange009
+ * @tc.desc: Test OnVisibleChange hidden then visible cycle with non-JSON text.
+ *           On hide: delay task cancelled. On visible: ParseOriText fails, StartAITask called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestNgFive, OnVisibleChange009, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(textPattern, nullptr);
+    textPattern->textDetectEnable_ = true;
+    textPattern->enabled_ = true;
+    textPattern->textForDisplay_ = u"hello world";
+    ASSERT_NE(textPattern->GetDataDetectorAdapter(), nullptr);
+    textPattern->dataDetectorAdapter_->aiDetectInitialized_ = false;
+    textPattern->OnVisibleChange(false);
+    EXPECT_FALSE(textPattern->dataDetectorAdapter_->aiDetectInitialized_);
+    textPattern->OnVisibleChange(true);
+    EXPECT_FALSE(textPattern->dataDetectorAdapter_->aiDetectInitialized_);
+}
+
+/**
+ * @tc.name: OnVisibleChange010
+ * @tc.desc: Test OnVisibleChange when visible with AI disabled.
+ *           CanStartAITask returns false, the if block should be skipped.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestNgFive, OnVisibleChange010, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto textPattern = frameNode->GetPattern<TextPattern>();
+    ASSERT_NE(textPattern, nullptr);
+    textPattern->textDetectEnable_ = false;
+    textPattern->enabled_ = true;
+    textPattern->textForDisplay_ = u"hello world";
+    ASSERT_NE(textPattern->GetDataDetectorAdapter(), nullptr);
+    textPattern->dataDetectorAdapter_->aiDetectInitialized_ = false;
+    textPattern->OnVisibleChange(true);
+    EXPECT_FALSE(textPattern->dataDetectorAdapter_->aiDetectInitialized_);
+}
 } // namespace OHOS::Ace::NG

@@ -1922,4 +1922,237 @@ HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeGetMemOptStrategy001, Tes
     EXPECT_EQ(strategy, RepeatMemOptStrategy::DEFAULT);
 }
 
+/**
+ * @tc.name: TryBindController001
+ * @tc.desc: Test RepeatVirtualScroll2Node TryBindController accepts only the first binding
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, TryBindController001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a RepeatVirtualScroll2Node
+     * @tc.expected: Node is created unbound
+     */
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    ASSERT_NE(repeatNode, nullptr);
+    // ElementRegister is not cleared between tests; reset to test the first-bind path.
+    repeatNode->controllerBound_ = false;
+    EXPECT_FALSE(repeatNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step2. Call TryBindController for the first time
+     * @tc.expected: The first binding is accepted (creation-time immutable binding)
+     */
+    EXPECT_TRUE(repeatNode->TryBindController());
+    EXPECT_TRUE(repeatNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step3. Call TryBindController again
+     * @tc.expected: Later binds on an already bound node are ignored
+     */
+    EXPECT_FALSE(repeatNode->TryBindController());
+    EXPECT_TRUE(repeatNode->controllerBound_);
+}
+ 
+/**
+ * @tc.name: SetController002
+ * @tc.desc: Test RepeatVirtualScroll2ModelNG::SetController via ElementRegister fallback path
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, SetController002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a RepeatVirtualScroll2Node (registered in ElementRegister)
+     */
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    ASSERT_NE(repeatNode, nullptr);
+    auto repeatElmtId = repeatNode->GetId();
+    // Reset binding state polluted by earlier tests sharing the same nodeId via ElementRegister.
+    repeatNode->controllerBound_ = false;
+ 
+    /**
+     * @tc.steps: step2. Clear ViewStackProcessor so stack->GetMainElementNode() returns nullptr
+     * @tc.expected: SetController falls back to ElementRegister lookup
+     */
+    ViewStackProcessor::GetInstance()->ClearStack();
+ 
+    RefPtr<RepeatVirtualScroll2Node> capturedNode;
+    RepeatVirtualScroll2ModelNG repeatModel;
+    repeatModel.SetController(repeatElmtId,
+        [&capturedNode](const RefPtr<RepeatVirtualScroll2Node>& node) {
+            capturedNode = node;
+        });
+    EXPECT_EQ(capturedNode, repeatNode);
+    EXPECT_TRUE(repeatNode->controllerBound_);
+}
+ 
+/**
+ * @tc.name: SetController003
+ * @tc.desc: Test RepeatVirtualScroll2ModelNG::SetController when node is not found
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, SetController003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Clear ViewStackProcessor and use a non-existent elmtId
+     * @tc.expected: bindController callback is not invoked
+     */
+    ViewStackProcessor::GetInstance()->ClearStack();
+ 
+    bool callbackCalled = false;
+    RepeatVirtualScroll2ModelNG repeatModel;
+    repeatModel.SetController(999999,
+        [&callbackCalled](const RefPtr<RepeatVirtualScroll2Node>& node) {
+            callbackCalled = true;
+        });
+    EXPECT_FALSE(callbackCalled);
+}
+ 
+/**
+ * @tc.name: SetController004
+ * @tc.desc: Test RepeatVirtualScroll2ModelNG::SetController when controller already bound
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, SetController004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a node and bind controller for the first time
+     */
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    ASSERT_NE(repeatNode, nullptr);
+    // Reset binding state polluted by earlier tests sharing the same nodeId via ElementRegister.
+    repeatNode->controllerBound_ = false;
+ 
+    bool firstCallbackCalled = false;
+    RepeatVirtualScroll2ModelNG repeatModel;
+    repeatModel.SetController(repeatNode->GetId(),
+        [&firstCallbackCalled](const RefPtr<RepeatVirtualScroll2Node>& node) {
+            firstCallbackCalled = true;
+        });
+    EXPECT_TRUE(firstCallbackCalled);
+    EXPECT_TRUE(repeatNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step2. Call SetController again on the already-bound node
+     * @tc.expected: bindController callback is not invoked (first-bind-wins)
+     */
+    bool secondCallbackCalled = false;
+    repeatModel.SetController(repeatNode->GetId(),
+        [&secondCallbackCalled](const RefPtr<RepeatVirtualScroll2Node>& node) {
+            secondCallbackCalled = true;
+        });
+    EXPECT_FALSE(secondCallbackCalled);
+}
+ 
+/**
+ * @tc.name: RepeatControllerPattern001
+ * @tc.desc: Test controller BindToNode with null node (CHECK_NULL_VOID branch)
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatControllerPattern001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Simulate JSRepeatController::BindToNode(nullptr)
+     * @tc.expected: WeakPtr stays empty after null bind attempt
+     */
+    WeakPtr<RepeatVirtualScroll2Node> weakNode;
+    auto nullNode = RefPtr<RepeatVirtualScroll2Node>(nullptr);
+    // CHECK_NULL_VOID equivalent: do not set weak ref when node is null
+    if (nullNode) {
+        weakNode = nullNode;
+    }
+    EXPECT_TRUE(weakNode.Upgrade() == nullptr);
+}
+ 
+/**
+ * @tc.name: RepeatControllerPattern002
+ * @tc.desc: Test controller BindToNode with valid node, then ClearCache with live weak ref
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatControllerPattern002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a RepeatVirtualScroll2Node and bind via weak ref (controller pattern)
+     */
+    auto repeatNode = CreateRepeatVirtualNode(10, 10);
+    ASSERT_NE(repeatNode, nullptr);
+ 
+    WeakPtr<RepeatVirtualScroll2Node> weakNode;
+    // BindToNode: CHECK_NULL_VOID then set weak ref
+    if (repeatNode) {
+        weakNode = repeatNode;
+    }
+    EXPECT_EQ(weakNode.Upgrade(), repeatNode);
+ 
+    /**
+     * @tc.steps: step2. ClearCache: upgrade weak ref, node is alive → call node->CleanCache(false)
+     * @tc.expected: CleanCache executes, pending flags reset, restoringCache_ false
+     */
+    repeatNode->pendingCleanCache_ = true;
+    repeatNode->pendingRestoreCache_ = true;
+    repeatNode->restoringCache_ = true;
+    auto node = weakNode.Upgrade();
+    ASSERT_TRUE(node);
+    node->CleanCache(false);
+    EXPECT_FALSE(repeatNode->pendingCleanCache_);
+    EXPECT_FALSE(repeatNode->pendingRestoreCache_);
+    EXPECT_FALSE(repeatNode->restoringCache_);
+}
+ 
+/**
+ * @tc.name: RepeatControllerPattern003
+ * @tc.desc: Test controller ClearCache with expired weak ref (safe no-op branch)
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatControllerPattern003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a RepeatVirtualScroll2Node, bind via weak ref, then release the strong ref
+     */
+    WeakPtr<RepeatVirtualScroll2Node> weakNode;
+    {
+        auto repeatNode = CreateRepeatVirtualNode(10, 10);
+        ASSERT_NE(repeatNode, nullptr);
+        if (repeatNode) {
+            weakNode = repeatNode;
+        }
+        EXPECT_NE(weakNode.Upgrade(), nullptr);
+    }
+    /**
+     * @tc.steps: step2. ClearCache: upgrade weak ref fails → safe no-op (spec R-6)
+     * @tc.expected: No crash, no node method called
+     */
+    auto node = weakNode.Upgrade();
+    EXPECT_EQ(node, nullptr);
+}
+ 
+/**
+ * @tc.name: RepeatControllerPattern004
+ * @tc.desc: Test controller last-bind-wins: rebinding replaces previous weak ref
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, RepeatControllerPattern004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create two RepeatVirtualScroll2Nodes, bind to first then second
+     * @tc.expected: Weak ref points to the second node (last-bind-wins, spec R-8)
+     */
+    auto node1 = CreateRepeatVirtualNode(10, 10);
+    ASSERT_NE(node1, nullptr);
+    auto node2 = CreateRepeatVirtualNode(10, 10);
+    ASSERT_NE(node2, nullptr);
+ 
+    WeakPtr<RepeatVirtualScroll2Node> weakNode;
+    if (node1) {
+        weakNode = node1;
+    }
+    EXPECT_EQ(weakNode.Upgrade(), node1);
+    // Rebind: last-bind-wins
+    if (node2) {
+        weakNode = node2;
+    }
+    EXPECT_EQ(weakNode.Upgrade(), node2);
+    EXPECT_NE(weakNode.Upgrade(), node1);
+}
+
 } // namespace OHOS::Ace::NG

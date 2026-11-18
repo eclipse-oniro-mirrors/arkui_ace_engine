@@ -132,6 +132,21 @@ typedef enum {
 } OH_ArkUI_DialogDisplayModeInSubWindow;
 
 /**
+* @brief Enumerates the handedness adaptation mode of the dialog box.
+*
+* @since 26.2.0
+*/
+typedef enum {
+    /** No adaptation. The dialog box keeps the current layout. */
+    OH_ARKUI_NATIVEMODULE_HANDEDNESS_MODE_NONE = 0,
+    /** The dialog box follows the position of the component that triggers it. */
+    OH_ARKUI_NATIVEMODULE_HANDEDNESS_MODE_FOLLOW_ANCHOR,
+    /** The dialog box follows the grip hand (the hand holding the device,
+     * distinguished from the operating hand interacting with the screen). */
+    OH_ARKUI_NATIVEMODULE_HANDEDNESS_MODE_FOLLOW_GRIP_HAND,
+} OH_ArkUI_NativeModule_HandednessMode;
+
+/**
  * @brief Invoked when the dialog box is closed.
  *
  * @since 12
@@ -1280,6 +1295,34 @@ int32_t OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterialInOptions(
   */
 int32_t OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterial(
     ArkUI_NativeDialogHandle handle, ArkUI_ImmersiveMaterialHandle material);
+
+/**
+ * @brief Sets the handedness adaptation mode of the dialog box in options.
+ *
+ * @param options Indicates the pointer to the custom dialog options.
+ * @param mode Indicates the handedness adaptation mode.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+int32_t OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandednessInOptions(
+    ArkUI_CustomDialogOptions* options, OH_ArkUI_NativeModule_HandednessMode mode);
+
+/**
+ * @brief Sets the handedness adaptation mode of the dialog box.
+ *
+ * @param handle Indicates the pointer to the custom dialog box controller.
+ * @param mode Indicates the handedness adaptation mode.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+int32_t OH_ArkUI_NativeModule_CustomDialog_SetAdaptToHandedness(
+    ArkUI_NativeDialogHandle handle, OH_ArkUI_NativeModule_HandednessMode mode);
 
 #ifdef __cplusplus
 };

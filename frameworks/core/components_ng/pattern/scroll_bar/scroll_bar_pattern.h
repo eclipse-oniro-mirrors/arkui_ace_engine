@@ -387,6 +387,7 @@ private:
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void ValidateOffset();
     void SetAccessibilityAction();
+    void InitTouchStateCallback();
     void InitPanRecognizer();
     void HandleDragStart(const GestureEvent& info);
     void HandleDragUpdate(const GestureEvent& info);

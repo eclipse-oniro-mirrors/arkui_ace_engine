@@ -53,6 +53,7 @@ import ohos.promptAction.LevelMode as LevelMode;
 import ohos.promptAction.ImmersiveMode as ImmersiveMode;
 import ohos.promptAction.promptAction.CommonState as PromptActionCommonState;
 import arkui.component.actionSheet.DismissDialogAction as DismissDialogAction;
+import ohos.arkui.dialog.HandednessFollowMode as HandednessFollowMode;
 
 [Entity=Interface]
 interface CustomDialogBuildOptions {
@@ -186,6 +187,8 @@ interface CustomDialogControllerOptionsExtender {
   attribute DistortionMode distortionMode;
   [Optional]
   attribute EdgeLightMode edgeLightMode;
+  [Optional]
+  attribute HandednessFollowMode adaptToHandedness;
 };
 
 interface CustomDialogControllerExternalOptionsExtender {

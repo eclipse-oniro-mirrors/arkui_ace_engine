@@ -20,11 +20,13 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 #include "base/json/json_util.h"
 #include "base/memory/ace_type.h"
+#include "core/components_ng/base/inspector_occlusion_collector.h"
 
 struct ArkUITreeOptions;
 struct ArkUITreeCompletion;
@@ -47,6 +49,12 @@ struct TreeCollectionState {
     const NG::UINode* traversalRoot = nullptr;
     // Only populated by VISIBLE collection; nodes remain alive during the read-only request.
     std::unordered_map<const NG::UINode*, TreeNodeVisibility> visibility;
+    // Populated only when a VISIBLE request explicitly enables occlusion filtering. Kept here rather than
+    // in ParamConfig so that the occluder decisions never travel through the UI-session parcelable config.
+    bool occlusionEnabled = false;
+    std::unordered_map<int32_t, NG::OcclusionDecision> occlusionDecisions;
+    // Node ids that must survive because they are not occluded or lead to a retained descendant.
+    std::unordered_set<int32_t> occlusionKeepIds;
     void Fail(int32_t e)
     {
         if (error == 0) {
@@ -75,6 +83,8 @@ struct UITreeRequestState {
     bool accessibility = false;
     bool visual = false;
     bool functional = false;
+    bool filterOccludedNodes = false;
+    float occlusionOpacityThreshold = 1.0f;
     std::function<void(uint64_t requestId, int32_t code, const char* data, uint32_t size)> deliver;
 };
 

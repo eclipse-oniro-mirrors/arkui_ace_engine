@@ -16,8 +16,10 @@
 #ifndef FOUNDATION_ACE_INTERFACE_UI_REPORT_STUB_H
 #define FOUNDATION_ACE_INTERFACE_UI_REPORT_STUB_H
 
+#include <map>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
 #include <iremote_object.h>
@@ -290,15 +292,20 @@ public:
     void UnregisterContentChangeCallback();
     void RegisterGetStateMgmtInfoCallback(const std::function<void(std::vector<std::string>)>& callback);
     void ReportGetStateMgmtInfo(std::vector<std::string> results) override;
-    // Dual ruleSet routing: callback is stored per ruleSetId and dispatched only
-    // to the ruleSets present in an event's hits/exits. Each callback receives
-    // only evidence belonging to its registered ruleSetId.
+    // Callback is stored per ruleSetId and dispatched only for ruleSets in an event's hits/exits.
     bool RegisterPageSceneEventCallback(const std::string& ruleSetId, const PageSceneEventCallback& eventCallback);
     bool TryRegisterPageSceneEventCallback(const std::string& ruleSetId, const PageSceneEventCallback& eventCallback);
     void UnregisterPageSceneEventCallback(const std::string& ruleSetId);
     bool RegisterGetPageSceneCallback(const PageSceneEventCallback& eventCallback);
     void UnregisterGetPageSceneCallback();
     void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) override;
+    void ReportCommandResult(uint64_t requestId, const std::string& resultJson) override;
+
+    bool RegisterSendCommandFinishCallback(
+        const SendCommandFinishCallback& finishCallback, uint64_t& requestId);
+    bool PostSendCommandCallbackRemoveTask(
+        uint64_t requestId, int32_t timeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS);
+    void UnregisterSendCommandFinishCallback(uint64_t requestId);
 
     void SetEventHandler(std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
 
@@ -323,6 +330,10 @@ private:
     void HandlePageTranslateResultWatchdogTimeout(int32_t nodeId, int64_t version);
     void ClearPageTranslateCallbackLocked();
     void CancelPageTranslateCallbackTimeoutTaskLocked();
+    void HandleSendCommandCallbackTimeout(uint64_t requestId);
+    void CancelSendCommandCallbackTimeoutTaskLocked(uint64_t requestId);
+    void ClearSendCommandFinishCallbackLocked();
+    void DispatchEnvelopeCallbacks(const std::map<std::string, std::string>& sceneByRuleSetId);
 
     EventCallback clickEventCallback_;
     EventCallback searchEventCallback_;
@@ -367,6 +378,9 @@ private:
     GetWebInfoByRequestCallback getWebInfoByRequestCallback_;
 
     std::weak_ptr<AppExecFwk::EventHandler> eventHandler_;
+    std::mutex sendCommandCallbackMutex_;
+    SendCommandFinishCallback sendCommandFinishCallback_;
+    uint64_t sendCommandRequestId_ = 0;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_REPORT_STUB_H

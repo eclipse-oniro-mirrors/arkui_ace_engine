@@ -47,12 +47,12 @@ RefPtr<RenderListItem> ListItemGroupElement::RequestListItem(size_t index)
 
 RefPtr<RenderNode> ListItemGroupElement::RequestListItemHeader(void)
 {
-    return headerElement_ ? AceType::DynamicCast<RenderNode>(headerElement_->GetRenderNode()) : nullptr;
+    return headerElement_ ? headerElement_->GetRenderNode() : nullptr;
 }
 
 RefPtr<RenderNode> ListItemGroupElement::RequestListItemFooter(void)
 {
-    return footerElement_ ? AceType::DynamicCast<RenderNode>(footerElement_->GetRenderNode()) : nullptr;
+    return footerElement_ ? footerElement_->GetRenderNode() : nullptr;
 }
 
 RefPtr<Element> ListItemGroupElement::GetListItemBySlot(size_t index)

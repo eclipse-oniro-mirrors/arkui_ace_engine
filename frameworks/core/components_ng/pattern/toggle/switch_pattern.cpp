@@ -108,7 +108,7 @@ bool SwitchPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         currentOffset_ = GetSwitchWidth();
     }
 
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto switchLayoutAlgorithm = DynamicCast<SwitchLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(switchLayoutAlgorithm, false);
@@ -919,9 +919,26 @@ void SwitchPattern::ResetHostMaterialEffects()
     auto material = renderContext->GetSystemMaterial();
     CHECK_NULL_VOID(material);
 
-    // Clear SO-level material effects
-    MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
+    AnimationUtils::ExecuteWithoutAnimation(
+        [weak = WeakClaim(this)]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ResetHostMaterialEffectsInner();
+        },
+        host->GetContextRefPtr());
+}
 
+void SwitchPattern::ResetHostMaterialEffectsInner()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
+    // Clear SO-level material effects
+    if (!MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr)) {
+        ViewAbstract::SetSystemMaterialImmediate(AceType::RawPtr(host), nullptr);
+    }
     // Clear RS material filter
     renderContext->UpdateUiMaterialFilter(nullptr);
 
@@ -1313,6 +1330,7 @@ void SwitchPattern::ShowMaterialNode()
 
     RegisterMaterialNodePositionCallback();
     ApplyDragFrameNodeSystemMaterial();
+
 #ifndef ACE_UNITTEST
     ApplyBlendMode();
 #endif
@@ -1540,7 +1558,7 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
     dragFrameMaterialParam.refractParams[0] = -0.008f + t * (-0.01f - (-0.008f));
     dragFrameMaterialParam.refractParams[1] = 0.15f + t * (0.13f - 0.15f);
     float dipScale = static_cast<float>(pipeline->GetDipScale());
-    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale);
+    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale, nullptr);
     if (filter) {
         auto renderContext = dragFrameNode_->GetRenderContext();
         if (renderContext) {
@@ -1549,6 +1567,8 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
             auto shadow = MaterialUtils::GetImmersiveShadow(dipScale * 0.8);
             shadow.SetColor(Color(0x1F050505));
             renderContext->UpdateBackShadow(shadow);
+
+            pipeline->AddTaskOverlayNodeMaterialArea(dragFrameNode_, "Switch ShowMaterialNode");
         }
     }
     ResetHostMaterialEffects();
@@ -1862,6 +1882,11 @@ bool SwitchPattern::ParseCommand(const std::string& command, bool& isOn)
     }
     isOn = isOnJson->GetBool();
     return true;
+}
+
+CommandResult SwitchPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
 }
 
 int32_t SwitchPattern::OnInjectionEvent(const std::string& command)

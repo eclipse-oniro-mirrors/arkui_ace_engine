@@ -45,6 +45,16 @@ constexpr int32_t TEST_RATE_MAX = 120;
 constexpr int32_t TEST_RATE_EXPECTED = 60;
 constexpr int32_t BAD_PARAMETER_RESULT = OH_NATIVEXCOMPONENT_RESULT_BAD_PARAMETER;
 constexpr int32_t SUCCESS_RESULT = OH_NATIVEXCOMPONENT_RESULT_SUCCESS;
+
+void OnSurfaceCreated(OH_ArkUI_SurfaceHolder*) {}
+
+void OnSurfaceChanged(OH_ArkUI_SurfaceHolder*, uint64_t, uint64_t) {}
+
+void OnSurfaceDestroyed(OH_ArkUI_SurfaceHolder*) {}
+
+void OnSurfaceShow(OH_ArkUI_SurfaceHolder*) {}
+
+void OnSurfaceHide(OH_ArkUI_SurfaceHolder*) {}
 } // namespace
 
 class NativeInterfaceXComponentTestNg : public testing::Test {

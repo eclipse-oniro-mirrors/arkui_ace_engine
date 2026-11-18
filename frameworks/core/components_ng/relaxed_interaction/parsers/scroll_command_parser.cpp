@@ -27,6 +27,7 @@
 #include "core/common/container.h"
 #include "core/common/display_info.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 
@@ -43,7 +44,63 @@ std::vector<std::unique_ptr<BaseExecutor>> ScrollCommandParser::Parse(const std:
     if (!ParseCmd(json.get(), cmd)) {
         return executors;
     }
+    if (!json->GetValue("action_info")->Contains("distance")) {
+        TAG_LOGE(AceLogTag::ACE_UIEVENT, "No distance. default 1/3 screen height");
+        cmd.actionInfo.distance = GetDefaultScrollDistance();
+    }
     return CreateExecutor(cmd);
+}
+
+bool ScrollCommandParser::Validate(const std::unique_ptr<JsonValue>& json)
+{
+    Command cmd = {};
+    if (!json || !json->IsObject() || !ParseCmd(json.get(), cmd)) {
+        return false;
+    }
+    auto coordinates = json->GetValue("action_info")->GetValue("coordinates");
+    return (!coordinates->Contains("x2") || coordinates->GetValue("x2")->IsNumber()) &&
+        (!coordinates->Contains("y2") || coordinates->GetValue("y2")->IsNumber());
+}
+
+std::vector<std::unique_ptr<BaseExecutor>> ScrollCommandParser::ParseInjectionCommand(
+    const std::unique_ptr<JsonValue>& json)
+{
+    Command cmd = {};
+    if (!json || !json->IsObject() || !ParseCmd(json.get(), cmd)) {
+        return {};
+    }
+    if (!json->GetValue("action_info")->Contains("distance")) {
+        auto context = context_.Upgrade();
+        cmd.actionInfo.distance = context && context->GetRootHeight() > 0.0
+            ? static_cast<float>(context->GetRootHeight() / 3.0f) : GetDefaultScrollDistance();
+    }
+    if (!cmd.isY2Set) {
+        CompleteEndPoint(cmd);
+    }
+    return CreateExecutor(cmd);
+}
+
+void ScrollCommandParser::CompleteEndPoint(Command& cmd)
+{
+    auto& coordinates = cmd.actionInfo.coordinates;
+    coordinates.x2 = coordinates.x1;
+    coordinates.y2 = coordinates.y1;
+    switch (cmd.actionInfo.direction) {
+        case RelaxedScrollDirection::LEFT:
+            coordinates.x2 += cmd.actionInfo.distance;
+            break;
+        case RelaxedScrollDirection::RIGHT:
+            coordinates.x2 -= cmd.actionInfo.distance;
+            break;
+        case RelaxedScrollDirection::BACKWARD:
+        case RelaxedScrollDirection::UP:
+            coordinates.y2 += cmd.actionInfo.distance;
+            break;
+        default:
+            coordinates.y2 -= cmd.actionInfo.distance;
+            break;
+    }
+    cmd.isY2Set = true;
 }
 
 bool ScrollCommandParser::ParseMode(const JsonValue* cmdJson, ExecuteMode& mode)
@@ -156,8 +213,7 @@ bool ScrollCommandParser::ParseCmd(const JsonValue* cmdJson, Command& cmd)
     cmd.actionInfo.direction = direction;
     // distance
     if (!actionInfoJson->Contains("distance")) {
-        TAG_LOGE(AceLogTag::ACE_UIEVENT, "No distance. default 1/3 screen height");
-        cmd.actionInfo.distance = GetDefaultScrollDistance();
+        cmd.actionInfo.distance = 0.0f;
     } else {
         if (!actionInfoJson->GetValue("distance")->IsNumber()) {
             TAG_LOGE(AceLogTag::ACE_UIEVENT, "distance is not number.");

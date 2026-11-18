@@ -210,6 +210,12 @@ std::function<void()> CreateHidePopupOnFinish(const RefPtr<BubblePattern>& popup
     OverlayManager* overlayManager, const BubbleHidePopupParams& params,
     const RefPtr<FrameNode>& popupNode, const RefPtr<UINode>& rootNode)
 {
+    const auto& registeredPopups = overlayManager->GetPopupMap();
+    auto popupInfo = registeredPopups.find(params.targetId);
+    WeakPtr<FrameNode> reportTrigger;
+    if (popupInfo != registeredPopups.end() && popupInfo->second.popupNode == popupNode) {
+        reportTrigger = popupInfo->second.target;
+    }
     // Fire onWillDisappear callback
     auto popupParam = popupPattern->GetPopupParam();
     if (popupParam) {
@@ -217,7 +223,7 @@ std::function<void()> CreateHidePopupOnFinish(const RefPtr<BubblePattern>& popup
     }
 
     auto overlayRef = AceType::Claim(overlayManager);
-    return [params, popupNodeWk = WeakPtr<FrameNode>(popupNode),
+    return [params, reportTrigger, popupNodeWk = WeakPtr<FrameNode>(popupNode),
         rootNodeWk = WeakPtr<UINode>(rootNode), overlayManagerWk = WeakPtr<OverlayManager>(overlayRef)]() {
         auto rootNode = rootNodeWk.Upgrade();
         auto popupNode = popupNodeWk.Upgrade();
@@ -268,6 +274,10 @@ std::function<void()> CreateHidePopupOnFinish(const RefPtr<BubblePattern>& popup
             subwindow->HideSubWindowNG();
         }
         popupPattern->CallDoubleBindCallback("false");
+        if (!popupNode->GetParent()) {
+            overlayManager->ReportCapiOverlayEvent(
+                popupNode, false, "popup", reportTrigger.Upgrade());
+        }
     };
 }
 

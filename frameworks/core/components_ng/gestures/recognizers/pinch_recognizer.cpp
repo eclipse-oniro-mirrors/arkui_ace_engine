@@ -21,6 +21,7 @@
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/manager/event/json_report.h"
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "base/ressched/ressched_report.h"
 
 namespace OHOS::Ace::NG {
@@ -33,6 +34,12 @@ constexpr Dimension DEFAULT_PINCH_DISTANCE = Dimension(5.0, DimensionUnit::VP);
 constexpr double SCALE_PER_AXIS_EVENT = 0.1f;
 
 } // namespace
+
+void PinchRecognizer::ForceCleanRecognizer()
+{
+    MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
+}
 
 PinchRecognizer::PinchRecognizer(int32_t fingers, double distance, bool isLimitFingerCount)
     : MultiFingersRecognizer(fingers, isLimitFingerCount), distance_(distance)
@@ -58,7 +65,7 @@ void PinchRecognizer::OnAccepted()
     }
     
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "PINCH RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "PINCH RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
 #ifndef CROSS_PLATFORM
     ResSchedReport::GetInstance().ResSchedDataReport("click");
@@ -361,7 +368,7 @@ void PinchRecognizer::HandleTouchCancelEvent(const TouchEvent& event)
         lastRefereeState_ = RefereeState::READY;
         refereeState_ = RefereeState::READY;
     } else if (refereeState_ == RefereeState::SUCCEED) {
-        TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW,
+        TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW,
             "PinchRecognizer activeFingers size not equal fingers_, not send cancel callback.");
     }
 }
@@ -436,6 +443,7 @@ Offset PinchRecognizer::ComputePinchCenter()
 void PinchRecognizer::OnResetStatus()
 {
     MultiFingersRecognizer::OnResetStatus();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     initialDev_ = 0.0;
     currentDev_ = 0.0;
     scale_ = 1.0;

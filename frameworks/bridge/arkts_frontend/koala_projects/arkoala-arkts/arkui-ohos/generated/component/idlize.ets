@@ -98,6 +98,7 @@ import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
 import { default as curves } from '@ohos.curves'
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial'
+import { HandednessFollowMode } from '@ohos.arkui.dialog'
 import { ParticleUpdater, ParticleColorOptions, VelocityOptions, EmitterParticleOptions, ParticleEmitterShape, DistributionType, DisturbanceFieldShape, ParticleColorOptions_serializer, EmitterParticleOptions_serializer, VelocityOptions_serializer } from './particle'
 import { default as router } from '@ohos.router'
 import { RootModifier } from './../RootModifier'
@@ -3930,6 +3931,11 @@ export class IUIContext {
         IUIContext.setTextSelectionClearPolicy_serialize(policy_casted)
         return
     }
+    public static setTransPageEnabled(enabled: boolean | undefined): void {
+        const enabled_casted = enabled as (boolean | undefined)
+        IUIContext.setTransPageEnabled_serialize(enabled_casted)
+        return
+    }
     private static freezeUINode0_serialize(id: string, isFrozen: boolean): void {
         ArkUIGeneratedNativeModule._IUIContext_freezeUINode0(id, isFrozen ? true : false)
     }
@@ -4053,6 +4059,18 @@ export class IUIContext {
     }
     private static setTextSelectionClearPolicy_serialize(policy: TextSelectionClearPolicy): void {
         ArkUIGeneratedNativeModule._IUIContext_setTextSelectionClearPolicy(policy.valueOf())
+    }
+    private static setTransPageEnabled_serialize(enabled: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (enabled !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const enabledTmpValue = enabled!
+            thisSerializer.writeBoolean(enabledTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._IUIContext_setTransPageEnabled(thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
     }
 }
 export class LazyBuild {
@@ -4249,6 +4267,11 @@ export class LazyForEachOps {
         LazyForEachOps.SetOptions_serialize(node_casted, options_casted)
         return
     }
+    public static ClearCache(node: KPointer): void {
+        const node_casted = node as (KPointer)
+        LazyForEachOps.ClearCache_serialize(node_casted)
+        return
+    }
     private static NotifyChange_serialize(node: KPointer, startIndex: int32, endIndex: int32, count: int32): void {
         ArkUIGeneratedNativeModule._LazyForEachOps_NotifyChange(node, startIndex, endIndex, count)
     }
@@ -4286,6 +4309,9 @@ export class LazyForEachOps {
         LazyForEachOptions_serializer.write(thisSerializer, options)
         ArkUIGeneratedNativeModule._LazyForEachOps_SetOptions(node, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
+    }
+    private static ClearCache_serialize(node: KPointer): void {
+        ArkUIGeneratedNativeModule._LazyForEachOps_ClearCache(node)
     }
 }
 export class LazyWaterFlowLayoutExtender {
@@ -7803,6 +7829,7 @@ export interface CustomDialogControllerOptionsExtender {
     systemMaterial?: SystemUiMaterial;
     distortionMode?: DistortionMode;
     edgeLightMode?: EdgeLightMode;
+    adaptToHandedness?: HandednessFollowMode;
 }
 export interface CustomDialogControllerExternalOptionsExtender {
     customStyle?: boolean;
@@ -8239,6 +8266,7 @@ export interface ImmersiveOptionsInner {
     applyShadow?: boolean;
     interactive?: boolean;
     lightEffect?: LightEffectOptionsInner | null;
+    colorBlendMode?: int32;
 }
 export interface WaterFlowSectionsInterface {
     ptr: KPointer;
@@ -10714,6 +10742,14 @@ export class ImmersiveOptionsInner_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForColorBlendMode = value.colorBlendMode
+        if (valueHolderForColorBlendMode !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForColorBlendModeTmpValue = valueHolderForColorBlendMode!
+            valueSerializer.writeInt32(valueHolderForColorBlendModeTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): ImmersiveOptionsInner {
         let valueDeserializer: DeserializerBase = buffer
@@ -10766,7 +10802,13 @@ export class ImmersiveOptionsInner_serializer {
             lightEffectTmpBuf = LightEffectOptionsInner_serializer.read(valueDeserializer)
         }
         const lightEffectTmpResult: LightEffectOptionsInner | null | undefined = lightEffectTmpBuf
-        let value: ImmersiveOptionsInner = ({style: styleTmpResult, materialColor: materialColorTmpResult, colorInvert: colorInvertTmpResult, applyShadow: applyShadowTmpResult, interactive: interactiveTmpResult, lightEffect: lightEffectTmpResult} as ImmersiveOptionsInner)
+        const colorBlendModeTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let colorBlendModeTmpBuf: int32 | undefined = undefined
+        if ((colorBlendModeTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            colorBlendModeTmpBuf = valueDeserializer.readInt32()
+        }
+        const colorBlendModeTmpResult: int32 | undefined = colorBlendModeTmpBuf
+        let value: ImmersiveOptionsInner = ({style: styleTmpResult, materialColor: materialColorTmpResult, colorInvert: colorInvertTmpResult, applyShadow: applyShadowTmpResult, interactive: interactiveTmpResult, lightEffect: lightEffectTmpResult, colorBlendMode: colorBlendModeTmpResult} as ImmersiveOptionsInner)
         return value
     }
 }
@@ -11414,6 +11456,14 @@ export class CustomDialogControllerOptionsExtender_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForAdaptToHandedness = value.adaptToHandedness
+        if (valueHolderForAdaptToHandedness !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAdaptToHandednessTmpValue = (valueHolderForAdaptToHandedness as HandednessFollowMode)
+            valueSerializer.writeInt32(valueHolderForAdaptToHandednessTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): CustomDialogControllerOptionsExtender {
         let valueDeserializer: DeserializerBase = buffer
@@ -11885,7 +11935,13 @@ export class CustomDialogControllerOptionsExtender_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
-        let value: CustomDialogControllerOptionsExtender = ({builder: builderTmpResult, cancel: cancelTmpResult, autoCancel: autoCancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, customStyle: customStyleTmpResult, gridCount: gridCountTmpResult, maskColor: maskColorTmpResult, maskRect: maskRectTmpResult, openAnimation: openAnimationTmpResult, closeAnimation: closeAnimationTmpResult, showInSubWindow: showInSubWindowTmpResult, displayModeInSubWindow: displayModeInSubWindowTmpResult, backgroundColor: backgroundColorTmpResult, cornerRadius: cornerRadiusTmpResult, isModal: isModalTmpResult, onWillDismiss: onWillDismissTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, keyboardAvoidDistance: keyboardAvoidDistanceTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrderExtender: levelOrderExtenderTmpResult, focusable: focusableTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult} as CustomDialogControllerOptionsExtender)
+        const adaptToHandednessTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let adaptToHandednessTmpBuf: HandednessFollowMode | undefined = undefined
+        if ((adaptToHandednessTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            adaptToHandednessTmpBuf = HandednessFollowMode.fromValue(valueDeserializer.readInt32())
+        }
+        const adaptToHandednessTmpResult: HandednessFollowMode | undefined = adaptToHandednessTmpBuf
+        let value: CustomDialogControllerOptionsExtender = ({builder: builderTmpResult, cancel: cancelTmpResult, autoCancel: autoCancelTmpResult, alignment: alignmentTmpResult, offset: offsetTmpResult, customStyle: customStyleTmpResult, gridCount: gridCountTmpResult, maskColor: maskColorTmpResult, maskRect: maskRectTmpResult, openAnimation: openAnimationTmpResult, closeAnimation: closeAnimationTmpResult, showInSubWindow: showInSubWindowTmpResult, displayModeInSubWindow: displayModeInSubWindowTmpResult, backgroundColor: backgroundColorTmpResult, cornerRadius: cornerRadiusTmpResult, isModal: isModalTmpResult, onWillDismiss: onWillDismissTmpResult, width: widthTmpResult, height: heightTmpResult, borderWidth: borderWidthTmpResult, borderColor: borderColorTmpResult, borderStyle: borderStyleTmpResult, shadow: shadowTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, keyboardAvoidMode: keyboardAvoidModeTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, keyboardAvoidDistance: keyboardAvoidDistanceTmpResult, levelMode: levelModeTmpResult, levelUniqueId: levelUniqueIdTmpResult, immersiveMode: immersiveModeTmpResult, levelOrderExtender: levelOrderExtenderTmpResult, focusable: focusableTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, adaptToHandedness: adaptToHandednessTmpResult} as CustomDialogControllerOptionsExtender)
         return value
     }
 }

@@ -21,12 +21,17 @@ interface ObservedResult {
   decoratorInfo: Array<DecoratorInfo>;
 }
 
+interface ElementInfo {
+  elementName: string;
+  elementId: number;
+}
+
 interface DecoratorInfo {
   decoratorName: string;
   stateVariableName: string;
   owningComponentOrClassName: string;
   owningComponentId: number;
-  dependentInfo: Array<Object>;
+  dependentInfo: Array<ElementInfo>;
 }
 
 // See stateMgmt.d.ts. You can add more methods to classes from that file.

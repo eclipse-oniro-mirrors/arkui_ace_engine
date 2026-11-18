@@ -101,6 +101,9 @@ foreach(item, ace_platforms) {
 }
 
 ohos_shared_library("uiservice") {
+  if (is_ohos) {
+    version_script = "$ace_root/build/libuiservice.map"
+  }
   sanitize = {
     cfi = true
     cfi_cross_dso = true

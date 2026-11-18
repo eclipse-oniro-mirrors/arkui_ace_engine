@@ -15,6 +15,7 @@
 
 #include <chrono>
 
+#include "base/log/log_wrapper_without_instance.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/components_ng/manager/event/json_child_report.h"
@@ -256,7 +257,7 @@ void ClickRecognizer::OnAccepted()
     firstInputTime_.reset();
 
     auto node = GetAttachedNode().Upgrade();
-    TAG_LOGI(AceLogTag::ACE_INPUTKEYFLOW, "CLK RACC, T: %{public}s",
+    TAG_LOGI_WITHOUT_INSTANCE(AceLogTag::ACE_INPUTKEYFLOW, "CLK RACC, T: %{public}s",
         node ? node->GetTag().c_str() : "null");
     
     auto lastRefereeState = refereeState_;
@@ -675,6 +676,7 @@ GestureEvent ClickRecognizer::GetGestureEventInfo()
         info.SetLastAction(lastAction_);
     }
     info.SetClickPointerEvent(touchPoint.GetTouchEventPointerEvent());
+    info.SetPointerEventId(touchPoint.touchEventId);
     info.SetPressedKeyCodes(touchPoint.pressedKeyCodes_);
     info.SetInputEventType(inputEventType_);
     info.CopyConvertInfoFrom(touchPoint.convertInfo);
@@ -1021,7 +1023,7 @@ void ClickRecognizer::ResetTouchDownNotifiedToClickFlag()
     CHECK_NULL_VOID(node);
     auto context = node->GetContext();
     CHECK_NULL_VOID(context);
-    auto ngContext = DynamicCast<PipelineContext>(context);
+    auto ngContext = context;
     CHECK_NULL_VOID(ngContext);
     const auto& touchOptimizer = ngContext->GetTouchOptimizer();
     CHECK_NULL_VOID(touchOptimizer);

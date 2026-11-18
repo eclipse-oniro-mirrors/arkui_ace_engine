@@ -1130,8 +1130,10 @@ HWTEST_F(GridTestNg, DumpGridAlignItemsValues, TestSize.Level1)
         auto legacy = JsonUtil::Create();
         pattern->DumpAdvanceGridInteractionInfo(legacy, ParamConfig());
         EXPECT_EQ(
-            legacy->ToString(), std::string("{\"Editable\":\"null\",\"ScrollEnabled\":\"null\",\"AlignItems\":\"") +
-                                    item.legacyValue + "\"}");
+            legacy->ToString(),
+            std::string("{\"Editable\":\"null\",\"ScrollEnabled\":\"null\",\"ScrollSnapStrategy\":"
+                        "\"ScrollSnapAlign.NONE\",\"AlignItems\":\"") +
+                item.legacyValue + "\"}");
         auto after = JsonUtil::Create();
         pattern->DumpAdvanceInfo(after);
         EXPECT_EQ(after->ToString(), before->ToString());

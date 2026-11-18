@@ -29,6 +29,7 @@ test_sources = [
   "old_cases/relative_container_testtwo_ng.cpp",
   "relative_container_algorithm_test_ng.cpp",
   "relative_container_base_test_ng.cpp",
+  "relative_container_branch_coverage_test_ng.cpp",
   "relative_container_test_min.cpp",
   "relative_container_test_core.cpp",
 ]

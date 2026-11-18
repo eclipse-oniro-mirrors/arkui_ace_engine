@@ -426,7 +426,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest007, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -520,7 +520,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest0010, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -553,7 +553,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest0011, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -586,7 +586,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest0012, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -619,7 +619,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest0013, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -652,7 +652,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest014, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -685,7 +685,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest015, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -720,7 +720,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest016, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -753,7 +753,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerTest017, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -839,7 +839,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventTest001, TestSize.Level1)
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     TouchEvent touchEvent;
     touchEvent.type = Ace::TouchType::DOWN;
     postEventManager_->passThroughResult_ = true;
@@ -865,7 +865,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyTest001, TestSize.Lev
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     TouchEvent touchEvent;
     touchEvent.type = Ace::TouchType::DOWN;
     postEventManager_->passThroughResult_ = true;
@@ -891,7 +891,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventTest002, TestSize.Level1)
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     TouchEvent touchEvent;
     touchEvent.type = Ace::TouchType::DOWN;
     postEventManager_->passThroughResult_ = true;
@@ -924,7 +924,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyTest002, TestSize.Lev
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     TouchEvent touchEvent;
     touchEvent.type = Ace::TouchType::DOWN;
     postEventManager_->passThroughResult_ = true;
@@ -957,7 +957,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventTest001, TestSize.Level1)
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     MouseEvent mouseEvent;
     postEventManager_->passThroughResult_ = true;
     postEventManager_->PostMouseEvent(uiNode, std::move(mouseEvent));
@@ -982,7 +982,7 @@ HWTEST_F(PostEventManagerTestNg, PostAxisEventWithStrategy001, TestSize.Level1)
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     AxisEvent axisEvent;
     postEventManager_->passThroughResult_ = true;
     postEventManager_->PostAxisEventWithStrategy(uiNode, std::move(axisEvent));
@@ -1020,7 +1020,7 @@ HWTEST_F(PostEventManagerTestNg, PostAxisEventTest001, TestSize.Level1)
      *                   action event through the PostDownEvent function.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     AxisEvent axisEvent;
     postEventManager_->passThroughResult_ = true;
     postEventManager_->PostAxisEvent(uiNode, std::move(axisEvent));
@@ -1051,7 +1051,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest001, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -1083,7 +1083,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest002, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -1120,7 +1120,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest003, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     firstTouchEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = firstTouchEvent;
@@ -1157,7 +1157,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest004, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     firstTouchEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = firstTouchEvent;
@@ -1194,7 +1194,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest005, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     firstTouchEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = firstTouchEvent;
@@ -1226,7 +1226,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest006, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -1258,7 +1258,7 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsTest001, TestSize.Level1)
     TimeStamp timeUp(nanosecondsUp);
     touchUpEvent.time = timeUp;
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     PostEventAction eventAction;
     eventAction.targetNode = UInode;
     eventAction.touchEvent = touchUpEvent;
@@ -1283,7 +1283,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventTest002, TestSize.Level1)
      * @tc.steps: step2. test PostMouseEvent.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
     MouseEvent mouseEvent;
     mouseEvent.touchEventId = 1;
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -1353,7 +1353,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventTest004, TestSize.Level1)
     RefPtr<UINode> uiNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
     auto patternNode = AceType::MakeRefPtr<Pattern>();
     RefPtr<FrameNode> frameNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, 1, patternNode);
-    auto uiNode2 = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode2 = frameNode;
 
     TouchEvent touchEvent;
     touchEvent.type = TouchType::DOWN;
@@ -1370,7 +1370,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventTest005, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     // Add a DOWN event first
     PostEventAction eventAction;
@@ -1401,7 +1401,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventTest006, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     // Add a DOWN event first
     PostEventAction eventAction;
@@ -1432,7 +1432,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventTest007, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     // Add a DOWN event first
     PostEventAction eventAction;
@@ -1489,7 +1489,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventTest004, TestSize.Level1)
 {
     Init();
     RefPtr<FrameNode> frameNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     MouseEvent mouseEvent;
     auto result = postEventManager_->PostMouseEvent(uiNode, std::move(mouseEvent));
@@ -1505,7 +1505,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventWithStrategy002, TestSize.Level1)
 {
     Init();
     RefPtr<FrameNode> frameNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     MouseEvent mouseEvent;
     auto result = postEventManager_->PostMouseEventWithStrategy(uiNode, std::move(mouseEvent));
@@ -1534,7 +1534,7 @@ HWTEST_F(PostEventManagerTestNg, PostAxisEventTest003, TestSize.Level1)
 {
     Init();
     RefPtr<FrameNode> frameNode = FrameNode::CreateFrameNode(V2::IMAGE_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     AxisEvent axisEvent;
     auto result = postEventManager_->PostAxisEvent(uiNode, std::move(axisEvent));
@@ -1564,7 +1564,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest008, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add UP event first
     PostEventAction eventAction;
@@ -1591,7 +1591,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest009, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     TouchEvent upEvent;
     upEvent.type = TouchType::UP;
@@ -1609,7 +1609,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest010, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     TouchEvent cancelEvent;
     cancelEvent.type = TouchType::CANCEL;
@@ -1627,7 +1627,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest011, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add DOWN event for one node
     PostEventAction eventAction;
@@ -1640,7 +1640,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest011, TestSize.Level1)
 
     // Check with different node
     auto frameNode2 = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode2 = AceType::DynamicCast<NG::UINode>(frameNode2);
+    RefPtr<NG::UINode> UInode2 = frameNode2;
 
     TouchEvent downEvent2;
     downEvent2.type = TouchType::DOWN;
@@ -1658,7 +1658,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest012, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add DOWN event with id 2
     PostEventAction eventAction;
@@ -1686,7 +1686,7 @@ HWTEST_F(PostEventManagerTestNg, CheckTouchEventTest013, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add DOWN event
     PostEventAction eventAction;
@@ -1738,7 +1738,7 @@ HWTEST_F(PostEventManagerTestNg, PostDownEventTest003, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     TouchEvent touchEvent;
     touchEvent.type = TouchType::DOWN;
@@ -1790,7 +1790,7 @@ HWTEST_F(PostEventManagerTestNg, PostMoveEventTest003, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add DOWN and UP events
     PostEventAction eventAction1;
@@ -1853,7 +1853,7 @@ HWTEST_F(PostEventManagerTestNg, PostUpEventTest003, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add DOWN and CANCEL events
     PostEventAction eventAction1;
@@ -1888,7 +1888,7 @@ HWTEST_F(PostEventManagerTestNg, HaveReceiveDownEventTest001, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Initially no DOWN event
     auto result = postEventManager_->HaveReceiveDownEvent(UInode, 1);
@@ -1912,7 +1912,7 @@ HWTEST_F(PostEventManagerTestNg, HaveReceiveDownEventTest001, TestSize.Level1)
 
     // Different node
     auto frameNode2 = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode2 = AceType::DynamicCast<NG::UINode>(frameNode2);
+    RefPtr<NG::UINode> UInode2 = frameNode2;
     result = postEventManager_->HaveReceiveDownEvent(UInode2, 1);
     EXPECT_FALSE(result);
 }
@@ -1926,7 +1926,7 @@ HWTEST_F(PostEventManagerTestNg, HaveReceiveUpOrCancelEventTest001, TestSize.Lev
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Initially no UP event
     auto result = postEventManager_->HaveReceiveUpOrCancelEvent(UInode, 1);
@@ -1967,7 +1967,7 @@ HWTEST_F(PostEventManagerTestNg, CheckPointValidityTest001, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add an event
     PostEventAction eventAction;
@@ -2000,7 +2000,7 @@ HWTEST_F(PostEventManagerTestNg, CheckPointValidityTest002, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add an event
     PostEventAction eventAction;
@@ -2038,7 +2038,7 @@ HWTEST_F(PostEventManagerTestNg, CheckPointValidityTest003, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add an event
     PostEventAction eventAction;
@@ -2091,7 +2091,7 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsTest002, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
 
     // Add multiple events with different ids
     for (int32_t i = 0; i < 3; i++) {
@@ -2120,9 +2120,9 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsTest003, TestSize.Level1)
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> UInode = frameNode;
     auto frameNode2 = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto UInode2 = AceType::DynamicCast<NG::UINode>(frameNode2);
+    RefPtr<NG::UINode> UInode2 = frameNode2;
 
     // Add events to both nodes
     PostEventAction eventAction;
@@ -2216,7 +2216,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest001, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test PRESS event with no previous events and verify result.
@@ -2268,7 +2268,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest002, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add first PRESS event to action queue.
@@ -2303,7 +2303,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest003, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test RELEASE event without previous PRESS and verify it fails.
@@ -2328,7 +2328,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest004, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test CANCEL event without previous PRESS and verify it fails.
@@ -2353,7 +2353,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest005, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test MOVE event without previous PRESS and verify it succeeds (MOVE always returns true).
@@ -2378,7 +2378,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest006, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add complete sequence: PRESS -> RELEASE.
@@ -2421,7 +2421,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventTest007, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add PRESS and RELEASE events.
@@ -2464,7 +2464,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest001, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test BEGIN event with no previous events and verify result.
@@ -2515,7 +2515,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest002, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add first BEGIN event to action queue.
@@ -2550,7 +2550,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest003, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test END event without previous BEGIN and verify it fails.
@@ -2575,7 +2575,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest004, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test CANCEL event without previous BEGIN and verify it fails.
@@ -2600,7 +2600,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest005, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. test UPDATE event without previous BEGIN and verify it fails.
@@ -2625,7 +2625,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest006, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add complete sequence: BEGIN -> END.
@@ -2668,7 +2668,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventTest007, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add BEGIN and END events.
@@ -2711,7 +2711,7 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsMouseTest001, TestSize.Lev
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add multiple mouse events with different IDs.
@@ -2759,7 +2759,7 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsAxisTest001, TestSize.Leve
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add multiple axis events with different IDs.
@@ -2807,7 +2807,7 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsTouchTest002, TestSize.Lev
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add multiple touch events with different IDs.
@@ -2855,7 +2855,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventFullSequenceTest, TestSize.Level1
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. initialize pipeline context and event manager.
@@ -2908,7 +2908,7 @@ HWTEST_F(PostEventManagerTestNg, ClearPostInputActionsDefaultTypeTest, TestSize.
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add touch event.
@@ -2942,7 +2942,7 @@ HWTEST_F(PostEventManagerTestNg, PostAxisEventFullSequenceTest, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. initialize pipeline context and event manager.
@@ -2994,9 +2994,9 @@ HWTEST_F(PostEventManagerTestNg, MouseEventDifferentNodesTest, TestSize.Level1)
      */
     Init();
     auto frameNode1 = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode1 = AceType::DynamicCast<NG::UINode>(frameNode1);
+    RefPtr<NG::UINode> uiNode1 = frameNode1;
     auto frameNode2 = AceType::MakeRefPtr<FrameNode>("root2", -2, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode2 = AceType::DynamicCast<NG::UINode>(frameNode2);
+    RefPtr<NG::UINode> uiNode2 = frameNode2;
 
     /**
      * @tc.steps: step2. add PRESS events for both nodes.
@@ -3045,9 +3045,9 @@ HWTEST_F(PostEventManagerTestNg, AxisEventDifferentNodesTest, TestSize.Level1)
      */
     Init();
     auto frameNode1 = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode1 = AceType::DynamicCast<NG::UINode>(frameNode1);
+    RefPtr<NG::UINode> uiNode1 = frameNode1;
     auto frameNode2 = AceType::MakeRefPtr<FrameNode>("root2", -2, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode2 = AceType::DynamicCast<NG::UINode>(frameNode2);
+    RefPtr<NG::UINode> uiNode2 = frameNode2;
 
     /**
      * @tc.steps: step2. add BEGIN events for both nodes.
@@ -3096,7 +3096,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventInstanceIDTest, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add PRESS event to action queue.
@@ -3135,7 +3135,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisEventInstanceIDTest, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add BEGIN event to action queue.
@@ -3174,7 +3174,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEvent001, TestSize.Level1)
      */
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<NG::UINode>(frameNode);
+    RefPtr<NG::UINode> uiNode = frameNode;
 
     /**
      * @tc.steps: step2. add first PRESS event to action queue.
@@ -3241,7 +3241,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyBranchTest003, TestSi
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
 
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -3297,7 +3297,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventWindowActionTest003, TestSize.Lev
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
 
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -3329,7 +3329,7 @@ HWTEST_F(PostEventManagerTestNg, PostMouseEventWithStrategyBranchTest003, TestSi
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
 
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -3399,7 +3399,7 @@ HWTEST_F(PostEventManagerTestNg, PostAxisEventWithStrategyBranchTest003, TestSiz
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
 
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -3455,7 +3455,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerEventManagerNullBranchTest001, 
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
 
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -3499,7 +3499,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerDefaultAndCancelBranchTest001, 
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
 
     auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -3571,7 +3571,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerPipelineContextNullBranchTest00
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
     ScopedMockPipelineContextBackup pipelineBackup;
     auto pipelineContext = MockPipelineContext::pipeline_;
@@ -3628,7 +3628,7 @@ HWTEST_F(PostEventManagerTestNg, PostEventManagerCancelEventManagerNullBranchTes
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
@@ -3656,7 +3656,7 @@ HWTEST_F(PostEventManagerTestNg, PostTouchCancelEventIterationBranchTest001, Tes
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
@@ -3729,7 +3729,7 @@ HWTEST_F(PostEventManagerTestNg, CheckMouseEventStateBranchTest008, TestSize.Lev
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     auto otherNode = AceType::MakeRefPtr<FrameNode>("other", -2, AceType::MakeRefPtr<Pattern>(), true);
     ASSERT_NE(uiNode, nullptr);
 
@@ -3806,7 +3806,7 @@ HWTEST_F(PostEventManagerTestNg, CheckAxisAndReceiveHelperBranchTest008, TestSiz
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     auto otherNode = AceType::MakeRefPtr<FrameNode>("other", -2, AceType::MakeRefPtr<Pattern>(), true);
     ASSERT_NE(uiNode, nullptr);
 
@@ -3875,7 +3875,7 @@ HWTEST_F(PostEventManagerTestNg, PostInputEntryRemainingBranchTest001, TestSize.
 {
     Init();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
-    auto uiNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> uiNode = frameNode;
     ASSERT_NE(uiNode, nullptr);
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);

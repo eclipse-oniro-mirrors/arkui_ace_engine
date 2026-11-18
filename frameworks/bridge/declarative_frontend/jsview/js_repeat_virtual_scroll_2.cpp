@@ -14,6 +14,7 @@
  */
 
 #include "bridge/declarative_frontend/jsview/js_repeat_virtual_scroll_2.h"
+#include "bridge/declarative_frontend/jsview/js_repeat_controller.h"
 
 #include <string>
 #include <vector>
@@ -361,6 +362,29 @@ void JSRepeatVirtualScroll2::OnMove(const JSCallbackInfo& info)
     }
 }
 
+void JSRepeatVirtualScroll2::Controller(const JSCallbackInfo& info)
+{
+    enum ControllerParam {
+        ELMTID = 0,
+        CONTROLLER = 1,
+    };
+    if (!info[ControllerParam::ELMTID]->IsNumber() || !info[ControllerParam::CONTROLLER]->IsObject()) {
+        TAG_LOGE(AceLogTag::ACE_REPEAT, "JSRepeatVirtualScroll2::Controller - invalid parameters ERROR");
+        return;
+    }
+    auto repeatElmtId = info[ControllerParam::ELMTID]->ToNumber<int32_t>();
+    void* controllerPtr = JSRef<JSObject>::Cast(info[ControllerParam::CONTROLLER])
+                              ->Unwrap<JSRepeatController>();
+    auto controller = Referenced::Claim(reinterpret_cast<JSRepeatController*>(controllerPtr));
+    CHECK_NULL_VOID(controller);
+    // Binding closure (creation-time, immutable on the node side, one-to-one on the
+    // controller side): bindController records the node weakly on the controller side
+    // (last-bind-wins); a destroyed node expires the weak reference automatically.
+    RepeatVirtualScroll2Model::GetInstance()->SetController(
+        repeatElmtId,
+        [controller](const RefPtr<NG::RepeatVirtualScroll2Node>& node) { controller->BindToNode(node); });
+}
+
 // NOTE: this function and its CallJsFuncWithIndex/CallJsFuncWithFromTo helpers are duplicated
 // verbatim in js_lazy_foreach.cpp, js_foreach.cpp and js_repeat.cpp; this variant additionally
 // carries repeatElmtId. Any change here must be mirrored there; consolidating them into
@@ -472,6 +496,7 @@ void JSRepeatVirtualScroll2::JSBind(BindingTarget globalObj)
     JSClass<JSRepeatVirtualScroll2>::StaticMethod("updateL1Rid4Index", &JSRepeatVirtualScroll2::UpdateL1Rid4Index);
 
     JSClass<JSRepeatVirtualScroll2>::StaticMethod("onMove", &JSRepeatVirtualScroll2::OnMove);
+    JSClass<JSRepeatVirtualScroll2>::StaticMethod("controller", &JSRepeatVirtualScroll2::Controller);
     JSClass<JSRepeatVirtualScroll2>::StaticMethod("setCreateByTemplate", &JSRepeatVirtualScroll2::SetCreateByTemplate);
     JSClass<JSRepeatVirtualScroll2>::StaticMethod("isAllowAnimation", &JSRepeatVirtualScroll2::IsAllowAnimation);
     JSClass<JSRepeatVirtualScroll2>::StaticMethod(

@@ -236,8 +236,12 @@ public:
     void ScheduleCleanCacheTask();
     void ScheduleRestoreCacheTask();
     void TryExecuteScheduledCacheTask();
-    void CleanCache(bool syncClean);
+    void CleanCache(bool syncClean, bool clearAll = false);
     void RestoreCache();
+    // Controller binding (creation-time, immutable): a node accepts only its first
+    // binding; later TryBindController calls return false and are ignored
+    // (options.controller is read once at LazyForEach creation).
+    bool TryBindController();
     void SetNeedPrebuild(bool needPrebuild);
     bool GetNeedPrebuild();
     void SetParentVisibility(bool visibility);
@@ -341,6 +345,8 @@ private:
     int32_t oldCacheStart_ = 0;
     int32_t oldCacheEnd_ = 0;
     bool isParentCustomNodeReleaseExpiringNodeEnabled_ = false;
+
+    bool controllerBound_ = false;
 
     RefPtr<LazyForEachBuilder> builder_;
 

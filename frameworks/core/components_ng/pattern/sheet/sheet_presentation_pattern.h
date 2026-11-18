@@ -56,6 +56,8 @@ enum class SheetMiniDefaultShowPosition {
     LeftBottom,
     RightBottom,
 };
+class ScrollablePaintProperty;
+
 class ACE_EXPORT SheetPresentationPattern : public LinearLayoutPattern,
                                             public PopupBasePattern,
                                             public FocusView,
@@ -854,6 +856,7 @@ public:
     void UpdateSheetCloseIcon();
     void UpdateSheetBackgroundColor();
     void UpdateSheetBackgroundBlurStyle();
+    void UpdateTitleBarVibrancy(const SheetStyle& sheetStyle);
 
     Color GetMaskBackgroundColor() const
     {
@@ -1046,6 +1049,9 @@ public:
         return scrollNode;
     }
 
+    void UpdateSafeAreaPaddingClip(const RefPtr<ScrollablePaintProperty>& scrollPaintProps,
+        SheetTitleBarHoverMode hoverMode, float top);
+
     const SheetEffectEdge& GetSheetEffectEdge() const
     {
         return sheetEffectEdge_;
@@ -1212,6 +1218,7 @@ public:
     }
 
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
 
 protected:

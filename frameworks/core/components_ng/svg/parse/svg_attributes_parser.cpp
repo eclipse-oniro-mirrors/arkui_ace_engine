@@ -434,17 +434,21 @@ bool IsBalanced(const std::string& str)
     return bracketStack.empty();
 }
 
-bool IsLegalParam(const std::vector<std::string>& paramVec)
+bool ConvertParamToDouble(const std::vector<std::string>& paramVecStr, std::vector<double>& paramVecD)
 {
     double result = 0.0;
-    for (auto param : paramVec) {
+    std::vector<double> tempVec;
+    tempVec.reserve(paramVecStr.size());
+    for (auto& param : paramVecStr) {
         if (param.empty() || (param.back() == '%')) {
             return false;
         }
         if (!StringUtils::StringToDouble(param, result)) {
             return false;
         }
+        tempVec.push_back(result);
     }
+    paramVecD = std::move(tempVec);
     return true;
 }
 
@@ -490,13 +494,17 @@ std::vector<NG::TransformInfo> SvgAttributesParser::GetTransformInfo(const std::
         }
         parameters = StringUtils::TrimStr(parameters);
 
-        std::vector<std::string> paramVec;
+        std::vector<std::string> paramVecStr;
         std::string tag = (parameters.find(",") != std::string::npos) ? "," : " ";
-        StringUtils::SplitStr(parameters, tag, paramVec);
-        if (paramVec.empty() || !IsLegalParam(paramVec)) {
+        StringUtils::SplitStr(parameters, tag, paramVecStr);
+        if (paramVecStr.empty()) {
             return std::vector<NG::TransformInfo>();
         }
-        NG::TransformInfo transformInfo {funcType, paramVec};
+        std::vector<double> paramVecD;
+        if (!ConvertParamToDouble(paramVecStr, paramVecD)) {
+            return std::vector<NG::TransformInfo>();
+        }
+        NG::TransformInfo transformInfo {funcType, paramVecD};
         transformVec.push_back(transformInfo);
     }
     return transformVec;

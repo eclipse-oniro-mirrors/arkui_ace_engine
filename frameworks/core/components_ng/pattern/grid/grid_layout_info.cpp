@@ -1038,6 +1038,22 @@ int32_t GridLayoutInfo::FindItemStartRow(int32_t startRow, int32_t colIdx) const
     return r;
 }
 
+// Whether the row holds the item's origin cell (+itemIdx). By the gridMatrix_
+// marking invariant (GridIrregularFiller::FillOne stores +idx only at the
+// span's top-left and -idx in every other span cell) this is true exactly on
+// the item's start row: there the -idx cells to the right of the origin are
+// horizontal continuations of the same row, not vertical continuations from
+// the row above.
+static bool HasOriginInRow(const std::map<int32_t, int32_t>& row, int32_t itemIdx)
+{
+    for (const auto& cell : row) {
+        if (cell.second == itemIdx) {
+            return true;
+        }
+    }
+    return false;
+}
+
 GridLayoutInfo::EndIndexInfo GridLayoutInfo::FindStartIdx(int32_t startLine) const
 {
     auto it = gridMatrix_.find(startLine);
@@ -1064,7 +1080,17 @@ GridLayoutInfo::EndIndexInfo GridLayoutInfo::FindStartIdx(int32_t startLine) con
             itemStartRow = startLine;
         } else {
             itemIdx = -val;
-            itemStartRow = FindItemStartRow(startLine, col);
+            // A -idx cell on a row that also holds +idx is a horizontal
+            // continuation inside that row (see HasOriginInRow): the item
+            // starts on startLine and must not walk up — FindItemStartRow
+            // would return the row above and the spanned item would outrank
+            // same-row items with smaller indexes, breaking parity with the
+            // unset-contentClip anchor reported by CheckMultiRow (whose
+            // UpdateStartItemForMultiRow applies the same rule through its
+            // left-neighbor isCurrentRow check; the row-wide scan here also
+            // covers columns >= 3, where the immediate-left form would miss
+            // the origin).
+            itemStartRow = HasOriginInRow(row, itemIdx) ? startLine : FindItemStartRow(startLine, col);
         }
         if (itemStartRow < bestStartRow) {
             bestStartRow = itemStartRow;
@@ -1096,7 +1122,17 @@ static int32_t FindReportStartLine(const GridLayoutInfo& info, float mainGap, bo
         if (it == info.lineHeightMap_.end()) {
             break;
         }
-        if (GreatNotEqual(pos + it->second + keepAllowance, 0.0f)) {
+        // A zero-height line at the content top (bottom == top == 0) is kept by
+        // neither rule above — the gap allowance collapses when mainGap is 0 and
+        // the strict rule never passes bottom > 0. Keep it explicitly: it is only
+        // scrolled past once pos leaves the epsilon band (NearEqual keeps the
+        // tolerance symmetric with WaterFlow's IsReportStartIndexCandidate and
+        // List's GetStartIndex). The walk stays within the active range, and a
+        // zero-height line that scrolled out of it fills no blank above the
+        // anchor, so the fill never recomposes it back — startIndex_ matches the
+        // pre-contentClip baseline in that state.
+        if (GreatNotEqual(pos + it->second + keepAllowance, 0.0f) ||
+            (NearZero(it->second) && NearEqual(pos, 0.0f))) {
             reportStartLine = i;
             break;
         }

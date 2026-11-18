@@ -99,6 +99,15 @@ foreach(module, component_modules) {
     configs = [ "$ace_root:ace_coverage_config" ]
     deps = []
     if (is_ohos) {
+      # Auto-detect module-specific version script: if build/libarkui_${sub_name}.map
+      # exists (listed in ace_module_map_files from ace_config.gni), use it;
+      # otherwise fall back to the generic libarkui_component.map.
+      _module_map_name = "libarkui_${sub_name}.map"
+      if (filter_include(ace_module_map_files, [ _module_map_name ]) != []) {
+        version_script = "$ace_root/build/$_module_map_name"
+      } else {
+        version_script = "$ace_root/build/libarkui_component.map"
+      }
       deps += [ "$ace_root/frameworks/core/components_ng/pattern/${module_path}:ace_core_components_${module}_pattern_ng_ohos" ]
     } else if (use_mingw_win) {
       deps += [ "$ace_root/frameworks/core/components_ng/pattern/${module_path}:ace_core_components_${module}_pattern_ng_windows" ]

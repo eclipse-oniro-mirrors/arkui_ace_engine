@@ -27,6 +27,7 @@
 
 #include "base/utils/macros.h"
 #include "core/components_ng/base/ui_node.h"
+#include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 
 namespace OHOS::Ace {
 
@@ -57,6 +58,19 @@ public:
     virtual void UpdateL1Rid4Index(int32_t repeatElmtId, uint32_t arrLen, uint32_t totalCount,
         uint32_t invalidateContainerLayoutFromChildIndex, std::map<int32_t, uint32_t>& l1Rd4Index) = 0;
     virtual void OnMove(int32_t repeatElmtId, std::function<void(int32_t, int32_t)>&& onMove) = 0;
+    // Controller binding on the Repeat node resolved by repeatElmtId (creation-time,
+    // immutable on the node side, one-to-one on the controller side):
+    // bindController(node) is invoked only when the node accepts its first binding;
+    // the controller records the node weakly, replacing any previous binding
+    // (last-bind-wins). Called once at Repeat node creation when options.controller
+    // is set; later calls on an already bound node are ignored.
+    // Node not found: safe no-op.
+    virtual void SetController(int32_t repeatElmtId,
+        const std::function<void(const RefPtr<NG::RepeatVirtualScroll2Node>&)>& bindController)
+    {
+        (void)repeatElmtId;
+        (void)bindController;
+    }
     virtual void SetItemDragHandler(int32_t repeatElmtId, std::function<void(int32_t)>&& onLongPress,
         std::function<void(int32_t)>&& onDragStart, std::function<void(int32_t, int32_t)>&& onMoveThrough,
         std::function<void(int32_t)>&& onDrop) = 0;

@@ -35,7 +35,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ArcListItemLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propStartDeleteAreaDistance_ = CloneStartDeleteAreaDistance();
         value->propEndDeleteAreaDistance_ = CloneEndDeleteAreaDistance();
         value->propAutoScale_ = CloneAutoScale();

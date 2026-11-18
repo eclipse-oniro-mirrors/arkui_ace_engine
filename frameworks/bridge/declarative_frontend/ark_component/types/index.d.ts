@@ -365,6 +365,22 @@ declare interface DragEvent {
   enableInternalDropAnimation(configuration: string): void;
 }
 type CustomBuilder = () => void;
+declare enum SafeAreaInsetAlignment {
+  START = 0,
+  CENTER = 1,
+  END = 2
+}
+declare interface SafeAreaInsetEdgeConfig {
+  content: CustomBuilder;
+  spacing?: LengthMetrics;
+  alignment?: SafeAreaInsetAlignment;
+}
+declare interface SafeAreaInsetOptions {
+  top?: SafeAreaInsetEdgeConfig;
+  end?: SafeAreaInsetEdgeConfig;
+  bottom?: SafeAreaInsetEdgeConfig;
+  start?: SafeAreaInsetEdgeConfig;
+}
 declare interface DragItemInfo {
   pixelMap?: PixelMap;
   builder?: CustomBuilder;
@@ -520,7 +536,9 @@ declare enum ObscuredReasons {
 }
 declare enum FunctionKey {
   ESC, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, TAB,
-  DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT
+  DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT,
+  CAPS_LOCK = 18, SCROLL_LOCK = 20, PAUSE_BREAK = 21, NUM_LOCK = 22, INSERT = 23, DELETE = 24,
+  HOME = 25, END = 26, PAGE_UP = 27, PAGE_DOWN = 28, ENTER = 29, BACKSPACE = 30
 }
 declare enum ModifierKey {
   CTRL,
@@ -1395,6 +1413,11 @@ declare interface ItemDragInfo {
   y: number;
 }
 declare interface EditModeOptions {}
+declare interface PlaceholderOptions {
+  id?: string;
+  size?: SizeOptions;
+}
+declare type PlaceholderProvider = (index: number) => PlaceholderOptions | undefined;
 declare interface Scroller {}
 declare enum FocusWrapMode {
   DEFAULT = 0,
@@ -1451,6 +1474,8 @@ declare enum ImageContent {
 declare interface TextBackgroundStyle {
   color?: ResourceColor;
   radius?: BorderRadiuses;
+  borderColor?: ResourceColor;
+  borderWidth?: Dimension;
 }
 declare type LinearIndicatorStyle = any;
 declare type OnLinearIndicatorChangeCallback = any;
@@ -1615,6 +1640,20 @@ declare interface TabsBreakpointType<T> {
   sm?: T;
   md?: T;
   lg?: T;
+}
+declare enum SidebarSectionTitleStyle {
+  STANDARD = 0,
+  EMPHASIZED = 1,
+}
+declare interface SidebarSection {
+  title: ResourceStr;
+  order?: number;
+  titleStyle?: SidebarSectionTitleStyle;
+}
+declare interface TabViewCustomization {
+  visibilityMap?: Map<number, TabVisibility>;
+  sectionMap?: Map<number, SidebarSection>;
+  orderMap?: Map<number, number>;
 }
 declare enum NestedScrollMode {
   SELF_ONLY,
@@ -2079,6 +2118,13 @@ declare type PickerIndicatorStyle = any;
 declare interface PickerTextStyle {
   color?: ResourceColor;
   font?: Font;
+}
+declare interface PickerComponentTextStyle {
+  color?: ResourceColor;
+  font?: Font;
+  minFontSize?: number | ResourceStr;
+  maxFontSize?: number | ResourceStr;
+  overflow?: TextOverflow;
 }
 declare type PluginComponentAttribute = any;
 declare type RemoteWindowAttribute = any;

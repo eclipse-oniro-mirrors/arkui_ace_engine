@@ -35,6 +35,7 @@ protected:
     static constexpr int32_t testPidAlt = 200;
     void RegisterValidRuleSet(const std::string& ruleSetId, int32_t pid = testPid);
     void ClearAllRules();
+    static std::string BuildRuleJson(const std::string& ruleSetId);
 };
 
 void WebPageSceneManagerTest::SetUpTestCase() {}
@@ -56,6 +57,18 @@ void WebPageSceneManagerTest::RegisterValidRuleSet(const std::string& ruleSetId,
             "report": { "eventName": "onTextInput" } }]
     })";
     WebPageSceneManager::GetInstance().RegisterPageSceneRules(pid, ruleJson);
+}
+
+std::string WebPageSceneManagerTest::BuildRuleJson(const std::string& ruleSetId)
+{
+    return R"({
+        "ruleSetId": ")" + ruleSetId + R"(",
+        "sourceConfig": { "web": true },
+        "globalConfig": { "includeUnfocusableTextInput": false },
+        "webRules": [{ "ruleId": "r1", "sceneType": "TEXT_EDITOR", "selector": { "nodeTypes": ["input"] },
+            "condition": { "operator": "COUNT_GTE", "threshold": 1 },
+            "report": { "eventName": "onTextInput" } }]
+    })";
 }
 
 void WebPageSceneManagerTest::ClearAllRules()
@@ -475,6 +488,236 @@ HWTEST_F(WebPageSceneManagerTest, UpdateRuleState_MatchedSetsTriggered, TestSize
     auto& state = rules->componentRuleStates[1]["r1"];
     EXPECT_TRUE(state.textEditorTriggered);
     EXPECT_GT(state.lastReportTimeMs, 0);
+}
+
+// ===== InitGetRemaining / DecrementGetRemaining =====
+
+HWTEST_F(WebPageSceneManagerTest, InitGetRemaining_Normal_SetsCounter, TestSize.Level0)
+{
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 3);
+    // Decrement 3 times should complete without crash
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+    // Extra decrement after completion should be a safe no-op
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, DecrementGetRemaining_ReachesZero_CompletesGetScene, TestSize.Level0)
+{
+    std::string ruleJson = BuildRuleJson("rs_dec");
+    std::optional<WebPageSceneRuleSet> ruleSet;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 2);
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+    // After completion, a new Begin should succeed (state cleaned)
+    std::optional<WebPageSceneRuleSet> ruleSet2;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet2),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, DecrementGetRemaining_NoInit_IsSafeNoOp, TestSize.Level0)
+{
+    // Decrement without prior Init should not crash
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid + 900);
+}
+
+HWTEST_F(WebPageSceneManagerTest, DecrementRoundRemaining_StaleRoundIgnored, TestSize.Level0)
+{
+    std::string ruleJson = BuildRuleJson("rs_generation");
+    std::optional<WebPageSceneRuleSet> ruleSet;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 2);
+    auto staleRound = WebPageSceneManager::GetInstance().GetRoundRemaining(testPid);
+    ASSERT_TRUE(staleRound != nullptr);
+    // A new round supersedes the previous (still incomplete) one and installs a new counter.
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    auto currentRound = WebPageSceneManager::GetInstance().GetRoundRemaining(testPid);
+    ASSERT_TRUE(currentRound != nullptr);
+    EXPECT_NE(staleRound, currentRound);
+    // Late callback bound to the stale round must not consume the current round's budget.
+    WebPageSceneManager::GetInstance().DecrementRoundRemaining(testPid, staleRound);
+    EXPECT_EQ(currentRound->load(std::memory_order_acquire), 1);
+    // Decrement bound to the current round completes it.
+    WebPageSceneManager::GetInstance().DecrementRoundRemaining(testPid, currentRound);
+    EXPECT_EQ(currentRound->load(std::memory_order_acquire), 0);
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, DecrementRoundRemaining_NullHandle_IsSafeNoOp, TestSize.Level0)
+{
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    WebPageSceneManager::GetInstance().DecrementRoundRemaining(testPid, nullptr);
+    // Round untouched: the counter is still 1.
+    auto round = WebPageSceneManager::GetInstance().GetRoundRemaining(testPid);
+    ASSERT_TRUE(round != nullptr);
+    EXPECT_EQ(round->load(std::memory_order_acquire), 1);
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, ReportEmptyWebRound_ReplacesInFlightRound, TestSize.Level0)
+{
+    std::string ruleJson = BuildRuleJson("rs_empty_round");
+    std::optional<WebPageSceneRuleSet> ruleSet;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    auto staleRound = WebPageSceneManager::GetInstance().GetRoundRemaining(testPid);
+    ASSERT_TRUE(staleRound != nullptr);
+    // No Web listener path: the in-flight round is closed out (instance replaced) and
+    // answered with a single empty result via the zero-counter completion fallback.
+    WebPageSceneManager::GetInstance().ReportEmptyWebRound(testPid);
+    EXPECT_TRUE(WebPageSceneManager::GetInstance().GetRoundRemaining(testPid) == nullptr);
+    // Late callbacks bound to the replaced round are discarded (safe no-op).
+    WebPageSceneManager::GetInstance().DecrementRoundRemaining(testPid, staleRound);
+    // State is fully cleaned: a fresh Begin works.
+    std::optional<WebPageSceneRuleSet> ruleSet2;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet2),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, ProcessQueryResultForRound_StaleRound_Discarded, TestSize.Level0)
+{
+    std::string ruleJson = BuildRuleJson("rs_round_report");
+    std::optional<WebPageSceneRuleSet> ruleSet;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet),
+        PAGE_SCENE_ERR_OK);
+    ASSERT_TRUE(ruleSet.has_value());
+    std::string selectorJson = WebPageSceneManager::GetInstance().BuildSelectorJson(
+        ruleSet->rules.front(), ruleSet->globalConfig);
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    auto staleRound = WebPageSceneManager::GetInstance().GetRoundRemaining(testPid);
+    ASSERT_TRUE(staleRound != nullptr);
+    // A new round supersedes the previous (still incomplete) one.
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    auto currentRound = WebPageSceneManager::GetInstance().GetRoundRemaining(testPid);
+    ASSERT_TRUE(currentRound != nullptr);
+    EXPECT_NE(staleRound, currentRound);
+    // A late result bound to the superseded round is discarded entirely: no rule-state
+    // update and no report, so the current round is never answered by stale data.
+    WebPageSceneManager::GetInstance().ProcessQueryResultForRound(
+        testPid, 1, 1, selectorJson, R"({"errorCode":0,"controls":[]})", staleRound);
+    // A result bound to the current round reports normally (empty controls path).
+    WebPageSceneManager::GetInstance().ProcessQueryResultForRound(
+        testPid, 1, 1, selectorJson, R"({"errorCode":0,"controls":[]})", currentRound);
+    // The current round still completes normally.
+    WebPageSceneManager::GetInstance().DecrementRoundRemaining(testPid, currentRound);
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+// ===== BeginGetPageScene reentry =====
+
+HWTEST_F(WebPageSceneManagerTest, BeginGetPageScene_InFlight_ReusesPendingRules, TestSize.Level0)
+{
+    std::string ruleJson = BuildRuleJson("rs_reentry");
+    std::optional<WebPageSceneRuleSet> ruleSet1;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet1),
+        PAGE_SCENE_ERR_OK);
+    ASSERT_TRUE(ruleSet1.has_value());
+    // Second call while in-flight should reuse pending rules, not return LAST_UNFINISH
+    std::optional<WebPageSceneRuleSet> ruleSet2;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet2),
+        PAGE_SCENE_ERR_OK);
+    ASSERT_TRUE(ruleSet2.has_value());
+    EXPECT_EQ(ruleSet2->ruleSetId, "rs_reentry");
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, BeginGetPageScene_InFlight_FallsBackToRegisteredRules, TestSize.Level0)
+{
+    // Cover the in-flight fallback branch: pendingGetProcesses_ hits but pendingGetRules_
+    // misses, so BeginGetPageScene falls back to registeredRules_ (manager.cpp:318-321).
+    //
+    // Key: going through the "registered rules reuse" branch (:322-327) on the first Begin
+    // inserts processId into pendingGetProcesses_ but does NOT write pendingGetRules_.
+    // That is exactly the state the fallback branch expects.
+    RegisterValidRuleSet("rs_registered");
+    // First Begin: registered rules exist -> reuse branch -> insert pendingGetProcesses_,
+    // pendingGetRules_ untouched (still empty for this pid).
+    std::optional<WebPageSceneRuleSet> ruleSet1;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, "rs_registered", ruleSet1),
+        PAGE_SCENE_ERR_OK);
+    ASSERT_TRUE(ruleSet1.has_value());
+    // Second Begin while in-flight: pendingGetProcesses_ hits, pendingGetRules_ misses ->
+    // falls back to registeredRules_ (the target branch).
+    std::optional<WebPageSceneRuleSet> ruleSet2;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, "rs_registered", ruleSet2),
+        PAGE_SCENE_ERR_OK);
+    ASSERT_TRUE(ruleSet2.has_value());
+    EXPECT_EQ(ruleSet2->ruleSetId, "rs_registered");
+    EXPECT_EQ(ruleSet2->rules.size(), ruleSet1->rules.size());
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, BeginGetPageScene_InvalidJson_ReturnsParamInvalid, TestSize.Level0)
+{
+    std::optional<WebPageSceneRuleSet> ruleSet;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, "not_a_json", ruleSet),
+        PAGE_SCENE_ERR_PARAM_INVALID);
+    EXPECT_FALSE(ruleSet.has_value());
+}
+
+// ===== OnMatchResult =====
+
+HWTEST_F(WebPageSceneManagerTest, OnMatchResult_Empty_ReportsWithoutDecrement, TestSize.Level0)
+{
+    // Empty sceneJson with isGetResult=true only reports; the round decrement is owned
+    // by the dispatch side (localRemaining closure / early-exit paths).
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    WebPageSceneManager::GetInstance().OnMatchResult(testPid, "", true);
+    // Explicit decrement completes the round; extra decrements are safe no-ops.
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
+}
+
+HWTEST_F(WebPageSceneManagerTest, OnMatchResult_NonEmpty_ParsesMatchedCount, TestSize.Level0)
+{
+    std::string sceneJson = R"({"matchedCount": 3, "controls": []})";
+    // Should not crash and should report the event
+    WebPageSceneManager::GetInstance().OnMatchResult(testPid, sceneJson, true);
+}
+
+// ===== InitGetRemaining timeout =====
+
+HWTEST_F(WebPageSceneManagerTest, InitGetRemaining_Supersede_ClearsResidualRules, TestSize.Level0)
+{
+    std::string ruleJsonA = BuildRuleJson("rs_residue_a");
+    std::string ruleJsonB = BuildRuleJson("rs_residue_b");
+    // Round 1: Begin writes the temporary rule set; a zero counter simulates a previous
+    // round that already consumed its budget (e.g. inside its report/cleanup window).
+    std::optional<WebPageSceneRuleSet> ruleSetA;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJsonA, ruleSetA),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 0);
+    // Round 2 supersedes round 1: the residual state must be cleared even though the
+    // previous counter already reached zero.
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    // A Begin for a different ruleSetId must NOT reuse round 1's temporary rule set.
+    std::optional<WebPageSceneRuleSet> ruleSetB;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJsonB, ruleSetB),
+        PAGE_SCENE_ERR_OK);
+    ASSERT_TRUE(ruleSetB.has_value());
+    EXPECT_EQ(ruleSetB->ruleSetId, "rs_residue_b");
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+}
+
+// ===== CompleteGetPageScene cleanup =====
+
+HWTEST_F(WebPageSceneManagerTest, CompleteGetPageScene_CleansAllState, TestSize.Level0)
+{
+    std::string ruleJson = BuildRuleJson("rs_clean");
+    std::optional<WebPageSceneRuleSet> ruleSet;
+    ASSERT_EQ(WebPageSceneManager::GetInstance().BeginGetPageScene(testPid, ruleJson, ruleSet),
+        PAGE_SCENE_ERR_OK);
+    WebPageSceneManager::GetInstance().InitGetRemaining(testPid, 1);
+    WebPageSceneManager::GetInstance().CompleteGetPageScene(testPid);
+    // Decrement after manual complete should be a safe no-op
+    WebPageSceneManager::GetInstance().DecrementGetRemaining(testPid);
 }
 
 } // namespace OHOS::Ace

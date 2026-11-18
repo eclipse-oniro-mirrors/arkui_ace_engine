@@ -29,7 +29,30 @@ public:
     ~SvgClipPath() override = default;
     static RefPtr<SvgNode> Create();
     void OnClipEffect(RSCanvas& canvas, const SvgCoordinateSystemContext& svgCoordinateSystemContext) override;
+    RSRecordingPath AsPath(const Size& viewPort) const override;
     RSRecordingPath AsPath(const SvgLengthScaleRule& lengthRule) override;
+
+private:
+    struct SizePathCacheKey {
+        Size viewPort;
+        uint32_t renderCacheVersion;
+        bool operator==(const SizePathCacheKey& other) const
+        {
+            return viewPort == other.viewPort && renderCacheVersion == other.renderCacheVersion;
+        }
+    };
+    struct RulePathCacheKey {
+        SvgLengthScaleRule lengthRule;
+        uint32_t renderCacheVersion;
+        bool operator==(const RulePathCacheKey& other) const
+        {
+            return lengthRule.IsSameForCache(other.lengthRule) && renderCacheVersion == other.renderCacheVersion;
+        }
+    };
+    mutable std::optional<SizePathCacheKey> sizePathCacheKey_;
+    mutable std::optional<RSRecordingPath> sizePathCache_;
+    std::optional<RulePathCacheKey> rulePathCacheKey_;
+    std::optional<RSRecordingPath> rulePathCache_;
 };
 
 } // namespace OHOS::Ace::NG

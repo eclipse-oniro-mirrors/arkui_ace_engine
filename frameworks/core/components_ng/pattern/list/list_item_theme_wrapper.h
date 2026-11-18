@@ -40,7 +40,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ListItemThemeWrapper>();
-            auto theme = AceType::DynamicCast<ListItemTheme>(wrapper);
+            RefPtr<ListItemTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }
@@ -60,7 +60,7 @@ public:
             hoverColor_ = colors->InteractiveHover();
             pressColor_ = colors->InteractiveClick();
             selectedColor_ = colors->CompBackgroundEmphasize();
-            selectedColorWithAlpha_ = selectedColor_.BlendOpacity(selectedAlpha_);
+            selectedColorWithAlpha_ = colors->CompEmphasizeTertiary();
         }
     }
 

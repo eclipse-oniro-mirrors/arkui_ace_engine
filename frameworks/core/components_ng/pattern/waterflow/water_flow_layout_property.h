@@ -159,6 +159,7 @@ public:
     std::optional<ScrollSnapStrategy> GetScrollSnapStrategy() const;
     void UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy);
     void ResetScrollSnapStrategy();
+    std::string GetScrollSnapStrategyString() const;
     std::optional<std::string> GetFinalColumnsTemplate(double width);
 
     void UpdateContentClip(std::optional<ContentClip> contentClip) override
@@ -174,7 +175,7 @@ protected:
     {
         auto value = DynamicCast<WaterFlowLayoutProperty>(property);
         ScrollableLayoutProperty::Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRowsTemplate_ = CloneRowsTemplate();
         value->propColumnsTemplate_ = CloneColumnsTemplate();
         value->propRowsGap_ = CloneRowsGap();

@@ -337,6 +337,16 @@ void FfiOHOSAceFrameworkScrollEdgeEffect(int32_t edgeEffect, bool alwaysEnabled)
     ScrollModel::GetInstance()->SetEdgeEffect(static_cast<EdgeEffect>(edgeEffect), alwaysEnabled);
 }
 
+void FfiOHOSAceFrameworkScrollEdgeEffectWithOptions(
+    int32_t edgeEffect, bool alwaysEnabled, int32_t effectEdge)
+{
+    if (effectEdge < static_cast<int32_t>(EffectEdge::START) || effectEdge > static_cast<int32_t>(EffectEdge::END)) {
+        effectEdge = static_cast<int32_t>(EffectEdge::ALL);
+    }
+    ScrollModel::GetInstance()->SetEdgeEffect(
+        static_cast<EdgeEffect>(edgeEffect), alwaysEnabled, static_cast<EffectEdge>(effectEdge));
+}
+
 void FfiOHOSAceFrameworkScrollScrollsnap(ScrollSnapOptionsParams params)
 {
     const auto& snapValue = *reinterpret_cast<std::vector<float>*>(params.vHandle);

@@ -123,6 +123,8 @@ std::unordered_map<napi_ref, NG::AbilityContextInfo> UIObserver::PanGestureInfos
 
 std::unordered_map<NG::FrameNode*, std::shared_ptr<UIObserver::NodeRenderListener>>
     UIObserver::specifiedNodeRenderStateListeners_;
+std::unordered_map<NG::FrameNode*, std::list<std::shared_ptr<UIObserverListener>>>
+    UIObserver::specifiedNodeSensitiveInputListeners_;
 
 std::list<std::shared_ptr<UIObserverListener>> UIObserver::textChangeEventListeners_;
 std::unordered_map<std::string, std::list<std::shared_ptr<UIObserverListener>>>
@@ -1831,6 +1833,68 @@ void UIObserver::UnRegisterNodeRenderStateChangeCallback(
     if (holder.empty()) {
         specifiedNodeRenderStateListeners_.erase(iter);
         monitor->UnRegisterNodeRenderStatusListener(frameNodePtr, id);
+    }
+}
+
+void UIObserver::RegisterNodeSensitiveInputCallback(
+    RefPtr<NG::FrameNode> frameNode, const std::shared_ptr<UIObserverListener>& listener, napi_value callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(listener);
+    auto* node = AceType::RawPtr(frameNode);
+    if (specifiedNodeSensitiveInputListeners_.find(node) == specifiedNodeSensitiveInputListeners_.end()) {
+        frameNode->PushDestroyCallbackWithTag(
+            [node]() {
+                auto iter = specifiedNodeSensitiveInputListeners_.find(node);
+                if (iter != specifiedNodeSensitiveInputListeners_.end()) {
+                    SafeIterateListeners(iter->second, &UIObserverListener::ResetNodeSensitiveInputCallback);
+                    specifiedNodeSensitiveInputListeners_.erase(iter);
+                }
+            }, "nodeSensitiveInput");
+    }
+    auto& listeners = specifiedNodeSensitiveInputListeners_[node];
+    if (std::any_of(listeners.begin(), listeners.end(),
+        [callback](const auto& registered) { return registered->NapiEqual(callback); })) {
+        return;
+    }
+    listeners.emplace_back(listener);
+}
+
+void UIObserver::UnRegisterNodeSensitiveInputCallback(RefPtr<NG::FrameNode> frameNode, napi_value callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto iter = specifiedNodeSensitiveInputListeners_.find(AceType::RawPtr(frameNode));
+    if (iter == specifiedNodeSensitiveInputListeners_.end()) {
+        return;
+    }
+    auto& listeners = iter->second;
+    listeners.erase(
+        std::remove_if(listeners.begin(), listeners.end(),
+            [callback](const std::shared_ptr<UIObserverListener>& listener) {
+                if (callback == nullptr || listener->NapiEqual(callback)) {
+                    listener->ResetNodeSensitiveInputCallback();
+                    return true;
+                }
+                return false;
+            }),
+        listeners.end());
+    if (listeners.empty()) {
+        frameNode->RemoveDestroyCallbackWithTag("nodeSensitiveInput");
+        specifiedNodeSensitiveInputListeners_.erase(iter);
+    }
+}
+
+void UIObserver::HandleNodeSensitiveInput(
+    const RefPtr<NG::FrameNode>& frameNode, const NG::NodeSensitiveInputInfo& info)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto iter = specifiedNodeSensitiveInputListeners_.find(AceType::RawPtr(frameNode));
+    if (iter == specifiedNodeSensitiveInputListeners_.end()) {
+        return;
+    }
+    auto listeners = iter->second;
+    for (const auto& listener : listeners) {
+        listener->OnNodeSensitiveInput(AceType::RawPtr(frameNode), info);
     }
 }
 

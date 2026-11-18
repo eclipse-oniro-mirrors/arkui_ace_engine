@@ -48,6 +48,7 @@ CJ_EXPORT ExternalString FfiOHOSAceFrameworkProcessViewId(int64_t nativeViewId);
 CJ_EXPORT bool FfiOHOSAceFrameworkNativeViewIsFirstRender(int64_t nativeViewId);
 CJ_EXPORT void FfiOHOSAceFrameworkNativeViewResetRecycleCustomNode(int64_t nativeViewId);
 CJ_EXPORT int32_t FfiOHOSAceFrameworkNativeViewGetUINodeId(int64_t nativeViewId);
+CJ_EXPORT int32_t FfiOHOSAceFrameworkNativeViewGetInstanceId(int64_t nativeViewId);
 
 CJ_EXPORT VectorToCFFIArray FfiOHOSAceFrameworkViewGetDeletedElemtIds(int64_t nativeViewId);
 CJ_EXPORT VectorCJInt64Handle FFICJCreateVectorCJInt64(int64_t size);

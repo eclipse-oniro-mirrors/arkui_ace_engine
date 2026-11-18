@@ -26,6 +26,7 @@
 #include "core/components_ng/pattern/swiper/swiper_event_hub.h"
 #include "core/components_ng/pattern/swiper/swiper_model.h"
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_algorithm.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/event/gesture_event_hub.h"
@@ -63,8 +64,6 @@ public:
         return true;
     }
 
-    void ClampTabBarTransformOffset();
-
     RefPtr<LayoutProperty> CreateLayoutProperty() override
     {
         ACE_UINODE_TRACE(GetHost());
@@ -72,6 +71,7 @@ public:
     }
 
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
+    BarOverlapMode GetComputedBarOverlapMode() const { return computedBarOverlapMode_; }
 
     FocusPattern GetFocusPattern() const override
     {
@@ -180,6 +180,11 @@ public:
     TabBarDisplayMode GetActiveBarDisplayMode() const;
     void SetCurrentBarDisplayMode(TabBarDisplayMode mode);
 
+    void MarkUserSetSafeAreaOpts()
+    {
+        isUserSetSafeAreaOpts_ = true;
+    }
+
     void FireBarDisplayModeChangeEvent(TabBarDisplayMode mode);
 
     void StartDisplayModeSwitchAnimation(TabBarDisplayMode fromMode, TabBarDisplayMode toMode);
@@ -202,6 +207,7 @@ public:
         UpdateSideBarDivider();
     }
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void OnColorConfigurationUpdate() override;
     void OnColorModeChange(uint32_t colorMode) override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
@@ -237,6 +243,16 @@ public:
         return lastFloatingTopBar_;
     }
     void SetFloatingScaleEnabled(bool isFloatingScaleEnabled);
+
+    float GetBaseFloatingScale() const
+    {
+        return baseFloatingScale_;
+    }
+
+    bool IsTabBarFollowingHand() const
+    {
+        return floatingBarPosition_ != FloatingBarPosition::CENTER || floatTabBarFollowHandAnimationCount_ > 0;
+    }
 
     void SetSidebarHeaderNode(const RefPtr<NG::UINode>& header)
     {
@@ -277,10 +293,36 @@ public:
         return sideBarDividerNode_;
     }
 
+    RefPtr<FrameNode> GetCollapseButtonNode() const
+    {
+        return collapseButtonNode_;
+    }
+
     void SetTabsSidebarSearchableOptions(const TabsSidebarSearchableOptions& options)
     {
         searchableOptions_ = options;
     }
+
+    void SetShowSidebarControlButton(bool showControlButton)
+    {
+        if (showSidebarControlButton_ == showControlButton) {
+            return;
+        }
+        showSidebarControlButton_ = showControlButton;
+        if (sideBarNode_) {
+            SyncPropertiesToSideBar();
+            UpdateCollapseButtonIfNeeded();
+        }
+    }
+
+    bool GetShowSidebarControlButton() const
+    {
+        return showSidebarControlButton_;
+    }
+
+    void UpdateCollapseButtonIfNeeded();
+
+    void UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode);
 
     const TabsSidebarSearchableOptions& GetTabsSidebarSearchableOptions() const
     {
@@ -345,6 +387,26 @@ public:
         return realSideBarWidthPx_;
     }
 
+    void SetRealSideBarWidthPx(float width)
+    {
+        realSideBarWidthPx_ = width;
+    }
+
+    void ClearRealSideBarWidthPx()
+    {
+        realSideBarWidthPx_.reset();
+    }
+
+    float GetPreSideBarWidthPx() const
+    {
+        return preSideBarWidthPx_;
+    }
+
+    void SetPreSideBarWidthPx(float width)
+    {
+        preSideBarWidthPx_ = width;
+    }
+
     std::optional<Dimension> GetEffectiveSidebarWidth() const;
 
     void SetSidebarWidthCalled()
@@ -382,6 +444,48 @@ public:
         return tabBarClickIntercept_;
     }
 
+    // Centralized sidebar tab view customization.
+    // SetTabViewCustomization stores the customization from ModelNG without
+    // applying it. The actual diff check against appliedTabViewCustomization_
+    // and application happen in OnModifyDone, where all properties are resolved.
+    void SetTabViewCustomization(const TabViewCustomization& customization)
+    {
+        tabViewCustomization_ = customization;
+    }
+
+    void ResetTabViewCustomization()
+    {
+        tabViewCustomization_.reset();
+    }
+
+    const std::optional<TabViewCustomization>& GetAppliedTabViewCustomization() const
+    {
+        return appliedTabViewCustomization_;
+    }
+
+    // Refresh the sidebar tab list with the current customization.
+    // Called from TabContentPattern::OnModifyDone when a single tab's
+    // visibility/section property changes and the sidebar is active.
+    void RefreshSideBarTabView();
+
+    // Diff tabViewCustomization_ (incoming from ModelNG) against
+    // appliedTabViewCustomization_ (currently applied). If changed (or forceApply
+    // is true), sync appliedTabViewCustomization_, re-apply to the sidebar tab
+    // list, and mark the host dirty for layout.
+    // forceApply=true: always apply regardless of diff (e.g. sidebar becoming
+    // visible, entering sidebar mode, property-change full rebuild).
+    // forceApply=false: only apply if customization actually changed.
+    void ApplyTabViewCustomizationIfNeeded(bool forceApply = false);
+
+    // Register/Remove a ResObj callback for customization sectionMap
+    // resource-backed section titles. Called from OnModifyDone after the
+    // customization has been applied.
+    //   - any section has valid resourceTitleObject → register a single
+    //     ResObj callback (with an empty ResourceObject as notification trigger)
+    //     that re-parses all section titles and refreshes the sidebar tab list.
+    //   - no resourceTitleObject → remove the callback to avoid stale triggers.
+    void RegisterCustomizationSectionResObj();
+
 private:
     void OnAttachToFrameNode() override;
     void OnAfterModifyDone() override;
@@ -415,6 +519,8 @@ private:
     void InitAccessibilityZIndex();
 
     void InitFloatingBar();
+    void ApplyStrategyBarOverlapBlurStyle();
+
     void UpdateBgMaskNode();
     void UpdateTopBgMaskNode();
     GradientColor CreatePercentGradientColor(float percent, Color color);
@@ -545,10 +651,12 @@ private:
     std::optional<TabBarLayoutStyle> layoutStyle_;
     RefPtr<FrameNode> sideBarNode_ = nullptr;
     RefPtr<FrameNode> sideBarDividerNode_ = nullptr;
+    RefPtr<FrameNode> collapseButtonNode_ = nullptr;
     RefPtr<NG::UINode> sidebarHeaderNode_;
     RefPtr<NG::UINode> sidebarFooterNode_;
     RefPtr<NG::UINode> sidebarBottomBarNode_;
     TabsSidebarSearchableOptions searchableOptions_;
+    bool showSidebarControlButton_ = false;
     std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
     bool hasBarBlurStyle_ = false;
     BlurStyleOption barBlurStyleOption_;
@@ -571,6 +679,8 @@ private:
     float preSideBarWidthPx_ = 0.0f;
     float minSideBarWidth_ = -1.0f;
     float maxSideBarWidth_ = -1.0f;
+    bool strategyEnabled_ = false;
+    BarOverlapMode computedBarOverlapMode_ = BarOverlapMode::STANDARD;
 
     // Display mode switch animation state.
     // sidebar translate + tabbar scale/opacity run as independent animations; a counter
@@ -583,6 +693,14 @@ private:
     std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
     std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
     bool tabBarClickIntercept_ = false;
+
+    bool isUserSetSafeAreaOpts_ = false;
+
+    // Centralized customization for the sidebar tab bar.
+    // tabViewCustomization_: the latest customization set from ModelNG, not yet applied.
+    // appliedTabViewCustomization_: the currently-applied customization.
+    std::optional<TabViewCustomization> tabViewCustomization_;
+    std::optional<TabViewCustomization> appliedTabViewCustomization_;
 };
 
 } // namespace OHOS::Ace::NG

@@ -13,8 +13,10 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/node_common_modifier.h"
+#include "core/components_ng/event/event_constants.h"
 
 #include "base/log/log_wrapper.h"
+#include "core/common/application_shortcut.h"
 #include "core/common/container.h"
 
 #include "interfaces/native/node/native_type_visual_impl.h"
@@ -2148,6 +2150,17 @@ void ResetHitTestBehavior(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     ViewAbstract::SetHitTestMode(frameNode, NG::HitTestMode::HTMDEFAULT);
+}
+
+void SetAgentControlMode(ArkUINodeHandle node, ArkUI_Int32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (value < static_cast<int32_t>(AgentControlMode::ALLOW) || value > static_cast<int32_t>(AgentControlMode::DENY)) {
+        frameNode->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    ViewAbstract::SetAgentControlMode(frameNode, static_cast<AgentControlMode>(value));
 }
 
 void SetZIndex(ArkUINodeHandle node, ArkUI_Int32 value)
@@ -11549,6 +11562,49 @@ namespace {
 OHOS::Ace::TouchEventInfo globalEventInfo("global");
 }
 
+ArkUI_Int32 RegisterApplicationShortcut(const std::string& value, uint8_t keys,
+    std::function<void(ArkUI_Int32)>&& callback)
+{
+    return ApplicationShortcutManager::GetInstance().RegisterApplicationShortcut(value, keys, std::move(callback));
+}
+
+void UnregisterApplicationShortcut(ArkUI_Int32 registrationId)
+{
+    ApplicationShortcutManager::GetInstance().UnregisterApplicationShortcut(registrationId);
+}
+
+static void ConvertShortcutModifierKeys(uint8_t keys, std::vector<OHOS::Ace::ModifierKey>& keysVector)
+{
+    if (keys & (1 << static_cast<uint8_t>(OHOS::Ace::ModifierKey::CTRL))) {
+        keysVector.emplace_back(OHOS::Ace::ModifierKey::CTRL);
+    }
+    if (keys & (1 << static_cast<uint8_t>(OHOS::Ace::ModifierKey::SHIFT))) {
+        keysVector.emplace_back(OHOS::Ace::ModifierKey::SHIFT);
+    }
+    if (keys & (1 << static_cast<uint8_t>(OHOS::Ace::ModifierKey::ALT))) {
+        keysVector.emplace_back(OHOS::Ace::ModifierKey::ALT);
+    }
+}
+
+void RegisterNodeKeyboardShortcut(
+    ArkUINodeHandle node, const std::string& value, uint8_t keys, std::function<void()>&& callback)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    std::vector<OHOS::Ace::ModifierKey> keysVector;
+    ConvertShortcutModifierKeys(keys, keysVector);
+    ViewAbstractModelNG::SetKeyboardShortcut(frameNode, value, keysVector, std::move(callback));
+}
+
+void UnregisterNodeKeyboardShortcut(ArkUINodeHandle node, const std::string& value, uint8_t keys)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    std::vector<OHOS::Ace::ModifierKey> keysVector;
+    ConvertShortcutModifierKeys(keys, keysVector);
+    ViewAbstractModelNG::RemoveKeyboardShortcut(frameNode, value, keysVector);
+}
+
 const ArkUICommonModifier* GetCommonModifier()
 {
     CHECK_INITIALIZED_FIELDS_BEGIN(); // don't move this line
@@ -12126,6 +12182,11 @@ const ArkUICommonModifier* GetCommonModifier()
         .getLinearGradientBlur = GetLinearGradientBlur,
         .setShadowClipMode = SetShadowClipMode,
         .resetShadowClipMode = ResetShadowClipMode,
+        .setAgentControlMode = SetAgentControlMode,
+        .registerApplicationShortcut = RegisterApplicationShortcut,
+        .unregisterApplicationShortcut = UnregisterApplicationShortcut,
+        .registerNodeKeyboardShortcut = RegisterNodeKeyboardShortcut,
+        .unregisterNodeKeyboardShortcut = UnregisterNodeKeyboardShortcut,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

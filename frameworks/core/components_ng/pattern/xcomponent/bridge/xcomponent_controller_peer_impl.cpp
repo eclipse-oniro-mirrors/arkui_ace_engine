@@ -93,8 +93,8 @@ void XComponentControllerNativePeerImpl::SetOnSurfaceChangedEvent(const OnSurfac
 void XComponentControllerNativePeerImpl::SetOnSurfaceDestroyedEvent(const OnSurfaceDestroyedCb& callback)
 {
     arkOnSurfaceDestroyed = callback;
-    onSurfaceDestroyedEvent = [arkCallback = CallbackHelper(callback)](
-                                  const std::string& surfaceId, const std::string& xcomponentId) {
+    onSurfaceDestroyedEvent = [arkCallback = CallbackHelper(callback)]
+        (const std::string& surfaceId, const std::string& xcomponentId) {
         auto arkSurfaceId = Converter::ArkValue<Ark_String>(surfaceId);
         arkCallback.InvokeSync(arkSurfaceId);
     };

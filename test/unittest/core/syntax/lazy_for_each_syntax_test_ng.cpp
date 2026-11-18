@@ -22,6 +22,7 @@
 
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
+#include "base/log/dump_log.h"
 #include "core/pipeline/base/element_register.h"
 
 #define private public
@@ -1916,6 +1917,45 @@ HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachUtilsParseMetaData006, TestSize.Lev
      * @tc.steps: step4. Reset state
      */
     LazyForEachUtils::SetEnableCustomComponentFreeze(false);
+    LazyForEachUtils::SetLazyForEachMemOptStrategy("UNDEFINED");
+}
+
+/**
+ * @tc.name: LazyForEachMemOptDump001
+ * @tc.desc: Test LazyForEachNode DumpInfo shows MemOpt enablement (auto cache clear).
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachMemOptDump001, TestSize.Level1)
+{
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+
+    auto findMemOpt = [](const std::string& needle) -> bool {
+        for (const auto& desc : DumpLog::GetInstance().description_) {
+            if (desc.find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    /**
+     * @tc.steps: step1. ENABLE_AUTO_CACHE_OPTIMIZATION -> dump shows "enabled".
+     */
+    lazyForEachNode->SetMemOptStrategy(LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION);
+    DumpLog::GetInstance().description_.clear();
+    lazyForEachNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("MemOpt: enabled"));
+
+    /**
+     * @tc.steps: step2. DEFAULT -> dump shows "disabled".
+     */
+    lazyForEachNode->SetMemOptStrategy(LazyForEachMemOptStrategy::DEFAULT);
+    DumpLog::GetInstance().description_.clear();
+    lazyForEachNode->DumpInfo();
+    EXPECT_TRUE(findMemOpt("MemOpt: disabled"));
+
+    DumpLog::GetInstance().description_.clear();
     LazyForEachUtils::SetLazyForEachMemOptStrategy("UNDEFINED");
 }
 

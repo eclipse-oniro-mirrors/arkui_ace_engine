@@ -64,6 +64,7 @@ public:
     void HdrBrightness(float hdrBrightness, HdrType hdrType) override;
     void SetExtraFlag(uint32_t flag) override;
     void EnableTransparentLayer(bool isTransparentLayer) override;
+    void SetSurfaceVisibilityLifecycle(bool isVisibilityLifecycle) override;
     void SetBufferQueueCount(int32_t bufferQueueCount) override;
     void SetScreenId(uint64_t screenId) override;
 
@@ -94,6 +95,7 @@ public:
     static void HdrBrightness(FrameNode* frameNode, float hdrBrightness, HdrType hdrType);
     static void SetExtraFlag(FrameNode* frameNode, uint32_t flag);
     static void EnableTransparentLayer(FrameNode* frameNode, bool enable);
+    static void SetSurfaceVisibilityLifecycle(FrameNode* frameNode, bool isVisibilityLifecycle);
     static void SetBufferQueueCount(FrameNode* frameNode, int32_t bufferQueueCount);
     static int32_t GetBufferQueueCount(FrameNode* frameNode);
     static void SetRenderFit(FrameNode* frameNode, RenderFit renderFit);
@@ -114,7 +116,6 @@ public:
 
 private:
     static XComponentType GetTypeImpl(const RefPtr<FrameNode>& frameNode);
-
     
     static void InnerSetSurfaceRectV1(FrameNode* frameNode, float offsetX, float offsetY,
         float surfaceWidth, float surfaceHeight);

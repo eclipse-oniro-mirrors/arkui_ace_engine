@@ -16,6 +16,7 @@
 
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/pattern/waterflow/water_flow_item_layout_property.h"
 #include "core/components_ng/pattern/waterflow/water_flow_item_model_ng.h"
 #include "core/components_ng/property/measure_utils.h"
@@ -246,10 +247,37 @@ AdjustOffset WaterFlowLayoutUtils::GetAdjustOffset(const RefPtr<LayoutWrapper>& 
     return pos;
 }
 
+bool WaterFlowLayoutUtils::IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    const auto& host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    const auto& pattern = host->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsScrollPlaceholderEnabled();
+}
+
 RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItem(
     LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache)
 {
     const auto& layoutProperty = AceType::DynamicCast<WaterFlowLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    // Scroll placeholder acquisition pre-check (ADR-2/ADR-7, 2026-10-12): the
+    // budget decision and shell mounting stay with the pattern (it owns the frame
+    // context); the index->wrapper substitution itself executes in
+    // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition
+    // declaration. This funnel is the single child build call point shared by the
+    // three layout algorithms (sliding-window / top-down / segmented), so the
+    // substitution semantics never fork per algorithm. Cache/preload paths never
+    // substitute.
+    bool allowPlaceholderSubstitution = false;
+    if (!isCache && layoutWrapper) {
+        const auto& host = layoutWrapper->GetHostNode();
+        const auto& pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
+        if (pattern && pattern->IsScrollPlaceholderEnabled()) {
+            pattern->PrepareScrollPlaceholderForAcquisition(index);
+            allowPlaceholderSubstitution = true;
+        }
+    }
     // Scroll placeholder load observation at the WaterFlow child build call point: predict
     // before the real builder runs on an unbuilt index and sample its duration afterwards.
     // Observation only; the dummy empty-branch fallback is reported after the acquisition so
@@ -257,14 +285,16 @@ RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItem(
     ScrollPlaceholderItemBuildScope buildScope(
         ScrollPlaceholderComponentType::WATER_FLOW, layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+            index, addToRenderTree, isCache, allowPlaceholderSubstitution);
         buildScope.SetAcquiredWrapper(wrapper);
         if (!wrapper) {
             wrapper = CreateDummyFlowItem();
         }
         return wrapper;
     }
-    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+        index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
 }
@@ -275,13 +305,30 @@ RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItemByIndex(
     CHECK_NULL_RETURN(layoutWrapper, nullptr);
     const auto& layoutProperty = AceType::DynamicCast<WaterFlowLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_RETURN(layoutProperty, nullptr);
+    auto wrapper = GetWaterFlowItemForLayout(layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetChildByIndex(index, isCache);
         if (!wrapper) {
             wrapper = CreateDummyFlowItem();
         }
         return wrapper;
     }
-    return layoutWrapper->GetChildByIndex(index, isCache);
+    return wrapper;
+}
+
+RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItemForLayout(
+    LayoutWrapper* layoutWrapper, int32_t index, bool isCache)
+{
+    CHECK_NULL_RETURN(layoutWrapper, nullptr);
+    auto wrapper = layoutWrapper->GetChildByIndex(static_cast<uint32_t>(index), isCache);
+    if (wrapper) {
+        return wrapper;
+    }
+    const auto& host = layoutWrapper->GetHostNode();
+    const auto& pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
+    CHECK_NULL_RETURN(pattern, nullptr);
+    // Node-as-wrapper: a mounted shell doubles as its own layout wrapper, so
+    // the positioning call site drives it exactly like a built real item
+    // (SetMarginFrameOffset + Layout / ForceSyncGeometryNode).
+    return pattern->GetScrollPlaceholderShell(index);
 }
 } // namespace OHOS::Ace::NG

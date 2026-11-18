@@ -15,6 +15,8 @@
 
 #include "core/common/ime/text_input_keyboard_utils.h"
 
+#include <memory>
+
 #include "base/utils/utils.h"
 
 #if defined(ENABLE_STANDARD_INPUT)
@@ -32,6 +34,23 @@ void NotifyInputMethodConfigChange(TextInputAction action, TextInputType keyboar
     config.SetEnterKeyType(static_cast<MiscServices::EnterKeyType>(action));
     config.SetTextInputType(static_cast<MiscServices::TextInputType>(keyboard));
     inputMethod->OnConfigurationChange(config);
+#endif
+}
+
+bool IsCurrentInputMethodDefaultIme()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_RETURN(inputMethod, false);
+    auto currentInputMethod = inputMethod->GetCurrentInputMethod();
+    CHECK_NULL_RETURN(currentInputMethod, false);
+    std::shared_ptr<MiscServices::Property> defaultInputMethod;
+    auto ret = inputMethod->GetDefaultInputMethod(defaultInputMethod);
+    CHECK_NULL_RETURN(ret == MiscServices::ErrorCode::NO_ERROR, false);
+    CHECK_NULL_RETURN(defaultInputMethod, false);
+    return currentInputMethod->name == defaultInputMethod->name;
+#else
+    return false;
 #endif
 }
 

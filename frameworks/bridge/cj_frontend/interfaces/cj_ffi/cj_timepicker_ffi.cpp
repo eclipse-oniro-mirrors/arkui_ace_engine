@@ -457,7 +457,7 @@ void TimePickerDialogShow(const NativeTimePickerDialogOptions& options,
     properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));
     ParseTimePickerDialogOptions(options, properties);
     ParseDateTimeOptions(options, settingData.dateTimeOptions);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     executor->PostTask(
         [properties, settingData, timePickerProperty, dialogEvent, dialogCancelEvent, dialogLifeCycleEvent, buttonInfos,

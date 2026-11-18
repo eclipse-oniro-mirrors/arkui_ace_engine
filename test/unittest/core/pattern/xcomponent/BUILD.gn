@@ -34,12 +34,18 @@ ace_unittest("xcomponent_test_ng") {
     "xcomponent_static_test_ng.cpp",
     "xcomponent_test_buffer_queue_count.cpp",
     "xcomponent_test_ng.cpp",
+    "xcomponent_test_surface_visibility_lifecycle.cpp",
     "xcomponent_test_three_ng.cpp",
     "xcomponent_testtwo_ng.cpp",
     "xcomponent_utils_test_ng.cpp",
     "xcomponent_v2_test_ng.cpp",
   ]
 
+  include_dirs = [
+    "$ace_root/interfaces/native/",
+    "$ace_root/interfaces/native/node",
+    "$ace_root",
+  ]
   if (!ace_enable_full_test_suite) {
     sources = []
     sources = [ "xcomponent_test_core.cpp" ]

@@ -26,6 +26,8 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_model_ng.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
 #include "core/components/text_overlay/text_overlay_theme.h"
+#include "core/common/ace_application_info.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 
 using namespace testing::ext;
 
@@ -33,6 +35,22 @@ namespace OHOS::Ace::NG {
 namespace {
     constexpr float DEFAULT_CONTENT_WIDTH = 800.0f;
     constexpr float DEFAULT_TEXT_HEIGHT = 50.0f;
+
+    class TranslateInputMenuFlagsGuard {
+    public:
+        TranslateInputMenuFlagsGuard()
+            : flags_(AceApplicationInfo::GetInstance().GetTextMenuInfo().disableFlags)
+        {
+            AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+        }
+        ~TranslateInputMenuFlagsGuard()
+        {
+            AceApplicationInfo::GetInstance().SetTextMenuDisableFlags(DISABLE_NORMAL_FLAG);
+            AceApplicationInfo::GetInstance().AddTextMenuDisableFlag(flags_);
+        }
+    private:
+        SystemServiceMenuDisableFlag flags_;
+    };
 } // namespace
 
 class RichEditorSelectOverlayTestNg : public RichEditorCommonTestNg {
@@ -89,17 +107,10 @@ void RichEditorSelectOverlayTestNg::TearDownTestSuite()
  */
 HWTEST_F(RichEditorSelectOverlayTestNg, GetSelectArea, TestSize.Level0)
 {
-    /**
-     * @tc.steps: step1. get RichEditorPattern and set hasTransform_ true
-     */
     ASSERT_NE(richEditorNode_, nullptr);
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
     richEditorPattern->selectOverlay_->hasTransform_ = true;
-
-    /**
-     * @tc.steps: step2. get select area
-     */
     RectF rect(10, 10, 100, 100);
     auto selectArea = richEditorPattern->selectOverlay_->GetSelectArea();
     EXPECT_NE(selectArea.GetX(), rect.GetX());
@@ -1204,7 +1215,7 @@ HWTEST_F(RichEditorSelectOverlayTestNg, RichEditorOverlayTestNg001, TestSize.Lev
     EXPECT_CALL(rsCanvas, DetachPen()).WillRepeatedly(ReturnRef(rsCanvas));
     DrawingContext context { rsCanvas, CONTEXT_WIDTH_VALUE, CONTEXT_HEIGHT_VALUE };
 
-    richEditorOverlayModifier->previewTextStyle_ = PreviewTextStyle::NORMAL;
+    richEditorPattern->SetPreviewTextStyling(PreviewTextStyling{});
     richEditorPattern->contentRect_ = RectF(0, 0, 10.0f, 10.0f);
     richEditorOverlayModifier->showPreviewTextDecoration_ = AceType::MakeRefPtr<PropertyBool>(1);
     richEditorOverlayModifier->caretVisible_ = AceType::MakeRefPtr<PropertyBool>(1);
@@ -1824,5 +1835,41 @@ HWTEST_F(RichEditorSelectOverlayTestNg, ChangeHandleHeight001, TestSize.Level1)
     selectOverlay->hasTransform_ = true;
     selectOverlay->ChangeHandleHeight(info, true);
     EXPECT_TRUE(NearEqual(firstHandle.Height(), handleHeight));
+}
+
+/**
+ * @tc.name: TranslateInputEditorModes
+ * @tc.desc: Both rich and plain input modes enforce selection and keyboard restrictions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSelectOverlayTestNg, TranslateInputEditorModes, TestSize.Level1)
+{
+    TranslateInputMenuFlagsGuard guard;
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto overlay = pattern->selectOverlay_;
+    ASSERT_NE(overlay, nullptr);
+    SelectMenuInfo info;
+    auto layoutProperty = richEditorNode_->GetLayoutProperty<RichEditorLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateTextInputType(TextInputType::TEXT);
+    auto isDefaultIme = IsCurrentInputMethodDefaultIme();
+    for (bool singleLine : { false, true }) {
+        pattern->isSingleLineMode_ = singleLine;
+        EXPECT_EQ(pattern->IsInPlainTextInputMode(), singleLine);
+        pattern->customKeyboardBuilder_ = nullptr;
+        pattern->textSelector_.Update(0, 0);
+        overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+        EXPECT_EQ(info.showTranslateInput, isDefaultIme);
+
+        pattern->textSelector_.Update(0, 1);
+        overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+        EXPECT_FALSE(info.showTranslateInput);
+
+        pattern->textSelector_.Update(0, 0);
+        pattern->customKeyboardBuilder_ = []() {};
+        overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
+        EXPECT_FALSE(info.showTranslateInput);
+    }
 }
 } // namespace OHOS::Ace::NG

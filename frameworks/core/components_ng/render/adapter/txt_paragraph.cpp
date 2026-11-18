@@ -599,7 +599,7 @@ bool TxtParagraph::ComputeOffsetForCaretUpstream(int32_t extent, CaretMetricsF& 
         }
     }
 
-    if (isnan(textBox.rect.GetRight()) || isnan(textBox.rect.GetLeft())) {
+    if (std::isnan(textBox.rect.GetRight()) || std::isnan(textBox.rect.GetLeft())) {
         LOGI("Right or left of textBox is NaN.");
         return false;
     }

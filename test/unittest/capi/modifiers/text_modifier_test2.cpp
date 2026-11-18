@@ -233,6 +233,157 @@ HWTEST_F(TextModifierTest2, DISABLED_setBindSelectionMenuTestMenuTypeValidValues
     EXPECT_THAT(resultValue, Eq(expectedValue)) << "Passed value is: " << expectedValue;
 }
 
+/*
+ * @tc.name: setBindSelectionMenuTestNullOptions
+ * @tc.desc: Test null options does not interrupt binding, selection menu is bound with default params
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextModifierTest2, setBindSelectionMenuTestNullOptions, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setBindSelectionMenu, nullptr);
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    ASSERT_NE(frameNode, nullptr);
+
+    int callsCount = 0;
+    CustomNodeBuilderTestHelper<TextModifierTest2> builderHelper(this, frameNode);
+    const auto builder = Converter::ArkValue<Opt_CustomNodeBuilder>(builderHelper.GetBuilder());
+    auto optSpanType = Converter::ArkValue<Opt_TextSpanType>(ARK_TEXT_SPAN_TYPE_TEXT);
+    auto optResponseType = Converter::ArkValue<Opt_TextResponseType>(ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+
+    modifier_->setBindSelectionMenu(node_, &optSpanType, &builder, &optResponseType, nullptr);
+
+    auto selectInfo = GetSelectionMenuParams_Patched(frameNode, ARK_TEXT_SPAN_TYPE_TEXT,
+        ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    ASSERT_TRUE(selectInfo.has_value());
+    ASSERT_NE(selectInfo->menuInfo.menuBuilder, nullptr);
+    selectInfo->menuInfo.menuBuilder();
+    EXPECT_EQ(builderHelper.GetCallsCountAsync(), ++callsCount);
+}
+
+/*
+ * @tc.name: setBindSelectionMenuTestUndefinedMenuType
+ * @tc.desc: Test options with UNDEFINED tag or unset menuType field binds selection menu, not preview menu
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextModifierTest2, setBindSelectionMenuTestUndefinedMenuType, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setBindSelectionMenu, nullptr);
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    ASSERT_NE(frameNode, nullptr);
+
+    int callsCount = 0;
+    CustomNodeBuilderTestHelper<TextModifierTest2> builderHelper(this, frameNode);
+    const auto builder = Converter::ArkValue<Opt_CustomNodeBuilder>(builderHelper.GetBuilder());
+    auto optSpanType = Converter::ArkValue<Opt_TextSpanType>(ARK_TEXT_SPAN_TYPE_IMAGE);
+    auto optResponseType = Converter::ArkValue<Opt_TextResponseType>(ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+
+    // Options not passed at all: materialized as a shell with UNDEFINED outer tag.
+    Opt_SelectionMenuOptions undefinedOptions = { .tag = InteropTag::INTEROP_TAG_UNDEFINED };
+    modifier_->setBindSelectionMenu(node_, &optSpanType, &builder, &optResponseType, &undefinedOptions);
+    auto selectInfo = GetSelectionMenuParams_Patched(frameNode, ARK_TEXT_SPAN_TYPE_IMAGE,
+        ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    ASSERT_TRUE(selectInfo.has_value());
+    ASSERT_NE(selectInfo->menuInfo.menuBuilder, nullptr);
+    selectInfo->menuInfo.menuBuilder();
+    EXPECT_EQ(builderHelper.GetCallsCountAsync(), ++callsCount);
+
+    // Options passed but menuType field not set: inner menuType tag is UNDEFINED.
+    // Even for image span with long press, preview menu must not be bound.
+    SelectionMenuOptions selectionMenuOptions = {};
+    auto options = Converter::ArkValue<Opt_SelectionMenuOptions>(selectionMenuOptions);
+    ASSERT_EQ(options.value.menuType.tag, InteropTag::INTEROP_TAG_UNDEFINED);
+    modifier_->setBindSelectionMenu(node_, &optSpanType, &builder, &optResponseType, &options);
+    selectInfo = GetSelectionMenuParams_Patched(frameNode, ARK_TEXT_SPAN_TYPE_IMAGE,
+        ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    ASSERT_TRUE(selectInfo.has_value());
+    ASSERT_NE(selectInfo->menuInfo.menuBuilder, nullptr);
+    selectInfo->menuInfo.menuBuilder();
+    EXPECT_EQ(builderHelper.GetCallsCountAsync(), ++callsCount);
+}
+
+/*
+ * @tc.name: setBindSelectionMenuTestPreviewMenuBranch
+ * @tc.desc: Test preview menu is bound only for image span with long press response,
+ *           other combinations fall back to selection menu
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextModifierTest2, setBindSelectionMenuTestPreviewMenuBranch, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setBindSelectionMenu, nullptr);
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    ASSERT_NE(frameNode, nullptr);
+
+    int callsCount = 0;
+    CustomNodeBuilderTestHelper<TextModifierTest2> builderHelper(this, frameNode);
+    const auto builder = Converter::ArkValue<Opt_CustomNodeBuilder>(builderHelper.GetBuilder());
+    SelectionMenuOptions selectionMenuOptions = { .menuType = Ark_MenuType::ARK_MENU_TYPE_PREVIEW_MENU };
+    auto options = Converter::ArkValue<Opt_SelectionMenuOptions>(selectionMenuOptions);
+
+    // IMAGE + LONG_PRESS: binds preview menu, selection menu builder stays unset.
+    auto optSpanType = Converter::ArkValue<Opt_TextSpanType>(ARK_TEXT_SPAN_TYPE_IMAGE);
+    auto optResponseType = Converter::ArkValue<Opt_TextResponseType>(ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    modifier_->setBindSelectionMenu(node_, &optSpanType, &builder, &optResponseType, &options);
+    auto selectInfo = GetSelectionMenuParams_Patched(frameNode, ARK_TEXT_SPAN_TYPE_IMAGE,
+        ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    ASSERT_TRUE(selectInfo.has_value());
+    EXPECT_EQ(selectInfo->menuInfo.menuBuilder, nullptr);
+
+    // Other combinations with PREVIEW_MENU: fall back to selection menu binding.
+    const std::vector<std::tuple<Ark_TextSpanType, Ark_TextResponseType>> selectionPlan = {
+        {ARK_TEXT_SPAN_TYPE_IMAGE, ARK_TEXT_RESPONSE_TYPE_SELECT},
+        {ARK_TEXT_SPAN_TYPE_TEXT, ARK_TEXT_RESPONSE_TYPE_LONG_PRESS},
+        {ARK_TEXT_SPAN_TYPE_MIXED, ARK_TEXT_RESPONSE_TYPE_RIGHT_CLICK},
+    };
+    for (auto [spanType, responseType] : selectionPlan) {
+        optSpanType = Converter::ArkValue<Opt_TextSpanType>(spanType);
+        optResponseType = Converter::ArkValue<Opt_TextResponseType>(responseType);
+        modifier_->setBindSelectionMenu(node_, &optSpanType, &builder, &optResponseType, &options);
+        selectInfo = GetSelectionMenuParams_Patched(frameNode, spanType, responseType);
+        ASSERT_TRUE(selectInfo.has_value());
+        ASSERT_NE(selectInfo->menuInfo.menuBuilder, nullptr);
+        selectInfo->menuInfo.menuBuilder();
+        EXPECT_EQ(builderHelper.GetCallsCountAsync(), ++callsCount);
+    }
+}
+
+/*
+ * @tc.name: setBindSelectionMenuTestDefaultSpanAndResponseType
+ * @tc.desc: Test responseType defaults to LONG_PRESS and spanType defaults to TEXT when not passed
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextModifierTest2, setBindSelectionMenuTestDefaultSpanAndResponseType, TestSize.Level1)
+{
+    ASSERT_NE(modifier_->setBindSelectionMenu, nullptr);
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    ASSERT_NE(frameNode, nullptr);
+
+    int callsCount = 0;
+    CustomNodeBuilderTestHelper<TextModifierTest2> builderHelper(this, frameNode);
+    const auto builder = Converter::ArkValue<Opt_CustomNodeBuilder>(builderHelper.GetBuilder());
+    SelectionMenuOptions selectionMenuOptions = { .menuType = Ark_MenuType::ARK_MENU_TYPE_PREVIEW_MENU };
+    auto options = Converter::ArkValue<Opt_SelectionMenuOptions>(selectionMenuOptions);
+
+    // responseType not passed defaults to LONG_PRESS: IMAGE + PREVIEW_MENU binds preview menu.
+    Opt_TextResponseType undefinedResponseType = { .tag = InteropTag::INTEROP_TAG_UNDEFINED };
+    auto optSpanType = Converter::ArkValue<Opt_TextSpanType>(ARK_TEXT_SPAN_TYPE_IMAGE);
+    modifier_->setBindSelectionMenu(node_, &optSpanType, &builder, &undefinedResponseType, &options);
+    auto selectInfo = GetSelectionMenuParams_Patched(frameNode, ARK_TEXT_SPAN_TYPE_IMAGE,
+        ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    ASSERT_TRUE(selectInfo.has_value());
+    EXPECT_EQ(selectInfo->menuInfo.menuBuilder, nullptr);
+
+    // spanType not passed defaults to TEXT: PREVIEW_MENU + LONG_PRESS falls back to selection menu.
+    Opt_TextSpanType undefinedSpanType = { .tag = InteropTag::INTEROP_TAG_UNDEFINED };
+    auto optResponseType = Converter::ArkValue<Opt_TextResponseType>(ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    modifier_->setBindSelectionMenu(node_, &undefinedSpanType, &builder, &optResponseType, &options);
+    selectInfo = GetSelectionMenuParams_Patched(frameNode, ARK_TEXT_SPAN_TYPE_TEXT,
+        ARK_TEXT_RESPONSE_TYPE_LONG_PRESS);
+    ASSERT_TRUE(selectInfo.has_value());
+    ASSERT_NE(selectInfo->menuInfo.menuBuilder, nullptr);
+    selectInfo->menuInfo.menuBuilder();
+    EXPECT_EQ(builderHelper.GetCallsCountAsync(), ++callsCount);
+}
+
 /**
  * @tc.name: setEditMenuOptionsTest
  * @tc.desc: setEditMenuOptions test

@@ -18,6 +18,7 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
 #include "core/components_ng/render/drawing.h"
 #include "base/log/ace_trace.h"
+#include "core/components/text_field/textfield_theme.h"
 
 namespace OHOS::Ace::NG {
 RichEditorContentModifier::RichEditorContentModifier(const std::optional<TextStyle>& textStyle,
@@ -34,6 +35,7 @@ RichEditorContentModifier::RichEditorContentModifier(const std::optional<TextSty
     AttachProperty(clipOffset_);
     clipSize_ = AceType::MakeRefPtr<AnimatablePropertySizeF>(SizeF());
     AttachProperty(clipSize_);
+    SetDefaultAutoFillProperties();
 }
 
 void RichEditorContentModifier::onDraw(DrawingContext& drawingContext)
@@ -42,6 +44,18 @@ void RichEditorContentModifier::onDraw(DrawingContext& drawingContext)
     CHECK_NULL_VOID(pManager_);
     auto contentPattern = AceType::DynamicCast<RichEditorContentPattern>(pattern_.Upgrade());
     CHECK_NULL_VOID(contentPattern);
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    auto richEditorPattern = contentPattern->GetParentPattern();
+    if (richEditorPattern) {
+        auto autoFillController = richEditorPattern->GetOrCreateAutoFillController();
+        auto status = autoFillController ?
+            autoFillController->GetAutoFillAnimationStatus(): AutoFillAnimationStatus::INIT;
+        if (status != AutoFillAnimationStatus::INIT) {
+            DoAutoFillDraw(drawingContext);
+            return;
+        }
+    }
+#endif
     auto& canvas = drawingContext.canvas;
     canvas.Save();
     auto contentRect = contentPattern->GetTextContentRect();
@@ -82,6 +96,30 @@ void RichEditorContentModifier::onDraw(DrawingContext& drawingContext)
 
     PaintCustomSpan(drawingContext);
     contentPattern->ReportPageTranslatePlaceholderDrawn();
+}
+
+void RichEditorContentModifier::DoAutoFillDraw(DrawingContext& drawingContext)
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    auto contentPattern = AceType::DynamicCast<RichEditorContentPattern>(pattern_.Upgrade());
+    CHECK_NULL_VOID(contentPattern);
+    auto richEditorPattern = contentPattern->GetParentPattern();
+    CHECK_NULL_VOID(richEditorPattern);
+    auto autoFillController = richEditorPattern->GetOrCreateAutoFillController();
+    CHECK_NULL_VOID(autoFillController);
+    // RichEditorContentPattern inherits from Pattern (not TextPattern), so the base
+    // TextContentModifier constructor's DynamicCast<TextPattern> fails and contentOffset_
+    // is never initialized. Derive the offset from the content rect instead.
+    // Use GetAutoFillTextContentRect() which returns the rect in the content-host's
+    // local coordinate system (same as the canvas), not GetTextContentRect() which
+    // returns it in the parent RichEditor's coordinate system.
+    auto contentRect = richEditorPattern->GetAutoFillTextContentRect();
+    OffsetF contentOffset(contentRect.GetX(), contentRect.GetY());
+    autoFillController->DrawAutoFill(drawingContext.canvas, contentOffset,
+        autoFillTranslationOffset_->Get(), autoFillTextScrollOffset_->Get(),
+        autoFillDefaultCharIndex_->Get(), autoFillEmphasizeCharTextColor_,
+        autoFillDefaultCharInitTextColor_, autoFillOriginTextColor_);
+#endif
 }
 
 float RichEditorContentModifier::AdjustParagraphX(const ParagraphManager::ParagraphInfo& info, const RectF& contentRect)
@@ -152,4 +190,64 @@ void RichEditorContentModifier::SetClipSize(SizeF size)
 {
     clipSize_->Set(size);
 }
+
+void RichEditorContentModifier::SetAutoFillTranslationOffset(float value)
+{
+    CHECK_NULL_VOID(autoFillTranslationOffset_);
+    autoFillTranslationOffset_->Set(value);
+}
+ 
+void RichEditorContentModifier::SetAutoFillTextScrollOffset(float value)
+{
+    CHECK_NULL_VOID(autoFillTextScrollOffset_);
+    autoFillTextScrollOffset_->Set(value);
+}
+ 
+void RichEditorContentModifier::SetAutoFillEmphasizeCharIndex(float value)
+{
+    CHECK_NULL_VOID(autoFillEmphasizeCharIndex_);
+    autoFillEmphasizeCharIndex_->Set(value);
+}
+ 
+void RichEditorContentModifier::SetAutoFillDefaultCharIndex(float value)
+{
+    CHECK_NULL_VOID(autoFillDefaultCharIndex_);
+    autoFillDefaultCharIndex_->Set(value);
+}
+ 
+void RichEditorContentModifier::SetAutoFillOriginTextColor(const Color& value)
+{
+    autoFillOriginTextColor_ = value;
+}
+ 
+void RichEditorContentModifier::ResetAutoFillProperties()
+{
+    SetAutoFillTranslationOffset(0.0f);
+    SetAutoFillTextScrollOffset(0.0f);
+    SetAutoFillEmphasizeCharIndex(0.0f);
+    SetAutoFillDefaultCharIndex(0.0f);
+}
+ 
+void RichEditorContentModifier::SetDefaultAutoFillProperties()
+{
+#ifdef ENABLE_AUTO_FILL_CONTROLLER
+    auto contentPattern = AceType::DynamicCast<RichEditorContentPattern>(pattern_.Upgrade());
+    CHECK_NULL_VOID(contentPattern);
+    auto richEditorPattern = contentPattern->GetParentPattern();
+    CHECK_NULL_VOID(richEditorPattern);
+    auto theme = richEditorPattern->GetTheme<TextFieldTheme>();
+    CHECK_NULL_VOID(theme);
+    autoFillEmphasizeCharTextColor_ = theme->GetAutoFillIconEmphasizeColor();
+    autoFillDefaultCharInitTextColor_ = theme->GetTextColor();
+#endif
+    autoFillTranslationOffset_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    AttachProperty(autoFillTranslationOffset_);
+    autoFillTextScrollOffset_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    AttachProperty(autoFillTextScrollOffset_);
+    autoFillEmphasizeCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    AttachProperty(autoFillEmphasizeCharIndex_);
+    autoFillDefaultCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    AttachProperty(autoFillDefaultCharIndex_);
+}
+
 } // namespace OHOS::Ace::NG

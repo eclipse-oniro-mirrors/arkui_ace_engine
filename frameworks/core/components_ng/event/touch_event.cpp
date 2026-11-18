@@ -22,9 +22,11 @@
 #include "base/utils/time_util.h"
 #include "core/common/event_manager.h"
 #include "core/common/reporter/reporter.h"
+#include "core/components_ng/event/developer_response_publisher.h"
 #include "core/components_ng/manager/event/json_child_report.h"
 #include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include <string>
 
 namespace OHOS::Ace::NG {
 
@@ -191,6 +193,22 @@ bool TouchEventActuator::ShouldResponse()
     }
     ctrl->TrySetFirstResponse(frameNode);
     return true;
+}
+
+TouchEventInfo TouchEventActuator::CreateInputEventInfo(const TouchEvent& event, const RefPtr<FrameNode>& node)
+{
+    TouchEventActuator actuator;
+    actuator.AttachFrameNode(node);
+    auto info = actuator.CreateTouchEventInfo(event);
+    info.AddChangedTouchLocationInfo(actuator.CreateChangedTouchInfo(event, event));
+    for (const auto& point : event.pointers) {
+        info.AddTouchLocationInfo(actuator.CreateTouchItemInfo(point, event, event.type));
+    }
+    for (const auto& history : event.history) {
+        info.AddHistoryLocationInfo(actuator.CreateHistoryTouchItemInfo(history, event));
+        info.AddHistoryPointerEvent(history.GetTouchEventPointerEvent());
+    }
+    return info;
 }
 
 TouchEventInfo TouchEventActuator::CreateTouchEventInfo(const TouchEvent& lastPoint)
@@ -410,6 +428,34 @@ void TouchEventActuator::TriggerCallBacks(TouchEventInfo& event)
         auto commonTouchEventCallback = commonTouchEventCallback_;
         (*commonTouchEventCallback)(event);
     }
+    PublishDeveloperResponse(event);
+}
+
+void TouchEventActuator::PublishDeveloperResponse(TouchEventInfo& event)
+{
+    // Only a node with a developer-visible touch callback can produce a RESPONSE operation.
+    // Pressed-state, focus, tips and other framework-internal touch listeners land in
+    // touchEvents_ as well, so gating on the public callback members is what keeps a plain
+    // component (for example a Button with no onClick/onTouch) from being reported.
+    if (!HasDeveloperTouchCallback()) {
+        return;
+    }
+    const auto& changedTouches = event.GetChangedTouches();
+    if (changedTouches.empty()) {
+        return;
+    }
+    auto touchType = changedTouches.front().GetTouchType();
+    if (touchType != TouchType::DOWN && touchType != TouchType::UP && touchType != TouchType::CANCEL) {
+        return;
+    }
+    auto frameNode = GetAttachedNode().Upgrade();
+    CHECK_NULL_VOID(frameNode);
+    DeveloperResponseCandidate candidate;
+    candidate.node = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    candidate.operationToken = "touch_" + std::to_string(event.GetTouchEventId());
+    candidate.callbackType = DeveloperResponseCallbackType::TOUCH;
+    candidate.touchType = touchType;
+    DeveloperResponsePublisher::GetInstance()->PublishTouch(candidate);
 }
 
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING

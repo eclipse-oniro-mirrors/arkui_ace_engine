@@ -49,4 +49,9 @@ RefPtr<CanvasImage> CanvasImage::Create(const RefPtr<PixelMap>& pixelMap)
 {
     return AceType::MakeRefPtr<PixelMapImage>(pixelMap);
 }
+
+std::string PixelMapImage::PixelSamplingDump() const
+{
+    return "";
+}
 } // namespace OHOS::Ace::NG

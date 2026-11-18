@@ -27,7 +27,7 @@ RefPtr<AceType> CanvasModelImpl::Create()
     }
     ViewStackProcessor::GetInstance()->ClaimElementId(paintChild);
     ViewStackProcessor::GetInstance()->Push(paintChild);
-    return AceType::DynamicCast<OHOS::Ace::CustomPaintComponent>(paintChild)->GetTaskPool();
+    return paintChild->GetTaskPool();
 }
 
 void CanvasModelImpl::SetOnReady(std::function<void(uint32_t)>&& readyEvent)

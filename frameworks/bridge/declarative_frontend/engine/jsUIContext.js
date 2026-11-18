@@ -389,6 +389,16 @@ class UIObserver {
             this.ohos_observer.off(...args);
         });
     }
+    onNodeSensitiveInput(...args) {
+        withInstanceId(this.instanceId_, () => {
+            this.ohos_observer.on('nodeSensitiveInput', ...args);
+        });
+    }
+    offNodeSensitiveInput(...args) {
+        withInstanceId(this.instanceId_, () => {
+            this.ohos_observer.off('nodeSensitiveInput', ...args);
+        });
+    }
     addGlobalGestureListener(...args) {
         withInstanceId(this.instanceId_, () => {
             this.ohos_observer?.addGlobalGestureListener(...args);
@@ -537,6 +547,10 @@ class SmartGestureController {
 }
 
 class UIContext {
+    static enableTouchPadEvent(enabled) {
+        getUINativeModule().common.enableTouchPadEvent(enabled);
+    }
+
     /**
      * Construct new instance of UIContext.
      * initialize with instanceId.
@@ -606,6 +620,22 @@ class UIContext {
 
     static setResourceManagerCacheMaxCountForHSP(count) {
         getUINativeModule().resource.setResourceManagerCacheMaxCountForHSP(count);
+    }
+
+    static registerApplicationShortcut(value, keys, callback) {
+        let shortcut = globalThis.requireNapi('arkui.applicationShortcut');
+        if (shortcut) {
+            return shortcut.registerApplicationShortcut(value, keys, callback);
+        }
+        console.error('Application shortcut registration module is unavailable.');
+        return 0;
+    }
+
+    static unregisterApplicationShortcut(registrationId) {
+        let shortcut = globalThis.requireNapi('arkui.applicationShortcut');
+        if (shortcut) {
+            shortcut.unregisterApplicationShortcut(registrationId);
+        }
     }
 
     getDragController() {
@@ -1259,6 +1289,18 @@ class UIContext {
     isEasySplit() {
         return withInstanceId(this.instanceId_, () => {
             return Context.isEasySplit();
+        });
+    }
+
+    isTransPageEnabled() {
+        return withInstanceId(this.instanceId_, () => {
+            return Context.isTransPageEnabled();
+        });
+    }
+
+    setTransPageEnabled(enabled) {
+        return withInstanceId(this.instanceId_, () => {
+            return getUINativeModule().setTransPageEnabled(enabled);
         });
     }
 

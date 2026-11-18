@@ -2776,6 +2776,17 @@ int32_t VideoPattern::ParseCommand(const std::string& command, PlaybackStatus& s
     return RET_FAILED;
 }
 
+CommandResult VideoPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setVideoPlayerStatus", "setVideoPlaybackSpeed" },
+        CommandErrorType::EXECUTE_FAIL, [this](const std::unique_ptr<JsonValue>& /* json */) {
+        if (!mediaPlayer_ || !mediaPlayer_->IsMediaPlayerValid()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t VideoPattern::OnInjectionEvent(const std::string& command)
 {
     TAG_LOGD(AceLogTag::ACE_VIDEO, "OnInjectionEvent command : %{public}s", command.c_str());

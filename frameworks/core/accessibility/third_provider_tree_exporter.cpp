@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cinttypes>
 #include <cmath>
 #include <cstring>
 #include <type_traits>
@@ -358,8 +359,17 @@ NodeIndex IndexNodes(const std::vector<ProviderElementInfo>& infos)
 {
     NodeIndex index;
     index.reserve(infos.size());
+    size_t duplicates = 0;
     for (size_t i = 0; i < infos.size(); ++i) {
-        index.emplace(infos[i].GetElementId(), i);
+        const auto [first, inserted] = index.emplace(infos[i].GetElementId(), i);
+        if (!inserted && duplicates++ == 0) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "Third provider duplicate node ID %{public}d: first index %{public}zu, duplicate index %{public}zu",
+                infos[i].GetElementId(), first->second, i);
+        }
+    }
+    if (duplicates > 0) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third provider duplicate node count: %{public}zu", duplicates);
     }
     return index;
 }
@@ -368,21 +378,47 @@ size_t SelectRoot(const std::vector<ProviderElementInfo>& infos, const NodeIndex
 {
     size_t orphan = infos.size();
     size_t fallback = infos.size();
+    size_t root = infos.size();
+    size_t rootCount = 0;
+    size_t selfParents = 0;
     for (size_t i = 0; i < infos.size(); ++i) {
         const auto id = infos[i].GetElementId();
         const auto parent = infos[i].GetParentId();
-        if (index.at(id) != i || id == parent) {
+        if (index.at(id) != i) {
+            continue;
+        }
+        if (id == parent) {
+            if (selfParents++ == 0) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider tree skips self-parent cycle at node %{public}d", id);
+            }
             continue;
         }
         if (fallback == infos.size()) {
             fallback = i;
         }
-        if (parent == PROVIDER_ROOT_PARENT_ID) {
-            return i;
+        if (parent == PROVIDER_ROOT_PARENT_ID && root == infos.size()) {
+            root = i;
+        }
+        if (parent == PROVIDER_ROOT_PARENT_ID || index.count(parent) == 0) {
+            ++rootCount;
         }
         if (orphan == infos.size() && index.count(parent) == 0) {
             orphan = i;
         }
+    }
+    if (rootCount > 1) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider tree has %{public}zu root candidates; selected root %{public}d",
+            rootCount, infos[root != infos.size() ? root : orphan].GetElementId());
+    }
+    if (root != infos.size()) {
+        return root;
+    }
+    if (orphan == infos.size()) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider tree has no root with an external parent: fallback index %{public}zu, "
+            "node count %{public}zu", fallback, infos.size());
     }
     return orphan != infos.size() ? orphan : fallback;
 }
@@ -421,6 +457,9 @@ bool FitsElementText(const ProviderElementInfo& info, size_t remaining)
         &ProviderElementInfo::GetHitTestBehavior,
     };
     for (const auto getter : getters) {
+        if (getter == &ProviderElementInfo::GetContents && info.IsPassword()) {
+            continue;
+        }
         if (!FitsJsonText((info.*getter)().c_str(), remaining)) {
             return false;
         }
@@ -600,23 +639,39 @@ struct TreeBuildState {
     }
 };
 
+bool EnterSubtree(const ProviderElementInfo& info, size_t depth, TreeBuildState& state)
+{
+    const auto id = info.GetElementId();
+    if (depth > MAX_PROVIDER_DEPTH) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider tree depth limit exceeded: node %{public}d, depth %{public}zu, limit %{public}zu",
+            id, depth, MAX_PROVIDER_DEPTH);
+        return false;
+    }
+    if (!state.visited.insert(id).second) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider tree cycle pruned: node %{public}d, parent %{public}" PRId64 ", depth %{public}zu",
+            id, info.GetParentId(), depth);
+        return false;
+    }
+    if (!FitsElementText(info, MAX_PROVIDER_BYTES - state.bytes)) {
+        state.failed = true;
+        return false;
+    }
+    return true;
+}
+
 std::unique_ptr<ProviderJson> BuildSubtree(size_t index, size_t depth, const std::vector<ProviderElementInfo>& infos,
     const ChildrenIndex& children, const RectTransform& transform, TreeBuildState& state)
 {
-    const auto id = infos[index].GetElementId();
-    if (depth > MAX_PROVIDER_DEPTH || !state.visited.insert(id).second) {
-        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third provider tree pruned at depth %{public}zu", depth);
-        return nullptr;
-    }
-    if (!FitsElementText(infos[index], MAX_PROVIDER_BYTES - state.bytes)) {
-        state.failed = true;
+    if (!EnterSubtree(infos[index], depth, state)) {
         return nullptr;
     }
     auto node = ElementToTreeJson(infos[index], transform);
     if (!state.Charge(*node)) {
         return nullptr;
     }
-    const auto it = children.find(id);
+    const auto it = children.find(infos[index].GetElementId());
     if (it == children.end()) {
         return node;
     }
@@ -700,38 +755,73 @@ std::unique_ptr<ProviderJson> ElementToFlatJson(const ProviderElementInfo& info,
 
 bool ValidateChildReferences(const std::vector<ProviderElementInfo>& infos, const NodeIndex& index, int64_t rootId)
 {
-    std::unordered_set<int64_t> referenced;
+    std::unordered_map<int64_t, int32_t> referenced;
     for (const auto& info : infos) {
         for (const auto childId : info.GetChildNodeIds()) {
             const auto child = index.find(childId);
-            if (child == index.end() || childId == rootId || childId == info.GetElementId() ||
-                infos[child->second].GetParentId() != info.GetElementId() || !referenced.insert(childId).second) {
+            if (child == index.end()) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider flat tree references missing child %{public}" PRId64 " from parent %{public}d",
+                    childId, info.GetElementId());
+                return false;
+            }
+            if (childId == rootId || childId == info.GetElementId()) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider flat tree %{public}s: parent %{public}d, child %{public}" PRId64,
+                    childId == info.GetElementId() ? "self-cycle" : "root referenced as child",
+                    info.GetElementId(), childId);
+                return false;
+            }
+            const auto [first, inserted] = referenced.emplace(childId, info.GetElementId());
+            if (!inserted) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider flat tree %{public}s child %{public}" PRId64
+                    ": first parent %{public}d, current parent %{public}d",
+                    first->second == info.GetElementId() ? "duplicate" : "shared",
+                    childId, first->second, info.GetElementId());
                 return false;
             }
         }
     }
+    // Check ownership after collecting references so shared children are diagnosed regardless of parent order.
+    for (const auto& [childId, parentId] : referenced) {
+        const auto declaredParent = infos[index.at(childId)].GetParentId();
+        if (declaredParent != parentId) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "Third provider flat tree parent mismatch: child %{public}" PRId64
+                ", declared parent %{public}" PRId64 ", referencing parent %{public}d",
+                childId, declaredParent, parentId);
+            return false;
+        }
+    }
     // Each non-root node must have exactly one incoming child reference.
-    return referenced.size() == infos.size() - 1;
+    if (referenced.size() != infos.size() - 1) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider flat tree has unreferenced nodes: referenced %{public}zu, expected %{public}zu",
+            referenced.size(), infos.size() - 1);
+        return false;
+    }
+    return true;
 }
 
-bool ValidateFlatTree(const std::vector<ProviderElementInfo>& infos, int64_t rootId)
+bool ValidateParentChains(const std::vector<ProviderElementInfo>& infos, const NodeIndex& index, int64_t rootId)
 {
-    const auto index = IndexNodes(infos);
-    if (index.size() != infos.size() || index.count(rootId) == 0) {
-        return false;
-    }
-    // The provider root may name an external parent, but never a node in its own subtree.
-    if (index.count(infos[index.at(rootId)].GetParentId()) != 0 ||
-        !ValidateChildReferences(infos, index, rootId)) {
-        return false;
-    }
     std::unordered_set<int64_t> valid { rootId };
     for (const auto& info : infos) {
         std::vector<int64_t> path;
         std::unordered_set<int64_t> active;
         auto id = static_cast<int64_t>(info.GetElementId());
         while (valid.count(id) == 0) {
-            if (index.count(id) == 0 || !active.insert(id).second) {
+            if (index.count(id) == 0) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider flat tree parent chain is broken: start %{public}d, missing %{public}" PRId64,
+                    info.GetElementId(), id);
+                return false;
+            }
+            if (!active.insert(id).second) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "Third provider flat tree parent cycle: start %{public}d, repeated node %{public}" PRId64,
+                    info.GetElementId(), id);
                 return false;
             }
             path.push_back(id);
@@ -740,6 +830,59 @@ bool ValidateFlatTree(const std::vector<ProviderElementInfo>& infos, int64_t roo
         valid.insert(path.begin(), path.end());
     }
     return true;
+}
+
+bool ValidateFlatTree(const std::vector<ProviderElementInfo>& infos, int64_t rootId)
+{
+    const auto index = IndexNodes(infos);
+    if (index.size() != infos.size()) {
+        return false;
+    }
+    if (index.count(rootId) == 0) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider flat tree root %{public}" PRId64 " is absent from recursive query", rootId);
+        return false;
+    }
+    // The provider root may name an external parent, but never a node in its own subtree.
+    const auto rootParent = infos[index.at(rootId)].GetParentId();
+    if (index.count(rootParent) != 0) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider flat tree root %{public}" PRId64 " has internal parent %{public}" PRId64,
+            rootId, rootParent);
+        return false;
+    }
+    for (const auto& info : infos) {
+        if (info.GetElementId() != rootId && index.count(info.GetParentId()) == 0) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "Third provider flat tree has multiple roots or orphan: selected root %{public}" PRId64
+                ", extra node %{public}d, external parent %{public}" PRId64,
+                rootId, info.GetElementId(), info.GetParentId());
+            return false;
+        }
+    }
+    return ValidateChildReferences(infos, index, rootId) && ValidateParentChains(infos, index, rootId);
+}
+
+ThirdProviderExportStatus QueryAndValidateFlatRoot(
+    ArkUI_AccessibilityProvider* provider, const std::vector<ProviderElementInfo>& infos)
+{
+    if (infos.empty()) {
+        return ThirdProviderExportStatus::SUCCESS;
+    }
+    std::vector<ProviderElementInfo> roots;
+    const auto result = provider->FindAccessibilityNodeInfosById(PROVIDER_ROOT_ELEMENT_ID,
+        ARKUI_ACCESSIBILITY_NATIVE_SEARCH_MODE_PREFETCH_CURRENT, PROVIDER_REQUEST_ID, roots);
+    if (result != 0) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third provider root query failed: %{public}d", result);
+        return ThirdProviderExportStatus::QUERY_FAILED;
+    }
+    if (roots.size() != 1) {
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider root query returned %{public}zu nodes; expected one root", roots.size());
+        return ThirdProviderExportStatus::INVALID_DATA;
+    }
+    return ValidateFlatTree(infos, roots.front().GetElementId()) ? ThirdProviderExportStatus::SUCCESS :
+        ThirdProviderExportStatus::INVALID_DATA;
 }
 
 ThirdProviderExportStatus ChargeArray(const JsonValue& array, ThirdProviderTreeExportBudget& budget)
@@ -841,7 +984,9 @@ std::shared_ptr<JsonValue> ThirdProviderTreeExporter::ExportToInspectorJson(
     TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "Third provider exported %{public}zu nodes, root %{public}d",
         state.visited.size(), infos[root].GetElementId());
     if (state.visited.size() != infos.size()) {
-        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third provider omitted duplicate or unreachable nodes");
+        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+            "Third provider tree omitted duplicate or unreachable nodes: input %{public}zu, visited %{public}zu, "
+            "root %{public}d", infos.size(), state.visited.size(), infos[root].GetElementId());
     }
     return std::shared_ptr<JsonValue>(tree->TakeValue());
 }
@@ -864,15 +1009,9 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
     if (budget.bytes > MAX_PROVIDER_BYTES - arrayBytes) {
         return { ThirdProviderExportStatus::SIZE_LIMIT, nullptr };
     }
-    if (!infos.empty()) {
-        std::vector<ProviderElementInfo> roots;
-        if (provider->FindAccessibilityNodeInfosById(PROVIDER_ROOT_ELEMENT_ID,
-            ARKUI_ACCESSIBILITY_NATIVE_SEARCH_MODE_PREFETCH_CURRENT, PROVIDER_REQUEST_ID, roots) != 0) {
-            return { ThirdProviderExportStatus::QUERY_FAILED, nullptr };
-        }
-        if (roots.size() != 1 || !ValidateFlatTree(infos, roots.front().GetElementId())) {
-            return { ThirdProviderExportStatus::INVALID_DATA, nullptr };
-        }
+    status = QueryAndValidateFlatRoot(provider, infos);
+    if (status != ThirdProviderExportStatus::SUCCESS) {
+        return { status, nullptr };
     }
     RectTransform transform;
     if (!GetTransform(host, transform)) {

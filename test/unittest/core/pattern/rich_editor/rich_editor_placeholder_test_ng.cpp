@@ -184,4 +184,33 @@ HWTEST_F(RichEditorPlaceholderTestNg, SetPlaceholder004, TestSize.Level0)
 
     EXPECT_EQ(layoutProperty->GetPropertyChangeFlag(), PROPERTY_UPDATE_NORMAL);
 }
+
+/**
+ * @tc.name: IsShowPlaceholder001
+ * @tc.desc: Test IsShowPlaceholder getter/setter.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPlaceholderTestNg, IsShowPlaceholder001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isShowPlaceholder_ = false;
+    EXPECT_FALSE(pattern->IsShowPlaceholder());
+    pattern->isShowPlaceholder_ = true;
+    EXPECT_TRUE(pattern->IsShowPlaceholder());
+}
+
+/**
+ * @tc.name: GetCurrentPlaceholderText001
+ * @tc.desc: Test GetCurrentPlaceholderText with no styled placeholder.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPlaceholderTestNg, GetCurrentPlaceholderText001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->styledPlaceholder_ = nullptr;
+    auto text = pattern->GetCurrentPlaceholderText();
+    EXPECT_TRUE(text.empty());
+}
 } // namespace OHOS::Ace::NG

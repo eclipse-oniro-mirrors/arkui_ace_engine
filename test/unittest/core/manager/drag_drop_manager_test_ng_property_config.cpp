@@ -1245,7 +1245,7 @@ HWTEST_F(DragDropManagerTestNgNew, DragDropManagerTest045, TestSize.Level1)
     auto frameNodeNullId = ElementRegister::GetInstance()->MakeUniqueId();
     auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, frameNodeNullId, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(frameNode, nullptr);
-    auto overlayManager = AceType::MakeRefPtr<OverlayManager>(AceType::DynamicCast<FrameNode>(frameNode));
+    auto overlayManager = AceType::MakeRefPtr<OverlayManager>(frameNode);
     ASSERT_NE(overlayManager, nullptr);
     overlayManager->pixmapColumnNodeWeak_ = nullptr;
     overlayManager->SetHasPixelMap(true);
@@ -1953,7 +1953,7 @@ HWTEST_F(DragDropManagerTestNgNew, DragDropManagerTest066, TestSize.Level1)
     EXPECT_NE(pipeline, nullptr);
     auto rootNode = pipeline->GetRootElement();
     EXPECT_NE(rootNode, nullptr);
-    auto parentFrameNode = AceType::DynamicCast<FrameNode>(rootNode);
+    auto parentFrameNode = rootNode;
     EXPECT_NE(parentFrameNode, nullptr);
     parentFrameNode->isActive_ = false;
     constexpr float GLOBAL_X = 10.0f;

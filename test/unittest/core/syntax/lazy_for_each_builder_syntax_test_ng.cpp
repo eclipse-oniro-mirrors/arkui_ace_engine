@@ -2085,6 +2085,48 @@ HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachNodeCleanCache004, TestSize.Level1)
 }
 
 /**
+ * @tc.name: LazyForEachNodeCleanCache005
+ * @tc.desc: Test CleanCache forwards clearAll to builder (sync resets flag, async keeps it)
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachNodeCleanCache005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode with builder
+     * @tc.expected: LazyForEachNode is created successfully
+     */
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+ 
+    auto builder = lazyForEachNode->builder_;
+    ASSERT_NE(builder, nullptr);
+ 
+    /**
+     * @tc.steps: step2. Call CleanCache with syncClean=false and clearAll=true
+     * @tc.expected: Builder keeps clearAllCache_ and reduceCache_ pending for the deferred clean
+     */
+    lazyForEachNode->CleanCache(false, true);
+    EXPECT_TRUE(builder->clearAllCache_);
+    EXPECT_TRUE(builder->reduceCache_);
+ 
+    /**
+     * @tc.steps: step3. Call CleanCache with syncClean=true and clearAll=true
+     * @tc.expected: Builder executes the sync clean and resets both flags
+     */
+    lazyForEachNode->CleanCache(true, true);
+    EXPECT_FALSE(builder->clearAllCache_);
+    EXPECT_FALSE(builder->reduceCache_);
+ 
+    /**
+     * @tc.steps: step4. Call CleanCache with syncClean=true and clearAll=false (default)
+     * @tc.expected: clearAllCache_ stays false
+     */
+    lazyForEachNode->CleanCache(true);
+    EXPECT_FALSE(builder->clearAllCache_);
+    EXPECT_FALSE(builder->reduceCache_);
+}
+
+/**
  * @tc.name: LazyForEachNodeRestoreCache001
  * @tc.desc: Test RestoreCache
  * @tc.type: FUNC
@@ -2238,6 +2280,103 @@ HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachBuilderReduceCacheCount004, TestSiz
     EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(0), 0);
 
     SystemProperties::bootVendorDdrSize_ = originDdrSize; // restore mock default
+}
+
+/**
+ * @tc.name: LazyForEachBuilderReduceCacheCount005
+ * @tc.desc: Test ReduceCacheCount retains nothing while clearAllCache_ is set
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachBuilderReduceCacheCount005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachBuilder
+     * @tc.expected: Builder is created successfully
+     */
+    auto lazyForEachBuilder = CreateLazyForEachBuilder();
+    ASSERT_NE(lazyForEachBuilder, nullptr);
+ 
+    /**
+     * @tc.steps: step2. Call ReduceCacheCount with clearAllCache_ during an active clean
+     * @tc.expected: Retained idle cache count is 0 (controller clearCache releases all)
+     */
+    lazyForEachBuilder->reduceCache_ = true;
+    lazyForEachBuilder->clearAllCache_ = true;
+    EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(10), 0);
+ 
+    /**
+     * @tc.steps: step3. clearAllCache_ takes precedence over the reduceCache_ early return
+     * @tc.expected: Retained idle cache count is still 0
+     */
+    lazyForEachBuilder->reduceCache_ = false;
+    lazyForEachBuilder->clearAllCache_ = true;
+    EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(10), 0);
+ 
+    /**
+     * @tc.steps: step4. clearAllCache_ takes precedence over startShowCached_ early return
+     * @tc.expected: Retained idle cache count is still 0
+     */
+    lazyForEachBuilder->reduceCache_ = true;
+    lazyForEachBuilder->startShowCached_ = 1;
+    lazyForEachBuilder->endShowCached_ = 0;
+    lazyForEachBuilder->clearAllCache_ = true;
+    EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(10), 0);
+ 
+    /**
+     * @tc.steps: step5. Without clearAllCache_ the normal cap applies again
+     * @tc.expected: Retained idle cache count is capped at 2
+     */
+    lazyForEachBuilder->startShowCached_ = 0;
+    lazyForEachBuilder->clearAllCache_ = false;
+    EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(10), 2);
+}
+ 
+/**
+ * @tc.name: LazyForEachBuilderCleanCache001
+ * @tc.desc: Test CleanCache clearAllCache_ flag lifecycle (async keeps, sync resets, RestoreCache resets)
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachBuilderCleanCache001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachBuilder
+     * @tc.expected: Builder is created successfully
+     */
+    auto lazyForEachBuilder = CreateLazyForEachBuilder();
+    ASSERT_NE(lazyForEachBuilder, nullptr);
+ 
+    /**
+     * @tc.steps: step2. Call CleanCache with syncClean=false and clearAll=true
+     * @tc.expected: clearAllCache_ stays pending together with reduceCache_ for the deferred clean
+     */
+    lazyForEachBuilder->CleanCache(false, true);
+    EXPECT_TRUE(lazyForEachBuilder->clearAllCache_);
+    EXPECT_TRUE(lazyForEachBuilder->reduceCache_);
+ 
+    /**
+     * @tc.steps: step3. While the deferred clean is pending no idle cache is retained
+     * @tc.expected: ReduceCacheCount returns 0
+     */
+    EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(5), 0);
+ 
+    /**
+     * @tc.steps: step4. Call CleanCache with syncClean=true and clearAll=true
+     * @tc.expected: The clean runs and both flags are reset
+     */
+    lazyForEachBuilder->CleanCache(true, true);
+    EXPECT_FALSE(lazyForEachBuilder->clearAllCache_);
+    EXPECT_FALSE(lazyForEachBuilder->reduceCache_);
+ 
+    /**
+     * @tc.steps: step5. RestoreCache also cancels a pending clearAll clean
+     * @tc.expected: Both flags are reset
+     */
+    lazyForEachBuilder->CleanCache(false, true);
+    EXPECT_TRUE(lazyForEachBuilder->clearAllCache_);
+    lazyForEachBuilder->RestoreCache();
+    EXPECT_FALSE(lazyForEachBuilder->clearAllCache_);
+    EXPECT_FALSE(lazyForEachBuilder->reduceCache_);
+    EXPECT_EQ(lazyForEachBuilder->ReduceCacheCount(1), 1);
 }
 
 /**

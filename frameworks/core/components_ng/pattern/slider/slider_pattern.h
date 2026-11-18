@@ -184,6 +184,8 @@ public:
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void DumpInfo() override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+    void DumpSimplifyInfoOnlyForParamConfig(
+        std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
 
     void InitPrefixSuffixRow();
     void SetPrefix(const RefPtr<NG::UINode>& prefix, const NG::SliderPrefixOptions& options);
@@ -230,6 +232,7 @@ public:
     void UpdateSliderComponentString(const bool isShowTips, const std::string& value);
     Axis GetDirection() const;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool IsContentModifierNode(const RefPtr<FrameNode>& node);
     bool IsMaterialNode(const RefPtr<FrameNode>& node);
     bool IsPrefixOrSuffixNode(const RefPtr<FrameNode>& node);

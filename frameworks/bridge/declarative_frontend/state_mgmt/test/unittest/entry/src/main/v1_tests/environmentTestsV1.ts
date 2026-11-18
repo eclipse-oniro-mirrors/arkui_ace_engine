@@ -23,11 +23,11 @@ declare class AppStorage {
 }
 
 declare interface IEnvironmentBackend {
-  getAccessibilityEnabled(): boolean;
+  getAccessibilityEnabled(): string;
   getColorMode(): number;
   getFontScale(): number;
   getFontWeightScale(): number;
-  getLayoutDirection(): number;
+  getLayoutDirection(): string;
   getLanguageCode(): string;
   onValueChanged(callback: (key: string, value: any) => void): void;
 }
@@ -52,11 +52,11 @@ declare class Environment {
 }
 
 class MockEnvironmentBackend implements IEnvironmentBackend {
-  private accessibilityEnabled: boolean = false;
+  private accessibilityEnabled: string = 'false';
   private colorMode: number = 0;
   private fontScale: number = 1.0;
   private fontWeightScale: number = 1.0;
-  private layoutDirection: number = 0;
+  private layoutDirection: string = '0';
   private languageCode: string = 'en';
   private valueChangedCallback?: (key: string, value: any) => void;
 
@@ -69,16 +69,16 @@ class MockEnvironmentBackend implements IEnvironmentBackend {
     languageCode?: string;
   }) {
     if (config) {
-      this.accessibilityEnabled = config.accessibilityEnabled ?? this.accessibilityEnabled;
+      this.accessibilityEnabled = config.accessibilityEnabled !== undefined ? String(config.accessibilityEnabled) : this.accessibilityEnabled;
       this.colorMode = config.colorMode ?? this.colorMode;
       this.fontScale = config.fontScale ?? this.fontScale;
       this.fontWeightScale = config.fontWeightScale ?? this.fontWeightScale;
-      this.layoutDirection = config.layoutDirection ?? this.layoutDirection;
+      this.layoutDirection = config.layoutDirection !== undefined ? String(config.layoutDirection) : this.layoutDirection;
       this.languageCode = config.languageCode ?? this.languageCode;
     }
   }
 
-  getAccessibilityEnabled(): boolean {
+  getAccessibilityEnabled(): string {
     return this.accessibilityEnabled;
   }
 
@@ -94,7 +94,7 @@ class MockEnvironmentBackend implements IEnvironmentBackend {
     return this.fontWeightScale;
   }
 
-  getLayoutDirection(): number {
+  getLayoutDirection(): string {
     return this.layoutDirection;
   }
 
@@ -391,7 +391,7 @@ export class EnvironmentTestsV1 implements ITestFile {
 
   public testMockBackendDefaultAccessibility(): void {
     const backend = new MockEnvironmentBackend();
-    eq(backend.getAccessibilityEnabled(), false, 'default accessibility false');
+    eq(backend.getAccessibilityEnabled(), 'false', 'default accessibility false');
   }
 
   public testMockBackendDefaultColorMode(): void {
@@ -411,7 +411,7 @@ export class EnvironmentTestsV1 implements ITestFile {
 
   public testMockBackendDefaultLayoutDirection(): void {
     const backend = new MockEnvironmentBackend();
-    eq(backend.getLayoutDirection(), 0, 'default layoutDirection 0');
+    eq(backend.getLayoutDirection(), '0', 'default layoutDirection 0');
   }
 
   public testMockBackendDefaultLanguageCode(): void {
@@ -421,7 +421,7 @@ export class EnvironmentTestsV1 implements ITestFile {
 
   public testMockBackendCustomAccessibility(): void {
     const backend = new MockEnvironmentBackend({ accessibilityEnabled: true });
-    eq(backend.getAccessibilityEnabled(), true, 'custom accessibility true');
+    eq(backend.getAccessibilityEnabled(), 'true', 'custom accessibility true');
   }
 
   public testMockBackendCustomColorMode(): void {
@@ -441,7 +441,7 @@ export class EnvironmentTestsV1 implements ITestFile {
 
   public testMockBackendCustomLayoutDirection(): void {
     const backend = new MockEnvironmentBackend({ layoutDirection: 1 });
-    eq(backend.getLayoutDirection(), 1, 'custom layoutDirection 1');
+    eq(backend.getLayoutDirection(), '1', 'custom layoutDirection 1');
   }
 
   public testMockBackendCustomLanguageCode(): void {
@@ -458,18 +458,18 @@ export class EnvironmentTestsV1 implements ITestFile {
       layoutDirection: 1,
       languageCode: 'ja'
     });
-    eq(backend.getAccessibilityEnabled(), true, 'multi config accessibility');
+    eq(backend.getAccessibilityEnabled(), 'true', 'multi config accessibility');
     eq(backend.getColorMode(), 1, 'multi config colorMode');
     eq(backend.getFontScale(), 1.5, 'multi config fontScale');
     eq(backend.getFontWeightScale(), 1.2, 'multi config fontWeightScale');
-    eq(backend.getLayoutDirection(), 1, 'multi config layoutDirection');
+    eq(backend.getLayoutDirection(), '1', 'multi config layoutDirection');
     eq(backend.getLanguageCode(), 'ja', 'multi config languageCode');
   }
 
   public testMockBackendPartialConfig(): void {
     const backend = new MockEnvironmentBackend({ colorMode: 2 });
     eq(backend.getColorMode(), 2, 'partial config colorMode set');
-    eq(backend.getAccessibilityEnabled(), false, 'partial config accessibility default');
+    eq(backend.getAccessibilityEnabled(), 'false', 'partial config accessibility default');
     eq(backend.getFontScale(), 1.0, 'partial config fontScale default');
   }
 
@@ -675,7 +675,7 @@ export class EnvironmentTestsV1 implements ITestFile {
       fontScale: 2.0
     });
     Environment.configureBackend(backend);
-    eq(backend.getAccessibilityEnabled(), true, 'switch accessibility');
+    eq(backend.getAccessibilityEnabled(), 'true', 'switch accessibility');
     eq(backend.getColorMode(), 1, 'switch colorMode');
     eq(backend.getFontScale(), 2.0, 'switch fontScale');
   }

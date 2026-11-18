@@ -72,6 +72,7 @@ public:
     void SetOnReachStart(OnReachEvent&& onReachStart) override;
     void SetOnReachEnd(OnReachEvent&& onReachEnd) override;
     void SetSyncLoad(bool syncLoad) override;
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider) override;
     void SetEditModeOptions(EditModeOptions& editModeOptions) override;
     void SetEnableEditMode(bool enableEditMode) override;
     void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) override;
@@ -160,6 +161,7 @@ public:
 
     static void SetSyncLoad(FrameNode* frameNode, bool syncLoad);
     static bool GetSyncLoad(FrameNode* frameNode);
+    static void SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider);
     static void SetEditModeOptions(FrameNode* frameNode, EditModeOptions& editModeOptions);
     static EditModeOptions GetEditModeOptions(FrameNode* frameNode);
     static void SetEnableEditMode(FrameNode* frameNode, bool enableEditMode);

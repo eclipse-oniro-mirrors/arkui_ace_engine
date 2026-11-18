@@ -103,6 +103,12 @@ AccessibilityHoverTestPath AccessibilityProperty::HoverTest(
     return {};
 }
 
+AccessibilityHoverTestPath AccessibilityProperty::HoverTest(const PointF& point, const RefPtr<FrameNode>& root,
+    std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, const HoverTestStopPredicate& stopAtHost)
+{
+    return HoverTest(point, root, debugInfo);
+}
+
 std::unique_ptr<JsonValue> AccessibilityProperty::CreateNodeSearchInfo(
     const RefPtr<FrameNode>& node, const PointF& parentPoint, bool& ancestorGroupFlag)
 {
@@ -111,7 +117,7 @@ std::unique_ptr<JsonValue> AccessibilityProperty::CreateNodeSearchInfo(
 
 bool AccessibilityProperty::ProcessHoverTestRecursive(const PointF& noOffsetPoint, const RefPtr<FrameNode>& node,
     AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo,
-    RecursiveParam recursiveParam)
+    RecursiveParam recursiveParam, const HoverTestStopPredicate& stopAtHost)
 {
     return true;
 }
@@ -137,7 +143,8 @@ NG::RectF AccessibilityProperty::UpdateHoverTestRect(const RefPtr<FrameNode>& no
 }
 
 bool AccessibilityProperty::HoverTestRecursive(const PointF& parentPoint, const RefPtr<FrameNode>& node,
-    AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, bool& ancestorGroupFlag)
+    AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, bool& ancestorGroupFlag,
+    const HoverTestStopPredicate& stopAtHost)
 {
     return true;
 }

@@ -34,6 +34,7 @@
 #include "test/mock/frameworks/core/common/mock_theme_default.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/components_ng/pattern/mock_picker_haptic_impl.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
@@ -1219,7 +1220,7 @@ HWTEST_F(TextPickerColumnExtendTestNg, InnerHandleScrollTest001, TestSize.Level1
     textPickerPattern->OnModifyDone();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->GetParentLayout()->UpdateCanLoop(true);
     RangeContent tstContentOne = { "test1", "test1" };
@@ -1305,7 +1306,7 @@ HWTEST_F(TextPickerColumnExtendTestNg, OnAttachToMainTreeMultiThread001, TestSiz
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     columnPattern->OnAttachToMainTreeMultiThread();
@@ -1327,6 +1328,16 @@ HWTEST_F(TextPickerColumnExtendTestNg, OnDetachFromMainTreeMultiThread001, TestS
     ASSERT_NE(columnNode, nullptr);
     auto pipeline = columnNode->GetContext();
     ASSERT_NE(pipeline, nullptr);
+
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
+    EXPECT_CALL(*taskExecutor, PostTask(_, _, _, _))
+        .Times(testing::AtLeast(0))
+        .WillRepeatedly([](std::function<void()>&& task, TaskExecutor::TaskType,
+                     const std::string&, PriorityType) -> bool {
+            if (task) { task(); }
+            return true;
+        });
+    pipeline->taskExecutor_ = taskExecutor;
 
     columnPattern->hapticController_ = PickerAudioHapticFactory::GetInstance();
     EXPECT_NE(columnPattern->hapticController_, nullptr);

@@ -26,6 +26,10 @@ namespace OHOS::MMI {
 class PointerEvent;
 } // namespace OHOS::MMI
 
+namespace OHOS::Ace::NG {
+struct AgentInputResult;
+} // namespace OHOS::Ace::NG
+
 namespace OHOS::Ace {
 
 using HotKey = std::tuple<std::set<int32_t>, int32_t>;
@@ -48,6 +52,11 @@ public:
 
     static std::shared_ptr<MMI::PointerEvent> CreatePointerEvent(
         const std::shared_ptr<const MMI::PointerEvent>& pointerEvent);
+
+    static bool IsAgentEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent);
+
+    static bool HasControlComponentPermission();
+    static void ReportAgentInputDecision(const NG::AgentInputResult& result);
 
     static KeyboardType GetKeyboardType(int32_t deviceId);
 

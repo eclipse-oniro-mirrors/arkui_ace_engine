@@ -940,6 +940,12 @@ void ButtonPattern::OnAfterModifyDone()
     }
 }
 
+CommandResult ButtonPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(
+        command, { "onButtonClick" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t ButtonPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

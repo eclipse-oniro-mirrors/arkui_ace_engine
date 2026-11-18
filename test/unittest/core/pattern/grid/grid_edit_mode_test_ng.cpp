@@ -22,10 +22,17 @@
 
 #include "core/common/back_press_handler_manager.h"
 #include "core/components_ng/base/inspector_filter.h"
+#include "core/components_ng/event/gesture_info.h"
+#include "core/components_ng/gestures/base_gesture_event.h"
 #include "core/components_ng/pattern/grid/grid_model_ng.h"
 #include "core/components_ng/pattern/scrollable/selectable_item_pattern.h"
+#include "core/interfaces/native/node/node_api.h"
 
 namespace OHOS::Ace::NG {
+// Register callbacks through the production dynamic modifier implementation.
+void SetEnableEditModeChangeEvent(ArkUINodeHandle node, void* event);
+void SetOnGridEditModeChangeCallBack(ArkUINodeHandle node, void* event);
+
 namespace {
 const InspectorFilter filter;
 } // namespace
@@ -597,6 +604,61 @@ HWTEST_F(GridEditModeTestNg, EnableEditModeChangeEventViaModelNGStatic001, TestS
     GridModelNG::SetEnableEditMode(AceType::RawPtr(frameNode_), true);
     EXPECT_TRUE(callbackFired);
     EXPECT_TRUE(callbackValue);
+}
+
+/**
+ * @tc.name: TwoFingerSwipeSelectFiresBindingAndChangeEventViaModifier001
+ * @tc.desc: Test the real modifier preserves both edit-mode callbacks during two-finger swipe selection.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridEditModeTestNg, TwoFingerSwipeSelectFiresBindingAndChangeEventViaModifier001, TestSize.Level1)
+{
+    CreateGrid();
+    CreateFixedItems(5);
+
+    std::vector<bool> bindingValues;
+    std::vector<bool> changeValues;
+    std::function<void(bool)> bindingEvent = [&](bool value) { bindingValues.push_back(value); };
+    std::function<void(bool)> changeEvent = [&](bool value) { changeValues.push_back(value); };
+    auto node = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(frameNode_));
+    SetEnableEditModeChangeEvent(node, &bindingEvent);
+    SetOnGridEditModeChangeCallBack(node, &changeEvent);
+    EditModeOptions options;
+    options.enableFingerMultiSelect = true;
+    GridModelNG::SetEditModeOptions(AceType::RawPtr(frameNode_), options);
+    CreateDone();
+
+    ASSERT_FALSE(pattern_->GetEnableEditMode());
+    ASSERT_NE(pattern_->swipeSelectPanEvent_, nullptr);
+    auto gestureHub = frameNode_->GetOrCreateGestureEventHub();
+    ASSERT_NE(gestureHub, nullptr);
+    auto judgeCallback = gestureHub->gestureJudgeNativeFunc_;
+    ASSERT_NE(judgeCallback, nullptr);
+    auto gestureInfo = AceType::MakeRefPtr<GestureInfo>(GestureTypeName::BOXSELECT);
+    gestureInfo->SetInputEventType(InputEventType::TOUCH_SCREEN);
+    auto panEvent = std::make_shared<PanGestureEvent>();
+    panEvent->SetRawInputEventType(InputEventType::TOUCH_SCREEN);
+    FingerInfo firstFinger;
+    firstFinger.fingerId_ = 0;
+    FingerInfo secondFinger;
+    secondFinger.fingerId_ = 1;
+    panEvent->SetFingerList({ firstFinger, secondFinger });
+    ASSERT_EQ(judgeCallback(gestureInfo, panEvent), GestureJudgeResult::CONTINUE);
+
+    auto actionStart = pattern_->swipeSelectPanEvent_->GetActionStartEventFunc();
+    ASSERT_NE(actionStart, nullptr);
+    GestureEvent info;
+    info.SetFingerList(panEvent->GetFingerList());
+    actionStart(info);
+
+    EXPECT_TRUE(pattern_->GetEnableEditMode());
+    EXPECT_EQ(bindingValues, (std::vector<bool> { true }));
+    EXPECT_EQ(changeValues, (std::vector<bool> { true }));
+
+    pattern_->SetEnableEditMode(false);
+    EXPECT_FALSE(pattern_->GetEnableEditMode());
+    EXPECT_EQ(bindingValues, (std::vector<bool> { true, false }));
+    EXPECT_EQ(changeValues, (std::vector<bool> { true, false }));
 }
 
 // ============================================================

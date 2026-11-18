@@ -508,4 +508,119 @@ void ContainerPickerModel::SetChangeEvent(ContainerPickerChangeEvent&& onChange)
     CHECK_NULL_VOID(eventHub);
     eventHub->SetChangeEvent(std::move(onChange));
 }
+
+void ContainerPickerModel::SetSelectedTextStyle(const PickerTextStyle& style)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<ContainerPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetSelectedTextStyleVal(style);
+    pickerPattern->SetSelectedTextStyle(true);
+    auto layoutProperty = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (style.textColor.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedColor, style.textColor.value());
+    }
+    if (style.fontSize.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedFontSize, style.fontSize.value());
+    }
+    if (style.fontWeight.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedWeight, style.fontWeight.value());
+    }
+    if (style.fontFamily.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedFontFamily, style.fontFamily.value());
+    }
+    if (style.fontStyle.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedFontStyle, style.fontStyle.value());
+    }
+    if (style.minFontSize.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedMinFontSize, style.minFontSize.value());
+    }
+    if (style.maxFontSize.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedMaxFontSize, style.maxFontSize.value());
+    }
+    if (style.textOverflow.has_value()) {
+        ACE_UPDATE_LAYOUT_PROPERTY(ContainerPickerLayoutProperty, SelectedTextOverflow, style.textOverflow.value());
+    }
+}
+
+void ContainerPickerModel::ResetSelectedTextStyle()
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<ContainerPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetSelectedTextStyleVal(PickerTextStyle());
+    pickerPattern->SetSelectedTextStyle(false);
+    auto layoutProperty = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    layoutProperty->ResetSelectedTextStyle();
+    layoutProperty->ResetSelectedTextOverflow();
+}
+
+void ContainerPickerModel::SetSelectedTextStyle(FrameNode* frameNode, const PickerTextStyle& style)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<ContainerPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetSelectedTextStyleVal(style);
+    pickerPattern->SetSelectedTextStyle(true);
+    auto layoutProperty = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (style.textColor.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedColor, style.textColor.value(), frameNode);
+    }
+    if (style.fontSize.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedFontSize, style.fontSize.value(), frameNode);
+    }
+    if (style.fontWeight.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedWeight, style.fontWeight.value(), frameNode);
+    }
+    if (style.fontFamily.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedFontFamily, style.fontFamily.value(), frameNode);
+    }
+    if (style.fontStyle.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedFontStyle, style.fontStyle.value(), frameNode);
+    }
+    if (style.minFontSize.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedMinFontSize, style.minFontSize.value(), frameNode);
+    }
+    if (style.maxFontSize.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedMaxFontSize, style.maxFontSize.value(), frameNode);
+    }
+    if (style.textOverflow.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            ContainerPickerLayoutProperty, SelectedTextOverflow, style.textOverflow.value(), frameNode);
+    }
+}
+
+void ContainerPickerModel::ResetSelectedTextStyle(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<ContainerPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetSelectedTextStyleVal(PickerTextStyle());
+    pickerPattern->SetSelectedTextStyle(false);
+    auto layoutProperty = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    layoutProperty->ResetSelectedTextStyle();
+    layoutProperty->ResetSelectedTextOverflow();
+}
+
+PickerTextStyle ContainerPickerModel::GetSelectedTextStyle(FrameNode* frameNode)
+{
+    PickerTextStyle style;
+    CHECK_NULL_RETURN(frameNode, style);
+    auto pickerPattern = frameNode->GetPattern<ContainerPickerPattern>();
+    CHECK_NULL_RETURN(pickerPattern, style);
+    return pickerPattern->GetSelectedTextStyleVal();
+}
 } // namespace OHOS::Ace::NG

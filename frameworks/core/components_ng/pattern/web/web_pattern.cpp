@@ -16,14 +16,20 @@
 #include "core/components_ng/pattern/web/web_pattern.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 
+#include "napi/native_api.h"
+
 #include <securec.h>
 #include <algorithm>
-#include <cctype>
+#include <cinttypes>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 
+#include <atomic>
+#include <mutex>
+#include <set>
 #include <string>
 #include <string_view>
 #include <sstream>
@@ -36,6 +42,9 @@
 #include "image_source.h"
 #include "input_method_controller.h"
 #include "parameters.h"
+#include "wm/window.h"
+
+#include "adapter/ohos/entrance/ace_container.h"
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "auto_fill_type.h"
@@ -59,6 +68,8 @@
 #include "arkweb_utils.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "base/input_manager/input_manager.h"                                        
+#include "core/components_ng/base/node_sensitive_input.h"
 #include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/common/ace_engine_ext.h"
 #include "core/common/ai/image_analyzer_manager.h"
@@ -127,10 +138,12 @@
 #include "frameworks/core/components_ng/base/ui_node.h"
 #include "oh_window_pip.h"
 #include "oh_window_comm.h"
+#include "pointer_event.h"
 #include "web_accessibility_session_adapter.h"
 #include "web_statusbar_click.h"
 #include "web_pattern.h"
 #include "nweb_handler.h"
+#include "nweb_color_chooser.h"
 #include "web_util.h"
 #include "nweb_hisysevent.h"
 #include "core/interfaces/native/node/menu_item_modifier.h"
@@ -139,6 +152,90 @@
 #endif
 
 namespace OHOS::Ace::NG {
+// Session state shared between the HDS ColorPicker TS callbacks and the
+// WebPattern that opened the picker.
+//
+// Lifetime design — aligned with the existing Web choosers (date/time
+// picker, file chooser, select menu): the callback is STRONGLY owned by the
+// session (their lambdas / result wrappers), the pattern is only WEAKLY
+// referenced, and WebPattern keeps NO member copy:
+// - The TS callbacks (napi_create_function data) carry an OPAQUE SESSION ID,
+//   never a raw pointer, so a callback fired after the session is gone can
+//   never dereference freed memory.
+// - Sessions live in a process-wide registry (map id -> shared_ptr), guarded
+//   by a mutex. A callback looks up its id while holding the lock and copies
+//   the shared_ptr, keeping the session alive for its whole body even if
+//   another thread concurrently erases the entry. A lookup miss means the
+//   session is stale (closed/pattern destroyed) — the callback returns.
+// - Ids are monotonically increasing and never reused (no ABA).
+// - Removal follows one invariant: ERASE = CANCEL. Every created id is
+//   erased exactly once — by the onClose callback, by the open-failure
+//   path, by the next OpenHdsColorPicker (purges leftovers of the previous
+//   picker), or by ~WebPattern — and each erase Cancels the session's
+//   NWeb callback first so the chooser can never hang. No path leaks.
+struct HdsColorPickerSession {
+    WeakPtr<WebPattern> weakPattern;
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback;
+};
+
+namespace {
+std::mutex g_hdsColorPickerSessionMutex;
+std::atomic<uint64_t> g_hdsColorPickerNextSessionId { 1 };
+std::unordered_map<uint64_t, std::shared_ptr<HdsColorPickerSession>>& HdsColorPickerSessionMap()
+{
+    static std::unordered_map<uint64_t, std::shared_ptr<HdsColorPickerSession>> map;
+    return map;
+}
+
+uint64_t CreateHdsColorPickerSession(const WeakPtr<WebPattern>& weakPattern,
+    const std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback>& callback)
+{
+    auto session = std::make_shared<HdsColorPickerSession>();
+    session->weakPattern = weakPattern;
+    session->callback = callback;
+    uint64_t id = g_hdsColorPickerNextSessionId.fetch_add(1);
+    std::lock_guard<std::mutex> lock(g_hdsColorPickerSessionMutex);
+    HdsColorPickerSessionMap()[id] = session;
+    return id;
+}
+
+// Returns a copy of the shared_ptr (keeps the session alive for the caller's
+// whole callback body) or nullptr when the id is stale.
+std::shared_ptr<HdsColorPickerSession> FindHdsColorPickerSession(uint64_t id)
+{
+    std::lock_guard<std::mutex> lock(g_hdsColorPickerSessionMutex);
+    auto& map = HdsColorPickerSessionMap();
+    auto it = map.find(id);
+    return it == map.end() ? nullptr : it->second;
+}
+
+// ERASE = CANCEL: Cancels the session's NWeb callback (so a discarded
+// chooser never hangs) and removes the session from the registry.
+void EraseHdsColorPickerSession(uint64_t id)
+{
+    std::shared_ptr<HdsColorPickerSession> session;
+    {
+        std::lock_guard<std::mutex> lock(g_hdsColorPickerSessionMutex);
+        auto& map = HdsColorPickerSessionMap();
+        auto it = map.find(id);
+        if (it == map.end()) {
+            return;
+        }
+        session = it->second;
+        map.erase(it);
+    }
+    if (session->callback) {
+        session->callback->Cancel();
+    }
+}
+
+void EraseHdsColorPickerSessions(const std::set<uint64_t>& ids)
+{
+    for (uint64_t id : ids) {
+        EraseHdsColorPickerSession(id);
+    }
+}
+} // namespace
 namespace {
 constexpr std::string_view IMAGE_POINTER_CONTEXT_MENU_PATH = "etc/webview/ohos_nweb/context-menu.svg";
 constexpr std::string_view IMAGE_POINTER_ALIAS_PATH = "etc/webview/ohos_nweb/alias.svg";
@@ -172,7 +269,6 @@ constexpr int32_t MAXIMUM_ROTATION_DELAY_TIME = 800;
 // SerializeWebState serializes the web back-forward navigation history (access stack).
 // The official @ohos.web.webview API documentation recommends not restoring state > 512KB.
 constexpr size_t MAX_WEB_STATE_SIZE = 512 * 1024; // 512KB, per SDK restoreWebState recommendation
-constexpr size_t MAX_DATA_URI_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 constexpr int32_t RESERVED_DEVICEID1 = 0xAAAAAAFF;
 constexpr int32_t RESERVED_DEVICEID2 = 0xAAAAAAFE;
 constexpr int32_t LONG_PRESS_DURATION_MS = 650;
@@ -483,6 +579,57 @@ std::vector<std::string> SplitAllByString(const std::string &src, const std::str
     return result;
 }
 
+const std::string NWEB_SECURITY_LABEL_DENY = "agentDeny";
+void ConvertAgentIdentity(OHOS::MMI::InputEvent& source, int32_t& callingUid, uint64_t& sessionId)
+{
+    const auto injectorInfo = source.GetInjectorInfo();
+    callingUid = injectorInfo.has_value() ? injectorInfo->uid : -1;
+    // Controller injection carries the opaque SAF sessionin optionalData; zero is also valid.
+    sessionId = injectorInfo.has_value() ? injectorInfo->optionalData : 0;
+}
+
+// Validate ByRect params: x, y, width, height must all be present as numbers
+// and width > 0, height > 0.
+bool IsValidRectParams(const std::string& json)
+{
+    if (json.empty()) {
+        return false;
+    }
+    auto root = JsonUtil::ParseJsonString(json);
+    if (!root || !root->IsValid()) {
+        return false;
+    }
+    auto xVal = root->GetValue("x");
+    auto yVal = root->GetValue("y");
+    auto wVal = root->GetValue("width");
+    auto hVal = root->GetValue("height");
+    if (!xVal || !yVal || !wVal || !hVal) {
+        return false;
+    }
+    if (!xVal->IsNumber() || !yVal->IsNumber() ||
+        !wVal->IsNumber() || !hVal->IsNumber()) {
+        return false;
+    }
+    return wVal->GetDouble() > 0 && hVal->GetDouble() > 0;
+}
+ 
+// Validate ByPoint params: pointX, pointY must both be present as numbers.
+bool IsValidPointParams(const std::string& json)
+{
+    if (json.empty()) {
+        return false;
+    }
+    auto root = JsonUtil::ParseJsonString(json);
+    if (!root || !root->IsValid()) {
+        return false;
+    }
+    auto pxVal = root->GetValue("pointX");
+    auto pyVal = root->GetValue("pointY");
+    if (!pxVal || !pyVal) {
+        return false;
+    }
+    return pxVal->IsNumber() && pyVal->IsNumber();
+}
 } // namespace
 
 namespace SameLayerSurface {
@@ -761,6 +908,15 @@ WebPattern::~WebPattern()
 {
     TAG_LOGI(AceLogTag::ACE_WEB, "NWEB ~WebPattern start");
     ACE_SCOPED_TRACE("WebPattern::~WebPattern, web id = %d", GetWebId());
+    // Purge any remaining HDS picker sessions created by this pattern.
+    // Normally onClose or the next open already erased them; leftovers (HDS
+    // close never delivered, pattern destroyed mid-picker) go here. A late
+    // TS callback afterwards fails the registry lookup and returns safely —
+    // its data is an id, not a pointer. No leak on any path.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
     CleanupWebPatternResource();
     UninitTouchEventListener();
     if (setWebDetachCallback_) {
@@ -2712,6 +2868,74 @@ void WebPattern::SupplementMouseEventsIfNeeded(
     }
 }
 
+void WebPattern::JudgeSecurityHitTestForValidation(const int32_t& id, const double& x, const double& y,
+    bool fromOverlay, const TouchEventInfo& eventInfo)
+{
+    CHECK_NULL_VOID(delegate_);
+    int32_t callingUid = -1;
+    uint64_t sessionId = 0;
+    const auto pointerEvent = eventInfo.GetPointerEvent();
+    if (pointerEvent != nullptr) {
+        ConvertAgentIdentity(*pointerEvent, callingUid, sessionId);
+    }
+    SecurityHitTestInfo secInfo;
+    secInfo.id = id;
+    secInfo.x = x;
+    secInfo.y = y;
+    secInfo.from_overlay = fromOverlay;
+    secInfo.callingUid = callingUid;
+    secInfo.sessionId = sessionId;
+    delegate_->GetElementInfoForSecurityHitTest(secInfo);
+}
+
+bool WebPattern::ReportDecsionForSecurityHitTest(
+    int32_t callingUid, uint64_t sessionId, std::string& response)
+{
+    auto host = GetHost();
+    WebSecurityHitTestElementInfo resultInfo = ParseSecurityHitTestElementInfo(response);
+
+    NG::AgentInputResult result;
+    result.sessionId   = sessionId;
+    result.callingUid  = callingUid;
+    result.instanceId  = Container::CurrentId();
+    result.nodeId      = resultInfo.domNodeId;
+    result.compId      = resultInfo.elementId;
+    result.tag         = host ? host->GetTag() : "Web";
+    result.allowed     = !(resultInfo.securityLabel == NWEB_SECURITY_LABEL_DENY);
+    TAG_LOGD(AceLogTag::ACE_WEB,
+        "WebPattern::WebSecurityReportDecision report agent compId=%{public}s, decision=%{public}d",
+        result.compId.c_str(), result.allowed);
+    InputManager::ReportAgentInputDecision(result);
+    return result.allowed;
+}
+
+WebSecurityHitTestElementInfo WebPattern::ParseSecurityHitTestElementInfo(const std::string& responseJson)
+{
+    WebSecurityHitTestElementInfo result;
+    auto response = JsonUtil::ParseJsonString(responseJson);
+    if (!response || !response->IsObject()) {
+        TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::ParseSecurityHitTestElementInfo response not object");
+        return result;
+    }
+
+    auto domNodeId = response->GetValue("domNodeId");
+    auto securityLabel = response->GetValue("securityLabel");
+    auto pageUuid = response->GetValue("pageUuid");
+    auto xpath = response->GetValue("xpath");
+    auto elementId = response->GetValue("elementId");
+    if (!domNodeId || !domNodeId->IsNumber() || !securityLabel || !securityLabel->IsString() || !pageUuid ||
+        !pageUuid->IsString() || !xpath || !xpath->IsString() || !elementId || !elementId->IsString()) {
+        TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::ParseSecurityHitTestElementInfo securityLabel not object");
+        return result;
+    }
+    result.domNodeId = domNodeId->GetInt();
+    result.securityLabel = securityLabel->GetString();
+    result.pageUuid = pageUuid->GetString();
+    result.xpath = xpath->GetString();
+    result.elementId = elementId->GetString();
+    return result;
+}
+
 void WebPattern::ResetDragAction()
 {
     auto frameNode = GetHost();
@@ -2889,9 +3113,9 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         std::string fileUri;
         std::string fullName;
         if (!fileName.empty()) {
-            // Only build a data: URI when we know the exact dir Blink wrote to. When tempDir_ is
-            // empty the hardcoded fallback path may not match Blink's actual write location, so
-            // skip BuildImageDataUri (fullName stays empty) and rely on the file:// fallback below.
+            // Only build the file:// URI when we know the exact dir Blink wrote to. When tempDir_
+            // is empty the hardcoded fallback path may not match Blink's actual write location,
+            // so leave fullName empty and skip the HTML src rewrite below.
             if (!delegate_->tempDir_.empty()) {
                 fullName = delegate_->tempDir_ + "/dragdrop/" + fileName;
             }
@@ -2899,23 +3123,9 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         } else {
             TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event start, dragdata has no image file uri, just pass");
         }
-        // Embed the image as a data: URI in the HTML so the <img src> is self-contained.
-        // A file:// URI baked into HTML is not portable: it points into the source app's sandbox
-        // and is unreachable on a cross-device drop target (UDMF cannot transform URIs inside HTML
-        // text). The data: URI is decoded the same way on both same-device and cross-device targets.
-        // When fullName is unknown (tempDir_ empty) or BuildImageDataUri fails (file missing / too
-        // large), fall back to the file:// URI so the same-device behavior of the prior fix is
-        // preserved rather than silently dropping the rewrite.
-        if (!htmlContent.empty()) {
-            std::string dataUri;
-            if (!fullName.empty()) {
-                dataUri = BuildImageDataUri(fullName, fileName);
-            }
-            if (!dataUri.empty()) {
-                RewriteHtmlImgSrc(htmlContent, dataUri);
-            } else if (!fileUri.empty()) {
-                RewriteHtmlImgSrc(htmlContent, fileUri);
-            }
+        if (!fileUri.empty() && !fullName.empty() && !htmlContent.empty()) {
+            std::string htmlImgSrc = "file://" + fullName;
+            RewriteHtmlImgSrc(htmlContent, htmlImgSrc);
         }
         if (!plainContent.empty()) {
             isDragEndMenuShow_ = true;
@@ -2930,7 +3140,20 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
             UdmfClient::GetInstance()->AddLinkRecord(aceUnifiedData, linkUrl, linkTitle);
             TAG_LOGI(AceLogTag::ACE_WEB, "web DragDrop event Start, linkUrl size:%{public}zu", linkUrl.size());
         }
-        UdmfClient::GetInstance()->SetTagProperty(aceUnifiedData, "records_to_entries_data_format");
+        // The records_to_entries_data_format tag has two UDMF effects:
+        //  (1) Set-side: PreProcessUtils skips HTML <img src> URI authorization for tagged data
+        //      (URI_AUTHORIZATION_POLICIES forced to 0).
+        //  (2) Get-side: UdmfServiceImpl::TransferToEntriesIfNeed collapses N records into
+        //      1 record-with-entries when UnifiedData::IsNeedTransferToEntries (tag set AND
+        //      records > 1) and IsNeedTransferDeviceType (local device PC/PAD/2IN1 and the
+        //      receiver hap declares only the 2in1 device type) both hold.
+        // For image-file drags we NEED the HTML URI transform (effect 1 must be OFF), and the image
+        // is carried as a self-contained <img src>+file-uri pair that receivers handle per-record,
+        // so the records->entries merge (effect 2) is not required. Drop the tag only for image-file
+        // drags; keep it for text/link drags where the merge still matters.
+        if (fileName.empty()) {
+            UdmfClient::GetInstance()->SetTagProperty(aceUnifiedData, "records_to_entries_data_format");
+        }
         info->SetData(aceUnifiedData);
         HandleOnDragEnter(info);
         return dragDropInfo;
@@ -2979,79 +3202,6 @@ std::string WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifie
         return "";
     }
     return udmfUri;
-}
-
-std::string WebPattern::BuildImageDataUri(const std::string& fullName, const std::string& fileName)
-{
-    // Read back the temp file Blink wrote and embed it as a base64 data: URI so the HTML <img src>
-    // is self-contained and portable across devices. UDMF cannot transform URIs baked into HTML
-    // text, so a file:// URI here would be unreachable on a cross-device drop target.
-    std::ifstream file(fullName, std::ifstream::binary);
-    if (!file.is_open()) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri open failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    file.seekg(0, std::ios::end);
-    auto endPos = file.tellg();
-    // tellg() returns -1 on failure; casting that to size_t yields SIZE_MAX and the subsequent
-    // vector allocation would abort (OpenHarmony disables exceptions). Bail out and let the
-    // caller fall back to the file:// path.
-    if (endPos < 0 || file.fail()) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri tellg failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    auto size = static_cast<size_t>(endPos);
-    file.seekg(0, std::ios::beg);
-    if (size == 0) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri empty file, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    // Cap the inlined image to avoid OOM and UI-thread jank: the raw bytes, the base64 string
-    // (~1.33x) and the final HTML all live in memory at once. Beyond the threshold, fall back
-    // to file:// (same-device still works; cross-device stays at the prior behavior).
-    if (size > MAX_DATA_URI_FILE_SIZE) {
-        TAG_LOGW(AceLogTag::ACE_WEB,
-            "BuildImageDataUri skip, file too large:%{public}zu, max:%{public}zu, path:%{public}s",
-            size, MAX_DATA_URI_FILE_SIZE, fullName.c_str());
-        return "";
-    }
-    std::vector<uint8_t> buffer(size);
-    if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri read failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    // Map the file extension to a mime type. Blink's GetSafeFilenameForImageFileContents
-    // produces extensions matching the source image format (bmp/png/webp/jpeg/etc.).
-    std::string ext;
-    auto dotPos = fileName.rfind('.');
-    if (dotPos != std::string::npos) {
-        ext = fileName.substr(dotPos + 1);
-        // Cast through unsigned char before calling ::tolower — passing a negative char value
-        // (non-ASCII byte) directly to std::tolower is undefined behavior.
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    }
-    std::string mime = "image/png"; // fallback; PNG is a safe default for unknown extensions
-    if (ext == "bmp") {
-        mime = "image/bmp";
-    } else if (ext == "webp") {
-        mime = "image/webp";
-    } else if (ext == "jpg" || ext == "jpeg") {
-        mime = "image/jpeg";
-    } else if (ext == "gif") {
-        mime = "image/gif";
-    } else if (ext == "png") {
-        mime = "image/png";
-    }
-    std::string encoded = Base64Util::Encode(buffer.data(), size);
-    if (encoded.empty()) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri base64 encode failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    TAG_LOGI(AceLogTag::ACE_WEB,
-        "BuildImageDataUri mime:%{public}s, file size:%{public}zu, data uri size:%{public}zu",
-        mime.c_str(), size, encoded.size() + mime.size() + sizeof("data:;base64,") - 1);
-    return "data:" + mime + ";base64," + encoded;
 }
 
 void WebPattern::HandleOnDropMove(const RefPtr<OHOS::Ace::DragEvent>& info)
@@ -3801,17 +3951,15 @@ bool WebPattern::IsContextMenuShow()
 
 bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
 {
-    bool isEscKey = event.code == KeyCode::KEY_ESCAPE;
     bool isKeyDown = event.action == KeyAction::DOWN;
     bool isKeyUp = event.action == KeyAction::UP;
-    if (isEscKey && isKeyDown) {
+    if (isKeyDown && isUsed) {
         isEscKeyDownConsumed_ = isUsed;
+        return false;
     }
     bool shouldTriggerBack = false;
-    if (isEscKey && isKeyUp) {
-        if (!isEscKeyDownConsumed_ && !isUsed) {
-            shouldTriggerBack = true;
-        }
+    if (isKeyUp) {
+        shouldTriggerBack = !isEscKeyDownConsumed_ && !isUsed;
         isEscKeyDownConsumed_ = true;
     }
     return shouldTriggerBack;
@@ -4316,6 +4464,13 @@ void WebPattern::OnDomStorageAccessEnabledUpdate(bool value)
 {
     if (delegate_) {
         delegate_->UpdateDomStorageEnabled(value);
+    }
+}
+
+void WebPattern::OnVisitedLinkPersistEnabledUpdate(bool value)
+{
+    if (delegate_) {
+        delegate_->UpdateVisitedLinkPersistEnabled(value);
     }
 }
 
@@ -5031,6 +5186,7 @@ void WebPattern::OnModifyDone()
         }
         delegate_->UpdateZoomControlAccess(GetZoomControlAccessValue(true));
         delegate_->UpdateDomStorageEnabled(GetDomStorageAccessEnabledValue(false));
+        delegate_->UpdateVisitedLinkPersistEnabled(GetVisitedLinkPersistEnabledValue(false));
         delegate_->UpdateGeolocationEnabled(GetGeolocationAccessEnabledValue(true));
         delegate_->UpdateCacheMode(GetCacheModeValue(WebCacheMode::DEFAULT));
         if (webData_) {
@@ -5743,7 +5899,11 @@ void WebPattern::HandleTouchDown(const TouchEventInfo& info, bool fromOverlay)
                     touchPoint.height, static_cast<OHOS::NWeb::SourceTool>(touchPoint.sourceTool));
             delegate_->HandleStylusTouchDown(stylus_touch_point_info, fromOverlay);
         } else {
-            delegate_->HandleTouchDown(touchPoint.id, touchPoint.x, touchPoint.y, fromOverlay);
+            if (info.IsAgent()) {
+                JudgeSecurityHitTestForValidation(touchPoint.id, touchPoint.x, touchPoint.y, fromOverlay, info);
+            } else {
+                delegate_->HandleTouchDown(touchPoint.id, touchPoint.x, touchPoint.y, fromOverlay);
+            }
         }
         UpdateImageOverlayStatus(ImageOverlayEvent::TOUCH_PRESS);
         if (overlayCreating_) {
@@ -7759,7 +7919,7 @@ bool WebPattern::ShowDateTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChoo
     CHECK_NULL_RETURN(pipelineContext, false);
     auto executor = pipelineContext->GetTaskExecutor();
     CHECK_NULL_RETURN(executor, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
@@ -7812,7 +7972,7 @@ bool WebPattern::ShowTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser>
     CHECK_NULL_RETURN(executor, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
     CHECK_NULL_RETURN(theme, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     NG::TimePickerSettingData settingData;
@@ -7865,7 +8025,7 @@ bool WebPattern::ShowDateTimeSuggestionDialog(std::shared_ptr<OHOS::NWeb::NWebDa
     CHECK_NULL_RETURN(executor, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
     CHECK_NULL_RETURN(theme, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     NG::TextPickerSettingData settingData;
@@ -9211,8 +9371,20 @@ void WebPattern::JavaScriptOnDocumentEnd(const ScriptItems& scriptItems)
 void WebPattern::UpdateJavaScriptOnDocumentStart()
 {
     if (delegate_ && onDocumentStartScriptItems_.has_value() && !onDocumentStartScriptItemsByOrder_.has_value()) {
-        delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
+        // Save a persistent copy of public scripts for later re-merge.
+        publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
+        publicOnDocumentStartScriptRegexItems_.clear();
+        publicOnDocumentStartScriptItemsByOrder_.clear();
+        // When inner scripts exist, MergeAndInject writes the merged batch, so
+        // skip the redundant public-only write here.
+        if (!hasInnerOnDocumentStartScripts_) {
+            delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
+        }
         onDocumentStartScriptItems_ = std::nullopt;
+        // If inner scripts exist, re-inject the merged batch.
+        if (hasInnerOnDocumentStartScripts_) {
+            MergeAndInjectJavaScriptOnDocumentStart();
+        }
     }
 }
 
@@ -9220,12 +9392,152 @@ void WebPattern::UpdateJavaScriptOnDocumentStartByOrder()
 {
     if (delegate_ && onDocumentStartScriptItems_.has_value() && onDocumentStartScriptRegexItems_.has_value() &&
         onDocumentStartScriptItemsByOrder_.has_value()) {
-        delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
-            onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
-            onDocumentStartScriptItemsByOrder_.value());
+        // Save a persistent copy of public scripts before injection so that
+        // inner-only changes can re-merge later without losing public scripts.
+        publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
+        publicOnDocumentStartScriptRegexItems_ = onDocumentStartScriptRegexItems_.value();
+        publicOnDocumentStartScriptItemsByOrder_ = onDocumentStartScriptItemsByOrder_.value();
+        // When inner scripts exist, MergeAndInject writes the merged batch, so
+        // skip the redundant public-only write here.
+        if (!hasInnerOnDocumentStartScripts_) {
+            delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
+                onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
+                onDocumentStartScriptItemsByOrder_.value());
+        }
         onDocumentStartScriptItems_ = std::nullopt;
         onDocumentStartScriptRegexItems_ = std::nullopt;
         onDocumentStartScriptItemsByOrder_ = std::nullopt;
+        // If inner scripts exist, re-inject the merged batch to ensure both
+        // sets survive NWeb's replace semantics.
+        if (hasInnerOnDocumentStartScripts_) {
+            MergeAndInjectJavaScriptOnDocumentStart();
+        }
+    }
+}
+
+void WebPattern::RegisterSystemDocumentStartJS(const ScriptItems& scriptItems,
+    const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder)
+{
+    // EX-3: empty scriptItems is rejected, no registration occurs.
+    if (scriptItems.empty()) {
+        return;
+    }
+    // EX-4: full replace — system stores are cleared before writing.
+    systemDocumentStartScripts_ = scriptItems;
+    systemDocumentStartScriptRegexItems_ = scriptRegexItems;
+    systemDocumentStartScriptItemsByOrder_ = scriptItemsByOrder;
+    hasInnerOnDocumentStartScripts_ = true;
+    if (delegate_) {
+        MergeAndInjectJavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::RemoveSystemDocumentStartJS()
+{
+    // NWeb keeps the last submitted DocumentStart registration until a new batch
+    // replaces it. Remember whether system scripts had been submitted so that an
+    // empty batch can be forced to clear them even when no public scripts exist.
+    bool hadSystemScripts = !systemDocumentStartScripts_.empty();
+    systemDocumentStartScripts_.clear();
+    systemDocumentStartScriptRegexItems_.clear();
+    systemDocumentStartScriptItemsByOrder_.clear();
+    hasInnerOnDocumentStartScripts_ = false;
+    if (delegate_) {
+        MergeAndInjectJavaScriptOnDocumentStart(hadSystemScripts);
+    }
+}
+
+void WebPattern::MergeAndInjectJavaScriptOnDocumentStart(bool forceInject)
+{
+    if (!delegate_) {
+        return;
+    }
+    // Early return only when there is nothing to inject and no previously
+    // submitted system scripts need to be cleared from NWeb.
+    if (!forceInject && systemDocumentStartScripts_.empty() && publicOnDocumentStartScriptItems_.empty()) {
+        return;
+    }
+    // Use ByOrder path when app registered via ByOrder API OR when only system
+    // JS exists with ByOrder information (no public scripts at all).
+    bool appUsesByOrder = !publicOnDocumentStartScriptItemsByOrder_.empty();
+    bool onlySystemWithByOrder = publicOnDocumentStartScriptItems_.empty() &&
+        publicOnDocumentStartScriptItemsByOrder_.empty() &&
+        !systemDocumentStartScriptItemsByOrder_.empty();
+    bool useByOrderPath = appUsesByOrder || onlySystemWithByOrder;
+
+    if (useByOrderPath) {
+        ScriptItems mergedItems;
+        ScriptRegexItems mergedRegexItems;
+        ScriptItemsByOrder mergedByOrder;
+        MergeByOrderPath(mergedItems, mergedRegexItems, mergedByOrder);
+        delegate_->SetJavaScriptItemsByOrder(mergedItems, mergedRegexItems,
+            ScriptItemType::DOCUMENT_START, mergedByOrder);
+        delegate_->JavaScriptOnDocumentStartByOrder();
+    } else {
+        ScriptItems mergedItems = publicOnDocumentStartScriptItems_;
+        MergeNonByOrderPath(mergedItems);
+        delegate_->SetJavaScriptItems(mergedItems, ScriptItemType::DOCUMENT_START);
+        delegate_->JavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& mergedRegexItems,
+    ScriptItemsByOrder& mergedByOrder)
+{
+    // App JS inserted at the front, preserving original order. Insert-or-append
+    // to avoid overwriting when script keys collide.
+    for (const auto& [script, urlRules] : publicOnDocumentStartScriptItems_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
+    }
+    for (const auto& [script, regexList] : publicOnDocumentStartScriptRegexItems_) {
+        auto it = mergedRegexItems.find(script);
+        if (it == mergedRegexItems.end()) {
+            mergedRegexItems[script] = regexList;
+        } else {
+            it->second.insert(it->second.end(), regexList.begin(), regexList.end());
+        }
+    }
+    for (const auto& script : publicOnDocumentStartScriptItemsByOrder_) {
+        mergedByOrder.emplace_back(script);
+    }
+    // System JS appended after app JS.
+    for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
+    }
+    for (const auto& [script, regexList] : systemDocumentStartScriptRegexItems_) {
+        auto it = mergedRegexItems.find(script);
+        if (it == mergedRegexItems.end()) {
+            mergedRegexItems[script] = regexList;
+        } else {
+            it->second.insert(it->second.end(), regexList.begin(), regexList.end());
+        }
+    }
+    for (const auto& script : systemDocumentStartScriptItemsByOrder_) {
+        mergedByOrder.emplace_back(script);
+    }
+}
+
+void WebPattern::MergeNonByOrderPath(ScriptItems& mergedItems)
+{
+    // Non-ByOrder fallback (DD-3): merge system JS into ScriptItems.
+    // Regex rules and execution order are not preserved in this path (BR-4).
+    for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
     }
 }
 
@@ -9663,7 +9975,7 @@ void WebPattern::OnShowAutofillPopup(
             CHECK_NULL_VOID(webPattern);
             webPattern->SuggestionSelected(index);
         };
-        auto optionNode = AceType::DynamicCast<FrameNode>(option);
+        auto optionNode = option;
         if (optionNode) {
             CHECK_NULL_CONTINUE(menuItemModifier);
             if (!menuItemModifier->hasMenuItemEventHub(optionNode) ||
@@ -9720,7 +10032,7 @@ void WebPattern::OnShowAutofillPopupV2(
             CHECK_NULL_VOID(webPattern);
             webPattern->SuggestionSelected(index);
         };
-        auto optionNode = AceType::DynamicCast<FrameNode>(option);
+        auto optionNode = option;
         if (optionNode) {
             CHECK_NULL_CONTINUE(menuItemModifier);
             if (!menuItemModifier->hasMenuItemEventHub(optionNode) ||
@@ -10618,6 +10930,64 @@ int32_t WebPattern::OnInjectionEvent(const std::string &command)
     return static_cast<int>(WebCommandResult::FAILED);
 }
 
+namespace {
+CommandResult ConvertWebCommandResult(int32_t result)
+{
+    if (result == static_cast<int32_t>(WebCommandResult::SUCCESS)) {
+        return CommandResult::Success();
+    }
+    if (result == static_cast<int32_t>(WebCommandResult::JSON_INVALID_EVENT_TYPE) ||
+        result == static_cast<int32_t>(WebCommandResult::JSON_VALUE_ERROR_EVENT_TYPE)) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    if (result == static_cast<int32_t>(WebCommandResult::INPUT_TYPE_INVALID) ||
+        result == static_cast<int32_t>(WebCommandResult::INPUT_EVENT_TYPE_MISMATCH) ||
+        result == static_cast<int32_t>(WebCommandResult::SELECT_NOT_MULTIPLE) ||
+        result == static_cast<int32_t>(WebCommandResult::SELECT_OPTION_DISABLED)) {
+        return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+    }
+    if ((result >= static_cast<int32_t>(WebCommandResult::JSON_IS_INVALID) &&
+        result <= static_cast<int32_t>(WebCommandResult::JSON_INVALID_PARAM)) ||
+        result >= static_cast<int32_t>(WebCommandResult::JSON_INVALID_INPUT_XPATH)) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+}
+} // namespace
+
+CommandResult WebPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || (!json->IsObject() && !json->IsArray())) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    if (json->IsArray()) {
+        if (json->GetArraySize() == 0) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+        for (int32_t index = 0; index < json->GetArraySize(); ++index) {
+            auto item = json->GetArrayItem(index);
+            if (!item || !item->IsObject()) {
+                return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+            }
+            auto result = OnInjectionEventWithResult(item->ToString());
+            if (!result.success) {
+                return result;
+            }
+        }
+        return CommandResult::Success();
+    }
+    auto batchCommand = json->GetValue("command");
+    if (!batchCommand || !batchCommand->IsString() || batchCommand->GetString() != "inputAutoFill") {
+        auto type = json->GetValue("event_type");
+        if (!type || !type->IsString()) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+    }
+    const int32_t result = OnInjectionEvent(command);
+    return ConvertWebCommandResult(result);
+}
+
 int WebPattern::SendCommandToNWeb(std::unique_ptr<JsonValue> comJson)
 {
     if (WebUtil::HasJSONDuplicateKeys(comJson->ToString())) {
@@ -11135,14 +11505,24 @@ void WebPattern::RunJsInit()
         return;
     }
     if (!isRegisterJsObject_) {
-        isRegisterJsObject_ = true;
-        RegisterTranslateTextJavaScript();
-        return;
+         isRegisterJsObject_ = true;
+         TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId: %{public}d", GetWebId());
+         // Register translate script as system DocumentStart JS so it executes
+         // at DocumentStart stage (before page load). The rule "*" matches all pages.
+         // ScriptItems: key = script content, value = URL match rules.
+         // ScriptItemsByOrder: script contents in execution order.
+         ScriptItems sysScriptItems;
+         sysScriptItems.insert(std::make_pair(g_translateTextData.translateScript, std::vector<std::string>{ "*" }));
+         sysScriptItems.insert(std::make_pair(g_translateTextData.initScript, std::vector<std::string>{ "*" }));
+         ScriptRegexItems sysRegexItems;
+         ScriptItemsByOrder sysByOrder;
+         sysByOrder.emplace_back(g_translateTextData.translateScript);
+         sysByOrder.emplace_back(g_translateTextData.initScript);
+         RegisterSystemDocumentStartJS(sysScriptItems, sysRegexItems, sysByOrder);
+         // Registers the JS Bridge with isNeedRefresh=true, which internally calls
+         // nweb->Reload() so the reloaded page picks up the system DocumentStart JS.
+         RegisterTranslateTextJavaScript();
     }
-    TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId:%{public}d", GetWebId());
-    CHECK_NULL_VOID(delegate_);
-    delegate_->ExecuteTypeScript(g_translateTextData.translateScript, [](std::string result) {});
-    delegate_->ExecuteTypeScript(g_translateTextData.initScript, [](std::string result) {});
 }
 
 void WebPattern::GetTranslateText(std::string extraData, std::function<void(std::string)> callback, bool isContinued)
@@ -11213,7 +11593,51 @@ void WebPattern::GetWebInfoByRequest(uint32_t windowId, int32_t webId, const std
             }, static_cast<int32_t>(OHOS::NWeb::NWebDomExtractionMode::VIEWPORT_ONLY));
         return;
     }
-    return;
+    if (HandleNativeDomTreeRequest(windowId, webId, request, finishCallback)) {
+        return;
+    }
+    TAG_LOGE(AceLogTag::ACE_WEB, "WebPattern GetWebInfoByRequest unknown request:%{public}s WebId:%{public}d",
+        request.c_str(), webId);
+    finishCallback(windowId, webId, request, "", WebRequestErrorCode::INVALID_REQUEST);
+}
+
+bool WebPattern::HandleNativeDomTreeRequest(uint32_t windowId, int32_t webId, const std::string& request,
+    const std::function<void(int32_t, int32_t, const std::string&, const std::string&, WebRequestErrorCode)>& finishCallback)
+{
+    std::string rectJson;
+    auto colonPos = request.find(':');
+    if (colonPos != std::string::npos) {
+        rectJson = request.substr(colonPos + 1);
+    }
+    bool isByNative = request == WEB_INTERFACE_REQUEST_DOM_TREE_BY_NATIVE;
+    bool isByRect = request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_RECT, 0) == 0;
+    bool isByPoint = request.rfind(WEB_INTERFACE_REQUEST_DOM_TREE_BY_POINT, 0) == 0;
+    if (!isByNative && !isByRect && !isByPoint) {
+        return false;
+    }
+    if ((isByRect && !IsValidRectParams(rectJson)) || (isByPoint && !IsValidPointParams(rectJson))) {
+        TAG_LOGE(AceLogTag::ACE_WEB,
+            "WebPattern NativeDomTree invalid params, request:%{public}s returning empty", request.c_str());
+        finishCallback(windowId, webId, request, "[]", WebRequestErrorCode::INVALID_REQUEST);
+        return true;
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern NativeDomTree dispatch WebId:%{public}d request:%{public}s",
+        webId, request.c_str());
+    auto offset = GetCoordinatePoint().value_or(OffsetF());
+    auto startTime = GetCurrentTimestamp();
+    auto nativeCallback = [weak = AceType::WeakClaim(this), windowId, webId, request, finishCallback, startTime](
+        const std::string& result) {
+        auto pattern = weak.Upgrade();
+        auto code = result.empty() ? WebRequestErrorCode::INVALID_REQUEST : WebRequestErrorCode::OK;
+        auto elapsedMs = GetCurrentTimestamp() - startTime;
+        TAG_LOGI(AceLogTag::ACE_WEB,
+            "WebPattern NativeDomTree callback WebId:%{public}d request:%{public}s elapsed:%{public}lldms "
+            "resultSize:%{public}zu code:%{public}d",
+            webId, request.c_str(), static_cast<long long>(elapsedMs), result.size(), static_cast<int32_t>(code));
+        finishCallback(windowId, webId, request, result, code);
+    };
+    delegate_->RequestNativeDomTree(nativeCallback, offset, rectJson);
+    return true;
 }
 
 void WebPattern::SendTranslateResult(std::vector<std::string> results, std::vector<int32_t> ids)
@@ -11245,6 +11669,9 @@ void WebPattern::EndTranslate()
         CHECK_NULL_VOID(webPattern);
         if (webPattern->isRegisterJsObject_) {
             CHECK_NULL_VOID(webPattern->delegate_);
+            // Remove system DocumentStart JS before reload so the reloaded
+            // page does not re-inject the translate script at DocumentStart.
+            webPattern->RemoveSystemDocumentStartJS();
             std::string p = g_translateTextData.registerObjectName;
             TAG_LOGI(AceLogTag::ACE_WEB, "UnRegister TranslateText JsObject %{public}s", p.c_str());
             webPattern->delegate_->UnRegisterNativeArkJSFunction(std::move(p));
@@ -11263,7 +11690,14 @@ void WebPattern::ExecuteReportOnRegisterMatch(int32_t processId)
 
 void WebPattern::GetPageSceneForWeb(int32_t processId, const std::string& ruleJson)
 {
-    CHECK_NULL_VOID(delegate_);
+    // The caller (TraverseAndMatchAllWeb) has already accounted for this listener in
+    // InitGetRemaining's count. If the delegate is null we cannot run the query, so we
+    // must decrement here to keep the listener/decrement contract balanced, otherwise
+    // the global remaining counter would never reach zero and the round would leak.
+    if (!delegate_) {
+        WebPageSceneManager::GetInstance().DecrementGetRemaining(processId);
+        return;
+    }
     delegate_->GetPageSceneForWeb(processId, ruleJson);
 }
 
@@ -12250,6 +12684,432 @@ void WebPattern::RemoveOfflineWebWindowStateChangedCallbackIfNeed(const RefPtr<P
         pipeline->RemoveWindowStateChangedCallback(nodeId);
         offlineWebPipelineContext_ = AceType::WeakClaim(AceType::RawPtr(context));
     }
+}
+
+void WebPattern::OnColorChooserPopup(const std::string& color,
+    const std::vector<OHOS::NWeb::NWebColorSuggestion>& suggestions,
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback)
+{
+    // Single-popup enforcement: purging the previous session CANCELS its
+    // callback (erase = cancel invariant), so a second popup cannot leave
+    // the first chooser hanging.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+    // Call the HDS ColorPicker directly via NAPI on the app's own ArkTS
+    // runtime. If HDS is unavailable (no HSP / no wrapper abc), this fails
+    // gracefully and cancels the callback below — no popup, no hang.
+    bool callbackHandled = false;
+    if (!OpenHdsColorPicker(color, callback, callbackHandled)) {
+        // No path available — cancel so the chooser doesn't hang.
+        if (!callbackHandled && callback) {
+            callback->Cancel();
+        }
+    }
+}
+
+void WebPattern::OnColorChooserClose()
+{
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::OnColorChooserClose");
+    // Erase = cancel: ends any live session and Cancels its NWeb callback.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+    CloseHdsColorPicker();
+}
+
+bool WebPattern::OpenHdsColorPicker(const std::string& color,
+    std::shared_ptr<OHOS::NWeb::NWebColorChooserCallback> callback, bool& callbackHandled)
+{
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::OpenHdsColorPicker color:%{public}s", color.c_str());
+    // Close any previously open HDS picker UI. NOTE: do NOT call
+    // CancelHdsColorPicker here — the caller (OnColorChooserPopup) has
+    // purged the previous sessions; CancelHdsColorPicker would only close
+    // the UI, which we do right below anyway.
+    CloseHdsColorPicker();
+    // Purge any leftover sessions from a PREVIOUS picker of this pattern.
+    // Normally onClose already erased them; leftovers (open-failure, HDS
+    // close never delivered) are removed here so nothing accumulates.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+
+    auto env = CreateEnv();
+    if (!env) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: no ark runtime");
+        return false;
+    }
+
+    // The real UIContext from the app's frontend — HdsColorPicker's
+    // openColorPicker(uiContext, ...) requires it to attach its UI.
+    auto engine = EngineHelper::GetCurrentEngine();
+    napi_value uiContext = engine ? engine->GetContextValue() : nullptr;
+    if (!uiContext) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: no UIContext");
+        return false;
+    }
+
+    napi_handle_scope scope = nullptr;
+    if (napi_open_handle_scope(env, &scope) != napi_ok || !scope) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: open scope failed");
+        return false;
+    }
+    // Session created lazily; its registry id is erased by the open-failure
+    // path so every created id is removed exactly once.
+    uint64_t sessionId = 0;
+    auto failGracefully = [this, env, scope, &sessionId, &callbackHandled]() {
+        if (sessionId != 0) {
+            EraseHdsColorPickerSession(sessionId);
+            hdsColorPickerSessionIds_.erase(sessionId);
+            sessionId = 0;
+            callbackHandled = true;
+        }
+        napi_close_handle_scope(env, scope);
+    };
+
+    // 1. Load the TS wrapper (hds_color_picker_wrapper.ets, compiled to abc)
+    //    into the app VM, then call its global entry. The wrapper owns the
+    //    HDS ColorPickerController — C++ only sees __openHdsColorPicker__ /
+    //    __closeHdsColorPicker__, never the HDS module itself.
+    constexpr char HDS_WRAPPER_ABC_PATH[] = "/system/etc/abc/arkui/hds_color_picker_wrapper.abc";
+    napi_status status = napi_generic_failure;
+    {
+        napi_value global = nullptr;
+        napi_get_global(env, &global);
+        napi_value openFn = nullptr;
+        if (global) {
+            napi_get_named_property(env, global, "__openHdsColorPicker__", &openFn);
+        }
+        napi_valuetype openFnType = napi_undefined;
+        if (openFn) {
+            napi_typeof(env, openFn, &openFnType);
+        }
+        if (openFnType != napi_function) {
+            // Wrapper not loaded yet — execute its abc once (idempotent:
+            // globalThis assignment), then re-fetch the entry.
+            auto engine = EngineHelper::GetCurrentEngine();
+            if (!engine) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: no engine for wrapper load");
+                failGracefully();
+                return false;
+            }
+            std::ifstream readFile(HDS_WRAPPER_ABC_PATH, std::ifstream::binary);
+            if (!readFile.is_open()) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: wrapper abc not found: %{public}s",
+                    HDS_WRAPPER_ABC_PATH);
+                failGracefully();
+                return false;
+            }
+            readFile.seekg(0, std::ios::end);
+            auto fileSize = readFile.tellg();
+            if (fileSize <= 0 || fileSize > INT32_MAX) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: invalid wrapper abc size");
+                failGracefully();
+                return false;
+            }
+            int32_t binarySize = static_cast<int32_t>(fileSize);
+            readFile.seekg(0, std::ios::beg);
+            std::vector<uint8_t> buffer(binarySize);
+            if (!readFile.read(reinterpret_cast<char*>(buffer.data()), binarySize)) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: read wrapper abc failed");
+                failGracefully();
+                return false;
+            }
+            if (!engine->ExecuteJs(buffer.data(), binarySize)) {
+                TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: execute wrapper abc failed");
+                failGracefully();
+                return false;
+            }
+            TAG_LOGI(AceLogTag::ACE_WEB, "OpenHdsColorPicker: wrapper abc loaded");
+            if (global) {
+                napi_get_named_property(env, global, "__openHdsColorPicker__", &openFn);
+                openFnType = napi_undefined;
+                if (openFn) {
+                    napi_typeof(env, openFn, &openFnType);
+                }
+            }
+        }
+        if (openFnType != napi_function) {
+            TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: __openHdsColorPicker__ unavailable");
+            failGracefully();
+            return false;
+        }
+
+    // 2. Session-bound callbacks bridging back to NWeb: onSelected ->
+    //    session->callback->Continue("#rrggbb"); onClose -> erase (which
+    //    Cancels the callback) and end the session. The functions' data is the OPAQUE session id
+    //    (not a pointer), so a late callback can never touch freed memory;
+    //    it just fails the registry lookup and returns.
+    sessionId = CreateHdsColorPickerSession(WeakClaim(this), callback);
+    hdsColorPickerSessionIds_.insert(sessionId);
+
+    napi_value onSelectedFn = nullptr;
+    napi_create_function(env, "onSelected", NAPI_AUTO_LENGTH,
+        &WebPattern::OnHdsColorSelected,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(sessionId)), &onSelectedFn);
+    napi_value onCloseFn = nullptr;
+    napi_create_function(env, "onClose", NAPI_AUTO_LENGTH,
+        &WebPattern::OnHdsColorPickerClose,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(sessionId)), &onCloseFn);
+
+    // 3. Call __openHdsColorPicker__(uiContext, initialColor, onSelected, onClose).
+    // HDS expects "#AARRGGBB" ('#000000' → '#FF000000'); NWeb delivers
+    // "#rrggbb" here. Promote to "#FF" + rrgbb so openColorPicker accepts
+    // the initial color.
+    napi_value jsColor = nullptr;
+    std::string colorHex;
+    if (color.size() == 7 && color[0] == '#') {
+        colorHex = "#FF" + color.substr(1);
+    } else if (color.size() == 9 && color[0] == '#') {
+        colorHex = color;
+    } else {
+        colorHex = "#FF000000";
+    }
+    napi_create_string_utf8(env, colorHex.c_str(), colorHex.size(), &jsColor);
+    napi_value args[4] = { uiContext, jsColor, onSelectedFn, onCloseFn };
+    napi_value result = nullptr;
+    status = napi_call_function(env, global, openFn, 4, args, &result);
+    if (status != napi_ok) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OpenHdsColorPicker: call __openHdsColorPicker__ failed, status:%{public}d",
+            static_cast<int>(status));
+        failGracefully();
+        return false;
+    }
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OpenHdsColorPicker: __openHdsColorPicker__ called");
+    hdsColorPickerOpen_.store(true);
+    napi_close_handle_scope(env, scope);
+    return true;
+}
+
+void WebPattern::CloseHdsColorPicker()
+{
+    if (!hdsColorPickerOpen_.load()) {
+        return;
+    }
+    auto env = CreateEnv();
+    if (!env) {
+        return;
+    }
+    napi_handle_scope scope = nullptr;
+    if (napi_open_handle_scope(env, &scope) != napi_ok || !scope) {
+        return;
+    }
+    napi_value global = nullptr;
+    napi_get_global(env, &global);
+    napi_value closeFn = nullptr;
+    if (global) {
+        napi_get_named_property(env, global, "__closeHdsColorPicker__", &closeFn);
+    }
+    napi_valuetype closeFnType = napi_undefined;
+    if (closeFn) {
+        napi_typeof(env, closeFn, &closeFnType);
+    }
+    if (closeFnType == napi_function) {
+        napi_value closeResult = nullptr;
+        napi_call_function(env, global, closeFn, 0, nullptr, &closeResult);
+        TAG_LOGI(AceLogTag::ACE_WEB, "CloseHdsColorPicker: __closeHdsColorPicker__ called");
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WEB, "CloseHdsColorPicker: __closeHdsColorPicker__ unavailable");
+    }
+    hdsColorPickerOpen_.store(false);
+    napi_close_handle_scope(env, scope);
+}
+
+void WebPattern::CancelHdsColorPicker()
+{
+    CloseHdsColorPicker();
+    // Erase = cancel: ends any live session and Cancels its NWeb callback.
+    if (!hdsColorPickerSessionIds_.empty()) {
+        EraseHdsColorPickerSessions(hdsColorPickerSessionIds_);
+        hdsColorPickerSessionIds_.clear();
+    }
+}
+
+napi_value WebPattern::OnHdsColorSelected(napi_env env, napi_callback_info info)
+{
+    void* data = nullptr;
+    napi_get_cb_info(env, info, nullptr, nullptr, nullptr, &data);
+    // |data| is an opaque session id, never a pointer — a session that was
+    // closed/removed simply fails the lookup below and returns safely.
+    uint64_t sessionId = reinterpret_cast<uintptr_t>(data);
+    if (sessionId == 0) {
+        return nullptr;
+    }
+    // Copy of the shared_ptr keeps the session alive for this whole callback
+    // body, even if onClose/concurrent removal erases the registry entry.
+    auto session = FindHdsColorPickerSession(sessionId);
+    if (!session) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: stale session %{public}" PRIu64 ", drop late color",
+            sessionId);
+        return nullptr;
+    }
+    auto pattern = session->weakPattern.Upgrade();
+    if (!pattern) {
+        // Session outlived its pattern (should not happen — dtor erases the
+        // ids); clean up so the id is not left in the registry.
+        EraseHdsColorPickerSession(sessionId);
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: pattern gone");
+        return nullptr;
+    }
+    size_t argc = 1;
+    napi_value argv[1] = { nullptr };
+    napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+    if (argc < 1 || !argv[0]) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: no color argument");
+        return nullptr;
+    }
+    size_t len = 0;
+    napi_get_value_string_utf8(env, argv[0], nullptr, 0, &len);
+    if (len == 0 || len > 16) { // "#AARRGGBB" at most
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: invalid color length %{public}zu", len);
+        return nullptr;
+    }
+    std::string chosen(len, '\0');
+    napi_get_value_string_utf8(env, argv[0], chosen.data(), len + 1, &len);
+    // HDS returns "#AARRGGBB"; the NWeb callback expects "#rrggbb" with
+    // the leading '#'. Strip the alpha channel and keep/re-add the '#'.
+    std::string rgb = chosen;
+    if (rgb.size() == 9 && rgb[0] == '#') {
+        rgb = "#" + rgb.substr(3);
+    } else if (rgb.size() == 8) { // "AARRGGBB" without '#'
+        rgb = "#" + rgb.substr(2);
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OnHdsColorSelected: chosen=%{public}s rgb=%{public}s hasCallback=%{public}d",
+        chosen.c_str(), rgb.c_str(), session->callback ? 1 : 0);
+    if (session->callback) {
+        // Continue is an intermediate update (real-time write-back for each
+        // selection) and may fire multiple times per session — do NOT end
+        // the session here. It ends in OnHdsColorPickerClose (onClose from
+        // HDS), whose erase cancels this callback.
+        session->callback->Continue(rgb);
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorSelected: no callback, color dropped");
+    }
+    return nullptr;
+}
+
+napi_value WebPattern::OnHdsColorPickerClose(napi_env env, napi_callback_info info)
+{
+    void* data = nullptr;
+    napi_get_cb_info(env, info, nullptr, nullptr, nullptr, &data);
+    uint64_t sessionId = reinterpret_cast<uintptr_t>(data);
+    if (sessionId == 0) {
+        return nullptr;
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::OnHdsColorPickerClose session:%{public}" PRIu64, sessionId);
+    auto session = FindHdsColorPickerSession(sessionId);
+    if (!session) {
+        // Stale close (session already removed by open-failure/next-open
+        // purge/dtor). Nothing to cancel — safe to return.
+        TAG_LOGW(AceLogTag::ACE_WEB, "OnHdsColorPickerClose: stale session, ignore");
+        return nullptr;
+    }
+    auto pattern = session->weakPattern.Upgrade();
+    // End the session: erase CANCELS the NWeb callback (erase = cancel),
+    // and a late onColorSelected (close-during-choose) then fails the
+    // lookup and returns harmlessly. Any in-flight onColorSelected that
+    // already holds a shared_ptr copy is unaffected (shared ownership).
+    EraseHdsColorPickerSession(sessionId);
+    if (pattern) {
+        // HDS closed itself; clear the open flag so a later
+        // CloseHdsColorPicker does not call __closeHdsColorPicker__ again.
+        pattern->hdsColorPickerOpen_.store(false);
+    }
+    return nullptr;
+}
+
+bool WebPattern::HandleWindowRectGet(int32_t& x, int32_t& y, uint32_t& w, uint32_t& h)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[getWindowBounds] window is null");
+        return false;
+    }
+    OHOS::Rosen::Rect rect = window->GetRect();
+    x = rect.posX_;
+    y = rect.posY_;
+    w = rect.width_;
+    h = rect.height_;
+    return true;
+}
+
+bool WebPattern::HandleWindowRectSet(int32_t x, int32_t y, uint32_t w, uint32_t h)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] window is null");
+        return false;
+    }
+    if (window->GetWindowMode() != Rosen::WindowMode::WINDOW_MODE_FLOATING) {
+        window->Recover();
+        windowState_ = "normal";
+    }
+    OHOS::Rosen::WMError moveRet = window->MoveTo(x, y);
+    if (moveRet != OHOS::Rosen::WMError::WM_OK) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] MoveTo failed, ret:%{public}d", static_cast<int>(moveRet));
+        return false;
+    }
+    std::string errMsg;
+    auto ret = window->Resize(w, h, errMsg);
+    if (ret != OHOS::Rosen::WMError::WM_OK) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] Resize failed, ret:%{public}d, msg:%{public}s, mode:%{public}d",
+            static_cast<int>(ret), errMsg.c_str(), static_cast<int>(window->GetWindowMode()));
+    }
+    return ret == OHOS::Rosen::WMError::WM_OK;
+}
+
+bool WebPattern::HandleWindowStateGet(std::string& state)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[getWindowBounds] state get failed, window is null");
+        return false;
+    }
+    if (window->IsFullScreen()) {
+        state = "fullscreen";
+        return true;
+    }
+    // Rosen::Window 仅暴露 IsFullScreen()，不暴露 minimized/maximized 状态，
+    // 回读以最近一次设置意图为准；若此前设置的 fullscreen 已被系统退出则回落 normal。
+    state = (windowState_ == "fullscreen") ? std::string("normal") : windowState_;
+    return true;
+}
+
+bool WebPattern::HandleWindowStateSet(const std::string& state)
+{
+    auto window = Platform::AceContainer::GetUIWindow(instanceId_);
+    if (!window) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] window is null");
+        return false;
+    }
+    OHOS::Rosen::WMError ret = OHOS::Rosen::WMError::WM_DO_NOTHING;
+    if (state == "normal") {
+        if (windowState_ == "minimized") {
+            ret = window->Restore();
+        } else {
+            ret = window->IsFullScreen() ? window->SetFullScreen(false) : window->Recover();
+        }
+    } else if (state == "minimized") {
+        ret = window->Minimize();
+    } else if (state == "maximized") {
+        ret = window->Maximize();
+    } else if (state == "fullscreen") {
+        ret = window->SetFullScreen(true);
+    } else {
+        TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] invalid state:%{public}s", state.c_str());
+        return false;
+    }
+    if (ret == OHOS::Rosen::WMError::WM_OK || ret == OHOS::Rosen::WMError::WM_ERROR_REPEAT_OPERATION) {
+        windowState_ = state;
+        return true;
+    }
+    TAG_LOGW(AceLogTag::ACE_WEB, "[setWindowBounds] state:%{public}s failed, ret:%{public}d",
+        state.c_str(), static_cast<int>(ret));
+    return false;
 }
 
 } // namespace OHOS::Ace::NG

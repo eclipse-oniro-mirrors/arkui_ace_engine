@@ -20,6 +20,7 @@
 
 #include "interfaces/inner_api/ace/ai/data_detector_interface.h"
 #define private public // NOLINT
+#define protected public // NOLINT
 #include "core/components/web/resource/web_delegate.h"
 #include "core/components/web/web_event.h"
 #include "core/components_ng/base/view_stack_processor.h"
@@ -27,6 +28,8 @@
 #include "core/components_ng/pattern/text/base_text_select_overlay.h"
 #include "core/components_ng/pattern/web/web_context_menu_overlay.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
+#include "test/unittest/core/pattern/web/mock_web_delegate.h"
+#undef protected
 #undef private
 #include "core/components_v2/inspector/inspector_constants.h"
 

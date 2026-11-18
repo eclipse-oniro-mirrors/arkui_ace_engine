@@ -28,14 +28,14 @@ void WaterFlowSections::ChangeData(
     deleteCount = std::min(deleteCount, sections_.size() - start);
     prevSections_ = sections_;
 
-    TAG_LOGI(AceLogTag::ACE_WATERFLOW,
+    TAG_LOGD(AceLogTag::ACE_WATERFLOW,
         "section changed, start:%{public}zu, deleteCount:%{public}zu, newSections:%{public}zu", start, deleteCount,
         newSections.size());
     NotifySectionChange(start, deleteCount, newSections);
 
     if (start < sections_.size()) {
         auto it = sections_.begin() + static_cast<int32_t>(start);
-        sections_.erase(it, it + static_cast<int32_t>(deleteCount));
+        it = sections_.erase(it, it + static_cast<int32_t>(deleteCount));
         sections_.insert(it, newSections.begin(), newSections.end());
     } else {
         sections_.insert(sections_.end(), newSections.begin(), newSections.end());

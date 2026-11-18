@@ -18,6 +18,7 @@
 #include "ui_event_injection.h"
 #include "ui_json_wrapper.h"
 
+#include "core/interfaces/native/node/relaxed_command_processor.h"
 #include "interfaces/native/native_error_message_macros.h"
 #include "interfaces/native/node/node_model.h"
 
@@ -75,4 +76,55 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
     params.userData = userData;
 
     return static_cast<ArkUI_ErrorCode>(frameNodeModifier->injectCompositeCommand(&params));
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIEventInjectRelaxedInteraction(
+    ArkUI_ContextHandle uiContext,
+    const OH_ArkUI_NativeModule_UIJsonWrapper *command,
+    OH_ArkUI_NativeModule_UIEventInjectionCallback callback,
+    void *userData)
+{
+    const auto* impl = OHOS::Ace::NodeModel::GetFullImplForAnyThread();
+    const auto reportError = [impl, functionName = __func__](ArkUI_ErrorCode code, const char* message) {
+        const auto* basic = impl && impl->getBasicAPI ? impl->getBasicAPI() : nullptr;
+        if (basic && basic->setErrorCodeAndMessage && basic->setErrorFunctionName) {
+            basic->setErrorCodeAndMessage(code, const_cast<char*>(message));
+            basic->setErrorFunctionName(const_cast<char*>(functionName));
+        }
+        return code;
+    };
+    if (uiContext == nullptr) {
+        return reportError(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "UI context is null");
+    }
+    if (command == nullptr) {
+        return reportError(ARKUI_ERROR_CODE_PARAM_INVALID, "Command parameter is null");
+    }
+    const char* jsonData = OH_ArkUI_NativeModule_UIJsonWrapperGetData(command);
+    uint32_t jsonSize = OH_ArkUI_NativeModule_UIJsonWrapperGetSize(command);
+    if (jsonData == nullptr || jsonSize == 0) {
+        return reportError(ARKUI_ERROR_CODE_PARAM_INVALID, "Command JSON data is null");
+    }
+
+    int32_t instanceId = reinterpret_cast<ArkUI_Context*>(uiContext)->id;
+
+    if (impl == nullptr || impl->getNodeModifiers == nullptr) {
+        return reportError(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "Native module not initialized");
+    }
+    auto* nodeModifiers = impl->getNodeModifiers();
+    if (nodeModifiers == nullptr || nodeModifiers->getFrameNodeModifier == nullptr) {
+        return reportError(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "Node modifiers not initialized");
+    }
+    auto* frameNodeModifier = nodeModifiers->getFrameNodeModifier();
+    if (frameNodeModifier == nullptr || frameNodeModifier->injectRelaxedCommand == nullptr) {
+        return reportError(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "Frame node modifier not initialized");
+    }
+
+    ArkUIInjectRelaxedCommandParams params = {};
+    params.instanceId = instanceId;
+    params.json = jsonData;
+    params.jsonSize = jsonSize;
+    params.callback = reinterpret_cast<void (*)(ArkUI_Int32, void*)>(callback);
+    params.userData = userData;
+
+    return static_cast<ArkUI_ErrorCode>(frameNodeModifier->injectRelaxedCommand(&params));
 }

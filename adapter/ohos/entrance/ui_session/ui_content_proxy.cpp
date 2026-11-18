@@ -19,12 +19,30 @@
 
 #include "adapter/ohos/entrance/ui_session/content_change_config_impl.h"
 #include "adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_json_util.h"
+#include "interfaces/inner_api/ui_session/ui_session_split_rule.h"
 
 namespace OHOS::Ace {
 namespace {
+constexpr size_t SPLIT_REGISTRATION_RULE_COUNT = 1;
+
+bool IsValidSplitPageSceneRequest(const std::string& request, bool isQuery = false)
+{
+    // Discover explicit SPLIT declarations without imposing new validation on legacy requests.
+    const char* parseEnd = nullptr;
+    PageSceneSplit::JsonPtr root(cJSON_ParseWithOpts(request.c_str(), &parseEnd, false), cJSON_Delete);
+    if (!PageSceneSplit::ContainsSplitRule(root.get())) {
+        return true;
+    }
+    // Reuse the tree and reject trailing data only for explicitly declared SPLIT requests.
+    const auto parsed = PageSceneSplit::ParseRuleSet(root.get(), parseEnd);
+    // Registration accepts one SPLIT rule; one-shot queries may evaluate multiple rules.
+    return parsed && (isQuery || parsed->rules.size() == SPLIT_REGISTRATION_RULE_COUNT);
+}
+
 // Extract the ruleSetId used to register and route the event callback.
 std::string ExtractPageSceneRuleSetId(const std::string& ruleJson)
 {
@@ -153,6 +171,9 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("connect write interface token failed");
         return FAILED;
     }
+    if (report_ != nullptr) {
+        LOGW("connect again");
+    }
     report_ = new (std::nothrow) UiReportStub();
     if (report_ == nullptr) {
         LOGW("connect failed,create reportStub failed");
@@ -163,13 +184,13 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("write reportStub failed");
         return FAILED;
     }
+    report_->SetEventHandler(eventHandler);
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_CONNECT, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("connect send request failed, errorCode is %{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
     isConnected_ = true;
-    report_->SetEventHandler(eventHandler);
     return NO_ERROR;
 }
 
@@ -194,6 +215,10 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
     auto ruleSetId = ExtractPageSceneRuleSetId(ruleJson);
     if (ruleSetId.empty()) {
         LOGW("RegisterPageSceneRules ruleSetId is empty or invalid");
+        return PARAM_INVALID;
+    }
+    if (!IsValidSplitPageSceneRequest(ruleJson)) {
+        LOGW("RegisterPageSceneRules invalid SPLIT params");
         return PARAM_INVALID;
     }
     if (!report_->TryRegisterPageSceneEventCallback(ruleSetId, eventCallback)) {
@@ -247,6 +272,10 @@ int32_t UIContentServiceProxy::GetPageScene(
     if (report_ == nullptr) {
         LOGW("GetPageScene reportStub is nullptr");
         return FAILED;
+    }
+    if (!IsValidSplitPageSceneRequest(ruleJsonOrRuleSetId, true)) {
+        LOGW("GetPageScene invalid SPLIT params");
+        return PARAM_INVALID;
     }
     MessageParcel data;
     MessageParcel reply;
@@ -644,8 +673,9 @@ int32_t UIContentServiceProxy::HighlightSpecifiedContent(int32_t id, const std::
     return NO_ERROR;
 }
 
-int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& command)
+int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
+    UiSessionCommandRequestTraceBegin("Legacy.Node");
     MessageParcel data;
     MessageParcel reply;
     MessageOption option;
@@ -653,7 +683,8 @@ int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& comman
         LOGW("SendCommand write interface token failed");
         return FAILED;
     }
-    if (!data.WriteInt32(id) || !data.WriteString(command)) {
+    if (!data.WriteInt32(id) || !data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
+        !data.WriteUint64(securityAuth.tokenId)) {
         LOGW("SendCommand write data failed");
         return FAILED;
     }
@@ -665,7 +696,7 @@ int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& comman
     return NO_ERROR;
 }
 
-int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& command)
+int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
     MessageParcel data;
     MessageParcel reply;
@@ -674,7 +705,8 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
         LOGW("SendCommandSync write interface token failed");
         return FAILED;
     }
-    if (!data.WriteInt32(id) || !data.WriteString(command)) {
+    if (!data.WriteInt32(id) || !data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
+        !data.WriteUint64(securityAuth.tokenId)) {
         LOGW("SendCommandSync write data failed");
         return FAILED;
     }
@@ -691,8 +723,9 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
     return result;
 }
 
-int32_t UIContentServiceProxy::SendCommand(const std::string command)
+int32_t UIContentServiceProxy::SendCommand(const std::string command, SecurityAuthInfo securityAuth)
 {
+    UiSessionCommandRequestTraceBegin("Legacy.Global");
     MessageParcel data;
     MessageParcel reply;
     MessageOption option(MessageOption::TF_ASYNC);
@@ -706,13 +739,81 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command)
         return FAILED;
     }
 
-    if (!data.WriteString(command)) {
+    if (!data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
+        !data.WriteUint64(securityAuth.tokenId)) {
         LOGW("SendCommand WriteStringVector  failed");
         return FAILED;
     }
     int32_t sendRequestErrorCode = Remote()->SendRequest(SEND_COMMAND, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("SendCommand send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        return REPLY_ERROR;
+    }
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceProxy::SendCommand(
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+    SecurityAuthInfo securityAuth)
+{
+    UiSessionCommandRequestTraceBegin("Callback.Node");
+    return SendCommandWithFinishCallback(
+        SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, &id, command, finishCallback, securityAuth);
+}
+
+int32_t UIContentServiceProxy::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback, SecurityAuthInfo securityAuth)
+{
+    UiSessionCommandRequestTraceBegin("Callback.Global");
+    return SendCommandWithFinishCallback(
+        SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback, securityAuth);
+}
+
+int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
+    uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+    const SecurityAuthInfo& securityAuth)
+{
+    if (finishCallback == nullptr) {
+        LOGW("SendCommandWithFinishCallback callback is nullptr");
+        return PARAM_INVALID;
+    }
+    if (report_ == nullptr) {
+        LOGW("SendCommandWithFinishCallback reportStub is nullptr");
+        return FAILED;
+    }
+    auto remote = Remote();
+    if (remote == nullptr) {
+        LOGW("SendCommandWithFinishCallback remote is nullptr");
+        return FAILED;
+    }
+    uint64_t requestId = 0;
+    if (!report_->RegisterSendCommandFinishCallback(finishCallback, requestId)) {
+        return LAST_UNFINISH;
+    }
+    UI_SESSION_SCOPED_TRACE("SendCommand.Send.%llu", static_cast<unsigned long long>(requestId));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    bool writeSuccess = data.WriteInterfaceToken(GetDescriptor()) && data.WriteUint64(requestId);
+    if (writeSuccess && id != nullptr) {
+        writeSuccess = data.WriteInt32(*id);
+    }
+    writeSuccess = writeSuccess && data.WriteString(command) && data.WriteBool(securityAuth.needSecurityAuth) &&
+        data.WriteUint64(securityAuth.tokenId);
+    if (!writeSuccess) {
+        LOGW("SendCommandWithFinishCallback write parcel failed");
+        report_->UnregisterSendCommandFinishCallback(requestId);
+        return FAILED;
+    }
+    if (!report_->PostSendCommandCallbackRemoveTask(requestId)) {
+        LOGW("SendCommandWithFinishCallback post timeout task failed");
+        report_->UnregisterSendCommandFinishCallback(requestId);
+        return FAILED;
+    }
+    int32_t sendRequestErrorCode = remote->SendRequest(code, data, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("SendCommandWithFinishCallback send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        report_->UnregisterSendCommandFinishCallback(requestId);
         return REPLY_ERROR;
     }
     return NO_ERROR;

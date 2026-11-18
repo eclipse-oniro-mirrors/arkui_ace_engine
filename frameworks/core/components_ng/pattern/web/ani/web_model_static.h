@@ -153,6 +153,7 @@ public:
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetScaleChangeId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetZoomChangeId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
+    static void SetVisitedLinkPersistEnabled(FrameNode* frameNode, bool enabled);
     static void SetOnHttpAuthRequest(
         FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& callback);
     static void SetOnInterceptRequest(

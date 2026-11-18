@@ -25,6 +25,22 @@ export class NodeHolder {
     node?: PeerNode
 }
 
+const detachedRootPtrsNeedDestroyImmediately: Set<KPointer> = new Set<KPointer>();
+
+export function isNeedDestroyImmediately(ptr: KPointer): boolean {
+    return detachedRootPtrsNeedDestroyImmediately.has(ptr);
+}
+
+export function resgisterDetachedRootPtrNeedDestroyImmediately(ptr: KPointer): void {
+    if (ptr !== nullptr) {
+        detachedRootPtrsNeedDestroyImmediately.add(ptr);
+    }
+}
+
+export function unresgisterDetachedRootPtrNeedDestroyImmediately(ptr: KPointer): void {
+    detachedRootPtrsNeedDestroyImmediately.delete(ptr);
+}
+
 export class SyntaxItemPeer extends PeerNode {
     public static create(): SyntaxItemPeer {
         const peerId = PeerNode.nextId()

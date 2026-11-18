@@ -526,6 +526,7 @@ public:
     void MarkMeasured(bool isMeasured);
     bool IsMeasured() const;
     ACE_FORCE_EXPORT int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool GetFallbackLineSpacingStyleOptimizeFlag();
     bool GetPunctuationOverflowStyleOptimizeFlag();
     bool SetFallbackLineSpacingAndIncludeFontPadding(bool flag);
@@ -737,6 +738,7 @@ protected:
 private:
     void DumpAdvanceParagraphInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceFontInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    bool CheckPhoneCallAppExist(const AISpan& aiSpan);
 
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& dataStr,
         const std::string& value, int32_t start, int32_t end);

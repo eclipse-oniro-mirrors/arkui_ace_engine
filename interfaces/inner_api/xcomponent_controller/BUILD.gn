@@ -31,6 +31,9 @@ config("xcomponent_controller_config") {
 }
 
 ohos_shared_library("ace_xcomponent_controller") {
+  if (is_ohos) {
+    version_script = "$ace_root/build/libace_xcomponent_controller.map"
+  }
   if (current_os == "ohos") {
     sanitize = {
       integer_overflow = true
@@ -57,8 +60,8 @@ ohos_shared_library("ace_xcomponent_controller") {
     "c_utils:utils",
     "ets_runtime:libark_jsruntime",
     "napi:ace_napi",
-    "node:node_header_notice",
     "libuv:uv",
+    "node:node_header_notice",
     "runtime_core:ani",
   ]
   public_external_deps = [ "hilog:libhilog" ]

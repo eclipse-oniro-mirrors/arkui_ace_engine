@@ -2607,6 +2607,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onResourceLoad", &JSWeb::OnResourceLoad);
     JSClass<JSWeb>::StaticMethod("onScaleChange", &JSWeb::OnScaleChange);
     JSClass<JSWeb>::StaticMethod("onZoomChange", &JSWeb::OnZoomChange);
+    JSClass<JSWeb>::StaticMethod("visitedLinkPersistEnabled", &JSWeb::VisitedLinkPersistEnabled);
     JSClass<JSWeb>::StaticMethod("password", &JSWeb::Password);
     JSClass<JSWeb>::StaticMethod("tableData", &JSWeb::TableData);
     JSClass<JSWeb>::StaticMethod("onFileSelectorShow", &JSWeb::OnFileSelectorShowAbandoned);
@@ -5465,6 +5466,11 @@ void JSWeb::OnZoomChange(const JSCallbackInfo& args)
     };
     WebModel::GetInstance()->SetZoomChangeId(jsCallback);
 }
+void JSWeb::VisitedLinkPersistEnabled(bool enabled)
+{
+    WebModel::GetInstance()->SetVisitedLinkPersistEnabled(enabled);
+}
+
 
 JSRef<JSVal> ScrollEventToJSValue(const WebOnScrollEvent& eventInfo)
 {

@@ -207,7 +207,7 @@ HWTEST_F(ShapeContainerPatternTestNg, ViewPortTransform001, TestSize.Level1)
         V2::ROW_ETS_TAG, rowNodeId, []() { return AceType::MakeRefPtr<LinearLayoutPattern>(false); });
     rowNode->MountToParent(frameNode03);
     pattern03->ViewPortTransform();
-    auto node = AceType::DynamicCast<FrameNode>(rowNode);
+    auto node = rowNode;
     auto context = node->GetRenderContext();
     EXPECT_EQ(context->HasOffset(), false);
     ViewStackProcessor::GetInstance()->Pop();

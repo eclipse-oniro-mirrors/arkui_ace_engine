@@ -248,7 +248,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, GetToastParentContainerId001, TestSize.Le
      */
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetInstanceId(10);
 
@@ -313,7 +313,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, GetTitleBarHeightFromContext001, TestSize
      */
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetContainerModalTitleHeight(60);
 
@@ -544,7 +544,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, GetTopMostTitleBarHeightInUEC001, TestSiz
      */
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
 
     constexpr int32_t parentContainerId = 53;
@@ -631,7 +631,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, GetUECTitleBarHeightForTopAlignment001, T
      */
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
 
     constexpr int32_t parentContainerId = 54;
@@ -753,7 +753,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, IsToastInUIExtensionWindow001, TestSize.L
      */
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetInstanceId(61);
 
@@ -825,7 +825,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, CalculateSafeAreaTopForTopAlignment001, T
     float safeAreaTop = 0.0f;
     auto pipelineContext = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipelineContext, nullptr);
-    auto mockPipeline = AceType::DynamicCast<MockPipelineContext>(pipelineContext);
+    auto mockPipeline = pipelineContext;
     ASSERT_NE(mockPipeline, nullptr);
     mockPipeline->SetContainerModalTitleHeight(50);
     mockPipeline->SetInstanceId(71);
@@ -1000,7 +1000,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternInitWrapperRectWithSafeArea00
     ASSERT_NE(layoutWrapper, nullptr);
     auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProp, nullptr);
-    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    auto layoutWrapperPtr = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
     ASSERT_NE(layoutWrapperPtr, nullptr);
     // Should not crash and should execute the helper path
     toastPattern->InitWrapperRect(layoutWrapperPtr, toastProp);
@@ -1040,7 +1040,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternInitWrapperRectWithSafeArea00
     ASSERT_NE(layoutWrapper, nullptr);
     auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProp, nullptr);
-    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    auto layoutWrapperPtr = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
     ASSERT_NE(layoutWrapperPtr, nullptr);
     // Should not crash with switch off
     toastPattern->InitWrapperRect(layoutWrapperPtr, toastProp);

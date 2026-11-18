@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/text/text_base.h"
 
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -206,7 +207,8 @@ void TextBase::RevertLocalPointWithTransform(const RefPtr<FrameNode>& targetNode
         auto rectOffset = renderContext->GetPaintRectWithoutTransform().GetOffset();
         localPoint = localPoint - rectOffset;
         if (!nodeStack.empty()) {
-            nodeStack.top()->RevertAdoptedCompensationFromPoint(localPoint);
+            FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(
+                nodeStack.top().GetRawPtr(), localPoint);
         }
     }
     point.SetX(localPoint.GetX());
@@ -230,8 +232,10 @@ bool TextBase::HasRenderTransform(const RefPtr<FrameNode>& targetNode)
             auto noTransformRect = renderContext->GetPaintRectWithoutTransform();
             auto transformRect = renderContext->GetPaintRectWithTransform();
             hasTransform = noTransformRect != transformRect;
-            if (!hasTransform && host->IsAdopted() && host->UseAdoptedCompensation()) {
-                hasTransform = !host->GetAdoptedCompensationTransform().IsIdentityMatrix();
+            if (!hasTransform && host->IsAdopted() &&
+                FrameNodeAdoptedCompensation::UseAdoptedCompensation(host.GetRawPtr())) {
+                hasTransform = FrameNodeAdoptedCompensation::HasAdoptedCompensationPaintRectTransform(
+                    host.GetRawPtr());
             }
         } else {
             break;
@@ -317,8 +321,8 @@ VectorF TextBase::GetHostScale(const RefPtr<FrameNode>& host) const
             scaleY *= std::abs(transform.scale[1]);
         }
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->HasAdoptedCompensation()) {
-            auto compensationScale = parent->GetAdoptedCompensationScale();
+        if (ancestor && FrameNodeAdoptedCompensation::HasAdoptedCompensation(parent.GetRawPtr())) {
+            auto compensationScale = FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(parent.GetRawPtr());
             scaleX *= std::abs(compensationScale.x);
             scaleY *= std::abs(compensationScale.y);
         }

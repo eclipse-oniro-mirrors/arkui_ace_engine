@@ -256,7 +256,7 @@ void StateStyleManager::HandleStateChangeInternal(
     TAG_LOGI(AceLogTag::ACE_STATE_STYLE, "Start execution, node is %{public}s/%{public}d, "
         "reset is %{public}d", node->GetTag().c_str(), nodeId, isReset);
 #endif
-        auto uiNode = DynamicCast<UINode>(node);
+        auto uiNode = node;
         CHECK_NULL_VOID(uiNode);
         RefPtr<CustomNodeBase> customNode;
         GetCustomNode(customNode, uiNode);

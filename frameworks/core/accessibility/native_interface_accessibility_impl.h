@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_IMPL_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_IMPL_H
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <mutex>
@@ -26,6 +27,7 @@
 #include "interfaces/native/native_interface_accessibility.h"
 
 #include "base/utils/singleton.h"
+#include "base/memory/ace_type.h"
 
 struct ArkUI_AccessibilityElementInfo {
     explicit ArkUI_AccessibilityElementInfo();
@@ -585,5 +587,40 @@ public:
 private:
     std::map<std::string, std::string> actionArguments_;
 };
+
+namespace OHOS::Ace::NG {
+class FrameNode;
+
+// Process-local registration state. Entries never own their host or userData.
+class NativeAccessibilityHoverRegistry {
+public:
+    using Handler = void (*)(void*, int32_t, int32_t, int32_t, ArkUI_AccessibilityElementInfo*);
+    static NativeAccessibilityHoverRegistry& GetInstance();
+    int32_t Register(const RefPtr<FrameNode>& host, void* userData, Handler handler);
+    int32_t Unregister(const RefPtr<FrameNode>& host);
+    bool HasRegisteredHosts() const
+    {
+        return hasRegisteredHosts_.load(std::memory_order_relaxed);
+    }
+    bool HasHandler(const RefPtr<FrameNode>& host);
+    bool Invoke(const RefPtr<FrameNode>& host, int32_t x, int32_t y,
+        ArkUI_AccessibilityElementInfo& info, uint64_t& generation);
+    bool IsCurrent(const RefPtr<FrameNode>& host, uint64_t generation);
+
+private:
+    struct Entry {
+        WeakPtr<FrameNode> host;
+        Handler handler = nullptr;
+        void* userData = nullptr;
+        uint64_t generation = 0;
+    };
+    void Remove(FrameNode* host);
+    std::mutex mutex_;
+    std::map<FrameNode*, Entry> entries_;
+    std::atomic<bool> hasRegisteredHosts_ { false };
+    uint64_t generation_ = 0;
+    uint32_t requestId_ = 0;
+};
+} // namespace OHOS::Ace::NG
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_ACCESSIBILITY_NATIVE_INTERFACE_ACCESSIBILITY_IMPL_H

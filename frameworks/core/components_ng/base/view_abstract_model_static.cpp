@@ -2033,6 +2033,12 @@ void ViewAbstractModelStatic::SetPrivacySensitive(FrameNode* frameNode, const st
     frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
+void ViewAbstractModelStatic::SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
+}
+
 void ViewAbstractModelStatic::SetOnTouchTestFunc(FrameNode* frameNode, NG::OnChildTouchTestFunc&& onChildTouchTest)
 {
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();

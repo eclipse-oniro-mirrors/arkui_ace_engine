@@ -284,10 +284,12 @@ void SetEnableScrollWithKeyboardImpl(Ark_NativePointer node, const Opt_Boolean* 
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
     auto convValue = Converter::GetOptPtr(value);
-    // Missing/unset option resets to the default: keyboard scrolling enabled.
-    // Deliberately the opposite of SetEnableScrollWithMouse (default off),
-    // matching NODE_SCROLL_ENABLE_SCROLL_WITH_KEYBOARD's documented default of 1.
-    ScrollableModelStatic::SetEnableScrollWithKeyboard(frameNode, convValue.value_or(true));
+    // Missing/unset option resets to the default: keyboard scrolling disabled
+    // (opt-in semantics, matching NODE_SCROLL_ENABLE_SCROLL_WITH_KEYBOARD's
+    // documented default of 0) — deliberately the opposite of
+    // SetEnableScrollWithMouse (default off), so the pre-feature behavior is
+    // preserved unless the app explicitly enables keyboard scrolling.
+    ScrollableModelStatic::SetEnableScrollWithKeyboard(frameNode, convValue.value_or(false));
 }
 void SetOnReachStartImpl(Ark_NativePointer node,
                          const Opt_synthetic_Callback_Void* value)

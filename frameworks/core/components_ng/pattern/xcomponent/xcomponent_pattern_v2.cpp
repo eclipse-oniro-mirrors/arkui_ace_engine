@@ -27,18 +27,18 @@
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/common/window.h"
 #include "core/common/statistic_event_reporter.h"
-#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
-#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_ext_surface_callback_client.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_inner_surface_controller.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_child_tree_callback.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_accessibility_session_adapter.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_surface_config_client.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_utils.h"
 #ifdef ENABLE_ROSEN_BACKEND
+#include "transaction/rs_sync_transaction_controller.h"
+#include "transaction/rs_sync_transaction_handler.h"
 #include "transaction/rs_transaction.h"
 #include "transaction/rs_transaction_handler.h"
 #include "transaction/rs_transaction_proxy.h"
-#include "transaction/rs_sync_transaction_controller.h"
-#include "transaction/rs_sync_transaction_handler.h"
 #include "ui/rs_ui_context.h"
 #include "ui/rs_ui_director.h"
 #endif
@@ -129,6 +129,9 @@ void XComponentPatternV2::OnAttachToMainTree()
     isOnTree_ = true;
     if (autoInitialize_) {
         HandleSurfaceCreated();
+    }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
     }
     if (renderSurface_) {
         renderSurface_->UpdateBufferTypeLeak(GetLeakType());
@@ -276,6 +279,7 @@ void XComponentPatternV2::OnDetachFromMainTree()
     if (autoInitialize_) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(displaySync_);
     if (displaySync_->IsOnPipeline()) {
         TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "OnDetachFromMainTree:remove displaySync: "
@@ -375,27 +379,18 @@ void XComponentPatternV2::DisposeSurface()
         surfaceHolder_->nativeWindow_ = nullptr;
     }
     nativeWindow_ = nullptr;
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto renderContext = host->GetRenderContext();
-    CHECK_NULL_VOID(renderContext);
-    // for surface type
-    CHECK_NULL_VOID(renderContextForSurface_);
-    renderContext->RemoveChild(renderContextForSurface_);
+    FlushRemoveChild();
     renderContextForSurface_ = nullptr;
     handlingSurfaceRenderContext_ = renderContextForSurface_;
-#ifdef ENABLE_ROSEN_BACKEND
-    FlushImplicitTransaction(host);
-#endif
 }
 
 std::shared_ptr<Rosen::RSTransactionHandler> XComponentPatternV2::GetRSTransactionHandler(
     const RefPtr<FrameNode>& frameNode)
 {
-#ifdef ENABLE_ROSEN_BACKEND
     if (!SystemProperties::GetMultiInstanceEnabled()) {
         return nullptr;
     }
+#ifdef ENABLE_ROSEN_BACKEND
     auto rsUIContext = GetRSUIContext(frameNode);
     CHECK_NULL_RETURN(rsUIContext, nullptr);
     return rsUIContext->GetRSTransaction();
@@ -419,13 +414,33 @@ std::shared_ptr<Rosen::RSUIContext> XComponentPatternV2::GetRSUIContext(const Re
     return nullptr;
 }
 
-void XComponentPatternV2::FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode)
+void XComponentPatternV2::FlushRemoveChild()
 {
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // for surface type
+    CHECK_NULL_VOID(renderContextForSurface_);
+
 #ifdef ENABLE_ROSEN_BACKEND
-    if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
-        transactionHandler->FlushImplicitTransaction();
-    } else {
-        Rosen::RSTransactionProxy::GetInstance()->FlushImplicitTransaction();
+    auto rsUIContext = GetRSUIContext(host);
+    auto transactionHandler = rsUIContext ? rsUIContext->GetRSTransaction() : nullptr;
+    if (transactionHandler) {
+        transactionHandler->Begin();
+    }
+#endif
+
+    renderContext->RemoveChild(renderContextForSurface_);
+
+#ifdef ENABLE_ROSEN_BACKEND
+    if (transactionHandler) {
+        transactionHandler->Commit();
+    } else if (!SystemProperties::GetMultiInstanceEnabled()) {
+        auto transactionProxy = Rosen::RSTransactionProxy::GetInstance();
+        if (transactionProxy != nullptr) {
+            transactionProxy->FlushImplicitTransaction();
+        }
     }
 #endif
 }
@@ -436,6 +451,9 @@ int32_t XComponentPatternV2::HandleSurfaceCreated()
     InitSurface();
     CHECK_NULL_RETURN(renderSurface_, ERROR_CODE_PARAM_INVALID);
     isInitialized_ = true;
+    // visibility lifecycle pairing needs an "ever initialized" marker: isInitialized_
+    // is cleared on destroy, but re-create must stay allowed after that
+    hasSurfaceInitialized_ = true;
     if (surfaceHolder_) {
         auto callbackList = surfaceHolder_->surfaceCallbackList_;
         TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] surfaceHolder OnSurfaceCreated", GetId().c_str());
@@ -510,6 +528,9 @@ void XComponentPatternV2::OnWindowHide()
         XComponentPattern::OnWindowHide();
         return;
     }
+    // window-level visibility feeds the same pairing state machine as the
+    // component-level visible-area callback; the state guard keeps pairs intact
+    OnVisibilityLifecycleChange(false);
     CHECK_EQUAL_VOID(hasReleasedSurface_, true);
     if (renderSurface_) {
         renderSurface_->OnWindowStateChange(false);
@@ -524,12 +545,48 @@ void XComponentPatternV2::OnWindowShow()
         XComponentPattern::OnWindowShow();
         return;
     }
+    // window-level visibility feeds the same pairing state machine as the
+    // component-level visible-area callback; the state guard keeps pairs intact
+    OnVisibilityLifecycleChange(true);
     CHECK_EQUAL_VOID(hasReleasedSurface_, false);
     if (renderSurface_) {
         renderSurface_->OnWindowStateChange(true);
     }
     OnSurfaceShow();
     hasReleasedSurface_ = false;
+}
+
+bool XComponentPatternV2::IsSurfaceLifecycleReady() const
+{
+    // the holder path tracks surface state with hasSurfaceInitialized_ instead of hasXComponentInit_
+    return usesSuperMethod_ ? hasXComponentInit_ : hasSurfaceInitialized_;
+}
+
+void XComponentPatternV2::OnVisibilityLifecycleCreate()
+{
+    if (usesSuperMethod_) {
+        XComponentPattern::OnVisibilityLifecycleCreate();
+        return;
+    }
+    // surfaceHolder path: fire the holder callbacks registered via C API
+    auto res = HandleSurfaceCreated();
+    if (res != ERROR_CODE_NO_ERROR) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "XComponentV2 visibility lifecycle create failed, ret: %{public}d",
+            static_cast<int32_t>(res));
+    }
+}
+
+void XComponentPatternV2::OnVisibilityLifecycleDestroy()
+{
+    if (usesSuperMethod_) {
+        XComponentPattern::OnVisibilityLifecycleDestroy();
+        return;
+    }
+    auto res = HandleSurfaceDestroyed();
+    if (res != ERROR_CODE_NO_ERROR) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "XComponentV2 visibility lifecycle destroy failed, ret: %{public}d",
+            static_cast<int32_t>(res));
+    }
 }
 
 void XComponentPatternV2::OnRebuildFrame()
@@ -729,9 +786,9 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
-    CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto pipelineAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(pipelineAccessibilityManager);
+    auto accessibilityManager = pipelineAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityChildTreeCallback_) {
         accessibilityManager->DeregisterAccessibilityChildTreeCallback(
@@ -764,6 +821,10 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
 
 ArkUI_AccessibilityProvider* XComponentPatternV2::CreateAccessibilityProvider()
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "CreateAccessibilityProvider: CheckThread fail: expected [UI]");
+    }
     if (hasGotNativeXComponent_) {
         return nullptr;
     }
@@ -782,6 +843,10 @@ ArkUI_AccessibilityProvider* XComponentPatternV2::CreateAccessibilityProvider()
 
 void XComponentPatternV2::DisposeAccessibilityProvider(ArkUI_AccessibilityProvider* provider)
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "DisposeAccessibilityProvider: CheckThread fail: expected [UI]");
+    }
     if (hasGotNativeXComponent_ || (provider != arkuiAccessibilityProvider_)) {
         return;
     }
@@ -798,6 +863,10 @@ std::unordered_map<void*, WeakPtr<FrameNode>> XComponentPatternV2::XComponentAcc
 
 FrameNode* XComponentPatternV2::QueryAccessibilityProviderHost(void* provider, bool& isProviderValied)
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "QueryAccessibilityProviderHost: CheckThread fail: expected [UI]");
+    }
     auto it = XComponentAccessibilityProviderMap.find(provider);
     if (it == XComponentAccessibilityProviderMap.end()) {
         isProviderValied = false;

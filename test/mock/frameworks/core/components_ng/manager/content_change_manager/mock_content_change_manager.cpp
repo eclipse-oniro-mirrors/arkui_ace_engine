@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/manager/content_change_manager/content_change_manager_impl.h"
+#include "core/components_ng/manager/content_change_manager/page_scene_split_state.h"
 namespace OHOS::Ace::NG {
 ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor)
     : capiImpl_(std::make_unique<CapiImpl>())

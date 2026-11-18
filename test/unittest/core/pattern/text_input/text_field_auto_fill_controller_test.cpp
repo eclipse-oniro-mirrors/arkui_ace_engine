@@ -634,7 +634,7 @@ HWTEST_F(TextFieldAutoFillControllerTest, GetTextDirection001, TestSize.Level1)
     /**
      * @tc.steps: step3. Call GetTextDirection
      */
-    auto direction = autoFillController->GetTextDirection(layoutProperty);
+    auto direction = autoFillController->GetTextDirection();
 
     /**
      * @tc.expected: Return explicit text direction (LTR)
@@ -666,7 +666,7 @@ HWTEST_F(TextFieldAutoFillControllerTest, GetTextDirection002, TestSize.Level1)
     /**
      * @tc.steps: step3. Call GetTextDirection
      */
-    auto direction = autoFillController->GetTextDirection(layoutProperty);
+    auto direction = autoFillController->GetTextDirection();
 
     /**
      * @tc.expected: Return layout direction (RTL) when text direction is INHERIT

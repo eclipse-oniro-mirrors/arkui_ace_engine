@@ -15,10 +15,16 @@
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/modal_ui_extension_proxy_impl.h"
 
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
+#include "base/utils/utils.h"
+
 namespace OHOS::Ace::NG {
 ModalUIExtensionProxyImpl::ModalUIExtensionProxyImpl(const RefPtr<UIExtensionProxy>& innerProxy)
     : innerProxy_(innerProxy)
 {}
+
+ModalUIExtensionProxyImpl::~ModalUIExtensionProxyImpl() = default;
 
 void ModalUIExtensionProxyImpl::SendData(const AAFwk::WantParams& params)
 {

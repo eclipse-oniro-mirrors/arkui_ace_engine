@@ -94,6 +94,7 @@ class ExposureProcessor;
 }
 
 namespace OHOS::Ace::NG {
+struct CommandResult;
 class InspectorFilter;
 class PipelineContext;
 class Pattern;
@@ -352,6 +353,12 @@ private:
     }
 
 public:
+    struct AdoptedCompensationInfo {
+        bool useAdoptedCompensation = false;
+        OffsetF offset;
+        Matrix4 transform;
+    };
+
     // create a new child element with new element tree.
     static RefPtr<FrameNode> CreateFrameNodeWithTree(
         std::string_view tag, int32_t nodeId, const RefPtr<Pattern>& pattern);
@@ -437,6 +444,11 @@ public:
     const std::multiset<WeakPtr<FrameNode>, ZIndexComparator>& GetFrameChildren() const
     {
         return frameChildren_;
+    }
+
+    bool IsRenderTreeSyncPending() const
+    {
+        return needSyncRenderTree_;
     }
 
     virtual void InitializePatternAndContext();
@@ -545,7 +557,7 @@ public:
         if (ACE_UNLIKELY(pattern_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(pattern_))) {
             LOGF_ABORT("bad type conversion: from [%{public}s] to [%{public}s]", GetPatternTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(pattern_));
+        return CastComponentPtr<T>(RawPtr(pattern_), 0);
     }
 
     template<typename T>
@@ -576,7 +588,7 @@ public:
             LOGF_ABORT(
                 "bad type conversion: from [%{public}s] to [%{public}s]", GetLayoutPropertyTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(layoutProperty_));
+        return CastComponentPtr<T>(RawPtr(layoutProperty_), 0);
     }
 
     template<typename T>
@@ -593,7 +605,7 @@ public:
             LOGF_ABORT(
                 "bad type conversion: from [%{public}s] to [%{public}s]", GetPaintPropertyTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(paintProperty_));
+        return CastComponentPtr<T>(RawPtr(paintProperty_), 0);
     }
 
     template<typename T>
@@ -620,27 +632,9 @@ public:
 
     void SetMountPolicy(MountPolicy mountPolicy);
 
-    bool UseAdoptedCompensation() const
-    {
-        return adoptedCompensationInfo_ && adoptedCompensationInfo_->useAdoptedCompensation;
-    }
-
-    void SetUseAdoptedCompensation(bool useAdoptedCompensation);
-    void SetAdoptedCompensation(const OffsetF& offset, const Matrix4& transform);
-    bool HasAdoptedCompensation() const;
-
-    OffsetF GetAdoptedCompensationOffset() const;
-    Matrix4 GetAdoptedCompensationTransform() const;
-    OffsetF GetTransformedAdoptedCompensationOffset() const;
-    VectorF GetAdoptedCompensationScale() const;
-
-    void ApplyAdoptedCompensationToPoints(std::vector<Point>& points) const;
-    void ApplyAdoptedCompensationToPoints(std::vector<PointF>& points) const;
-    void ApplyAdoptedCompensationToRect(RectF& rect) const;
-    void ApplyAdoptedCompensationToPoint(Point& point) const;
-    void ApplyAdoptedCompensationToPoint(PointF& point) const;
-    void RevertAdoptedCompensationFromPoint(PointF& point) const;
-    void ApplyAdoptedCompensationToCenterAndSize(PointF& center, float& width, float& height) const;
+    // Exposes the FrameNode-owned compensation state to the dedicated helper without transferring ownership.
+    std::unique_ptr<AdoptedCompensationInfo>& GetAdoptedCompensationInfo();
+    const std::unique_ptr<AdoptedCompensationInfo>& GetAdoptedCompensationInfo() const;
 
     RefPtr<FrameNode> GetCoordinateAncestorNodeOfFrame(bool checkBoundary = false) const;
 
@@ -657,6 +651,8 @@ public:
     const RefPtr<FocusHub>& GetOrCreateFocusHub(const FocusPattern& focusPattern);
 
     const RefPtr<DragDropRelatedConfigurations>& GetOrCreateDragDropRelatedConfigurations();
+
+    const DragPreviewOption* GetDragPreviewOptionIfExist() const;
 
     void CreateEventHubInner();
 
@@ -1039,10 +1035,7 @@ public:
 
     void SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode);
 
-    RefPtr<FrameNode> GetSafeAreaInsetNode() const
-    {
-        return safeAreaInsetNode_;
-    }
+    RefPtr<FrameNode> GetSafeAreaInsetNode() const;
 
     RefPtr<FrameNode> FindChildByPosition(float x, float y);
     // some developer use translate to make Grid drag animation, using old function can't find accurate child.
@@ -1067,6 +1060,10 @@ public:
 
     void SetHitTestMode(HitTestMode mode);
     HitTestMode GetHitTestMode() const override;
+
+    void SetAgentControlMode(const std::optional<AgentControlMode>& mode);
+    bool HasAgentControlMode() const;
+    AgentControlMode GetAgentControlMode() const;
 
     TouchResult GetOnChildTouchTestRet(const std::vector<TouchTestInfo>& touchInfo);
     OnChildTouchTestFunc GetOnTouchTestFunc();
@@ -1502,6 +1499,12 @@ public:
     }
 
     void SetAICallerHelper(const std::shared_ptr<AICallerHelper>& aiCallerHelper);
+
+    bool HasAICallerHelper() const
+    {
+        return aiCallerHelper_ != nullptr;
+    }
+
     /**
      * @description: this callback triggered by ai assistant by ui_session proxy.
      * @param funcName function name of the target function.
@@ -1659,6 +1662,7 @@ public:
     }
 
     int32_t OnRecvCommand(const std::string& command) override;
+    CommandResult OnRecvCommandWithResult(const std::string& command);
 
     std::vector<std::pair<float, float>> GetSpecifiedContentOffsets(const std::string& content);
     void HighlightSpecifiedContent(
@@ -1733,6 +1737,23 @@ protected:
 
 private:
     void NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene);
+
+    // Forwards node-side split changes to the ContentChangeManager bound to this
+    // node's context; no-op unless split tracking is installed. Logic lives in the manager.
+    void NotifyPageSceneSplitChanged(bool attached = false);
+
+    // Preserve the static fast path; virtual-base downcasts require type information.
+    template<typename T, typename O>
+    static auto CastComponentPtr(O* ptr, int) -> decltype(static_cast<T*>(ptr))
+    {
+        return static_cast<T*>(ptr);
+    }
+
+    template<typename T, typename O>
+    static T* CastComponentPtr(O* ptr, long)
+    {
+        return DynamicCast<T>(ptr);
+    }
 
     static bool ShouldDetectAceObjTypeConvertion();
     void DispatchAreaChangeWithThrottle(const RectF& currFrameRect, const OffsetF& currParentOffsetToWindow);
@@ -1926,12 +1947,6 @@ private:
     RefPtr<AccessibilityProperty>& GetOrCreateAccessibilityProperty();
     void OnHoverWithHightLight(bool isHover) const;
     bool IsPreMakeAndScroll();
-    struct AdoptedCompensationInfo {
-        bool useAdoptedCompensation = false;
-        OffsetF offset;
-        Matrix4 transform;
-    };
-
     bool isAccessibilityPropertyInitialized_ = false;
     bool isTrimMemRecycle_ = false;
     // sort in ZIndex.
@@ -1981,6 +1996,7 @@ private:
     bool isPrivacySensitive_ = false;
     // Only ordinary bindMenu sets this preference; no value means no ordinary menu binding.
     std::optional<bool> inspectorMenuShowInSubWindow_;
+    std::optional<AgentControlMode> agentControlMode_;
 
     // for container, this flag controls only the last child in touch area is consuming event.
     bool exclusiveEventForChild_ = false;

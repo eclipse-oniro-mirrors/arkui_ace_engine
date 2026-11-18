@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 #include "base/i18n/date_time_sequence.h"
+#include "unicode/datefmt.h"
 #include "unicode/dtptngen.h"
 #include "unicode/smpdtfmt.h"
 #include <regex>
@@ -81,34 +82,31 @@ OrderResult DateTimeSequence::GetDateTimeOrder(const std::string& locale)
 OrderResult DateTimeSequence::GetAmPmTimeOrder(const std::string& locale)
 {
     UErrorCode status = U_ZERO_ERROR;
-    OrderResult orderResult;
+    // "10" = AM/PM column first, "01" = AM/PM column last; default "-1" when ICU fails
+    OrderResult orderResult = {"", "", "-1"};
     icu::Locale localeObj = icu::Locale::forLanguageTag(locale.data(), status);
     if (status != U_ZERO_ERROR) {
-        orderResult.amPmTimeOrder = "-1";
         return orderResult;
     }
-    // 0 represents am/pm position, 1 represents time position
-    const std::string amPmFirst = "10";
-    const std::string amPmLast = "01";
-    icu::DateTimePatternGenerator* gen = icu::DateTimePatternGenerator::createInstance(localeObj, status);
-    icu::UnicodeString skeleton("h");
-    if (gen == nullptr) {
-        orderResult.amPmTimeOrder = "-1";
+    // Use DateFormat::createTimeInstance + toPattern to get the locale's predefined
+    // time format pattern, consistent with global_i18n's approach (locale_config.cpp).
+    icu::DateFormat* dateFormat = icu::DateFormat::createTimeInstance(icu::DateFormat::kShort, localeObj);
+    if (dateFormat == nullptr) {
         return orderResult;
     }
-    icu::UnicodeString resultStr = gen->getBestPattern(skeleton, status);
-    if (U_FAILURE(status)) {
-        orderResult.amPmTimeOrder = "-1";
-        return orderResult;
-    }
+    icu::SimpleDateFormat* simDateFormat = static_cast<icu::SimpleDateFormat*>(dateFormat);
+    icu::UnicodeString patternUnicode;
+    simDateFormat->toPattern(patternUnicode);
+    delete dateFormat;
     std::string result;
-    resultStr.toUTF8String<std::string>(result);
+    patternUnicode.toUTF8String<std::string>(result);
+    if (result.empty()) {
+        return orderResult;
+    }
     std::regex pattrn("a[^ah]*h");
     std::smatch match;
     bool found = std::regex_search(result, match, pattrn);
-    std::string amPmTimeOrder = found ? amPmFirst : amPmLast;
-    orderResult = {result, "", amPmTimeOrder};
-    delete gen;
+    orderResult = {result, "", found ? "10" : "01"};
     return orderResult;
 }
 

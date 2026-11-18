@@ -95,6 +95,7 @@ const PickerDateF DatePickerPattern::emptyPickerDate_;
 std::unordered_map<uint32_t, std::string> DatePickerPattern::years_;       // year from 1900 to 2100,count is 201
 std::unordered_map<uint32_t, std::string> DatePickerPattern::solarMonths_; // solar month from 1 to 12,count is 12
 std::unordered_map<uint32_t, std::string> DatePickerPattern::solarDays_;   // solar day from 1 to 31, count is 31
+std::unordered_map<uint32_t, std::string> DatePickerPattern::solarMonthDays_; // solar month-day combined
 std::unordered_map<uint32_t, std::string> DatePickerPattern::lunarMonths_; // lunar month from 1 to 24, count is 24
 std::unordered_map<uint32_t, std::string> DatePickerPattern::lunarDays_;   // lunar day from 1 to 30, count is 30
 std::vector<std::string> DatePickerPattern::tagOrder_;    // order of year month day
@@ -2017,7 +2018,7 @@ void DatePickerPattern::HandleLunarYearChange(bool isAdd, uint32_t index)
     auto allChildNode = GetAllChildNode();
     auto yearNode = allChildNode["year"];
     CHECK_NULL_VOID(yearNode);
-    auto yearColumn = DynamicCast<FrameNode>(yearNode);
+    auto yearColumn = yearNode;
     uint32_t lastYearIndex = index;
     auto optionCount = GetOptionCount(yearColumn);
     if (isAdd) { // need reduce one index
@@ -2989,6 +2990,7 @@ void DatePickerPattern::Init()
     years_.clear();
     solarMonths_.clear();
     solarDays_.clear();
+    solarMonthDays_.clear();
     lunarMonths_.clear();
     lunarDays_.clear();
     localizedMonths_ = Localization::GetInstance()->GetMonths(true);
@@ -3053,6 +3055,29 @@ const std::string& DatePickerPattern::GetSolarDay(uint32_t day)
         return dateDay;
     }
     return it->second; // index in [0,30]
+}
+
+const std::string& DatePickerPattern::GetSolarMonthDay(uint32_t month, uint32_t day)
+{
+    Init();
+    if (!(1 <= month && month <= 12) || !(1 <= day && day <= 31)) { // month in [1,12], day in [1,31]
+        return empty_;
+    }
+    // Combine month and day into one key: month in the high bits, day in the low bits.
+    uint32_t key = (month << 8) | day;
+    auto it = solarMonthDays_.find(key);
+    if (it == solarMonthDays_.end()) {
+        DateTime date;
+        date.month = month - 1; // W3C's month start from 0 to 11
+        date.day = day;
+        auto& value = solarMonthDays_[key];
+        // "MMMd" lets ICU pick the locale's own month-day pattern (separator + field
+        // order), e.g. "M月d日" for zh, "MMM d" for en, "d. MMM" for de. This avoids
+        // hardcoding a language list to decide the separator.
+        value = Localization::GetInstance()->FormatDateTime(date, "MMMd");
+        return value;
+    }
+    return it->second;
 }
 
 const std::string& DatePickerPattern::GetLunarMonth(uint32_t month, bool isLeap)
@@ -3124,19 +3149,29 @@ const std::string DatePickerPattern::GetFormatString(PickerDateF date)
     std::string dayStr;
     if (date.day.has_value()) {
         dayStr = date.lunar ? GetLunarDay(date.day.value()) : GetSolarDay(date.day.value());
-        DateTimeSequence sequence;
-        auto language = AceApplicationInfo::GetInstance().GetLanguage();
-        OrderResult orderResult = sequence.GetDateOrder(language);
-        const auto& dateOrder = orderResult.dateOrder;
         if (!date.month.has_value()) {
             return dayStr;
         }
+        // Solar: format month+day together via ICU so the locale's own separator and
+        // field order apply (e.g. "10月15日", "Oct 15", "15. Okt"). Lunar strings are
+        // already CJK-compact, so concatenate them ordered by dateOrder with no separator.
+        if (!date.lunar) {
+            const auto& combined = GetSolarMonthDay(date.month.value(), date.day.value());
+            if (!combined.empty()) {
+                return combined;
+            }
+        }
+        // Fallback (lunar, or solar when ICU is unavailable): compact concatenation
+        // ordered by the locale's date order.
+        DateTimeSequence sequence;
+        auto language = AceApplicationInfo::GetInstance().GetLanguage();
+        const auto& dateOrder = sequence.GetDateOrder(language).dateOrder;
         auto monthPos = dateOrder.find('M');
         auto dayPos = dateOrder.find('d');
         if (monthPos != std::string::npos && dayPos != std::string::npos && dayPos < monthPos) {
-            return dayStr + " " + monthStr;
+            return dayStr + monthStr;
         }
-        return monthStr + " " + dayStr;
+        return monthStr + dayStr;
     }
 
     return "";
@@ -3567,6 +3602,20 @@ bool DatePickerPattern::IsNotSetStartEndDate()
     return startDate == startDefaultDateSolar_ && endDate == endDefaultDateSolar_;
 }
 
+CommandResult DatePickerPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setDatePickerTime", "setDatePickerDialogTime" },
+        CommandErrorType::INVALID_PARAM, [this](const std::unique_ptr<JsonValue>& json) {
+        if ((json->GetString("cmd") == "setDatePickerDialogTime") != GetIsShowInDialog()) {
+            return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+        }
+        if (!GetHost()->GetLayoutProperty<DataPickerRowLayoutProperty>()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t DatePickerPattern::OnInjectionEvent(const std::string& command)
 {
     if (GetIsShowInDialog()) {
@@ -3874,6 +3923,14 @@ bool DatePickerPattern::CheckDialogParamDataValid(const std::unique_ptr<JsonValu
 
 void DatePickerPattern::OnWindowSizeChanged(int32_t width, int32_t height, WindowSizeChangeReason type)
 {
+    // MOVE and DRAG_MOVE indicate window position-only changes with no size change.
+    // Picker display (text content, padding, font) depends on window size, not position.
+    // Skipping FlushCurrentOptions avoids unnecessary dirty propagation to parent dialog,
+    // which would trigger AvoidScreen repositioning during free-window dragging on PC.
+    if (type == WindowSizeChangeReason::MOVE || type == WindowSizeChangeReason::DRAG_MOVE) {
+        return;
+    }
+
     bool oldFullscreen = isWindowFullscreen_;
     switch (type) {
         case WindowSizeChangeReason::SPLIT_TO_FULL:

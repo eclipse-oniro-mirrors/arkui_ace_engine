@@ -36,17 +36,25 @@ type RepeatTemplateOptions =  { cachedCount?: number };
 type RepeatTemplateImplOptions = { cachedCountSpecified: boolean, cachedCount?: number };
 type OnMoveHandler = (from: number, to: number) => void;
 
+// Repeat creation options (public RepeatOptions API): the cache clean controller is read
+// once when the Repeat is created and cannot be modified afterwards (spec R-8).
+type RepeatOptions = { controller?: RepeatController };
+
 /*
     global function Repeat()
     returns an object that retains the state of Repeat instance between render calls
     exec attribute functions on this instance.
+
+    The owning view is always the second argument and options always the third: the
+    runtime receives (arr, this) when no options are given and (arr, this, options)
+    when options are given.
 */
-const Repeat: <T>(arr: Array<T>, owningView?: PUV2ViewBase) => RepeatAPI<T> =
-    <T>(arr: Array<T>, owningView?: PUV2ViewBase): RepeatAPI<T> => {
+const Repeat: <T>(arr: Array<T>, owningView?: PUV2ViewBase, options?: RepeatOptions) => RepeatAPI<T> =
+    <T>(arr: Array<T>, owningView?: PUV2ViewBase, options?: RepeatOptions): RepeatAPI<T> => {
         if (!owningView) {
             throw new Error("Transpilation error, Repeat lacks 2nd parameter owningView");
         }
-        return owningView!.__mkRepeatAPI(arr);
+        return owningView!.__mkRepeatAPI(arr, options);
     };
 
 /*

@@ -269,22 +269,30 @@ BatchParseResult ParseBatchCommands(const cJSON* commands, const BatchJsonString
             result.batchReason = BatchDiagnosticReason::TOO_MANY_COMMANDS;
             result.items.clear();
             result.diagnostics.clear();
+            result.resultItems.clear();
             break;
         }
         int32_t nodeId = -1;
         const auto keyLength = strings.GetLength(child->string);
         if (!ParseNodeId(child->string, nodeId, strings)) {
             auto item = AnalyzeCommand(child, nodeId, result.commandCount, strings);
+            item.nodeKey = std::string(child->string, keyLength);
+            item.semanticError = BatchDiagnosticReason::INVALID_NODE_ID;
+            result.resultItems.emplace_back(item);
             result.diagnostics.emplace_back(
                 MakePreDispatchDiagnostic(item, BatchDiagnosticReason::INVALID_NODE_ID, keyLength, false));
             continue;
         }
         auto item = AnalyzeCommand(child, nodeId, result.commandCount, strings);
+        item.nodeKey = std::string(child->string, keyLength);
         if (!nodeIds.emplace(nodeId).second) {
+            item.semanticError = BatchDiagnosticReason::DUPLICATE_NODE_ID;
+            result.resultItems.emplace_back(item);
             result.diagnostics.emplace_back(
                 MakePreDispatchDiagnostic(item, BatchDiagnosticReason::DUPLICATE_NODE_ID, keyLength, true));
             continue;
         }
+        result.resultItems.emplace_back(item);
         result.items.emplace_back(std::move(item));
     }
     return result;
@@ -312,6 +320,10 @@ void EmitItemDiagnostic(const BatchDispatchContext& context, const BatchCommandI
 void ProcessItem(const BatchDispatchContext& context, const BatchCommandItem& item)
 {
     const auto target = context.resolveTarget ? context.resolveTarget(item.nodeId) : BatchResolvedTarget {};
+    if (target.status == BatchTargetStatus::SECURITY_DENIED) {
+        EmitItemDiagnostic(context, item, BatchDiagnosticReason::SECURITY_DENIED);
+        return;
+    }
     if (target.status == BatchTargetStatus::NOT_FOUND) {
         EmitItemDiagnostic(context, item, BatchDiagnosticReason::NODE_NOT_FOUND);
         return;
@@ -439,6 +451,8 @@ const char* UiSessionBatchCommand::GetReasonName(BatchDiagnosticReason reason)
             return "task_executor_unavailable";
         case BatchDiagnosticReason::POST_TASK_FAILED:
             return "post_task_failed";
+        case BatchDiagnosticReason::SECURITY_DENIED:
+            return "security_denied";
         default:
             return "unknown";
     }

@@ -16,6 +16,7 @@
 #include "core/components_ng/base/modifier.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/components_ng/pattern/text_picker/textpicker_column_pattern.h"
+#include "base/thread/task_executor.h"
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 
 namespace OHOS::Ace::NG {
@@ -45,13 +46,28 @@ void TextPickerColumnPattern::OnAttachToMainTreeMultiThread()
 
 void TextPickerColumnPattern::OnDetachFromMainTreeMultiThread()
 {
-    if (hapticController_) {
-        hapticController_->Stop();
-    }
-
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    FrameNode* node = RawPtr(host);
-    UnregisterWindowStateChangedCallback(node);
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+    auto weak = WeakClaim(this);
+    auto hostId = host->GetId();
+    auto task = [weak, hostId]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        auto host = pattern->GetHost();
+        CHECK_NULL_VOID(host);
+        if (host->GetId() != hostId) {
+            return;
+        }
+        if (pattern->hapticController_) {
+            pattern->hapticController_->Stop();
+        }
+        pattern->UnregisterWindowStateChangedCallback(RawPtr(host));
+    };
+    auto taskExecutor = context->GetTaskExecutor();
+    if (taskExecutor) {
+        taskExecutor->PostTask(task, TaskExecutor::TaskType::UI, "ArkUITextPickerOnDetachMultiThread");
+    }
 }
 } // namespace OHOS::Ace::NG

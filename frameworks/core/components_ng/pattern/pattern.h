@@ -48,12 +48,27 @@ class AccessibilityEventInfo;
 namespace OHOS::Ace {
 struct ImmersiveOptions;
 struct UiMaterialParam;
+class AccessibilityProvider;
 class NotifyDragEvent;
 class GestureEvent;
 using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
+enum class CommandErrorType : uint8_t {
+    NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL,
+    NOT_SUPPORTED, SECURITY_DENIED
+};
+
+struct ACE_FORCE_EXPORT CommandResult {
+    bool success = false;
+    CommandErrorType errorType = CommandErrorType::EXECUTE_FAIL;
+    std::string errorMessage;
+
+    static CommandResult Success();
+    static CommandResult Error(CommandErrorType type, std::string message = "");
+};
+
 struct InspectorDumpOptions;
 class AccessibilitySessionAdapter;
 class InspectorFilter;
@@ -530,6 +545,11 @@ public:
         return nullptr;
     }
 
+    virtual RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider()
+    {
+        return nullptr;
+    }
+
     virtual int32_t GetUiExtensionId()
     {
         return -1;
@@ -613,6 +633,7 @@ public:
     virtual void OnFocusNodeChange(FocusReason focusReason) {}
     virtual void OnCollectRemoved() {}
     int32_t OnRecvCommand(const std::string& command);
+    CommandResult OnRecvCommandWithResult(const std::string& command);
     virtual std::vector<std::pair<float, float>> GetSpecifiedContentOffsets(const std::string& content)
     {
         return std::vector<std::pair<float, float>> {};
@@ -624,7 +645,11 @@ public:
     {
         return RET_SUCCESS;
     };
+    virtual CommandResult OnInjectionEventWithResult(const std::string& command);
 
+    CommandResult ConvertLegacyInjectionEventResult(const std::string& command,
+        std::initializer_list<std::string_view> commands, CommandErrorType failure = CommandErrorType::INVALID_PARAM,
+        const std::function<CommandResult(const std::unique_ptr<JsonValue>&)>& preflight = nullptr);
     bool HandleTextBoxComponentCommand(const std::string& command, std::string& cmd, std::unique_ptr<JsonValue>& json,
         std::unique_ptr<JsonValue>& params);
 

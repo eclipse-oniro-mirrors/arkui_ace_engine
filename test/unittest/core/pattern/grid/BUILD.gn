@@ -14,6 +14,7 @@
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
 COMMON_SRC = [
+  "$ace_root/frameworks/core/components_ng/pattern/grid/bridge/grid/grid_dynamic_modifier.cpp",
   "$ace_root/frameworks/bridge/common/dom/dom_type.cpp",
   "$ace_root/frameworks/bridge/common/utils/utils.cpp",
   "$ace_root/frameworks/bridge/js_frontend/engine/common/js_constants.cpp",
@@ -21,6 +22,7 @@ COMMON_SRC = [
   "grid_common_test_ng.cpp",
   "grid_common_testtwo_ng.cpp",
   "grid_option_layout_test_ng.cpp",
+  "grid_scroll_placeholder_test_ng.cpp",
   "grid_scroll_snap_test_ng.cpp",
   "grid_scroller_test_ng.cpp",
   "grid_scroller_testtwo_ng.cpp",

@@ -16,49 +16,17 @@
 #ifndef FOUNDATION_ACE_INTERFACE_INNERKITS_ACE_TEST_MOCK_MOCK_IREMOTE_OBJECT_H
 #define FOUNDATION_ACE_INTERFACE_INNERKITS_ACE_TEST_MOCK_MOCK_IREMOTE_OBJECT_H
 
+#include <cstddef>
+#include <string>
+
+#include "test/mock/ohos_mock/c_utils/refbase.h"
+
 namespace OHOS {
 class IRemoteObject {
 public:
     explicit IRemoteObject(const std::u16string& descriptor = nullptr);
     virtual ~IRemoteObject() = default;
 };
-#ifndef ACE_MOCK_REFBASE_SPTR_DEFINED
-#define ACE_MOCK_REFBASE_SPTR_DEFINED
-template <typename T>
-class sptr {
-private:
-    T* ptr;
-public:
-    sptr(T* p) : ptr(p) {}
-    ~sptr()
-    {
-        delete ptr;
-    }
-
-    sptr(const sptr&) = delete;
-    sptr& operator=(const sptr&) = delete;
-
-    T& operator*()
-    {
-        return *ptr;
-    }
-
-    T* operator->()
-    {
-        return ptr;
-    }
-
-    bool operator==(std::nullptr_t) const
-    {
-        return ptr == nullptr;
-    }
-
-    bool operator!=(std::nullptr_t) const
-    {
-        return ptr != nullptr;
-    }
-};
-#endif // ACE_MOCK_REFBASE_SPTR_DEFINED
-}
+} // namespace OHOS
 
 #endif //FOUNDATION_ACE_INTERFACE_INNERKITS_ACE_TEST_MOCK_MOCK_IREMOTE_OBJECT_H

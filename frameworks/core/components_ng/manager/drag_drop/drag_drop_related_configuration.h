@@ -59,6 +59,11 @@ public:
     void SetOptionsAfterApplied(const OptionsAfterApplied& optionsAfterApplied);
     ACE_FORCE_EXPORT void SetDragPreviewOption(const DragPreviewOption& previewOption, bool isResetOptions);
 
+    const DragPreviewOption* GetDragPreviewOptionIfExist() const
+    {
+        return previewOption_.get();
+    }
+
 private:
     RefPtr<DragSpringLoadingConfiguration> dragSpringLoadingConfiguration_;
     std::unique_ptr<DragPreviewOption> previewOption_;

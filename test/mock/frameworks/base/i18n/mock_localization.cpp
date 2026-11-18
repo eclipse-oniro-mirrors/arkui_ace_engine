@@ -63,7 +63,17 @@ std::string Localization::FormatDuration(uint32_t duration, const std::string& f
     return "08:00:00";
 }
 
+std::string Localization::FormatDurationLocalized(uint32_t duration, const std::string& format)
+{
+    return "08:00:00";
+}
+
 const std::string Localization::FormatDateTime(DateTime dateTime, const std::string& format)
+{
+    return "08:00:00";
+}
+
+const std::string Localization::FormatDateTimeMatchHourField(DateTime dateTime, const std::string& format)
 {
     return "08:00:00";
 }
@@ -154,10 +164,25 @@ std::string Localization::NumberFormat(double number)
     return std::to_string(number);
 }
 
+std::string Localization::NumberFormat(int32_t number)
+{
+    return std::to_string(number);
+}
+
+std::string Localization::FormatPercent(int32_t number)
+{
+    return std::to_string(number) + "%";
+}
+
 bool Localization::LocalizeNumber(const std::string& inputNum, std::string& outputNum, const int32_t precision)
 {
     outputNum = inputNum;
     return true;
+}
+
+std::string Localization::LocalizeDigits(const std::string& numStr)
+{
+    return numStr;
 }
 
 bool Localization::GetDateColumnFormatOrder(std::vector<std::string>& outOrder)

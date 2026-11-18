@@ -157,6 +157,7 @@ public:
     static int32_t ParseCommand(const std::string& command, bool& selectStatus);
     void ReportChangeEvent(bool selectStatus);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     void SaveCheckboxSettingData(const CheckboxSettingData& checkboxSettingData)
     {

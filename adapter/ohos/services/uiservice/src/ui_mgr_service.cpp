@@ -80,6 +80,7 @@ void UIMgrService::OnStart()
 
 bool UIMgrService::Init()
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     eventLoop_ = AppExecFwk::EventRunner::Create("UIMgrService");
     if (eventLoop_ == nullptr) {
         return false;
@@ -101,6 +102,7 @@ bool UIMgrService::Init()
 
 void UIMgrService::OnStop()
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     eventLoop_->Stop();
     eventLoop_.reset();
     handler_.reset();
@@ -115,6 +117,7 @@ UIServiceRunningState UIMgrService::QueryServiceState() const
 
 int32_t UIMgrService::RegisterCallBack(const AAFwk::Want& want, const sptr<IUIService>& uiService)
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     if (uiService == nullptr) {
         return UI_SERVICE_IS_NULL;
     }
@@ -132,6 +135,7 @@ int32_t UIMgrService::RegisterCallBack(const AAFwk::Want& want, const sptr<IUISe
 
 int32_t UIMgrService::UnregisterCallBack(const AAFwk::Want& want)
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     if (handler_ == nullptr) {
         return UI_SERVICE_HANDLER_IS_NULL;
     }

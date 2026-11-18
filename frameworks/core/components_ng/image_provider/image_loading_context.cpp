@@ -39,7 +39,8 @@ void CapToPixelLimit(SizeF& targetSize)
     }
     double pixelCount = static_cast<double>(targetSize.Width()) * static_cast<double>(targetSize.Height());
     double scale = std::sqrt(IMAGE_PIXEL_COUNT_THRESHOLD / pixelCount);
-    targetSize.ApplyScale(scale);
+    targetSize.SetWidth(std::floor(targetSize.Width() * scale));
+    targetSize.SetHeight(std::floor(targetSize.Height() * scale));
 }
 } // namespace
 

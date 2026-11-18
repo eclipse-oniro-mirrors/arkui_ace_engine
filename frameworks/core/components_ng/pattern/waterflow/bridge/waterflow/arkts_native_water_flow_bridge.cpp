@@ -745,6 +745,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         "setCachedCount",
         "resetSyncLoad",
         "setSyncLoad",
+        "resetScrollPlaceholder",
+        "setScrollPlaceholder",
         "resetWaterFlowInitialize",
         "setWaterFlowInitialize",
         "resetOnScrollIndex",
@@ -798,6 +800,8 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         panda::FunctionRef::New(vm, WaterFlowBridge::SetCachedCount),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetSyncLoad),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetSyncLoad),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetScrollPlaceholder),
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetScrollPlaceholder),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetWaterFlowInitialize),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetWaterFlowInitialize),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetOnWaterFlowScrollIndex),
@@ -1407,6 +1411,86 @@ ArkUINativeModuleValue WaterFlowBridge::ResetSyncLoad(ArkUIRuntimeCallInfo* runt
     CHECK_NULL_RETURN(IsNativePointerArg(vm, node), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(node->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getWaterFlowModifier()->resetSyncLoad(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+// Same provider contract as ListBridge::SetListScrollPlaceholder: a non-function
+// or undefined argument clears the provider (capability off), a function is
+// wrapped into the synchronous northbound provider called while scrolling.
+// The node argument accepts both forms used on this module: a native pointer
+// (modifier path) and the boolean "current node" convention of the static path.
+ArkUINativeModuleValue WaterFlowBridge::SetScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(NUM_0);
+    Local<JSValueRef> providerArg = runtimeCallInfo->GetCallArgRef(NUM_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    if (!providerArg->IsFunction(vm)) {
+        WaterFlowModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    panda::Local<panda::FunctionRef> providerFuncLocal = providerArg->ToObject(vm);
+    auto providerFunc = panda::CopyableGlobal(vm, providerFuncLocal);
+    ScrollPlaceholderProvider provider =
+        [vm, providerFunc = std::move(providerFunc)](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        panda::LocalScope localScope(vm);
+        panda::TryCatch tryCatch(vm);
+        panda::Local<panda::JSValueRef> params[1] = { panda::IntegerRef::New(vm, index) };
+        auto result = providerFunc->Call(vm, providerFunc.ToLocal(), params, 1);
+        if (tryCatch.HasCaught() || !result->IsObject(vm)) {
+            // A throwing provider is treated like "no placeholder for this item":
+            // the scroll path must stay a pure calculation without error fences.
+            return std::nullopt;
+        }
+        auto obj = result->ToObject(vm);
+        ScrollPlaceholderOptions options;
+        auto id = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id"));
+        if (id->IsString(vm)) {
+            options.id = id->ToString(vm)->ToString(vm);
+        }
+        auto size = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "size"));
+        if (size->IsObject(vm)) {
+            auto sizeObj = size->ToObject(vm);
+            ScrollPlaceholderSizeOption sizeOption;
+            auto width = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "width"));
+            if (width->IsNumber()) {
+                sizeOption.width =
+                    Dimension(static_cast<float>(width->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (width->IsString(vm)) {
+                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
+                sizeOption.width =
+                    StringUtils::StringToDimension(width->ToString(vm)->ToString(vm), true);
+            }
+            auto height = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "height"));
+            if (height->IsNumber()) {
+                sizeOption.height =
+                    Dimension(static_cast<float>(height->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (height->IsString(vm)) {
+                sizeOption.height =
+                    StringUtils::StringToDimension(height->ToString(vm)->ToString(vm), true);
+            }
+            options.size = sizeOption;
+        }
+        return options;
+    };
+    WaterFlowModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(NUM_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    WaterFlowModelNG::SetScrollPlaceholder(frameNode, nullptr);
     return panda::JSValueRef::Undefined(vm);
 }
 

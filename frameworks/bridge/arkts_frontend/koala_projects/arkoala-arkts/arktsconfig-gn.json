@@ -94,6 +94,9 @@
             "@ohos/arkui/dragController": [
                 "@ohos.arkui.dragController.ets"
             ],
+            "@ohos/arkui/dialog": [
+                "@ohos.arkui.dialog.ets"
+            ],
             "@ohos/arkui/theme": [
                 "@ohos.arkui.theme.ets"
             ],

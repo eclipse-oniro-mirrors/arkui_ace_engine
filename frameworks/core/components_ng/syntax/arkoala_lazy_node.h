@@ -31,6 +31,10 @@ namespace {
 constexpr int64_t CACHE_TASK_DELAY_TIME = 2000000000;
 constexpr int32_t MEMORY_LEVEL_LOW = 1;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
+// Mirror of LazyForEachBuilder retention caps (lazy_for_each_builder.cpp):
+// idle cache retained by memory-optimization clean is capped at 2, or 0 on low-DDR devices.
+constexpr int32_t LOW_MEMORY_DDR_THRESHOLD_GB = 6;
+constexpr int32_t MAX_CACHED_COUNT_FOR_MEMORY_OPTIMIZATION = 2;
 }
 
 namespace OHOS::Ace::NG {
@@ -190,7 +194,7 @@ public:
     void ScheduleCleanCacheTask();
     void ScheduleRestoreCacheTask();
     void TryExecuteScheduledCacheTask();
-    void CleanCache(bool syncClean);
+    void CleanCache(bool syncClean, bool clearAll = false);
     void RestoreCache();
     void SetNeedPrebuild(bool needPrebuild);
     bool GetNeedPrebuild();
@@ -205,6 +209,12 @@ private:
     void RebuildCache();
     bool IsInActiveRange(int32_t index, const ActiveRangeParam& param) const;
     bool IsInCacheRange(int32_t index, const ActiveRangeParam& param) const;
+    // Memory-optimization retention cap, mirroring LazyForEachBuilder::ReduceCacheCount
+    // (lazy_for_each_builder.cpp): clearAll -> 0; low-DDR device -> 0; otherwise 2.
+    static int32_t GetMaxCacheCountForMemOpt(bool clearAll);
+    // Cache band retained by CleanCache under memory optimization: same active range with
+    // cacheStart/cacheEnd clamped to GetMaxCacheCountForMemOpt(); never laid out -> caches 0.
+    ActiveRangeParam GetReducedCacheRangeParam(bool clearAll) const;
     void UpdateIsCache(const RefPtr<UINode>& node, bool isCache, bool shouldTrigger = true);
 
     void UpdateMoveFromTo(int32_t from, int32_t to);

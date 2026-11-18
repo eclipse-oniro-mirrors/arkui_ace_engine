@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_model_ng.h"
 
@@ -694,7 +696,7 @@ void MenuItemPattern::CleanParentMenuItemBgColor()
     props->UpdatePress(false);
     auto parentNode = host->GetParent();
     CHECK_NULL_VOID(parentNode);
-    auto parent = AceType::DynamicCast<UINode>(parentNode);
+    auto parent = parentNode;
     CHECK_NULL_VOID(parent);
     menuPattern->OnItemPressed(parent, index_, false, false);
     PlayBgColorAnimation();
@@ -724,7 +726,7 @@ void MenuItemPattern::ShowSubMenu(ShowSubMenuType type)
         CHECK_NULL_VOID(pipeline);
         auto overlayManager = pipeline->GetOverlayManager();
         CHECK_NULL_VOID(overlayManager);
-        overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+        overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
         SetDetachedFreeRootProxy(customNode);
         return;
     }
@@ -796,11 +798,17 @@ void MenuItemPattern::ShowSubMenuWithAnimation(const RefPtr<FrameNode>& subMenu)
                 renderContext->UpdateTransformScale(VectorF(MENU_ANIMATION_MAX_SCALE, MENU_ANIMATION_MAX_SCALE));
                 renderContext->UpdateOpacity(MENU_ANIMATION_MAX_OPACITY);
             },
-            animationOption.GetOnFinishEvent(), nullptr, subMenu->GetContextRefPtr());
+            [weak = WeakPtr<FrameNode>(subMenu)]() {
+                ReportCapiSubMenuEvent(weak.Upgrade(), true);
+            }, nullptr, subMenu->GetContextRefPtr());
+    } else {
+        pipeline->AddAfterLayoutTask([weak = WeakPtr<FrameNode>(subMenu)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        });
     }
     auto overlayManager = pipeline->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
-    overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+    overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
 }
 
 void MenuItemPattern::SendSubMenuOpenToAccessibility(RefPtr<FrameNode>& subMenu, ShowSubMenuType type)
@@ -937,6 +945,9 @@ void MenuItemPattern::ShowSubMenuHelper(const RefPtr<FrameNode>& subMenu)
         menuProps->UpdateMenuOffset(offset);
         menuWrapper->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
         RegisterWrapperMouseEvent();
+    }
+    if (auto ctx = subMenu->GetContext()) {
+        ctx->AddTaskOverlayNodeMaterialArea(subMenu, "MenuItem ShowSubMenuHelper");
     }
     // select overlay menu no need focus
     if (!isSelectOverlayMenu) {
@@ -1110,7 +1121,9 @@ void MenuItemPattern::ShowEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
             pattern->SetShowEmbeddedMenuParams(expandableNode);
             menuRenderContext->UpdateSubmenuDistortionParam();
         },
-        nullptr, nullptr, host->GetContextRefPtr());
+        [weak = WeakPtr<FrameNode>(expandableNode)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::SetShowEmbeddedMenuParams(const RefPtr<FrameNode>& expandableNode)
@@ -1206,7 +1219,9 @@ void MenuItemPattern::HideEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
         CHECK_NULL_VOID(menuItemPattern);
         menuItemPattern->UpdatePreviewPosition(oldMenuSize, menuGeometryNode->GetFrameSize());
         menuRenderContext->UpdateSubmenuDistortionParam();
-    }, nullptr, nullptr, host->GetContextRefPtr());
+    }, [weak = WeakPtr<FrameNode>(expandableNode)]() {
+        ReportCapiSubMenuEvent(weak.Upgrade(), false);
+    }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::CloseMenu()
@@ -1523,7 +1538,7 @@ void MenuItemPattern::NotifyPressStatus(bool isPress)
     ACE_UINODE_TRACE(menu);
     auto menuPattern = menu->GetPattern<MenuPattern>();
     CHECK_NULL_VOID(menuPattern);
-    auto parent = AceType::DynamicCast<UINode>(host->GetParent());
+    auto parent = host->GetParent();
     auto menuWrapper = GetMenuWrapper();
     auto menuWrapperPattern = menuWrapper ? menuWrapper->GetPattern<MenuWrapperPattern>() : nullptr;
 
@@ -1652,7 +1667,7 @@ void MenuItemPattern::OnHover(bool isHover)
         CHECK_NULL_VOID(menuPattern);
         auto props = GetPaintProperty<MenuItemPaintProperty>();
         CHECK_NULL_VOID(props);
-        auto parent = AceType::DynamicCast<UINode>(host->GetParent());
+        auto parent = host->GetParent();
         SetBgBlendColor(isHover || isSubMenuShowed_ ? theme->GetHoverColor() : Color::TRANSPARENT);
         props->UpdateHover(isHover || isSubMenuShowed_);
         UpdateDividerHoverStatus(isHover || isSubMenuShowed_);

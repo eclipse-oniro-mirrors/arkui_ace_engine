@@ -33,12 +33,8 @@ namespace OHOS::Ace {
 namespace {
 std::string GetWebLanguageByNodeId(int32_t nodeId)
 {
-    auto& weakNodeCache = Recorder::EventRecorder::Get().GetWeakNodeMap();
-    auto iter = weakNodeCache.find(nodeId);
-    if (iter == weakNodeCache.end()) {
-        return "";
-    }
-    auto node = iter->second.Upgrade();
+    auto weakNode = Recorder::EventRecorder::Get().GetWebNode(nodeId);
+    auto node = weakNode.Upgrade();
     CHECK_NULL_RETURN(node, "");
     auto pattern = node->GetPattern();
     CHECK_NULL_RETURN(pattern, "");

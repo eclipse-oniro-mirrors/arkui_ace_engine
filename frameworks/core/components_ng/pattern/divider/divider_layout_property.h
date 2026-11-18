@@ -32,7 +32,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<DividerLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propVertical_ = CloneVertical();
         value->propStrokeWidth_ = CloneStrokeWidth();
         value->propStrokeWidthLimitation_ = CloneStrokeWidthLimitation();

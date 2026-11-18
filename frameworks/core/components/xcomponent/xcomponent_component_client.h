@@ -42,7 +42,7 @@ public:
             LOGE("xcomponent: %s not exists", xcomponentId.c_str());
             return nullptr;
         }
-        return AceType::DynamicCast<XComponentComponent>(iter->second.Upgrade());
+        return iter->second.Upgrade();
     }
 
     void AddXComponentToXcomponentsMap(const std::string& xcomponentId, const RefPtr<XComponentComponent>& component)

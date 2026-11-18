@@ -49,6 +49,12 @@ struct ForceSplitParam {
     std::unordered_map<std::string, std::unordered_set<std::string>> pagePairs;
     // For ForceSplitBehaviorMode::DISPLACE
     std::unordered_set<std::string> transPages;
+    // Master switch of page-level split control
+    bool enablePageLevelSplit = false;
+    // Page-level split options: page name -> split(true means the page uses split layout)
+    std::unordered_map<std::string, bool> pageSplitOptions;
+    // Whether pages without an explicit option follow the upstream page's split state
+    bool enableInheritSplitStrategy = false;
 };
 
 class ForceSplitUtils {
@@ -62,7 +68,10 @@ public:
     static bool ParseForceSplitParam(bool isRouter, const std::string& configJsonStr, ForceSplitParam& config);
     static void LogForceSplitParam(bool isRouter, const ForceSplitParam& config);
 private:
+    static bool ParseHomePageAndRelatedPageConfig(const std::unique_ptr<JsonValue>& configJson,
+        ForceSplitParam& config);
     static bool ParseCommonConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
+    static bool ParsePageLevelSplitConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
     static bool ParseBehaviorModeConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
     static bool ParseFullScreenPages(const std::unique_ptr<JsonValue>& fullScreenPages, ForceSplitParam& config);
     static bool ParseSplitDividerColor(const std::unique_ptr<JsonValue>& splitDividerColor, ForceSplitParam& config);
@@ -71,6 +80,7 @@ private:
     static bool ParseNavigationOptions(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
     static bool ParsePagePairs(const std::unique_ptr<JsonValue>& pagePairs, ForceSplitParam& config);
     static bool ParseTransPages(const std::unique_ptr<JsonValue>& transPages, ForceSplitParam& config);
+    static bool ParsePageSplitOptions(const std::unique_ptr<JsonValue>& pageSplitOptions, ForceSplitParam& config);
 };
 
 } // namespace OHOS::Ace::NG

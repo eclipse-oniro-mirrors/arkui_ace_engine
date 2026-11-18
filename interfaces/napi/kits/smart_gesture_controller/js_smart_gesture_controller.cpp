@@ -14,9 +14,10 @@
  */
 
 #include <algorithm>
+#include <iterator>
 #include <memory>
+#include <mutex>
 #include <optional>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -428,10 +429,12 @@ private:
 
 class SmartGestureMonitorState final {
 public:
-    static std::shared_ptr<SmartGestureMonitorState> Create(napi_env env, int32_t instanceId, napi_value callback)
+    static std::shared_ptr<SmartGestureMonitorState> Create(
+        napi_env env, int32_t instanceId, napi_value callback, napi_value originalCallback)
     {
         auto state = std::make_shared<SmartGestureMonitorState>(env, instanceId);
         CHECK_NULL_RETURN(state && state->SetMonitorRef(callback), nullptr);
+        CHECK_NULL_RETURN(state->SetOriginalRef(originalCallback), nullptr);
         return state;
     }
 
@@ -440,6 +443,7 @@ public:
     ~SmartGestureMonitorState()
     {
         ResetMonitorRef();
+        ResetOriginalRef();
     }
 
     NG::SmartGestureHandlingResolution Invoke(const NG::SmartGestureProposal& defaultProposal) const
@@ -484,7 +488,7 @@ public:
         return env_;
     }
 
-    bool MatchesCallback(napi_env env, napi_value callback) const
+    bool MatchesCallback(napi_env env, napi_value callback, napi_value originalCallback) const
     {
         CHECK_NULL_RETURN(env_ != nullptr, false);
         CHECK_NULL_RETURN(env == env_, false);
@@ -493,13 +497,12 @@ public:
         if (IsStrictlyEqual(env_, currentCallback, callback)) {
             return true;
         }
-        auto originalCallback = GetOriginalMonitorCallback(env_, currentCallback);
-        if (originalCallback == nullptr) {
-            return false;
+        auto storedOriginalCallback = GetOriginalCallback();
+        CHECK_NULL_RETURN(storedOriginalCallback != nullptr, false);
+        if (IsStrictlyEqual(env_, storedOriginalCallback, callback)) {
+            return true;
         }
-        auto inputOriginalCallback = GetOriginalMonitorCallback(env_, callback);
-        return IsStrictlyEqual(env_, originalCallback, callback) ||
-               IsStrictlyEqual(env_, originalCallback, inputOriginalCallback);
+        return IsStrictlyEqual(env_, storedOriginalCallback, originalCallback);
     }
 
     int32_t GetInstanceId() const
@@ -510,6 +513,7 @@ public:
     void Detach()
     {
         ResetMonitorRef();
+        ResetOriginalRef();
         env_ = nullptr;
         instanceId_ = -1;
     }
@@ -522,12 +526,30 @@ private:
         return true;
     }
 
+    bool SetOriginalRef(napi_value originalCallback)
+    {
+        if (originalCallback == nullptr) {
+            return true;
+        }
+        CHECK_NULL_RETURN(env_ != nullptr, false);
+        NAPI_CALL_BASE(env_, napi_create_reference(env_, originalCallback, 1, &originalRef_), false);
+        return true;
+    }
+
     void ResetMonitorRef()
     {
         if (env_ != nullptr && monitorRef_ != nullptr) {
             napi_delete_reference(env_, monitorRef_);
         }
         monitorRef_ = nullptr;
+    }
+
+    void ResetOriginalRef()
+    {
+        if (env_ != nullptr && originalRef_ != nullptr) {
+            napi_delete_reference(env_, originalRef_);
+        }
+        originalRef_ = nullptr;
     }
 
     napi_value GetCallback() const
@@ -539,92 +561,113 @@ private:
         return callback;
     }
 
+    napi_value GetOriginalCallback() const
+    {
+        CHECK_NULL_RETURN(env_, nullptr);
+        CHECK_NULL_RETURN(originalRef_ != nullptr, nullptr);
+        napi_value originalCallback = nullptr;
+        CHECK_NULL_RETURN(napi_get_reference_value(env_, originalRef_, &originalCallback) == napi_ok, nullptr);
+        return originalCallback;
+    }
+
     napi_env env_ = nullptr;
     int32_t instanceId_ = -1;
     napi_ref monitorRef_ = nullptr;
+    napi_ref originalRef_ = nullptr;
 };
 
 class SmartGestureMonitorRegistry final {
 public:
     static bool Register(napi_env env, int32_t instanceId, napi_value callback)
     {
-        auto iter = states_.find(instanceId);
-        if (iter != states_.end()) {
-            for (const auto& state : iter->second) {
-                if (state && state->MatchesCallback(env, callback)) {
+        auto originalCallback = GetOriginalMonitorCallback(env, callback);
+        std::lock_guard<std::mutex> lock(context_.mutex);
+        auto iter = context_.states.find(instanceId);
+        if (iter != context_.states.end()) {
+            for (const auto& existingState : iter->second) {
+                if (existingState && existingState->MatchesCallback(env, callback, originalCallback)) {
                     return true;
                 }
             }
         }
-        auto state = SmartGestureMonitorState::Create(env, instanceId, callback);
-        if (!state) {
+        if (!AcquireEnvCleanupHookLocked(env)) {
             return false;
         }
-        if (!AcquireEnvCleanupHook(env)) {
-            return false;
-        }
-        states_[instanceId].emplace_back(std::move(state));
+        auto state = SmartGestureMonitorState::Create(env, instanceId, callback, originalCallback);
+        CHECK_NULL_RETURN(state, false);
+        context_.states[instanceId].emplace_back(std::move(state));
         return true;
     }
 
     static bool Unregister(napi_env env, int32_t instanceId, napi_value callback)
     {
+        auto originalCallback = GetOriginalMonitorCallback(env, callback);
         std::shared_ptr<SmartGestureMonitorState> stateToDetach;
-        auto iter = states_.find(instanceId);
-        if (iter == states_.end() || iter->second.empty()) {
-            return false;
-        }
-        auto& stateStack = iter->second;
-        for (auto reverseIter = stateStack.rbegin(); reverseIter != stateStack.rend(); ++reverseIter) {
-            auto state = *reverseIter;
-            if (!state || !state->MatchesCallback(env, callback)) {
-                continue;
+        bool removed = false;
+        {
+            std::lock_guard<std::mutex> lock(context_.mutex);
+            auto iter = context_.states.find(instanceId);
+            if (iter == context_.states.end() || iter->second.empty()) {
+                return false;
             }
-            stateToDetach = state;
-            stateStack.erase(std::next(reverseIter).base());
-            break;
+            auto& stateStack = iter->second;
+            for (auto reverseIter = stateStack.rbegin(); reverseIter != stateStack.rend(); ++reverseIter) {
+                auto state = *reverseIter;
+                if (!state || !state->MatchesCallback(env, callback, originalCallback)) {
+                    continue;
+                }
+                stateToDetach = state;
+                stateStack.erase(std::next(reverseIter).base());
+                removed = true;
+                break;
+            }
+            if (stateStack.empty()) {
+                context_.states.erase(iter);
+            }
+            context_.DeferDetachLocked(stateToDetach);
         }
-        if (stateStack.empty()) {
-            states_.erase(iter);
+        if (stateToDetach) {
+            stateToDetach->Detach();
         }
-        if (!stateToDetach) {
-            return false;
-        }
-        InvokeScope::DetachOrDefer(std::move(stateToDetach));
-        return true;
+        return removed;
     }
 
     static bool Clear(int32_t instanceId)
     {
         std::vector<std::shared_ptr<SmartGestureMonitorState>> statesToDetach;
-        auto iter = states_.find(instanceId);
-        if (iter == states_.end() || iter->second.empty()) {
-            return false;
+        {
+            std::lock_guard<std::mutex> lock(context_.mutex);
+            auto iter = context_.states.find(instanceId);
+            if (iter == context_.states.end() || iter->second.empty()) {
+                return false;
+            }
+            statesToDetach = std::move(iter->second);
+            context_.states.erase(iter);
+            context_.DeferDetachLocked(statesToDetach);
         }
-        statesToDetach = std::move(iter->second);
-        states_.erase(iter);
-        for (auto& state : statesToDetach) {
-            InvokeScope::DetachOrDefer(std::move(state));
+        for (const auto& state : statesToDetach) {
+            if (state) {
+                state->Detach();
+            }
         }
         return true;
     }
 
     static bool HasMonitor(int32_t instanceId)
     {
-        auto iter = states_.find(instanceId);
-        return iter != states_.end() && !iter->second.empty();
+        std::lock_guard<std::mutex> lock(context_.mutex);
+        auto iter = context_.states.find(instanceId);
+        return iter != context_.states.end() && !iter->second.empty();
     }
 
     static NG::SmartGestureHandlingResolution Invoke(
         int32_t instanceId, const NG::SmartGestureProposal& defaultProposal)
     {
-        std::vector<std::shared_ptr<SmartGestureMonitorState>> states;
-        auto iter = states_.find(instanceId);
-        if (iter == states_.end() || iter->second.empty()) {
+        InvokeScope invokeScope(context_, instanceId);
+        const auto& states = invokeScope.GetStates();
+        if (states.empty()) {
             return CreateAcceptedResolution();
         }
-        states = iter->second;
-        InvokeScope invokeScope;
         for (auto iter = states.rbegin(); iter != states.rend(); ++iter) {
             auto state = *iter;
             CHECK_NULL_CONTINUE(state);
@@ -644,28 +687,24 @@ public:
 private:
     using InvokeScope = NG::SmartGestureMonitorInvokeScope<SmartGestureMonitorState>;
 
+    struct RegistryContext final : NG::SmartGestureMonitorRegistryContext<SmartGestureMonitorState> {
+        // Register one cleanup hook per env to release its monitors before the env is destroyed.
+        std::unordered_set<napi_env> cleanupHookEnvs;
+    };
+
     static void HandleEnvCleanup(void* data)
     {
         auto env = static_cast<napi_env>(data);
         std::vector<std::shared_ptr<SmartGestureMonitorState>> statesToDetach;
-        for (auto iter = states_.begin(); iter != states_.end();) {
-            auto& stateStack = iter->second;
-            auto removeIter = std::remove_if(stateStack.begin(), stateStack.end(),
-                [&statesToDetach, env](const std::shared_ptr<SmartGestureMonitorState>& state) {
-                    if (!state || state->GetEnv() != env) {
-                        return false;
-                    }
-                    statesToDetach.emplace_back(state);
-                    return true;
-                });
-            stateStack.erase(removeIter, stateStack.end());
-            if (!stateStack.empty()) {
-                ++iter;
-                continue;
-            }
-            iter = states_.erase(iter);
+        {
+            std::lock_guard<std::mutex> lock(context_.mutex);
+            // Take both registered and deferred states before this env is destroyed. VM access and
+            // cleanup must still follow the runtime's owning-thread and teardown contracts.
+            statesToDetach = context_.CloseEnvLocked(env);
+            context_.cleanupHookEnvs.erase(env);
         }
-        cleanupHookEnvs_.erase(env);
+        // The cleanup hook runs while env is still valid, so its references are released here
+        // instead of being handed to whichever thread exits another instance's invocation.
         for (const auto& state : statesToDetach) {
             if (state) {
                 state->Detach();
@@ -673,30 +712,27 @@ private:
         }
     }
 
-    static bool AcquireEnvCleanupHook(napi_env env)
+    // The caller must hold context_.mutex throughout the hook check, registration and bookkeeping.
+    static bool AcquireEnvCleanupHookLocked(napi_env env)
     {
         if (env == nullptr) {
             return false;
         }
-        if (cleanupHookEnvs_.find(env) != cleanupHookEnvs_.end()) {
+        if (context_.cleanupHookEnvs.find(env) != context_.cleanupHookEnvs.end()) {
             return true;
         }
         if (napi_add_env_cleanup_hook(env, HandleEnvCleanup, env) != napi_ok) {
             return false;
         }
-        cleanupHookEnvs_.insert(env);
+        context_.cleanupHookEnvs.insert(env);
         return true;
     }
 
-    static std::unordered_map<int32_t, std::vector<std::shared_ptr<SmartGestureMonitorState>>> states_;
-    static std::unordered_set<napi_env> cleanupHookEnvs_;
+    static RegistryContext context_;
 };
 
 // 一个instanceId下允许注册多个monitor回调，按注册顺序保存，触发时按后进先出执行。
-std::unordered_map<int32_t, std::vector<std::shared_ptr<SmartGestureMonitorState>>>
-    SmartGestureMonitorRegistry::states_;
-// 一个env只注册一次cleanup hook，env销毁时统一清理其名下的monitor回调。
-std::unordered_set<napi_env> SmartGestureMonitorRegistry::cleanupHookEnvs_;
+SmartGestureMonitorRegistry::RegistryContext SmartGestureMonitorRegistry::context_;
 
 RefPtr<NG::SmartGestureManager> GetManagerByInstanceId(int32_t instanceId)
 {

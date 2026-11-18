@@ -20,6 +20,7 @@
 
 #include "core/common/ace_engine.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/node_sensitive_input.h"
 #include "core/components_ng/base/node_render_status_monitor.h"
 #include "interfaces/napi/kits/observer/gesture/gesture_observer.h"
 #include "interfaces/napi/kits/utils/napi_utils.h"
@@ -107,6 +108,7 @@ constexpr char BEFORE_PAN_END[] = "beforePanEnd";
 constexpr char AFTER_PAN_START[] = "afterPanStart";
 constexpr char AFTER_PAN_END[] = "afterPanEnd";
 constexpr char NODE_RENDER_STATE[] = "nodeRenderState";
+constexpr char NODE_SENSITIVE_INPUT[] = "nodeSensitiveInput";
 constexpr char TEXT_CHANGE[] = "textChange";
 constexpr char SWIPER_CONTENT_UPDATE[] = "swiperContentUpdate";
 constexpr char WIN_SIZE_LAYOUT_BREAKPOINT[] = "windowSizeLayoutBreakpointChange";
@@ -212,6 +214,19 @@ RefPtr<NG::FrameNode> ParseNodeRenderStateFrameNode(napi_env env, napi_value val
         return frameNode;
     }
     return nullptr;
+}
+
+RefPtr<NG::FrameNode> ParseNodeSensitiveInputFrameNode(napi_env env, napi_value value)
+{
+    auto node = ParseNodeRenderStateFrameNode(env, value);
+    CHECK_NULL_RETURN(node, nullptr);
+    auto context = node->GetContextRefPtr();
+    if (!context || context->GetInstanceId() != Container::CurrentIdSafely() ||
+        node->GetTag() == V2::ROOT_ETS_TAG || node->GetTag() == V2::STAGE_ETS_TAG ||
+        node->GetTag() == V2::PAGE_ETS_TAG) {
+        return nullptr;
+    }
+    return node;
 }
 
 struct NavDestinationSwitchParams {
@@ -400,6 +415,7 @@ ObserverProcess::ObserverProcess()
         { BEFORE_PAN_END, &ObserverProcess::ProcessBeforePanEndRegister },
         { AFTER_PAN_END, &ObserverProcess::ProcessAfterPanEndRegister },
         { NODE_RENDER_STATE, &ObserverProcess::ProcessNodeRenderStateRegister },
+        { NODE_SENSITIVE_INPUT, &ObserverProcess::ProcessNodeSensitiveInputRegister },
         { TEXT_CHANGE, &ObserverProcess::ProcessTextChangeEventRegister },
         { SWIPER_CONTENT_UPDATE, &ObserverProcess::ProcessSwiperContentUpdateRegister },
     };
@@ -411,7 +427,7 @@ ObserverProcess::ObserverProcess()
         { DENSITY_UPDATE, &ObserverProcess::ProcessDensityUnRegister },
         { WIN_SIZE_LAYOUT_BREAKPOINT, &ObserverProcess::ProcessWinSizeLayoutBreakpointUnRegister },
         { LAYOUT_DONE, &ObserverProcess::ProcessLayoutDoneUnRegister },
-        { DRAW_COMMAND_SEND, &ObserverProcess::ProcessDrawCommandSendUnRegister},
+        { DRAW_COMMAND_SEND, &ObserverProcess::ProcessDrawCommandSendUnRegister },
         { NAVDESTINATION_SWITCH, &ObserverProcess::ProcessNavDestinationSwitchUnRegister },
         { WILLCLICK_UPDATE, &ObserverProcess::ProcessWillClickUnRegister },
         { DIDCLICK_UPDATE, &ObserverProcess::ProcessDidClickUnRegister },
@@ -422,6 +438,7 @@ ObserverProcess::ObserverProcess()
         { BEFORE_PAN_END, &ObserverProcess::ProcessBeforePanEndUnRegister },
         { AFTER_PAN_END, &ObserverProcess::ProcessAfterPanEndUnRegister },
         { NODE_RENDER_STATE, &ObserverProcess::ProcessNodeRenderStateUnRegister },
+        { NODE_SENSITIVE_INPUT, &ObserverProcess::ProcessNodeSensitiveInputUnRegister },
         { TEXT_CHANGE, &ObserverProcess::ProcessTextChangeEventUnRegister },
         { SWIPER_CONTENT_UPDATE, &ObserverProcess::ProcessSwiperContentUpdateUnRegister },
     };
@@ -1555,6 +1572,36 @@ napi_value ObserverProcess::ProcessNodeRenderStateUnRegister(napi_env env, napi_
     return nullptr;
 }
 
+napi_value ObserverProcess::ProcessNodeSensitiveInputRegister(napi_env env, napi_callback_info info)
+{
+    GET_PARAMS(env, info, PARAM_SIZE_THREE);
+    if (!isNodeSensitiveInputHandleFuncSetted_) {
+        NG::UIObserverHandler::GetInstance().SetNodeSensitiveInputHandleFunc(&UIObserver::HandleNodeSensitiveInput);
+        isNodeSensitiveInputHandleFuncSetted_ = true;
+    }
+    if (argc == PARAM_SIZE_THREE && MatchValueType(env, argv[PARAM_INDEX_TWO], napi_function)) {
+        auto frameNode = ParseNodeSensitiveInputFrameNode(env, argv[PARAM_INDEX_ONE]);
+        auto listener = std::make_shared<UIObserverListener>(env, argv[PARAM_INDEX_TWO]);
+        UIObserver::RegisterNodeSensitiveInputCallback(frameNode, listener, argv[PARAM_INDEX_TWO]);
+    }
+    return nullptr;
+}
+
+napi_value ObserverProcess::ProcessNodeSensitiveInputUnRegister(napi_env env, napi_callback_info info)
+{
+    GET_PARAMS(env, info, PARAM_SIZE_THREE);
+    RefPtr<NG::FrameNode> frameNode;
+    napi_value callback = nullptr;
+    if (argc >= PARAM_SIZE_TWO) {
+        frameNode = ParseNodeSensitiveInputFrameNode(env, argv[PARAM_INDEX_ONE]);
+    }
+    if (argc == PARAM_SIZE_THREE && MatchValueType(env, argv[PARAM_INDEX_TWO], napi_function)) {
+        callback = argv[PARAM_INDEX_TWO];
+    }
+    UIObserver::UnRegisterNodeSensitiveInputCallback(frameNode, callback);
+    return nullptr;
+}
+
 napi_value ObserverProcess::ProcessTextChangeEventRegister(napi_env env, napi_callback_info info)
 {
     GET_PARAMS(env, info, PARAM_SIZE_THREE);
@@ -1913,6 +1960,20 @@ napi_value AddToNodeRenderStateType(napi_env env)
     return nodeRenderStateType;
 }
 
+napi_value AddToNodeSensitiveInputEventType(napi_env env)
+{
+    napi_value eventType = nullptr;
+    napi_value prop = nullptr;
+    napi_create_object(env, &eventType);
+    napi_create_uint32(env, static_cast<uint32_t>(NG::NodeSensitiveInputEventType::TOUCH), &prop);
+    napi_set_named_property(env, eventType, "TOUCH", prop);
+    napi_create_uint32(env, static_cast<uint32_t>(NG::NodeSensitiveInputEventType::MOUSE), &prop);
+    napi_set_named_property(env, eventType, "MOUSE", prop);
+    napi_create_uint32(env, static_cast<uint32_t>(NG::NodeSensitiveInputEventType::KEY), &prop);
+    napi_set_named_property(env, eventType, "KEY", prop);
+    return eventType;
+}
+
 napi_value AddToTabContentState(napi_env env)
 {
     napi_value tabContentState = nullptr;
@@ -1990,17 +2051,16 @@ static napi_value UIObserverExport(napi_env env, napi_value exports)
 
     napi_value nodeRenderStateType = nullptr;
     nodeRenderStateType = AddToNodeRenderStateType(env);
+    napi_value nodeSensitiveInputEventType = AddToNodeSensitiveInputEventType(env);
 
-    napi_property_descriptor uiObserverDesc[] = {
-        DECLARE_NAPI_FUNCTION("on", ObserverOn),
-        DECLARE_NAPI_FUNCTION("off", ObserverOff),
-        DECLARE_NAPI_PROPERTY("NavDestinationState", navDestinationState),
+    napi_property_descriptor uiObserverDesc[] = { DECLARE_NAPI_FUNCTION("on", ObserverOn),
+        DECLARE_NAPI_FUNCTION("off", ObserverOff), DECLARE_NAPI_PROPERTY("NavDestinationState", navDestinationState),
         DECLARE_NAPI_PROPERTY("ScrollEventType", scrollEventType),
         DECLARE_NAPI_PROPERTY("RouterPageState", routerPageState),
-        DECLARE_NAPI_PROPERTY("TabContentState", tabContentState),
-        DECLARE_NAPI_PROPERTY("GestureType", gestureType),
+        DECLARE_NAPI_PROPERTY("TabContentState", tabContentState), DECLARE_NAPI_PROPERTY("GestureType", gestureType),
         DECLARE_NAPI_PROPERTY("GestureRecognizerState", gestureRecognizerState),
         DECLARE_NAPI_PROPERTY("NodeRenderState", nodeRenderStateType),
+        DECLARE_NAPI_PROPERTY("NodeSensitiveInputEventType", nodeSensitiveInputEventType),
         DECLARE_NAPI_FUNCTION("onSwiperContentUpdate", OnSwiperContentUpdate),
         DECLARE_NAPI_FUNCTION("offSwiperContentUpdate", OffSwiperContentUpdate),
         DECLARE_NAPI_FUNCTION("onRouterPageSizeChange", OnRouterPageSizeChange),
@@ -2008,8 +2068,7 @@ static napi_value UIObserverExport(napi_env env, napi_value exports)
         DECLARE_NAPI_FUNCTION("onNavDestinationSizeChange", OnNavDestinationSizeChange),
         DECLARE_NAPI_FUNCTION("offNavDestinationSizeChange", OffNavDestinationSizeChange),
         DECLARE_NAPI_FUNCTION("onNavDestinationSizeChangeByUniqueId", OnNavDestinationSizeChangeByUniqueId),
-        DECLARE_NAPI_FUNCTION("offNavDestinationSizeChangeByUniqueId", OffNavDestinationSizeChangeByUniqueId)
-    };
+        DECLARE_NAPI_FUNCTION("offNavDestinationSizeChangeByUniqueId", OffNavDestinationSizeChangeByUniqueId) };
     NAPI_CALL(
         env, napi_define_properties(env, exports, sizeof(uiObserverDesc) / sizeof(uiObserverDesc[0]), uiObserverDesc));
     NAPI_CALL(env, GestureObserver::DefineGestureObserver(env, exports));

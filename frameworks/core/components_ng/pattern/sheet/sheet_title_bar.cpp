@@ -319,7 +319,8 @@ void SheetPresentationPattern::UpdateTitleBarZIndex()
     UpdateNodeZIndex(GetSheetCloseIcon(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
     UpdateNodeZIndex(GetDragBarNode(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
 
-    if (preScrollSelfHeight_.has_value() && preTitleStackMode_ != titleUseStackMode) {
+    if (preScrollSelfHeight_.has_value() && preTitleStackMode_ != titleUseStackMode &&
+        sheetStyle.sheetType.value_or(SheetType::SHEET_BOTTOM) != SheetType::SHEET_POPUP) {
         auto scrollNode = GetSheetScrollNode();
         CHECK_NULL_VOID(scrollNode);
         auto scrollProps = scrollNode->GetLayoutProperty<ScrollLayoutProperty>();

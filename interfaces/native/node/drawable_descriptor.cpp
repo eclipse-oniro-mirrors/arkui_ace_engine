@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "config_manager.h"
 #include "node_extened.h"
 #include "node_model.h"
 
@@ -93,6 +94,7 @@ int32_t OH_ArkUI_DrawableDescriptor_GetAnimatedPixelMapArraySize(ArkUI_DrawableD
 
 void OH_ArkUI_DrawableDescriptor_SetAnimationDuration(ArkUI_DrawableDescriptor* drawableDescriptor, int32_t duration)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_SetAnimationDuration");
     CHECK_NULL_VOID(drawableDescriptor);
     CHECK_NULL_VOID(drawableDescriptor->newDrawableDescriptor);
     OHOS::Ace::NodeModel::SetTotalDuration(drawableDescriptor->newDrawableDescriptor, duration);
@@ -100,6 +102,7 @@ void OH_ArkUI_DrawableDescriptor_SetAnimationDuration(ArkUI_DrawableDescriptor* 
 
 int32_t OH_ArkUI_DrawableDescriptor_GetAnimationDuration(ArkUI_DrawableDescriptor* drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_GetAnimationDuration");
     CHECK_NULL_RETURN(drawableDescriptor, -1);
     CHECK_NULL_RETURN(drawableDescriptor->newDrawableDescriptor, -1);
     return OHOS::Ace::NodeModel::GetTotalDuration(drawableDescriptor->newDrawableDescriptor);
@@ -107,6 +110,7 @@ int32_t OH_ArkUI_DrawableDescriptor_GetAnimationDuration(ArkUI_DrawableDescripto
 
 void OH_ArkUI_DrawableDescriptor_SetAnimationIteration(ArkUI_DrawableDescriptor* drawableDescriptor, int32_t iteration)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_SetAnimationIteration");
     CHECK_NULL_VOID(drawableDescriptor);
     CHECK_NULL_VOID(drawableDescriptor->newDrawableDescriptor);
     OHOS::Ace::NodeModel::SetIterations(drawableDescriptor->newDrawableDescriptor, iteration);
@@ -114,6 +118,7 @@ void OH_ArkUI_DrawableDescriptor_SetAnimationIteration(ArkUI_DrawableDescriptor*
 
 int32_t OH_ArkUI_DrawableDescriptor_GetAnimationIteration(ArkUI_DrawableDescriptor* drawableDescriptor)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_GetAnimationIteration");
     CHECK_NULL_RETURN(drawableDescriptor, 1);
     CHECK_NULL_RETURN(drawableDescriptor->newDrawableDescriptor, 1);
     return OHOS::Ace::NodeModel::GetIterations(drawableDescriptor->newDrawableDescriptor);
@@ -122,6 +127,7 @@ int32_t OH_ArkUI_DrawableDescriptor_GetAnimationIteration(ArkUI_DrawableDescript
 int32_t OH_ArkUI_DrawableDescriptor_SetAnimationFrameDurations(
     ArkUI_DrawableDescriptor* drawableDescriptor, uint32_t* durations, size_t size)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_SetAnimationFrameDurations");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The drawableDescriptor input parameter is nullptr");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
@@ -134,6 +140,7 @@ int32_t OH_ArkUI_DrawableDescriptor_SetAnimationFrameDurations(
 int32_t OH_ArkUI_DrawableDescriptor_GetAnimationFrameDurations(
     ArkUI_DrawableDescriptor* drawableDescriptor, uint32_t* durations, size_t* size)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_GetAnimationFrameDurations");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The drawableDescriptor input parameter is nullptr");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
@@ -146,6 +153,7 @@ int32_t OH_ArkUI_DrawableDescriptor_GetAnimationFrameDurations(
 int32_t OH_ArkUI_DrawableDescriptor_SetAnimationAutoPlay(
     ArkUI_DrawableDescriptor* drawableDescriptor, uint32_t autoPlay)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_SetAnimationAutoPlay");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The drawableDescriptor input parameter is nullptr");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
@@ -156,6 +164,7 @@ int32_t OH_ArkUI_DrawableDescriptor_SetAnimationAutoPlay(
 int32_t OH_ArkUI_DrawableDescriptor_GetAnimationAutoPlay(
     ArkUI_DrawableDescriptor* drawableDescriptor, uint32_t* autoPlay)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_GetAnimationAutoPlay");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The drawableDescriptor input parameter is nullptr");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
@@ -168,6 +177,7 @@ int32_t OH_ArkUI_DrawableDescriptor_GetAnimationAutoPlay(
 int32_t OH_ArkUI_DrawableDescriptor_SetAnimationStopMode(
     ArkUI_DrawableDescriptor* drawableDescriptor, DrawableDescriptor_AnimationStopMode mode)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_SetAnimationStopMode");
     CHECK_NULL_RETURN(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     return OHOS::Ace::NodeModel::SetStopMode(drawableDescriptor->newDrawableDescriptor, static_cast<int32_t>(mode));
@@ -176,6 +186,7 @@ int32_t OH_ArkUI_DrawableDescriptor_SetAnimationStopMode(
 int32_t OH_ArkUI_DrawableDescriptor_GetAnimationStopMode(
     const ArkUI_DrawableDescriptor* drawableDescriptor, DrawableDescriptor_AnimationStopMode* mode)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_GetAnimationStopMode");
     CHECK_NULL_RETURN(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(mode, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
@@ -191,23 +202,27 @@ int32_t OH_ArkUI_DrawableDescriptor_GetAnimationStopMode(
 int32_t OH_ArkUI_DrawableDescriptor_CreateAnimationController(ArkUI_DrawableDescriptor* drawableDescriptor,
     ArkUI_NodeHandle node, ArkUI_DrawableDescriptor_AnimationController** controller)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_CreateAnimationController");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The drawableDescriptor input parameter is nullptr");
     CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor->newDrawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The drawableDescriptor is not an animated image object");
     CHECK_NULL_RETURN_WITH_MESSAGE(controller, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The controller input parameter is nullptr");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     return OHOS::Ace::NodeModel::CreateAnimationController(drawableDescriptor->newDrawableDescriptor, node, controller);
 }
 
 void OH_ArkUI_DrawableDescriptor_DisposeAnimationController(ArkUI_DrawableDescriptor_AnimationController* controller)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_DisposeAnimationController");
     CHECK_NULL_VOID(controller);
     OHOS::Ace::NodeModel::DisposeAnimationController(controller);
 }
 
 int32_t OH_ArkUI_DrawableDescriptor_StartAnimation(ArkUI_DrawableDescriptor_AnimationController* controller)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_StartAnimation");
     CHECK_NULL_RETURN_WITH_MESSAGE(controller, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The controller input parameter is nullptr");
     return OHOS::Ace::NodeModel::StartAnimation(controller);
@@ -215,6 +230,7 @@ int32_t OH_ArkUI_DrawableDescriptor_StartAnimation(ArkUI_DrawableDescriptor_Anim
 
 int32_t OH_ArkUI_DrawableDescriptor_StopAnimation(ArkUI_DrawableDescriptor_AnimationController* controller)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_StopAnimation");
     CHECK_NULL_RETURN_WITH_MESSAGE(controller, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The controller input parameter is nullptr");
     return OHOS::Ace::NodeModel::StopAnimation(controller);
@@ -222,6 +238,7 @@ int32_t OH_ArkUI_DrawableDescriptor_StopAnimation(ArkUI_DrawableDescriptor_Anima
 
 int32_t OH_ArkUI_DrawableDescriptor_ResumeAnimation(ArkUI_DrawableDescriptor_AnimationController* controller)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_ResumeAnimation");
     CHECK_NULL_RETURN_WITH_MESSAGE(controller, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The controller input parameter is nullptr");
     return OHOS::Ace::NodeModel::ResumeAnimation(controller);
@@ -229,6 +246,7 @@ int32_t OH_ArkUI_DrawableDescriptor_ResumeAnimation(ArkUI_DrawableDescriptor_Ani
 
 int32_t OH_ArkUI_DrawableDescriptor_PauseAnimation(ArkUI_DrawableDescriptor_AnimationController* controller)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_PauseAnimation");
     CHECK_NULL_RETURN_WITH_MESSAGE(controller, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The controller input parameter is nullptr");
     return OHOS::Ace::NodeModel::PauseAnimation(controller);
@@ -237,6 +255,7 @@ int32_t OH_ArkUI_DrawableDescriptor_PauseAnimation(ArkUI_DrawableDescriptor_Anim
 int32_t OH_ArkUI_DrawableDescriptor_GetAnimationStatus(
     ArkUI_DrawableDescriptor_AnimationController* controller, DrawableDescriptor_AnimationStatus* status)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DrawableDescriptor_GetAnimationStatus");
     CHECK_NULL_RETURN_WITH_MESSAGE(controller, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "The controller input parameter is nullptr");
     CHECK_NULL_RETURN_WITH_MESSAGE(status, OHOS::Ace::ERROR_CODE_PARAM_INVALID,

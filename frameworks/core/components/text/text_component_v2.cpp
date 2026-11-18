@@ -37,7 +37,7 @@ void TextComponentV2::CheckAndSetChildStyle(const RefPtr<Component>& child)
         LOGW("child of text is not valid.");
         return;
     }
-    auto spanDeclaration = AceType::DynamicCast<SpanDeclaration>(spanComponent->GetDeclaration());
+    auto spanDeclaration = spanComponent->GetDeclaration();
     if (!spanDeclaration) {
         LOGW("declaration of span is not valid.");
         return;

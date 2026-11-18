@@ -63,6 +63,17 @@ void PutTreeDimension(JsonValue& json, const char* key, const std::optional<Dime
     }
 }
 
+void PutTreeGradientCenter(JsonValue& json, const char* key, const std::optional<Dimension>& value)
+{
+    if (!value) {
+        return;
+    }
+    // Gradient centers store percentages on a 0..100 scale; radius dimensions use 0..1.
+    const auto text = value->Unit() == DimensionUnit::PERCENT
+        ? StringUtils::DoubleToString(value->Value()) + "%" : value->ToString();
+    json.Put(key, text.c_str());
+}
+
 void PutTreeGradientColors(JsonValue& json, const Gradient& data)
 {
     auto colors = JsonUtil::CreateArray();
@@ -118,8 +129,8 @@ void PutTreeSweepGradient(JsonValue& json, const Gradient& data)
 {
     const auto& sweep = data.GetSweepGradient();
     CHECK_NULL_VOID(sweep);
-    PutTreeDimension(json, "centerX", sweep->centerX);
-    PutTreeDimension(json, "centerY", sweep->centerY);
+    PutTreeGradientCenter(json, "centerX", sweep->centerX);
+    PutTreeGradientCenter(json, "centerY", sweep->centerY);
     PutTreeDimension(json, "startAngle", sweep->startAngle, true);
     PutTreeDimension(json, "endAngle", sweep->endAngle, true);
     PutTreeDimension(json, "rotation", sweep->rotation, true);
@@ -129,8 +140,8 @@ void PutTreeRadialGradient(JsonValue& json, const Gradient& data)
 {
     const auto& radial = data.GetRadialGradient();
     CHECK_NULL_VOID(radial);
-    PutTreeDimension(json, "centerX", radial->radialCenterX);
-    PutTreeDimension(json, "centerY", radial->radialCenterY);
+    PutTreeGradientCenter(json, "centerX", radial->radialCenterX);
+    PutTreeGradientCenter(json, "centerY", radial->radialCenterY);
     PutTreeDimension(json, "horizontalSize", radial->radialHorizontalSize);
     PutTreeDimension(json, "verticalSize", radial->radialVerticalSize);
     if (radial->radialShape) {

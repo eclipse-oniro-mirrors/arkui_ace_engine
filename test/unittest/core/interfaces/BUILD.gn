@@ -89,9 +89,23 @@ ace_unittest("ui_tree_api_test") {
   sources = [ "native/node/ui_tree_api_test.cpp" ]
 }
 
+ace_unittest("capi_handle_conversion_test") {
+  module_name = "UIEngine-Mainprocess"
+  type = "new"
+  if (is_host_product) {
+    type = "host_components"
+  }
+  sources = [
+    "$ace_root/frameworks/core/components_ng/pattern/canvas/bridge/canvas_dynamic_modifier.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/swiper_indicator/bridge/swiper_indicator_dynamic_modifier.cpp",
+    "native/node/capi_handle_conversion_test.cpp",
+  ]
+}
+
 group("core_interfaces_unittest") {
   testonly = true
   deps = [
+    ":capi_handle_conversion_test",
     ":immersive_strategy_ani_modifier_test",
     ":interfaces_test",
     ":ui_event_command_test",

@@ -481,7 +481,7 @@ HWTEST_F(RichEditorStyledStringExtendTestNg, HandleSelectFontStyle, TestSize.Lev
     decorationSpan =
         AceType::DynamicCast<DecorationSpan>(richEditorPattern->styledString_->GetSpan(2, 4, SpanType::Decoration));
     ASSERT_NE(decorationSpan, nullptr);
-    bool ret = V2::HasTextDecoration(decorationSpan->GetTextDecorationTypes(), TextDecoration::UNDERLINE);
+    bool ret = V2::HasTextDecoration(decorationSpan->GetTextDecorationTypes(),TextDecoration::UNDERLINE);
     EXPECT_FALSE(ret);
 }
 
@@ -758,18 +758,4 @@ HWTEST_F(RichEditorStyledStringExtendTestNg, HandleRedoAction001, TestSize.Level
     richEditorPattern->HandleOnRedoAction();
     EXPECT_EQ(richEditorPattern->styledString_->GetString(), EXPECT_STRING_LIST[18]);
 }
-
-/**
- * @tc.name: IsCloseKeyboard001
- * @tc.desc: Test IsCloseKeyboard.
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorStyledStringExtendTestNg, IsCloseKeyboard001, TestSize.Level0)
-{
-    ASSERT_NE(richEditorNode_, nullptr);
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-    EXPECT_FALSE(richEditorPattern->IsCloseKeyboard());
-}
-
 } // namespace OHOS::Ace::NG

@@ -17,6 +17,9 @@ test_sources = [
   "custom_dialog_controller_model_test_ng.cpp",
   "dialog_layout_test_ng.cpp",
   "dialog_layout_test_two_ng.cpp",
+  "dialog_layout_test_three_ng.cpp",
+  "dialog_layout_test_four_ng.cpp",
+  "dialog_layout_safe_area_test_ng.cpp",
   "dialog_model_test_ng.cpp",
   "dialog_model_test_two_ng.cpp",
   "dialog_pattern_test_ng.cpp",
@@ -26,6 +29,8 @@ test_sources = [
   "dialog_test_ng.cpp",
   "dialog_test_two_ng.cpp",
   "dialog_test_core.cpp",
+  "dialog_theme_wrapper_test_ng.cpp",
+  "$ace_root/frameworks/core/components/dialog/dialog_theme.cpp",
 ]
 
 if (is_host_product) {

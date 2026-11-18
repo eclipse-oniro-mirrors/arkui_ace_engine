@@ -17,6 +17,7 @@
 
 #include "base/error/error_code.h"
 #include "base/log/log.h"
+#include "base/utils/napi_scope_raii.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/common/utils/utils.h"
 #include "core/common/ace_application_info.h"
@@ -272,9 +273,8 @@ void GetDialogOnWillDismiss(napi_env env, napi_value options, DialogProperties& 
             if (!dismissRef) {
                 return;
             }
-            napi_handle_scope scope = nullptr;
-            auto ret = napi_open_handle_scope(env, &scope);
-            if ((ret != napi_ok) || (scope == nullptr)) {
+            ScopeRAII scope(env);
+            if (!scope) {
                 TAG_LOGE(AceLogTag::ACE_DIALOG,
                     "onWillDismiss of the dialog failed to open the scope of the handle.");
                 return;
@@ -292,7 +292,6 @@ void GetDialogOnWillDismiss(napi_env env, napi_value options, DialogProperties& 
                     "onWillDismiss of the dialog failed to create dismiss function, status: %{public}d",
                     static_cast<int>(createStatus));
                 delete id;
-                napi_close_handle_scope(env, scope);
                 return;
             }
             napi_set_named_property(env, paramObj, "dismiss", funcValue);
@@ -307,7 +306,6 @@ void GetDialogOnWillDismiss(napi_env env, napi_value options, DialogProperties& 
             if (status != napi_ok) {
                 delete id;
                 TAG_LOGE(AceLogTag::ACE_DIALOG, "Fail to add the finalizer method for instanceId.");
-                napi_close_handle_scope(env, scope);
                 return;
             }
             napi_create_int32(env, info, &reasonValue);
@@ -316,21 +314,18 @@ void GetDialogOnWillDismiss(napi_env env, napi_value options, DialogProperties& 
             if (onWillDismissFunc) {
                 napi_call_function(env, nullptr, onWillDismissFunc, 1, &paramObj, nullptr);
             }
-            napi_close_handle_scope(env, scope);
         };
         dialogProps.onWillDismissRelease = [env, dismissRef]() {
             if (!dismissRef) {
                 return;
             }
-            napi_handle_scope scope = nullptr;
-            auto status = napi_open_handle_scope(env, &scope);
-            if ((status != napi_ok) || (scope == nullptr)) {
+            ScopeRAII scope(env);
+            if (!scope) {
                 TAG_LOGE(AceLogTag::ACE_DIALOG,
                     "onWillDismissRelease of the dialog failed to open the scope of the handle.");
                 return;
             }
             napi_delete_reference(env, dismissRef);
-            napi_close_handle_scope(env, scope);
         };
     }
 }
@@ -812,8 +807,12 @@ std::function<void(int32_t, int32_t)> CreatePresentFinishCallback(
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
+                ScopeRAII scope(context->env);
+                if (!scope) {
+                    TAG_LOGE(AceLogTag::ACE_DIALOG,
+                        "ArkUIDialogPresentCallback failed to open the scope of the handle.");
+                    return;
+                }
                 if (context->deferred) {
                     if (callbackType == CALLBACK_TYPE_SUCCESS) {
                         ResolvePromise(context->env, context->deferred, successType);
@@ -824,7 +823,6 @@ std::function<void(int32_t, int32_t)> CreatePresentFinishCallback(
                     }
                     context->deferred = nullptr;
                 }
-                napi_close_handle_scope(context->env, scope);
             },
             TaskExecutor::TaskType::JS, "ArkUIDialogPresentCallback");
         context = nullptr;
@@ -844,8 +842,12 @@ std::function<void(int32_t errorCode, int32_t dialogId)> CreatePresentCustomFini
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
+                ScopeRAII scope(context->env);
+                if (!scope) {
+                    TAG_LOGE(AceLogTag::ACE_DIALOG,
+                        "ArkUIDialogPresentCustomCallback failed to open the scope of the handle.");
+                    return;
+                }
                 if (context->deferred) {
                     if (errorCode == ERROR_CODE_NO_ERROR) {
                         ResolvePromiseWithId(context->env, context->deferred, dialogId);
@@ -854,7 +856,6 @@ std::function<void(int32_t errorCode, int32_t dialogId)> CreatePresentCustomFini
                     }
                     context->deferred = nullptr;
                 }
-                napi_close_handle_scope(context->env, scope);
             },
             TaskExecutor::TaskType::JS, "ArkUIDialogPresentCustomCallback");
         context = nullptr;
@@ -874,8 +875,12 @@ std::function<void(int32_t)> CreateUpdateFinishCallback(
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
+                ScopeRAII scope(context->env);
+                if (!scope) {
+                    TAG_LOGE(AceLogTag::ACE_DIALOG,
+                        "ArkUIDialogUpdateCallback failed to open the scope of the handle.");
+                    return;
+                }
                 if (context->deferred) {
                     if (errorCode == 0) {
                         ResolvePromiseVoid(context->env, context->deferred);
@@ -884,7 +889,6 @@ std::function<void(int32_t)> CreateUpdateFinishCallback(
                     }
                     context->deferred = nullptr;
                 }
-                napi_close_handle_scope(context->env, scope);
             },
             TaskExecutor::TaskType::JS, "ArkUIDialogUpdateCallback");
         context = nullptr;
@@ -904,8 +908,12 @@ std::function<void(int32_t)> CreateDismissFinishCallback(
                 if (context == nullptr) {
                     return;
                 }
-                napi_handle_scope scope = nullptr;
-                napi_open_handle_scope(context->env, &scope);
+                ScopeRAII scope(context->env);
+                if (!scope) {
+                    TAG_LOGE(AceLogTag::ACE_DIALOG,
+                        "ArkUIDialogDismissCallback failed to open the scope of the handle.");
+                    return;
+                }
                 if (context->deferred) {
                     if (errorCode == 0) {
                         ResolvePromiseVoid(context->env, context->deferred);
@@ -914,7 +922,6 @@ std::function<void(int32_t)> CreateDismissFinishCallback(
                     }
                     context->deferred = nullptr;
                 }
-                napi_close_handle_scope(context->env, scope);
             },
             TaskExecutor::TaskType::JS, "ArkUIDialogDismissCallback");
         context = nullptr;
@@ -935,9 +942,8 @@ void GetCustomBuilder(napi_env env, napi_value content, DialogProperties& dialog
         if (!builderRef) {
             return;
         }
-        napi_handle_scope scope = nullptr;
-        auto status = napi_open_handle_scope(env, &scope);
-        if ((status != napi_ok) || (scope == nullptr)) {
+        ScopeRAII scope(env);
+        if (!scope) {
             TAG_LOGE(AceLogTag::ACE_DIALOG,
                 "customBuilder of the dialog failed to open the scope of the handle.");
             napi_delete_reference(env, builderRef);
@@ -949,15 +955,13 @@ void GetCustomBuilder(napi_env env, napi_value content, DialogProperties& dialog
             napi_call_function(env, nullptr, builderFunc, 0, nullptr, nullptr);
         }
         napi_delete_reference(env, builderRef);
-        napi_close_handle_scope(env, scope);
     };
     dialogProps.customBuilderWithId = [env, builderRef](const int32_t dialogId) {
         if (!builderRef) {
             return;
         }
-        napi_handle_scope scope = nullptr;
-        auto status = napi_open_handle_scope(env, &scope);
-        if ((status != napi_ok) || (scope == nullptr)) {
+        ScopeRAII scope(env);
+        if (!scope) {
             TAG_LOGE(AceLogTag::ACE_DIALOG,
                 "customBuilderWithId of the dialog failed to open the scope of the handle.");
             napi_delete_reference(env, builderRef);
@@ -971,7 +975,6 @@ void GetCustomBuilder(napi_env env, napi_value content, DialogProperties& dialog
             napi_call_function(env, nullptr, builderFunc, 1, &dialogIdArg, nullptr);
         }
         napi_delete_reference(env, builderRef);
-        napi_close_handle_scope(env, scope);
     };
 }
 
@@ -1270,6 +1273,19 @@ bool GetDialogBaseOptions(napi_env env, napi_value options, DialogProperties& di
             int32_t edgeLightMode = 0;
             napi_get_value_int32(env, edgeLightModeApi, &edgeLightMode);
             dialogProps.edgeLightMode = static_cast<EdgeLightMode>(edgeLightMode);
+        }
+    }
+
+    // Adapt to handedness
+    {
+        napi_value adaptToHandednessApi = nullptr;
+        napi_valuetype athType = napi_undefined;
+        napi_get_named_property(env, options, "adaptToHandedness", &adaptToHandednessApi);
+        napi_typeof(env, adaptToHandednessApi, &athType);
+        if (athType == napi_number) {
+            int32_t adaptToHandedness = 0;
+            napi_get_value_int32(env, adaptToHandednessApi, &adaptToHandedness);
+            dialogProps.adaptToHandedness = static_cast<NG::HandednessFollowMode>(adaptToHandedness);
         }
     }
 

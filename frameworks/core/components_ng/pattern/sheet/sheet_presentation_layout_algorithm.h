@@ -32,7 +32,6 @@
 #include "core/components_ng/pattern/sheet/sheet_style.h"
 
 namespace OHOS::Ace::NG {
-class ScrollablePaintProperty;
 
 class ACE_EXPORT SheetPresentationLayoutAlgorithm : public LinearLayoutAlgorithm {
     DECLARE_ACE_TYPE(SheetPresentationLayoutAlgorithm, LayoutAlgorithm);
@@ -90,6 +89,7 @@ private:
     void ComputeCenterStyleOffset(LayoutWrapper* layoutWrapper);
     void ComputeCenterOffsetForUECSubwindow(LayoutWrapper* layoutWrapper);
     void ComputeCenterOffsetForNotUECSubwindow(LayoutWrapper* layoutWrapper);
+    float ComputeHandednessOffsetX(LayoutWrapper* layoutWrapper, float defaultCenterX);
     void ComputePopupStyleOffset(LayoutWrapper* layoutWrapper);
     void ComputeWidthAndHeight(LayoutWrapper* layoutWrapper);
     float ComputeMaxHeight(const float parentConstraintHeight, const float parentConstraintWidth,
@@ -111,8 +111,6 @@ private:
     void MeasureDragBar(LayoutWrapper* layoutWrapper, LayoutConstraintF constraint);
     void MeasureCloseIcon(LayoutWrapper* layoutWrapper, LayoutConstraintF constraint);
     void MeasureTitleBarEffect(LayoutWrapper* layoutWrapper, LayoutConstraintF constraint);
-    void UpdateSafeAreaPaddingClip(const RefPtr<FrameNode>& host,
-        const RefPtr<ScrollablePaintProperty>& scrollPaintProps, SheetTitleBarHoverMode hoverMode, float top);
 
     float sheetHeight_ = 0.0f;
     float sheetWidth_ = 0.0f;

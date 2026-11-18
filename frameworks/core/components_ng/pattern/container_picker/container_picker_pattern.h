@@ -27,13 +27,18 @@
 #include "core/components_ng/pattern/container_picker/container_picker_layout_property.h"
 #include "core/components_ng/pattern/container_picker/container_picker_model.h"
 #include "core/components_ng/pattern/container_picker/container_picker_utils.h"
+#include "core/components_ng/pattern/date_picker/picker_text_style.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scrollable/axis/axis_animator.h"
 #include "core/components_ng/pattern/scrollable/nestable_scroll_container.h"
 #include "core/gestures/gesture_event.h"
 
+namespace OHOS::Ace {
+template<typename T> class LinearEvaluator;
+}
 namespace OHOS::Ace::NG {
 class AnimatablePropertyFloat;
+class TextLayoutProperty;
 template<typename T, typename S>
 class NodeAnimatableProperty;
 using NodeAnimatablePropertyFloat = NodeAnimatableProperty<float, AnimatablePropertyFloat>;
@@ -43,6 +48,18 @@ class ContainerPickerEventParam : public AceType {
 public:
     int32_t itemIndex = 0;
     int32_t itemNodeId = 0;
+};
+
+struct TextProperties {
+    Dimension upFontSize;
+    Dimension fontSize;
+    Dimension downFontSize;
+    FontWeight upFontWeight = FontWeight::REGULAR;
+    FontWeight fontWeight = FontWeight::REGULAR;
+    FontWeight downFontWeight = FontWeight::REGULAR;
+    Color upColor;
+    Color currentColor;
+    Color downColor;
 };
 
 enum class ContainerPickerDirection {
@@ -174,6 +191,38 @@ public:
     {
         return indicatorStyle_;
     }
+
+    void SetSelectedTextStyleVal(const PickerTextStyle& style)
+    {
+        selectedTextStyle_ = style;
+    }
+
+    PickerTextStyle GetSelectedTextStyleVal() const
+    {
+        return selectedTextStyle_;
+    }
+
+    bool HasSelectedTextStyle() const
+    {
+        return selectedTextStyle_.fontSize.has_value() || selectedTextStyle_.textColor.has_value() ||
+               selectedTextStyle_.fontWeight.has_value() || selectedTextStyle_.minFontSize.has_value() ||
+               selectedTextStyle_.maxFontSize.has_value() || selectedTextStyle_.textOverflow.has_value();
+    }
+
+    // Scroll-driven font-size scale + color gradient animation (ported from DatePicker).
+    void SetSelectedTextStyle(bool isUpdateTextStyle);
+    void ApplyTextStyleToItem(const RefPtr<FrameNode>& node, bool isSelected);
+    Dimension LinearFontSize(const Dimension& startFontSize, const Dimension& endFontSize, double percent);
+    void AddAnimationTextProperties(int32_t currentIndex, const RefPtr<TextLayoutProperty>& textLayoutProperty);
+    void UpdatePickerTextProperties(int32_t dataIndex, int32_t animIdx, int32_t showCount,
+        const RefPtr<TextLayoutProperty>& textLayoutProperty,
+        const Color& defaultColor, const Dimension& defaultSize);
+    void UpdateTextPropertiesLinear(bool isDown, double scale);
+    void TextPropertiesLinearAnimation(const RefPtr<TextLayoutProperty>& textLayoutProperty, int32_t index,
+        int32_t showCount, bool isDown, double scale);
+    void FlushAnimationTextProperties(bool isDown);
+    void UpdateScrollTextAnimation(double delta);
+    void SyncSelectedTextStyleWithTheme();
 
     void UpdateDividerWidthWithResObj(const RefPtr<ResourceObject>& resObj);
     void UpdateDividerColorWithResObj(const RefPtr<ResourceObject>& resObj);
@@ -310,6 +359,16 @@ private:
 
     void SyncPickerParamsFromLayout();
 
+    void CacheOriginalItemStyle(int32_t index, const RefPtr<TextLayoutProperty>& textLayoutProperty,
+        const Dimension& defaultSize, const Color& defaultColor);
+    void ApplyCenterItemSelectedStyle(const RefPtr<TextLayoutProperty>& textLayoutProperty, Color& applyColor);
+    void RestoreItemOriginalStyle(int32_t index, const RefPtr<TextLayoutProperty>& textLayoutProperty,
+        Color& applyColor);
+    void UpdateSingleItemTextLinear(const ContainerPickerUtils::PositionMap::value_type& item,
+        const RefPtr<FrameNode>& host, const Color& defaultColor, const Dimension& defaultSize,
+        const Dimension& selectedSize, const Color& selectedColor,
+        float containerCenter, float threshold, const RefPtr<LinearEvaluator<Color>>& evaluator);
+
     void InitDefaultParams()
     {
         pickerItemHeight_ = static_cast<float>(PICKER_ITEM_HEIGHT.ConvertToPx());
@@ -330,6 +389,7 @@ private:
     void InitDisabled();
     void InitAreaChangeEvent();
     void SyncSelectionIndicatorWithTheme();
+    static RefPtr<FrameNode> FindTextNode(const RefPtr<FrameNode>& node);
 
     RefPtr<PanEvent> panEvent_;
     PanDirection panDirection_;
@@ -397,6 +457,10 @@ private:
     float pickerDefaultHeight_ = 0.0f;
     float pickerHeightBeforeRotate_ = 0.0f;
     PickerIndicatorStyle indicatorStyle_;
+    PickerTextStyle selectedTextStyle_;
+    std::vector<TextProperties> animationProperties_;
+    std::map<int32_t, TextProperties> originalItemStyle_;
+    double distancePercent_ = 0.0;
 };
 } // namespace OHOS::Ace::NG
 

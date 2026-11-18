@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/picker_utils/picker_column_pattern.h"
 
+#include "base/thread/task_executor.h"
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 namespace OHOS::Ace::NG {
 void PickerColumnPattern::OnAttachToMainTreeMultiThread()
@@ -42,14 +43,29 @@ void PickerColumnPattern::OnAttachToMainTreeMultiThread()
 
 void PickerColumnPattern::OnDetachFromMainTreeMultiThread()
 {
-    isTossPlaying_ = false;
-    if (hapticController_) {
-        hapticController_->Stop();
-    }
-
+    isTossPlaying_.store(false);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    FrameNode* node = RawPtr(host);
-    UnregisterWindowStateChangedCallback(node);
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+    auto weak = WeakClaim(this);
+    auto hostId = host->GetId();
+    auto task = [weak, hostId]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        auto host = pattern->GetHost();
+        CHECK_NULL_VOID(host);
+        if (host->GetId() != hostId) {
+            return;
+        }
+        if (pattern->hapticController_) {
+            pattern->hapticController_->Stop();
+        }
+        pattern->UnregisterWindowStateChangedCallback(RawPtr(host));
+    };
+    auto taskExecutor = context->GetTaskExecutor();
+    if (taskExecutor) {
+        taskExecutor->PostTask(task, TaskExecutor::TaskType::UI, "ArkUIPickerOnDetachMultiThread");
+    }
 }
 } // namespace OHOS::Ace::NG

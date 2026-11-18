@@ -310,6 +310,14 @@ public:
 
     void UpdateCurrentFocus(const RefPtr<FocusHub>& current, SwitchingUpdateReason reason);
     RefPtr<FocusHub> GetCurrentFocus();
+    std::optional<bool> GetIsSwitchingFocus() const
+    {
+        return isSwitchingFocus_;
+    }
+    std::optional<SwitchingStartReason> GetStartReason() const
+    {
+        return startReason_;
+    }
     void UpdateSwitchingEndReason(SwitchingEndReason reason)
     {
         if (isSwitchingFocus_.value_or(false)) {

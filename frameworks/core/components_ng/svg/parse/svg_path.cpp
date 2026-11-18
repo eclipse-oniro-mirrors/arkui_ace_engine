@@ -83,12 +83,16 @@ RSRecordingPath SvgPath::AsPath(const SvgLengthScaleRule& lengthRule)
 
 RSRecordingPath SvgPath::AsPath(const Size& /* viewPort */) const
 {
-    RSRecordingPath out;
-    if (!d_.empty()) {
-        out.BuildFromSVGString(d_);
-        if (attributes_.fillState.IsEvenodd()) {
-            out.SetFillStyle(RSPathFillType::EVENTODD);
+    if (!sizePathCache_.has_value()) {
+        RSRecordingPath out;
+        if (!d_.empty()) {
+            out.BuildFromSVGString(d_);
         }
+        sizePathCache_ = out;
+    }
+    RSRecordingPath out = sizePathCache_.value();
+    if (!d_.empty() && attributes_.fillState.IsEvenodd()) {
+        out.SetFillStyle(RSPathFillType::EVENTODD);
     }
     return out;
 }

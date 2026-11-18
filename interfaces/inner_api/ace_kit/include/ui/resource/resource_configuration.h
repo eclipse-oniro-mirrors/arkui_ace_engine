@@ -29,6 +29,9 @@ struct ConfigurationChange {
     bool fontWeightScaleUpdate = false;
     bool hotReloadUpdate = false;
     bool hotReloadFullRebuild = false;
+    // One-shot policy for the current configuration update only. Default true keeps the existing
+    // reload transition. It is carried by value and never persists across configuration updates.
+    bool fontAnimationEnabled = true;
 
     bool IsNeedUpdate() const
     {
@@ -40,6 +43,13 @@ struct ConfigurationChange {
     {
         return colorModeUpdate && !(languageUpdate || directionUpdate || dpiUpdate || fontUpdate || skinUpdate ||
                fontScaleUpdate || fontWeightScaleUpdate || hotReloadUpdate);
+    }
+
+    // True only when this update contains a font update and nothing else that triggers a reload.
+    bool OnlyFontChange() const
+    {
+        return fontUpdate && !(colorModeUpdate || languageUpdate || directionUpdate || dpiUpdate || iconUpdate ||
+               skinUpdate || fontScaleUpdate || fontWeightScaleUpdate || hotReloadUpdate || hotReloadFullRebuild);
     }
 
     void MergeConfig(const ConfigurationChange& config)
@@ -55,6 +65,8 @@ struct ConfigurationChange {
         fontWeightScaleUpdate |= config.fontWeightScaleUpdate;
         hotReloadUpdate |= config.hotReloadUpdate;
         hotReloadFullRebuild |= config.hotReloadFullRebuild;
+        // Keep the animation unless every merged update explicitly disables it.
+        fontAnimationEnabled = fontAnimationEnabled && config.fontAnimationEnabled;
     }
 };
 } // namespace OHOS::Ace

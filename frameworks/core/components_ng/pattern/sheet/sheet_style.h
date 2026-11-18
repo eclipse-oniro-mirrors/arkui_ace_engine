@@ -40,6 +40,9 @@ private:                                                                        
     RefPtr<ResourceObject> prop##name##Obj_
 
 namespace OHOS::Ace::NG {
+
+enum class HandednessFollowMode;
+
 constexpr float SHEET_VELOCITY_THRESHOLD = 1000.0f;
 constexpr float CURVE_MASS = 1.0f;
 constexpr float CURVE_STIFFNESS = 328.0f;
@@ -256,6 +259,7 @@ struct SheetStyle {
     std::optional<SheetHeight> detentSelection;
     std::optional<Placement> placement;
     std::optional<bool> placementOnTarget;
+    std::optional<HandednessFollowMode> adaptToHandedness;
     std::optional<bool> showInSubWindow;
     std::optional<ModalTransition> modalTransition;
     std::optional<RenderStrategy> radiusRenderStrategy;
@@ -268,6 +272,7 @@ struct SheetStyle {
     std::optional<SheetTitleBarHoverMode> titleBarHoverMode;
     std::optional<DisplayMode> scrollBarState;
     RefPtr<UiMaterial> closeButtonMaterial;
+    std::optional<VibrancyMode> titleBarVibrancyMode;
 
     SheetStyle() = default;
     // constructor for image generator dialog
@@ -293,13 +298,15 @@ struct SheetStyle {
                 hoverModeArea == sheetStyle.hoverModeArea && radius == sheetStyle.radius &&
                 detentSelection == sheetStyle.detentSelection && sheetEffectEdge == sheetStyle.sheetEffectEdge &&
                 placement == sheetStyle.placement && placementOnTarget == sheetStyle.placementOnTarget &&
+                adaptToHandedness == sheetStyle.adaptToHandedness &&
                 showInSubWindow == sheetStyle.showInSubWindow && modalTransition == sheetStyle.modalTransition &&
                 radiusRenderStrategy == sheetStyle.radiusRenderStrategy &&
                 systemMaterial == sheetStyle.systemMaterial && sheetEdgeLightMode == sheetStyle.sheetEdgeLightMode &&
                 blurSnapshotOptions == sheetStyle.blurSnapshotOptions &&
                 titleBarBackgroundBlur == sheetStyle.titleBarBackgroundBlur &&
                 titleBarHoverMode == sheetStyle.titleBarHoverMode && scrollBarState == sheetStyle.scrollBarState &&
-                closeButtonMaterial == sheetStyle.closeButtonMaterial);
+                closeButtonMaterial == sheetStyle.closeButtonMaterial &&
+                titleBarVibrancyMode == sheetStyle.titleBarVibrancyMode);
     }
 
     void PartialUpdate(const SheetStyle& sheetStyle)
@@ -345,6 +352,8 @@ struct SheetStyle {
         placement = sheetStyle.placement.has_value() ? sheetStyle.placement : placement;
         placementOnTarget = sheetStyle.placementOnTarget.has_value() ?
             sheetStyle.placementOnTarget : placementOnTarget;
+        adaptToHandedness = sheetStyle.adaptToHandedness.has_value() ?
+            sheetStyle.adaptToHandedness : adaptToHandedness;
         modalTransition = sheetStyle.modalTransition.has_value() ? sheetStyle.modalTransition : modalTransition;
         radiusRenderStrategy =
             sheetStyle.radiusRenderStrategy.has_value() ? sheetStyle.radiusRenderStrategy : radiusRenderStrategy;
@@ -357,6 +366,8 @@ struct SheetStyle {
         titleBarHoverMode = sheetStyle.titleBarHoverMode.has_value() ? sheetStyle.titleBarHoverMode : titleBarHoverMode;
         scrollBarState = sheetStyle.scrollBarState.has_value() ? sheetStyle.scrollBarState : scrollBarState;
         closeButtonMaterial = sheetStyle.closeButtonMaterial ? sheetStyle.closeButtonMaterial : closeButtonMaterial;
+        titleBarVibrancyMode =
+            sheetStyle.titleBarVibrancyMode.has_value() ? sheetStyle.titleBarVibrancyMode : titleBarVibrancyMode;
     }
 
     // Register the set/get method of the resource.

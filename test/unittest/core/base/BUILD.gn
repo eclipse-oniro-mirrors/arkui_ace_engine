@@ -33,6 +33,7 @@ ace_unittest("distributed_ui_test_ng") {
 ace_unittest("frame_node_test_ng") {
   module_name = "Animation-Frame"
   type = "new"
+  cflags = [ "-fno-access-control" ]
   if (is_host_product) {
     type = "host_components"
   } else {
@@ -43,6 +44,10 @@ ace_unittest("frame_node_test_ng") {
     "inspector_tree_context_test_ng.cpp",
     "inspector_tree_native_fields_test_ng.cpp",
     "inspector_tree_response_region_test_ng.cpp",
+    "send_command_result_test_ng.cpp",
+    "send_command_result_rating_test_ng.cpp",
+    "send_command_result_radio_test_ng.cpp",
+    "send_command_result_swiper_grid_test_ng.cpp",
     "frame_node_test_ng_coverage.cpp",
     "frame_node_test_ng_coverage_new.cpp",
     "frame_node_test_ng_dump.cpp",
@@ -84,7 +89,12 @@ ace_unittest("simplified_inspector_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
-  sources = [ "simplified_inspector_test_ng.cpp" ]
+  sources = [
+    "$ace_root/frameworks/core/components_ng/base/inspector_occlusion_collector.cpp",
+    "$ace_root/frameworks/core/components_ng/base/inspector_occlusion_region.cpp",
+    "simplified_inspector_test_ng.cpp",
+    "ui_node_occlusion_test.cpp",
+  ]
 }
 
 ace_unittest("ui_node_gc_test_ng") {

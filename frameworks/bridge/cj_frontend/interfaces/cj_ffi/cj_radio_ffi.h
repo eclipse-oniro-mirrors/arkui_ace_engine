@@ -20,12 +20,23 @@
 #include "bridge/cj_frontend/interfaces/cj_ffi/cj_view_abstract_ffi.h"
 
 extern "C" {
+struct CJRadioStyleOptions {
+    uint32_t checkedBackgroundColor;
+    bool hasCheckedBackgroundColor;
+    uint32_t uncheckedBorderColor;
+    bool hasUncheckedBorderColor;
+    uint32_t indicatorColor;
+    bool hasIndicatorColor;
+};
+
 CJ_EXPORT void FfiOHOSAceFrameworkRadioWithIndicatorCreate(
     const char* group, const char* value, int32_t indicatorType, void (*indicatorBuilder)());
 CJ_EXPORT void FfiOHOSAceFrameworkRadioCreate(const char* group, const char* value);
 CJ_EXPORT void FfiOHOSAceFrameworkRadioChecked(bool value);
 CJ_EXPORT void FfiOHOSAceFrameworkRadioSetStyle(
     uint32_t checkedBackgroundColor, uint32_t uncheckedBorderColor, uint32_t indicatorColor);
+
+CJ_EXPORT void FfiOHOSAceFrameworkRadioSetStyleV2(CJRadioStyleOptions options);
 CJ_EXPORT void FfiOHOSAceFrameworkRadioSetSize(double width, int32_t widthUnit, double height, int32_t heightUnit);
 CJ_EXPORT void FfiOHOSAceFrameworkRadioSetPadding(double padding, uint32_t unit);
 CJ_EXPORT void FfiOHOSAceFrameworkRadioSetPaddings(CJEdge params);

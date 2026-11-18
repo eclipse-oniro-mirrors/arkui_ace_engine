@@ -867,6 +867,7 @@ void DatePickerDialogModelNG::SetDatePickerDialogShow(PickerDialogInfo& pickerDi
     properties.systemMaterial = pickerDialog.systemMaterial;
     properties.distortionMode = pickerDialog.distortionMode;
     properties.edgeLightMode = pickerDialog.edgeLightMode;
+    properties.adaptToHandedness = pickerDialog.adaptToHandedness;
     properties.customStyle = false;
     if (lessThanApi11) {
         properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));
@@ -889,7 +890,7 @@ void DatePickerDialogModelNG::SetDatePickerDialogShow(PickerDialogInfo& pickerDi
         settingData.datePickerProperty["selected"] = pickerDialog.parseSelectedDate;
         settingData.timePickerProperty["selected"] = pickerDialog.pickerTime;
     }
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     executor->PostTask(
         [properties, settingData, dialogEvent, dialogCancelEvent, dialogLifeCycleEvent, buttonInfos,

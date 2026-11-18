@@ -437,8 +437,13 @@ int32_t ExtractAndBuildLazyForEachData(const RefPtr<LazyForEachBuilder>& builder
         }
         int32_t dataError = ERR_OK;
         auto dataJson = builder->GetDataByIndexAsJson(item.first, dataError);
-        if (dataError != ERR_OK || dataJson.empty()) {
-            continue;
+        if (dataError != ERR_OK) {
+            resultJson = BuildQueryErrorJson(dataError);
+            return dataError;
+        }
+        if (dataJson.empty()) {
+            resultJson = BuildQueryErrorJson(ERR_DATA_SOURCE_ERROR);
+            return ERR_DATA_SOURCE_ERROR;
         }
         auto entry = JsonUtil::CreateSharedPtrJson(true);
         entry->Put("index", item.first);
@@ -549,19 +554,14 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
     int32_t errorCode = ERR_OK;
     auto navGroupNode = FindNavigationByPoint(x, y, state, errorCode);
     if (!navGroupNode) {
-        if (errorCode != ERR_TARGET_NOT_FOUND) {
-            resultJson = buildResult(errorCode);
-            return errorCode;
-        }
-        // Navigation not found.
-        resultJson = buildResult(ERR_OK);
-        return ERR_OK;
+        resultJson = buildResult(errorCode);
+        return errorCode;
     }
 
     auto contentNode = navGroupNode->GetContentNode();
     if (!contentNode) {
-        resultJson = buildResult(ERR_OK);
-        return ERR_OK;
+        resultJson = buildResult(ERR_TARGET_NOT_FOUND);
+        return ERR_TARGET_NOT_FOUND;
     }
     // Check remaining time budget before subtree serialization.
     auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(

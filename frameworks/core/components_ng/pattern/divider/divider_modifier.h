@@ -27,7 +27,7 @@ namespace OHOS::Ace::NG {
 class DividerModifier : public ContentModifier {
     DECLARE_ACE_TYPE(DividerModifier, ContentModifier);
 public:
-    DividerModifier();
+    explicit DividerModifier(const LinearColor& initialColor);
     ~DividerModifier() override = default;
     void PaintDivider(DrawingContext& context) const;
     void onDraw(DrawingContext& context) override;

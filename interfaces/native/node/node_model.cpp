@@ -253,6 +253,21 @@ ArkUIFullNodeAPI* GetOrCreateFullImpl()
     return impl;
 }
 
+ArkUIFullNodeAPI* GetFullImplForAnyThread()
+{
+    static auto* api = []() -> ArkUIFullNodeAPI* {
+        auto* module = FindModule();
+        if (!module) {
+            return nullptr;
+        }
+        using GetAPI = ArkUIAnyAPI* (*)(int);
+        auto entry = reinterpret_cast<GetAPI>(FindFunction(module, "GetArkUIAnyFullNodeAPI"));
+        auto* resolved = entry ? reinterpret_cast<ArkUIFullNodeAPI*>(entry(ARKUI_NODE_API_VERSION)) : nullptr;
+        return resolved && resolved->version == ARKUI_NODE_API_VERSION ? resolved : nullptr;
+    }();
+    return api;
+}
+
 ArkUIFullNodeAPI* GetFullImplForErrorMessage()
 {
     if (!errorMessageImpl && !InitialFullNodeImpl(ARKUI_NODE_API_VERSION, errorMessageImpl)) {

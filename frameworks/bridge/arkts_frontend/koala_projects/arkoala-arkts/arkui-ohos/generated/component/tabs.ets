@@ -41,6 +41,7 @@ import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
 import { ComponentBuilder, Builder } from '@koalaui/builderLambda'
 import { CommonModifier } from 'arkui.CommonModifier'
 import { default as uiMaterial } from '@ohos.arkui.uiMaterial'
+import { TabVisibility, SidebarSection, SidebarSection_serializer } from './tabContent'
 import { TabsModifier } from './../TabsModifier'
 import { NodeAttach, remember } from '@koalaui/runtime'
 import { ModifierStateManager } from './../CommonModifier'
@@ -487,7 +488,7 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setNestedScroll(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
-    setBarOverlapAttribute(value: boolean | undefined): void {
+    setBarOverlap0Attribute(value: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
             thisSerializer.writeInt8(RuntimeType.OBJECT)
@@ -496,7 +497,19 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         } else {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
-        ArkUIGeneratedNativeModule._TabsAttribute_setBarOverlap(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        ArkUIGeneratedNativeModule._TabsAttribute_setBarOverlap0(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setBarOverlap1Attribute(value: BarOverlapMode | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as BarOverlapMode)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setBarOverlap1(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setBarBackgroundColorAttribute(value: ResourceColor | undefined): void {
@@ -1031,6 +1044,30 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setSidebarBottomBar(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setShowSidebarControlButtonAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setShowSidebarControlButton(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setTabViewCustomizationAttribute(value: TabViewCustomization | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            TabViewCustomization_serializer.write(thisSerializer, valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setTabViewCustomization(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBarModeAttribute(value: BarMode | undefined, options?: ScrollableBarModeOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -1144,6 +1181,11 @@ export enum LayoutStyle {
     ALWAYS_AVERAGE_SPLIT = 1,
     SPACE_BETWEEN_OR_CENTER = 2
 }
+export enum BarOverlapMode {
+    STANDARD = 0,
+    STACK = 1,
+    SAFE_AREA_PADDING = 2
+}
 export enum TabsCacheMode {
     CACHE_BOTH_SIDE = 0,
     CACHE_LATEST_SWITCHED = 1
@@ -1228,6 +1270,11 @@ export interface TabsBreakpointType<T> {
     md?: T;
     lg?: T;
 }
+export interface TabViewCustomization {
+    visibilityMap?: Map<int32, TabVisibility>;
+    sectionMap?: Map<int32, SidebarSection>;
+    orderMap?: Map<int32, int32>;
+}
 export interface TabsAttribute extends CommonMethod {
     setTabsOptions(options?: TabsOptions): this {
         throw new Error('Unimplemented method setTabsOptions')
@@ -1290,6 +1337,9 @@ export interface TabsAttribute extends CommonMethod {
         throw new Error('Unimplemented method nestedScroll')
     }
     barOverlap(value: boolean | undefined): this {
+        throw new Error('Unimplemented method barOverlap')
+    }
+    barOverlap(value: BarOverlapMode | undefined): this {
         throw new Error('Unimplemented method barOverlap')
     }
     barBackgroundColor(value: ResourceColor | undefined): this {
@@ -1384,6 +1434,12 @@ export interface TabsAttribute extends CommonMethod {
     }
     sidebarBottomBar(value: ComponentContentBase | undefined): this {
         throw new Error('Unimplemented method sidebarBottomBar')
+    }
+    showSidebarControlButton(value: boolean | undefined): this {
+        throw new Error('Unimplemented method showSidebarControlButton')
+    }
+    tabViewCustomization(value: TabViewCustomization | undefined): this {
+        throw new Error('Unimplemented method tabViewCustomization')
     }
     barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
         throw new Error('Unimplemented method barMode')
@@ -1513,7 +1569,12 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     }
     public barOverlap(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
-        this.getPeer()?.setBarOverlapAttribute(value_casted)
+        this.getPeer()?.setBarOverlap0Attribute(value_casted)
+        return this
+    }
+    public barOverlap(value: BarOverlapMode | undefined): this {
+        const value_casted = value as (BarOverlapMode | undefined)
+        this.getPeer()?.setBarOverlap1Attribute(value_casted)
         return this
     }
     public barBackgroundColor(value: ResourceColor | undefined): this {
@@ -1669,6 +1730,16 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     public sidebarBottomBar(value: ComponentContentBase | undefined): this {
         const value_casted = value as (ComponentContentBase | undefined)
         this.getPeer()?.setSidebarBottomBarAttribute(value_casted)
+        return this
+    }
+    public showSidebarControlButton(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setShowSidebarControlButtonAttribute(value_casted)
+        return this
+    }
+    public tabViewCustomization(value: TabViewCustomization | undefined): this {
+        const value_casted = value as (TabViewCustomization | undefined)
+        this.getPeer()?.setTabViewCustomizationAttribute(value_casted)
         return this
     }
     public barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
@@ -1875,6 +1946,100 @@ export class TabsBreakpointType_TabBarDisplayMode_serializer {
         }
         const lgTmpResult: TabBarDisplayMode | undefined = lgTmpBuf
         let value: TabsBreakpointType<TabBarDisplayMode> = ({sm: smTmpResult, md: mdTmpResult, lg: lgTmpResult} as TabsBreakpointType<TabBarDisplayMode>)
+        return value
+    }
+}
+export class TabViewCustomization_serializer {
+    public static write(buffer: SerializerBase, value: TabViewCustomization): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForVisibilityMap = value.visibilityMap
+        if (valueHolderForVisibilityMap !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForVisibilityMapTmpValue = valueHolderForVisibilityMap!
+            valueSerializer.writeInt32((valueHolderForVisibilityMapTmpValue.size).toInt())
+            for (const pair of valueHolderForVisibilityMapTmpValue) {
+                const valueHolderForVisibilityMapTmpValueKeyVar = pair[0]
+                const valueHolderForVisibilityMapTmpValueValueVar = pair[1]
+                valueSerializer.writeInt32(valueHolderForVisibilityMapTmpValueKeyVar)
+                valueSerializer.writeInt32(valueHolderForVisibilityMapTmpValueValueVar.valueOf())
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForSectionMap = value.sectionMap
+        if (valueHolderForSectionMap !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForSectionMapTmpValue = valueHolderForSectionMap!
+            valueSerializer.writeInt32((valueHolderForSectionMapTmpValue.size).toInt())
+            for (const pair of valueHolderForSectionMapTmpValue) {
+                const valueHolderForSectionMapTmpValueKeyVar = pair[0]
+                const valueHolderForSectionMapTmpValueValueVar = pair[1]
+                valueSerializer.writeInt32(valueHolderForSectionMapTmpValueKeyVar)
+                SidebarSection_serializer.write(valueSerializer, valueHolderForSectionMapTmpValueValueVar)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForOrderMap = value.orderMap
+        if (valueHolderForOrderMap !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForOrderMapTmpValue = valueHolderForOrderMap!
+            valueSerializer.writeInt32((valueHolderForOrderMapTmpValue.size).toInt())
+            for (const pair of valueHolderForOrderMapTmpValue) {
+                const valueHolderForOrderMapTmpValueKeyVar = pair[0]
+                const valueHolderForOrderMapTmpValueValueVar = pair[1]
+                valueSerializer.writeInt32(valueHolderForOrderMapTmpValueKeyVar)
+                valueSerializer.writeInt32(valueHolderForOrderMapTmpValueValueVar)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): TabViewCustomization {
+        let valueDeserializer: DeserializerBase = buffer
+        const visibilityMapTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let visibilityMapTmpBuf: Map<int32, TabVisibility> | undefined = undefined
+        if ((visibilityMapTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const visibilityMapTmpBufOptSizeVar: int32 = valueDeserializer.readInt32()
+            let visibilityMapTmpBufOpt: Map<int32, TabVisibility> = new Map<int32, TabVisibility>()
+            // TODO: TS map resize
+            for (let visibilityMapTmpBufOptIVar = 0; visibilityMapTmpBufOptIVar < visibilityMapTmpBufOptSizeVar; visibilityMapTmpBufOptIVar++) {
+                const visibilityMapTmpBufOptKeyVar: int32 = valueDeserializer.readInt32()
+                const visibilityMapTmpBufOptValueVar: TabVisibility = TabVisibility.fromValue(valueDeserializer.readInt32())
+                visibilityMapTmpBufOpt.set(visibilityMapTmpBufOptKeyVar, visibilityMapTmpBufOptValueVar)
+            }
+            visibilityMapTmpBuf = visibilityMapTmpBufOpt
+        }
+        const visibilityMapTmpResult: Map<int32, TabVisibility> | undefined = visibilityMapTmpBuf
+        const sectionMapTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let sectionMapTmpBuf: Map<int32, SidebarSection> | undefined = undefined
+        if ((sectionMapTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const sectionMapTmpBufOptSizeVar: int32 = valueDeserializer.readInt32()
+            let sectionMapTmpBufOpt: Map<int32, SidebarSection> = new Map<int32, SidebarSection>()
+            // TODO: TS map resize
+            for (let sectionMapTmpBufOptIVar = 0; sectionMapTmpBufOptIVar < sectionMapTmpBufOptSizeVar; sectionMapTmpBufOptIVar++) {
+                const sectionMapTmpBufOptKeyVar: int32 = valueDeserializer.readInt32()
+                const sectionMapTmpBufOptValueVar: SidebarSection = SidebarSection_serializer.read(valueDeserializer)
+                sectionMapTmpBufOpt.set(sectionMapTmpBufOptKeyVar, sectionMapTmpBufOptValueVar)
+            }
+            sectionMapTmpBuf = sectionMapTmpBufOpt
+        }
+        const sectionMapTmpResult: Map<int32, SidebarSection> | undefined = sectionMapTmpBuf
+        const orderMapTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let orderMapTmpBuf: Map<int32, int32> | undefined = undefined
+        if ((orderMapTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const orderMapTmpBufOptSizeVar: int32 = valueDeserializer.readInt32()
+            let orderMapTmpBufOpt: Map<int32, int32> = new Map<int32, int32>()
+            // TODO: TS map resize
+            for (let orderMapTmpBufOptIVar = 0; orderMapTmpBufOptIVar < orderMapTmpBufOptSizeVar; orderMapTmpBufOptIVar++) {
+                const orderMapTmpBufOptKeyVar: int32 = valueDeserializer.readInt32()
+                const orderMapTmpBufOptValueVar: int32 = valueDeserializer.readInt32()
+                orderMapTmpBufOpt.set(orderMapTmpBufOptKeyVar, orderMapTmpBufOptValueVar)
+            }
+            orderMapTmpBuf = orderMapTmpBufOpt
+        }
+        const orderMapTmpResult: Map<int32, int32> | undefined = orderMapTmpBuf
+        let value: TabViewCustomization = ({visibilityMap: visibilityMapTmpResult, sectionMap: sectionMapTmpResult, orderMap: orderMapTmpResult} as TabViewCustomization)
         return value
     }
 }

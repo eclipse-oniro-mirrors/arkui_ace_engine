@@ -2308,7 +2308,7 @@ HWTEST_F(OverlayManagerTwoTestNg, PopMenuAnimation, TestSize.Level1)
     menuNode->renderContext_ = AceType::MakeRefPtr<RenderContext>();
     auto deformRenderContext = menuNode->GetRenderContext();
     EXPECT_NE(deformRenderContext, nullptr);
-    auto renderContext = AceType::DynamicCast<RenderContext>(deformRenderContext);
+    auto renderContext = deformRenderContext;
     EXPECT_NE(renderContext, nullptr);
     EXPECT_FALSE(renderContext->HasDisappearTransition());
     menuManager->PopMenuAnimation(menuNode, overlayManager, true, true);

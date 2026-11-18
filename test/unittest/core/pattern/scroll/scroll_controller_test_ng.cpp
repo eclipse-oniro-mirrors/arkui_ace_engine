@@ -952,4 +952,33 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState016, TestSize.Level1)
     EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 }
 
+/**
+ * @tc.name: GetScrollState017
+ * @tc.desc: Test getScrollState returns IDLE after a stay over-scroll scrollTo reaches its
+ *           out-of-boundary target
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState017, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetEdgeEffect(EdgeEffect::SPRING, true);
+    CreateContent();
+    CreateScrollDone();
+
+    /**
+     * @tc.steps: step1. scrollTo an out-of-boundary target with canOverScroll and smooth spring.
+     * @tc.expected: Position rests at the out-of-boundary target and getScrollState turns IDLE
+     * instead of a stale FLING.
+     */
+    pattern_->SetCanStayOverScroll(true);
+    MockAnimationManager::GetInstance().SetTicks(5);
+    ASSERT_TRUE(AnimateTo(Dimension(2600.f), 0, nullptr, true, false));
+    for (int32_t i = 0; i < 100 && !MockAnimationManager::GetInstance().AllFinished(); i++) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+    }
+    EXPECT_TRUE(Position(-2600.f));
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
 } // namespace OHOS::Ace::NG

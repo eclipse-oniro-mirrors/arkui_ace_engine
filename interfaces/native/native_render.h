@@ -412,6 +412,77 @@ int32_t OH_ArkUI_RenderNodeUtils_InsertChildAfter(
     ArkUI_RenderNodeHandle node, ArkUI_RenderNodeHandle child, ArkUI_RenderNodeHandle sibling);
 
 /**
+ * @brief Defines the attach policy for a child render node, which determines
+ * whether the child and it complete render node subtree inherit the parent
+ * render node's instance.
+ *
+ * @since 26.1.0
+ */
+typedef enum {
+    /**
+     * The child and its render node subtree not inherit the parent
+     * render node's instance.
+     *
+     * @since 26.1.0
+     */
+    OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_NOT_INHERIT_PARENT_INSTANCE = 0,
+    /**
+     * The child and its render node subtree inherit the parent
+     * render node's instance.
+     *
+     * @since 26.1.0
+     */
+    OH_ARKUI_RENDER_NODE_UTILS_ATTACH_POLICY_INHERIT_PARENT_INSTANCE = 1,
+} OH_ArkUI_RenderNodeAttachPolicy;
+
+/**
+ * @brief Adds a child render node to the target parent render node, when
+ * the policy requires, migrates the child and its render node subtree
+ * to the parent instance.
+ *
+ * @param node [in] Target parent render node.
+ * @param child [in] Child render node to be added.
+ * @param policy [in] Attach policy that determines whether the child inherits the
+ *     parent render node's instance.
+ * @return Error code.
+ *     <ul><li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter error occurs.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} if C API initialization failed.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_RENDER_IS_FROM_FRAME_NODE} if the target node
+ *     originates from a FrameNode.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_RENDER_HAS_INVALID_FRAME_NODE} if the current render node originates from a
+ *     FrameNode that has been either detached as a child node or destroyed.</li></ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_RenderNodeUtils_AddChildWithPolicy(
+    ArkUI_RenderNodeHandle node, ArkUI_RenderNodeHandle child, OH_ArkUI_RenderNodeAttachPolicy policy);
+
+/**
+ * @brief Insert a child node after the target child node of the parent node, when the policy
+ * requires, migrates the child and its render node subtree to the
+ * parent instance.
+ *
+ * @param node [in] Target parent render node.
+ * @param child [in] Child render node to be inserted.
+ * @param sibling [in] Target child node, which is used to determine the reference sibling render node of the insertion
+ *     position. If the node is not in the current child node list of **node**, the node is appended to the end.
+ * @param policy [in] Attach policy that determines whether the child inherits the
+ *     parent render node's instance.
+ * @return Error code.
+ *     <ul><li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter error occurs.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} if C API initialization failed.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_RENDER_IS_FROM_FRAME_NODE} if the target node or
+ *         child originates from a FrameNode.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_RENDER_HAS_INVALID_FRAME_NODE} if the current render node originates from a
+ *     FrameNode that has been either detached as a child node or destroyed.</li></ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_RenderNodeUtils_InsertChildAfterWithPolicy(
+    ArkUI_RenderNodeHandle node, ArkUI_RenderNodeHandle child,
+    ArkUI_RenderNodeHandle sibling, OH_ArkUI_RenderNodeAttachPolicy policy);
+
+/**
  * @brief Remove a child node from the specified RenderNode.
  *
  * @param node the parent RenderNode.

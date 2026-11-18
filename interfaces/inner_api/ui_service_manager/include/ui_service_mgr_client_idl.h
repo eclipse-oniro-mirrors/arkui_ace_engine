@@ -60,6 +60,9 @@ public:
 
     ErrCode ReportStatisticEvents(const AppInfoParcel& appInfo, const std::vector<StatisticEventInfoParcel>& events);
 
+    ErrCode ReportMaterialStatisticEvents(
+        const AppInfoParcel& appInfo, const std::vector<MaterialStatisticEventInfoParcel>& events);
+
 private:
     /**
      * Connect UIService manager service.

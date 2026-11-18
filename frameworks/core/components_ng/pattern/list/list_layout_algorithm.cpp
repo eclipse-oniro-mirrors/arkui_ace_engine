@@ -2529,6 +2529,28 @@ void ListLayoutAlgorithm::LayoutItem(RefPtr<LayoutWrapper>& wrapper, int32_t ind
     SetListItemIndex(wrapper, index);
 }
 
+void ListLayoutAlgorithm::LayoutDeferredCacheItem(const RefPtr<LayoutWrapper>& wrapper, int32_t index,
+    const ListItemInfo& pos, float crossSize, bool isDirty, bool show)
+{
+    CHECK_NULL_VOID(wrapper);
+    auto geometryNode = wrapper->GetGeometryNode();
+    CHECK_NULL_VOID(geometryNode);
+    const auto prevOffset = geometryNode->GetMarginFrameOffset();
+    RefPtr<LayoutWrapper> itemWrapper = wrapper;
+    auto startIndex = index;
+    LayoutItem(itemWrapper, index, pos, startIndex, crossSize);
+    ExpandWithSafeAreaPadding(wrapper);
+    auto offset = geometryNode->GetMarginFrameOffset();
+    if (axis_ == Axis::VERTICAL) {
+        offset.SetX(prevOffset.GetX());
+    } else {
+        offset.SetY(prevOffset.GetY());
+    }
+    geometryNode->SetMarginFrameOffset(offset);
+    wrapper->SetActive(show);
+    SyncGeometry(itemWrapper, isDirty);
+}
+
 void ListLayoutAlgorithm::ProcessCacheCount(LayoutWrapper* layoutWrapper, int32_t cacheCount, bool show)
 {
     if (!itemPosition_.empty() && cacheCount > 0) {
@@ -2553,6 +2575,67 @@ void ListLayoutAlgorithm::ProcessCacheCount(LayoutWrapper* layoutWrapper, int32_
     } else {
         ResetLayoutItem(layoutWrapper);
         SetActiveChildRange(layoutWrapper, cacheCount, cacheCount, show);
+    }
+}
+
+void ListLayoutAlgorithm::UpdateItemDecodeState(LayoutWrapper* layoutWrapper, int32_t idx, bool active)
+{
+    auto wrapper = GetListItem(layoutWrapper, idx, false, true);
+    CHECK_NULL_VOID(wrapper);
+    auto itemFrameNode = wrapper->GetHostNode();
+    CHECK_NULL_VOID(itemFrameNode);
+    if (itemPosition_.count(idx) > 0 && itemPosition_[idx].isGroup) {
+        auto groupAlgo = wrapper->GetLayoutAlgorithm(true);
+        if (groupAlgo) {
+            auto group = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
+                groupAlgo->GetLayoutAlgorithm());
+            if (group) {
+                group->UpdateGroupDecodeCacheWindow(RawPtr(wrapper), active);
+                return;
+            }
+        }
+    }
+    ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+}
+
+void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
+        return;
+    }
+    auto listProps = layoutWrapper->GetHostNode()->GetLayoutProperty<ListLayoutProperty>();
+    if (listProps && listProps->GetShowCachedItemsValue(false)) {
+        return;
+    }
+    if (cacheCount <= 0 || itemPosition_.empty()) {
+        return;
+    }
+    const int32_t decodeWindow = ScrollableUtils::CalcDecodeWindowCount(cacheCount);
+    if (decodeWindow <= 0) {
+        return;
+    }
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+
+    const int32_t startIndex = GetStartIndex();
+    const int32_t endIndex = GetEndIndex();
+    const int32_t lanes = GetLanes();
+    const int32_t firstCacheIdx = std::max(0, startIndex - cacheCount * lanes);
+    const int32_t lastCacheIdx = std::min(totalItemCount_ - 1, endIndex + cacheCount * lanes);
+    const int32_t decodeStart = std::max(0, startIndex - decodeWindow * lanes);
+    const int32_t decodeEnd = std::min(totalItemCount_ - 1, endIndex + decodeWindow * lanes);
+
+    TAG_LOGD(AceLogTag::ACE_LIST,
+        "decode window: cacheCount=%{public}d, window=%{public}d, visible=[%{public}d,%{public}d], "
+        "decode=[%{public}d,%{public}d], cache=[%{public}d,%{public}d], lanes=%{public}d",
+        cacheCount, decodeWindow, startIndex, endIndex, decodeStart, decodeEnd,
+        firstCacheIdx, lastCacheIdx, lanes);
+
+    for (int32_t idx = firstCacheIdx; idx <= lastCacheIdx; ++idx) {
+        bool active = (idx >= startIndex && idx <= endIndex) ||
+                      (idx >= decodeStart && idx <= decodeEnd);
+        UpdateItemDecodeState(layoutWrapper, idx, active);
     }
 }
 
@@ -2688,6 +2771,7 @@ void ListLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
         listProps->SetDefaultCachedCount(newCacheCount);
     }
     ProcessCacheCount(layoutWrapper, cacheCount, listProps->GetShowCachedItemsValue(false));
+    UpdateListDecodeCacheWindow(layoutWrapper, cacheCount);
     FixItemLayoutOffset(layoutWrapper);
     LayoutHeader(layoutWrapper, paddingOffset_, crossSize);
     UpdateOverlay(layoutWrapper);
@@ -3265,7 +3349,12 @@ int32_t ListLayoutAlgorithm::LayoutCachedForward(LayoutWrapper* layoutWrapper,
             predictList.emplace_back(
                 PredictLayoutItem { curIndex, cachedCount, -1, forceCache, needParentLayout, currPos });
             if (needParentLayout) {
-                return curIndex - 1;
+                auto deferredMainLen = GetChildMainSize(wrapper, curIndex);
+                int32_t deferredId = childNode ? childNode->GetId() : -1;
+                ListItemInfo deferredPos = { deferredId, currPos, currPos + deferredMainLen, isGroup, isLazyChild };
+                // Not recorded in cachedItemPosition_: a zero-size entry would add a spurious divider.
+                LayoutDeferredCacheItem(wrapper, curIndex, deferredPos, crossSize, isDirty, show);
+                return curIndex;
             }
         }
         int32_t currCache = 1;
@@ -3329,7 +3418,12 @@ int32_t ListLayoutAlgorithm::LayoutCachedBackward(LayoutWrapper* layoutWrapper,
             predictList.emplace_back(
                 PredictLayoutItem { curIndex, -1, cachedCount, forceCache, needParentLayout, currPos });
             if (needParentLayout) {
-                return curIndex + 1;
+                auto deferredMainLen = GetChildMainSize(wrapper, curIndex);
+                int32_t deferredId = childNode ? childNode->GetId() : -1;
+                ListItemInfo deferredPos = { deferredId, currPos - deferredMainLen, currPos, isGroup, isLazyChild };
+                // Not recorded in cachedItemPosition_: a zero-size entry would add a spurious divider.
+                LayoutDeferredCacheItem(wrapper, curIndex, deferredPos, crossSize, isDirty, show);
+                return curIndex;
             }
         }
         int32_t currCache = 1;

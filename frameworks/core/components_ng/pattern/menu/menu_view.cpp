@@ -1251,9 +1251,9 @@ bool MenuView::HandleLowEndImmersiveMaterialForMenu(const RefPtr<FrameNode>& men
         CHECK_NULL_RETURN(copiedOptions, false);
         copiedOptions->materialColor = backgroundColor;
         renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(copiedMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(menuNode), AceType::RawPtr(copiedMaterial));
     } else {
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(systemMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(menuNode), AceType::RawPtr(systemMaterial));
     }
     return true;
 }
@@ -2310,7 +2310,7 @@ void MenuView::NeedAgingUpdateNode(const RefPtr<FrameNode>& optionNode)
         NearEqual(fontScale, menuTheme->GetMaxFontSizeScale())) {
         auto optionPattern = optionNode->GetPattern<MenuItemPattern>();
         CHECK_NULL_VOID(optionPattern);
-        auto textNode = AceType::DynamicCast<FrameNode>(optionPattern->GetTextNode());
+        auto textNode = optionPattern->GetTextNode();
         CHECK_NULL_VOID(textNode);
         auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
         CHECK_NULL_VOID(textLayoutProperty);

@@ -14,12 +14,15 @@
  */
 
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
+#include "core/components_ng/event/event_constants.h"
+#include "core/event/function_key.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <regex>
@@ -91,6 +94,7 @@
 #include "core/common/dynamic_module_helper.h"
 #include "core/common/resource/resource_manager.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/properties/depth_option.h"
@@ -218,7 +222,7 @@ const char* DEBUG_LINE_INFO_LINE = "$line";
 const char* DEBUG_LINE_INFO_PACKAGE_NAME = "$packageName";
 
 enum class MenuItemType { COPY, PASTE, CUT, SELECT_ALL, AUTO_FILL, PASSWORD_VAULT, UNKNOWN, CAMERA_INPUT,
-    AI_WRITER, TRANSLATE, SHARE, SEARCH, ASK_CELIA, AI_MENU_OPTION };
+    AI_WRITER, TRANSLATE, SHARE, SEARCH, ASK_CELIA, AI_MENU_OPTION, TRANSLATE_INPUT };
 enum class BackgroundType { CUSTOM_BUILDER, COLOR };
 
 const int32_t NUM_0 = 0;
@@ -1956,6 +1960,7 @@ MenuItemType StringToMenuItemType(std::string_view id)
         { "OH_DEFAULT_AUTO_FILL", MenuItemType::AUTO_FILL },
         { "OH_DEFAULT_PASSWORD_VAULT", MenuItemType::PASSWORD_VAULT },
         { "OH_DEFAULT_CAMERA_INPUT", MenuItemType::CAMERA_INPUT },
+        { "OH_DEFAULT_TRANSLATE_INPUT", MenuItemType::TRANSLATE_INPUT },
         { "OH_DEFAULT_AI_WRITE", MenuItemType::AI_WRITER },
         { "OH_DEFAULT_TRANSLATE", MenuItemType::TRANSLATE },
         { "OH_DEFAULT_SHARE", MenuItemType::SHARE },
@@ -2027,6 +2032,7 @@ void UpdateInfoById(NG::MenuOptionsParam& menuOptionsParam, std::string_view id)
             menuOptionsParam.symbolId = theme->GetAIWriteSymbolId();
             break;
         case MenuItemType::TRANSLATE:
+        case MenuItemType::TRANSLATE_INPUT:
             menuOptionsParam.symbolId = theme->GetTranslateSymbolId();
             break;
         case MenuItemType::SHARE:
@@ -5891,53 +5897,55 @@ bool JSViewAbstract::ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimensi
 
 void JSViewAbstract::RegisterTextBackgroundStyleResource(TextBackgroundStyle& textBackgroundStyle,
     RefPtr<ResourceObject>& resObjTopLeft, RefPtr<ResourceObject>& resObjTopRight,
-    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight)
+    RefPtr<ResourceObject>& resObjBottomLeft, RefPtr<ResourceObject>& resObjBottomRight,
+    RefPtr<ResourceObject>& borderColorResObj, RefPtr<ResourceObject>& borderWidthResObj)
 {
     if (!SystemProperties::ConfigChangePerform()) {
         return;
     }
-    if (resObjTopLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
+    auto registerRadius = [&textBackgroundStyle](
+        RefPtr<ResourceObject>& resObj, const std::string& key,
+        std::optional<Dimension> NG::BorderRadiusProperty::* member) {
+        if (!resObj) {
+            return;
+        }
+        auto&& updateFunc = [member](const RefPtr<ResourceObject>& resObj,
+            TextBackgroundStyle& style) {
+            if (!style.backgroundRadius.has_value()) {
+                style.backgroundRadius = NG::BorderRadiusProperty();
+            }
             CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            ResourceParseUtils::ParseResDimensionVp(resObj, radius);
+            style.backgroundRadius.value().*member = radius;
+            style.backgroundRadius->multiValued = true;
         };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusTopLeft", resObjTopLeft,
+        textBackgroundStyle.AddResource(key, resObj, std::move(updateFunc));
+    };
+    registerRadius(resObjTopLeft, "textBackgroundStyle.radiusTopLeft", &NG::BorderRadiusProperty::radiusTopLeft);
+    registerRadius(resObjTopRight, "textBackgroundStyle.radiusTopRight", &NG::BorderRadiusProperty::radiusTopRight);
+    registerRadius(resObjBottomLeft, "textBackgroundStyle.radiusBottomLeft",
+        &NG::BorderRadiusProperty::radiusBottomLeft);
+    registerRadius(resObjBottomRight, "textBackgroundStyle.radiusBottomRight",
+        &NG::BorderRadiusProperty::radiusBottomRight);
+    if (borderColorResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderColorResObj,
+            TextBackgroundStyle& textBackgroundStyle) {
+            Color color;
+            if (ResourceParseUtils::ParseResColor(borderColorResObj, color)) {
+                textBackgroundStyle.borderColor = color;
+            }
+        };
+        textBackgroundStyle.AddResource("textBackgroundStyle.borderColor", borderColorResObj,
             std::move(updateFunc));
     }
-    if (resObjTopRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjTopRight,
+    if (borderWidthResObj) {
+        auto&& updateFunc = [](const RefPtr<ResourceObject>& borderWidthResObj,
             TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjTopRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusTopRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
+            CalcDimension width;
+            ResourceParseUtils::ParseResDimensionVp(borderWidthResObj, width);
+            textBackgroundStyle.borderWidth = width;
         };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusTopRight", resObjTopRight,
-            std::move(updateFunc));
-    }
-    if (resObjBottomLeft) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomLeft,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomLeft, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomLeft = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusBottomLeft", resObjBottomLeft,
-            std::move(updateFunc));
-    }
-    if (resObjBottomRight) {
-        auto&& updateFunc = [](const RefPtr<ResourceObject>& resObjBottomRight,
-            TextBackgroundStyle& textBackgroundStyle) {
-            CalcDimension radius;
-            ResourceParseUtils::ParseResDimensionVp(resObjBottomRight, radius);
-            textBackgroundStyle.backgroundRadius->radiusBottomRight = radius;
-            textBackgroundStyle.backgroundRadius->multiValued = true;
-        };
-        textBackgroundStyle.AddResource("textBackgroundStyle.radiusBottomRight", resObjBottomRight,
+        textBackgroundStyle.AddResource("textBackgroundStyle.borderWidth", borderWidthResObj,
             std::move(updateFunc));
     }
 }
@@ -5970,8 +5978,10 @@ bool JSViewAbstract::ParseAllBorderRadiuses(JSRef<JSObject>& object, CalcDimensi
     GetBorderRadiusResObj("bottomLeft", object, bottomLeft, resObjBottomLeft);
     GetBorderRadiusResObj("bottomRight", object, bottomRight, resObjBottomRight);
 
+    RefPtr<ResourceObject> borderColorResObj;
+    RefPtr<ResourceObject> borderWidthResObj;
     RegisterTextBackgroundStyleResource(textBackgroundStyle, resObjTopLeft, resObjTopRight, resObjBottomLeft,
-        resObjBottomRight);
+        resObjBottomRight, borderColorResObj, borderWidthResObj);
     return false;
 }
 
@@ -9974,7 +9984,7 @@ void JSViewAbstract::JSCreateAnimatableProperty(const JSCallbackInfo& info)
         RefPtr<JSAnimatableArithmetic> animatableArithmeticImpl =
             AceType::MakeRefPtr<JSAnimatableArithmetic>(obj, info.GetExecutionContext());
         RefPtr<CustomAnimatableArithmetic> animatableArithmetic =
-            AceType::DynamicCast<CustomAnimatableArithmetic>(animatableArithmeticImpl);
+            animatableArithmeticImpl;
         std::function<void(const RefPtr<NG::CustomAnimatableArithmetic>&)> onCallbackEvent;
         RefPtr<JsFunction> jsFunc = AceType::MakeRefPtr<JsFunction>(JSRef<JSObject>(), JSRef<JSFunc>::Cast(callback));
         onCallbackEvent = [execCtx = info.GetExecutionContext(), func = std::move(jsFunc), id = Container::CurrentId(),
@@ -10010,7 +10020,7 @@ void JSViewAbstract::JSUpdateAnimatableProperty(const JSCallbackInfo& info)
         RefPtr<JSAnimatableArithmetic> animatableArithmeticImpl =
             AceType::MakeRefPtr<JSAnimatableArithmetic>(obj, info.GetExecutionContext());
         RefPtr<CustomAnimatableArithmetic> animatableArithmetic =
-            AceType::DynamicCast<CustomAnimatableArithmetic>(animatableArithmeticImpl);
+            animatableArithmeticImpl;
         ViewAbstractModel::GetInstance()->UpdateAnimatableArithmeticProperty(propertyName, animatableArithmetic);
     }
 }
@@ -10515,6 +10525,7 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
         "onVisibleAreaApproximateChange", &JSViewAbstract::JsOnVisibleAreaApproximateChange);
     JSClass<JSViewAbstract>::StaticMethod("smartGestureShortcut", &JSViewAbstract::JsSmartGestureShortcut);
     JSClass<JSViewAbstract>::StaticMethod("hitTestBehavior", &JSViewAbstract::JsHitTestBehavior);
+    JSClass<JSViewAbstract>::StaticMethod("agentControlMode", &JSViewAbstract::JsAgentControlMode);
     JSClass<JSViewAbstract>::StaticMethod("onChildTouchTest", &JSViewAbstract::JsOnChildTouchTest);
     JSClass<JSViewAbstract>::StaticMethod("keyboardShortcut", &JSViewAbstract::JsKeyboardShortcut);
     JSClass<JSViewAbstract>::StaticMethod("obscured", &JSViewAbstract::JsObscured);
@@ -12328,6 +12339,21 @@ void JSViewAbstract::JsHitTestBehavior(const JSCallbackInfo& info)
     ViewAbstractModel::GetInstance()->SetHitTestMode(hitTestModeNG);
 }
 
+void JSViewAbstract::JsAgentControlMode(const JSCallbackInfo& info)
+{
+    if (info.Length() != 1 || !info[0]->IsNumber()) {
+        ViewAbstractModel::GetInstance()->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    const auto value = info[0]->ToNumber<int32_t>();
+    if (value < static_cast<int32_t>(NG::AgentControlMode::ALLOW) ||
+        value > static_cast<int32_t>(NG::AgentControlMode::DENY)) {
+        ViewAbstractModel::GetInstance()->SetAgentControlMode(std::nullopt);
+        return;
+    }
+    ViewAbstractModel::GetInstance()->SetAgentControlMode(static_cast<NG::AgentControlMode>(value));
+}
+
 void JSViewAbstract::JsOnChildTouchTest(const JSCallbackInfo& info)
 {
     static std::vector<JSCallbackInfoType> checkList { JSCallbackInfoType::FUNCTION };
@@ -12393,6 +12419,44 @@ void JSViewAbstract::JsForegroundColor(const JSCallbackInfo& info)
             ViewAbstractModel::GetInstance()->SetForegroundColor(foregroundColor);
         }
     }
+}
+
+std::string JSViewAbstract::GetFunctionKeyName(FunctionKey functionkey)
+{
+    static const std::map<FunctionKey, std::string> keyNameMap {
+        {FunctionKey::FK_ESC, "ESC"},
+        {FunctionKey::FK_F1, "F1"},
+        {FunctionKey::FK_F2, "F2"},
+        {FunctionKey::FK_F3, "F3"},
+        {FunctionKey::FK_F4, "F4"},
+        {FunctionKey::FK_F5, "F5"},
+        {FunctionKey::FK_F6, "F6"},
+        {FunctionKey::FK_F7, "F7"},
+        {FunctionKey::FK_F8, "F8"},
+        {FunctionKey::FK_F9, "F9"},
+        {FunctionKey::FK_F10, "F10"},
+        {FunctionKey::FK_F11, "F11"},
+        {FunctionKey::FK_F12, "F12"},
+        {FunctionKey::FK_TAB, "TAB"},
+        {FunctionKey::FK_DPAD_UP, "DPAD_UP"},
+        {FunctionKey::FK_DPAD_DOWN, "DPAD_DOWN"},
+        {FunctionKey::FK_DPAD_LEFT, "DPAD_LEFT"},
+        {FunctionKey::FK_DPAD_RIGHT, "DPAD_RIGHT"},
+        {FunctionKey::FK_CAPS_LOCK, "CAPS_LOCK"},
+        {FunctionKey::FK_SCROLL_LOCK, "SCROLL_LOCK"},
+        {FunctionKey::FK_PAUSE_BREAK, "PAUSE_BREAK"},
+        {FunctionKey::FK_NUM_LOCK, "NUM_LOCK"},
+        {FunctionKey::FK_INSERT, "INSERT"},
+        {FunctionKey::FK_DELETE, "DELETE"},
+        {FunctionKey::FK_HOME, "HOME"},
+        {FunctionKey::FK_END, "END"},
+        {FunctionKey::FK_PAGE_UP, "PAGE_UP"},
+        {FunctionKey::FK_PAGE_DOWN, "PAGE_DOWN"},
+        {FunctionKey::FK_ENTER, "ENTER"},
+        {FunctionKey::FK_BACKSPACE, "BACKSPACE"}
+    };
+    auto result = keyNameMap.find(functionkey);
+    return (result != keyNameMap.end()) ? result->second : std::string();
 }
 
 void JSViewAbstract::JsKeyboardShortcut(const JSCallbackInfo& info)

@@ -36,19 +36,20 @@ typedef Vector4<float> Vector4f;
 
 namespace OHOS::Ace {
 struct FrostedGlassParam;
+struct ExtraGlassParam;
 }
 
 namespace OHOS::Ace::NG {
 class RosenEffectConverter {
 public:
     ACE_FORCE_EXPORT static std::shared_ptr<Rosen::RSNGFilterBase> ConvertToFrostedGlassFilter(
-        const FrostedGlassParam& param, float oneVpValue);
+        const FrostedGlassParam& param, float oneVpValue, const ExtraGlassParam* extraParam);
     static std::shared_ptr<Rosen::RSNGFilterBase> ConvertToFrostedGlassFilterEC(
         const FrostedGlassParam& param, float oneVpValue);
-    static std::shared_ptr<Rosen::RSNGShaderBase> ConvertToRSNGFrostedGlassEffectECSub(
-        const FrostedGlassParam& param, float oneVpValue, bool needSplitOverlayShader);
+    static std::shared_ptr<Rosen::RSNGShaderBase> ConvertToRSNGFrostedGlassEffectECSub(const FrostedGlassParam& param,
+        float oneVpValue, bool needSplitOverlayShader, const ExtraGlassParam* extraParam);
     static std::shared_ptr<Rosen::RSNGShaderBase> ConvertToRSNGFrostedGlassEffectECSubOverlay(
-        const FrostedGlassParam& param, float oneVpValue);
+        const FrostedGlassParam& param, float oneVpValue, const ExtraGlassParam* extraParam);
     static Rosen::Vector2f ConvertToVector2f(const std::array<float, 2>& arr);
     static Rosen::Vector3f ConvertToVector3f(const std::array<float, 3>& arr);
 

@@ -16,6 +16,7 @@ import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 if (is_host_product) {
   ace_unittest("lazy_grid_layout_test") {
     type = "host_components"
+    defines = [ "ARKUI_CAPI_UNITTEST" ]
     cflags = [ "-fno-access-control" ]
     module_name = "ScrollingSet-LazyVGridLayout"
     sources = [

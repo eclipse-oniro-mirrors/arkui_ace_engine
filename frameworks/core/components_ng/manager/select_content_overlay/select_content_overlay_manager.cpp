@@ -20,6 +20,7 @@
 #include "base/utils/utils.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/pattern/container_modal/container_modal_pattern.h"
@@ -235,6 +236,7 @@ SelectOverlayInfo SelectContentOverlayManager::BuildSelectOverlayInfo(int32_t re
     overlayInfo.menuCallback.onSearch = MakeMenuCallback(OptionMenuActionId::SEARCH, overlayInfo);
     overlayInfo.menuCallback.onShare = MakeMenuCallback(OptionMenuActionId::SHARE, overlayInfo);
     overlayInfo.menuCallback.onCameraInput = MakeMenuCallback(OptionMenuActionId::CAMERA_INPUT, overlayInfo);
+    overlayInfo.menuCallback.onTranslateInput = MakeMenuCallback(OptionMenuActionId::TRANSLATE_INPUT, overlayInfo);
     overlayInfo.menuCallback.onAIWrite = MakeMenuCallback(OptionMenuActionId::AI_WRITE, overlayInfo);
     overlayInfo.menuCallback.onAppear = MakeMenuCallback(OptionMenuActionId::APPEAR, overlayInfo);
     overlayInfo.menuCallback.onDisappear = MakeMenuCallback(OptionMenuActionId::DISAPPEAR, overlayInfo);
@@ -524,6 +526,7 @@ void SelectContentOverlayManager::MarkInfoChange(SelectOverlayDirtyFlag dirty)
             if ((dirty & DIRTY_COPY_ALL_ITEM) == DIRTY_COPY_ALL_ITEM) { // can extract to function
                 localReplacedMenuInfo.showCopyAll = menuInfo.showCopyAll;
                 localReplacedMenuInfo.showCopy = menuInfo.showCopy;
+                localReplacedMenuInfo.showTranslateInput = menuInfo.showTranslateInput;
             }
             if ((dirty & DIRTY_AI_MENU_ITEM) == DIRTY_AI_MENU_ITEM) {
                 localReplacedMenuInfo.aiMenuOptionType = menuInfo.aiMenuOptionType;
@@ -722,13 +725,13 @@ std::list<RefPtr<UINode>>::const_iterator SelectContentOverlayManager::FindSelec
     auto callerNode = selectOverlayHolder_->GetOwner();
     CHECK_NULL_RETURN(callerNode, begin);
     RefPtr<UINode> prevNode = nullptr;
-    auto parent = callerNode->GetParent();
+    auto parent = callerNode->GetParent(true);
     while (parent) {
         if (parent == root) {
             break;
         }
         prevNode = parent;
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     CHECK_NULL_RETURN(parent, begin);
     CHECK_NULL_RETURN(prevNode, begin);
@@ -753,7 +756,7 @@ void SelectContentOverlayManager::MountNodeToCaller(const RefPtr<FrameNode>& ove
     ownerFrameNode->SetOverlayNode(overlayNode);
     overlayNode->SetParent(AceType::WeakClaim(AceType::RawPtr(ownerFrameNode)));
     overlayNode->SetActive(true);
-    auto overlayProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto overlayProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(overlayProperty);
     overlayProperty->SetIsOverlayNode(true);
     overlayProperty->UpdateAlignment(Alignment::CENTER);
@@ -808,9 +811,9 @@ RefPtr<UINode> SelectContentOverlayManager::FindWindowScene(RefPtr<FrameNode> ta
         return rootNodeWeak_.Upgrade();
     }
     CHECK_NULL_RETURN(targetNode, nullptr);
-    auto parent = targetNode->GetParent();
+    auto parent = targetNode->GetParent(true);
     while (parent && parent->GetTag() != V2::WINDOW_SCENE_ETS_TAG) {
-        parent = parent->GetParent();
+        parent = parent->GetParent(true);
     }
     CHECK_NULL_RETURN(parent, nullptr);
     return parent;
@@ -836,7 +839,7 @@ bool SelectContentOverlayManager::CloseInternal(int32_t id, bool animation, Clos
     auto menuNode = menuNode_.Upgrade();
     auto handleNode = handleNode_.Upgrade();
     auto owner = selectOverlayHolder_->GetOwner();
-    if (owner && IsMenuShow() && IsMenuAccessibilityFocused(AceType::DynamicCast<UINode>(menuNode))) {
+    if (owner && IsMenuShow() && IsMenuAccessibilityFocused(menuNode)) {
         auto ownerTag = owner->GetTag();
         if (ownerTag != V2::RICH_EDITOR_ETS_TAG ||
             (reason != CloseReason::CLOSE_REASON_SELECT_ALL && reason != CloseReason::CLOSE_REASON_BY_RECREATE)) {
@@ -1282,12 +1285,8 @@ void SelectContentOverlayManager::ConvertPointRelativeToNode(
         temp = temp - rectOffset;
         if (!nodeStack.empty()) {
             auto child = nodeStack.top();
-            if (child->IsAdopted() && child->UseAdoptedCompensation()) {
-                auto pointWithRevert = Matrix4::Invert(child->GetAdoptedCompensationTransform()) *
-                    Point(temp.GetX(), temp.GetY());
-                auto offset = child->GetAdoptedCompensationOffset();
-                temp.SetX(pointWithRevert.GetX() - offset.GetX());
-                temp.SetY(pointWithRevert.GetY() - offset.GetY());
+            if (child->IsAdopted() && FrameNodeAdoptedCompensation::UseAdoptedCompensation(child.GetRawPtr())) {
+                FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(child.GetRawPtr(), temp);
             }
         }
     }

@@ -119,6 +119,7 @@ private:
     bool smartTapAndSlideGesturesEnabled_ = false;
     bool autoInActive_ = false;
     SmartGestureMonitor monitorCallback_;
+    mutable std::mutex monitorMutex_;
     WeakPtr<PipelineContext> context_;
     WeakPtr<FrameNode> selectedNode_;
     WeakPtr<FrameNode> selectedPaintedNode_;

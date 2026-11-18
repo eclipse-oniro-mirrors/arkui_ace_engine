@@ -27,22 +27,45 @@
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 
 namespace OHOS::Ace {
-bool UiContentStub::IsSACalling() const
+bool UiContentStub::IsTrustedCallerUid(uint32_t uid)
+{
+    constexpr uint32_t UI_SA_UID = 16666;
+    constexpr uint32_t MSDP_UID = 6699;
+    constexpr uint32_t AI_APP_CONTROLLER_SERVICE_UID = 7101;
+    constexpr uint32_t trustedCallerUids[] = {
+        UI_SA_UID,
+        MSDP_UID,
+        AI_APP_CONTROLLER_SERVICE_UID,
+    };
+    for (auto trustedUid : trustedCallerUids) {
+        if (trustedUid == uid) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UiContentStub::IsTrustedCaller() const
 {
     using namespace Security::AccessToken;
     const auto tokenId = IPCSkeleton::GetCallingTokenID();
-    const auto flag = AccessTokenKit::GetTokenTypeFlag(tokenId);
-    if (flag == ATokenTypeEnum::TOKEN_NATIVE) {
-        LOGD("SA called, tokenId:%{private}u, flag:%{public}u", tokenId, flag);
-        return true;
+    if (AccessTokenKit::GetTokenTypeFlag(tokenId) != ATokenTypeEnum::TOKEN_NATIVE) {
+        LOGW("Not SA called, tokenId:%{private}u", tokenId);
+        return false;
     }
-    LOGW("Not SA called, tokenId:%{private}u, flag:%{public}u", tokenId, flag);
-    return false;
+    const auto uid = IPCSkeleton::GetCallingUid();
+    if (!IsTrustedCallerUid(uid)) {
+        LOGW("ui_session caller rejected, uid:%{public}d, pid:%{public}d",
+            static_cast<int32_t>(uid), static_cast<int32_t>(IPCSkeleton::GetCallingRealPid()));
+        return false;
+    }
+    LOGD("SA called, tokenId:%{private}u, uid:%{public}d", tokenId, static_cast<int32_t>(uid));
+    return true;
 }
 
 int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option)
 {
-    if (!IsSACalling()) {
+    if (!IsTrustedCaller()) {
         return -1;
     }
     if (data.ReadInterfaceToken() != GetDescriptor()) {
@@ -266,6 +289,12 @@ int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messa
             GetNodesInRectInner(data, reply, option);
             break;
         }
+        case SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK: {
+            return SendCommandWithFinishCallbackInner(data, reply, option);
+        }
+        case SEND_COMMAND_WITH_FINISH_CALLBACK: {
+            return SendCommandKeyCodeWithFinishCallbackInner(data, reply, option);
+        }
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
             return IPCObjectStub::OnRemoteRequest(code, data, reply, option);
@@ -421,12 +450,27 @@ int32_t UiContentStub::RegisterSelectTextEventCallbackInner(
     return NO_ERROR;
 }
 
+namespace {
+// Read the trailing SecurityAuthInfo fields. Old proxies do not append them;
+// ReadBool/ReadUint64 then leave the legacy defaults in place.
+SecurityAuthInfo ReadSecurityAuthInfo(MessageParcel& data)
+{
+    SecurityAuthInfo securityAuth;
+    securityAuth.needSecurityAuth = data.ReadBool();
+    uint64_t tokenId = 0;
+    if (data.ReadUint64(tokenId)) {
+        securityAuth.tokenId = tokenId;
+    }
+    return securityAuth;
+}
+} // namespace
+
 int32_t UiContentStub::SendCommandInner(
     MessageParcel& data, MessageParcel& reply, MessageOption& option)
 {
     int32_t id = data.ReadInt32();
     std::string command = data.ReadString();
-    reply.WriteInt32(SendCommand(id, command));
+    reply.WriteInt32(SendCommand(id, command, ReadSecurityAuthInfo(data)));
     return NO_ERROR;
 }
 
@@ -435,7 +479,7 @@ int32_t UiContentStub::SendCommandInnerSync(
 {
     int32_t id = data.ReadInt32();
     std::string command = data.ReadString();
-    int32_t result = SendCommandSync(id, command);
+    int32_t result = SendCommandSync(id, command, ReadSecurityAuthInfo(data));
     if (!reply.WriteInt32(result)) {
         LOGE("SendCommandInnerSync write reply failed");
         return FAILED;
@@ -446,8 +490,45 @@ int32_t UiContentStub::SendCommandInnerSync(
 int32_t UiContentStub::SendCommandKeyCodeInner(MessageParcel& data, MessageParcel& reply, MessageOption& option)
 {
     std::string command = data.ReadString();
-    reply.WriteInt32(SendCommand(command));
+    reply.WriteInt32(SendCommand(command, ReadSecurityAuthInfo(data)));
     return NO_ERROR;
+}
+
+int32_t UiContentStub::SendCommandWithFinishCallbackInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    uint64_t requestId = 0;
+    int32_t id = 0;
+    if (!data.ReadUint64(requestId) || requestId == 0 || !data.ReadInt32(id)) {
+        LOGW("SendCommandWithFinishCallbackInner read parcel failed");
+        return FAILED;
+    }
+    std::string command;
+    if (!data.ReadString(command)) {
+        return FAILED;
+    }
+    SecurityAuthInfo securityAuth = ReadSecurityAuthInfo(data);
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
+    return callback ? SendCommand(id, command, callback, securityAuth) : FAILED;
+}
+
+int32_t UiContentStub::SendCommandKeyCodeWithFinishCallbackInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    uint64_t requestId = 0;
+    if (!data.ReadUint64(requestId) || requestId == 0) {
+        LOGW("SendCommandKeyCodeWithFinishCallbackInner read parcel failed");
+        return FAILED;
+    }
+    std::string command;
+    if (!data.ReadString(command)) {
+        return FAILED;
+    }
+    SecurityAuthInfo securityAuth = ReadSecurityAuthInfo(data);
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    auto callback = UiSessionManager::GetInstance()->MakeCommandResultCallback(processId, requestId);
+    return callback ? SendCommand(command, callback, securityAuth) : FAILED;
 }
 
 int32_t UiContentStub::UnregisterClickEventCallbackInner(

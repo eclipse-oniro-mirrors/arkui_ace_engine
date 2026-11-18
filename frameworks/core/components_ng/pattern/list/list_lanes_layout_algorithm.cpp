@@ -835,6 +835,37 @@ void ListLanesLayoutAlgorithm::LayoutCachedALine(LayoutWrapper* layoutWrapper,
     wrapper->SetActive(false);
 }
 
+int32_t ListLanesLayoutAlgorithm::LayoutDeferredCacheLine(LayoutWrapper* layoutWrapper,
+    const RefPtr<LayoutWrapper>& wrapper, int32_t curIndex, float refPos, float crossSize, bool forward, bool show)
+{
+    if (!wrapper) {
+        return forward ? curIndex - 1 : curIndex + 1;
+    }
+    auto geometryNode = wrapper->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, curIndex);
+    auto deferredNode = wrapper->GetHostNode();
+    auto deferredLen = GetChildMainSize(wrapper, curIndex);
+    const float startPos = forward ? refPos : refPos - deferredLen;
+    const float endPos = forward ? refPos + deferredLen : refPos;
+    ListItemInfo deferredInfo = { deferredNode ? deferredNode->GetId() : -1, startPos, endPos, false,
+        CanSupportNestedLazy(deferredNode, layoutWrapper->GetHostNode(), GetLanes()) };
+    const auto prevOffset = geometryNode->GetMarginFrameOffset();
+    RefPtr<LayoutWrapper> itemWrapper = wrapper;
+    auto deferredStart = GetLanesFloor(layoutWrapper, curIndex);
+    LayoutItem(itemWrapper, curIndex, deferredInfo, deferredStart, crossSize);
+    auto offset = geometryNode->GetMarginFrameOffset();
+    if (axis_ == Axis::VERTICAL) {
+        offset.SetX(prevOffset.GetX());
+    } else {
+        offset.SetY(prevOffset.GetY());
+    }
+    geometryNode->SetMarginFrameOffset(offset);
+    const bool isDirty = wrapper->CheckNeedForceMeasureAndLayout() || !IsListLanesEqual(wrapper);
+    SyncGeometry(itemWrapper, isDirty);
+    wrapper->SetActive(show);
+    return curIndex;
+}
+
 std::pair<bool, bool> ListLanesLayoutAlgorithm::CheckACachedItem(
     const RefPtr<LayoutWrapper>& wrapper, int32_t cnt, bool& isGroup, float ref, bool forward) const
 {
@@ -847,7 +878,8 @@ std::pair<bool, bool> ListLanesLayoutAlgorithm::CheckACachedItem(
         return std::make_pair(true, false);
     }
     bool isDirty = wrapper->CheckNeedForceMeasureAndLayout() || !IsListLanesEqual(wrapper);
-    if (!isGroup && (isDirty || CheckLayoutConstraintChanged(wrapper, ref, forward))) {
+    if (!isGroup && (isDirty || CheckLayoutConstraintChanged(wrapper, ref, forward)) &&
+        !wrapper->CheckHasPreMeasured()) {
         if (isDirty && !wrapper->GetHostNode()->IsLayoutComplete()) {
             return std::make_pair(true, true);
         }
@@ -901,7 +933,8 @@ int32_t ListLanesLayoutAlgorithm::LayoutCachedForward(LayoutWrapper* layoutWrapp
             }
             currCache = std::max(res.forwardCacheMax, 1);
         } else if (cnt <= 0) {
-            break;
+            // Not recorded in the cached position map: a zero-size entry would add a spurious divider.
+            return LayoutDeferredCacheLine(layoutWrapper, wrapper, curIndex, startPos, crossSize, true, show);
         }
         for (auto& pos : posMap) {
             pos.second.endPos = startPos + mainLen;
@@ -971,7 +1004,8 @@ int32_t ListLanesLayoutAlgorithm::LayoutCachedBackward(LayoutWrapper* layoutWrap
             }
             currCache = std::max(res.backwardCacheMax, 1);
         } else if (cnt <= 0) {
-            break;
+            // Not recorded in the cached position map: a zero-size entry would add a spurious divider.
+            return LayoutDeferredCacheLine(layoutWrapper, wrapper, curIndex, endPos, crossSize, false, show);
         }
         for (auto& pos: posMap) {
             pos.second.startPos = endPos - mainLen;

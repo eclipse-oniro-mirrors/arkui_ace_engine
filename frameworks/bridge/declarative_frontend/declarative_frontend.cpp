@@ -597,6 +597,24 @@ void DeclarativeFrontend::InitializeFrontendDelegate(const RefPtr<TaskExecutor>&
         return;
     }
     delegate_->SetGroupJsBridge(jsEngine_->GetGroupJsBridge());
+    auto recoverableSnapshotCallBack =
+        [weakEngine = WeakPtr<Framework::JsEngine>(jsEngine_)](int32_t instanceId, std::string& section) {
+            auto jsEngine = weakEngine.Upgrade();
+            if (!jsEngine) {
+                return;
+            }
+            section = jsEngine->GetRecoverableStorageSnapshot(instanceId);
+        };
+    delegate_->SetRecoverableSnapshotCallBack(std::move(recoverableSnapshotCallBack));
+    auto recoverableRestoreCallBack =
+        [weakEngine = WeakPtr<Framework::JsEngine>(jsEngine_)](int32_t instanceId, const std::string& section) {
+            auto jsEngine = weakEngine.Upgrade();
+            if (!jsEngine) {
+                return;
+            }
+            jsEngine->SetRecoverableStorageData(instanceId, section);
+        };
+    delegate_->SetRecoverableRestoreCallBack(std::move(recoverableRestoreCallBack));
     if (Container::IsCurrentUseNewPipeline()) {
         auto loadDynamicPageCallback =
             [weakEngine = WeakPtr<Framework::JsEngine>(jsEngine_)](

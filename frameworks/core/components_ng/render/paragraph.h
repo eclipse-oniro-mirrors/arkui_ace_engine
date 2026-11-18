@@ -30,9 +30,7 @@
 #include "core/components_ng/render/drawing_forward.h"
 #include "core/components_ng/render/font_collection.h"
 
-#ifndef USE_ROSEN_DRAWING
 class SkCanvas;
-#endif
 
 namespace OHOS::Ace::NG {
 struct DrawingContext;
@@ -361,9 +359,7 @@ public:
     virtual void SetParagraphSymbolAnimation(const RefPtr<FrameNode>& frameNode) = 0;
     // interfaces for painting
     virtual void Paint(RSCanvas& canvas, float x, float y) = 0;
-#ifndef USE_ROSEN_DRAWING
-    virtual void Paint(SkCanvas* skCanvas, float x, float y) = 0;
-#endif
+    virtual void Paint(SkCanvas* skCanvas, float x, float y) {}
     virtual LineMetrics GetLineMetricsByRectF(RectF& rect) = 0;
     virtual TextLineMetrics GetLineMetrics(size_t lineNumber) = 0;
     virtual RectF GetPaintRegion(float x, float y) = 0;

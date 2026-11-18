@@ -321,7 +321,20 @@ type TabsSidebarSearchableOptions = object;
 type TabBarDisplayMode = 'bottomTabbar' | 'sidebar' | 'topTabbar';
 type TabsBreakpointType<T> = object;
 type TabVisibility = 'visible' | 'hidden';
-
+enum SidebarSectionTitleStyle {
+    STANDARD = 0,
+    EMPHASIZED = 1
+}
+interface SidebarSection {
+    title: ResourceStr;
+    order?: number;
+    titleStyle?: SidebarSectionTitleStyle;
+}
+interface TabViewCustomization {
+    visibilityMap?: Map<number, TabVisibility>;
+    sectionMap?: Map<number, SidebarSection>;
+    orderMap?: Map<number, number>
+};
 declare class Indicator {
     left(value: LengthMetrics | undefined): this;
     top(value: LengthMetrics | undefined): this;
@@ -577,6 +590,7 @@ type LayoutStyle = 'alwaysCenter' | 'alwaysAverageSplit' | 'spaceAroundAverage' 
 type TabsAnimationMode = 'none' | 'content' | 'actionSheet';
 type ScrollableBarModeOptions = object;
 type BarOverlapOptions = object;
+type BarOverlapMode = 'STANDARD' | 'STACK' | 'SAFE_AREA_PADDING';
 type TabBarOptions = object | CustomBuilder;
 type FlexDirection = 'row' | 'rowReverse' | 'column' | 'columnReverse';
 type ScrollState = 'idle' | 'scroll' | 'fling';

@@ -44,6 +44,7 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "core/components_ng/pattern/ui_extension/preview_ui_extension_component/preview_session_wrapper_impl.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_layout_algorithm.h"
 #include "core/components_ng/pattern/window_scene/scene/window_pattern.h"
 #include "core/components_ng/property/accessibility_property.h"
@@ -57,6 +58,7 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+constexpr char BRAND_COLOR_KEY[] = "ohos.application.brandColor";
 constexpr char PROHIBIT_NESTING_FAIL_NAME[] = "Prohibit_Nesting_SecurityUIExtensionComponent";
 constexpr char PROHIBIT_NESTING_FAIL_MESSAGE[] =
     "Prohibit nesting securityUIExtensionComponent in securityUIExtensionAbility";
@@ -224,6 +226,14 @@ void SecurityUIExtensionPattern::OnAttachContext(PipelineContext *context)
         UpdateWant(wantWrap);
         SetWantWrap(nullptr);
     }
+    RegisterBrandColorChangeListener();
+}
+
+void SecurityUIExtensionPattern::OnDetachContext(PipelineContext *context)
+{
+    hasAttachContext_ = false;
+    CHECK_NULL_VOID(context);
+    UnRegisterBrandColorChangeListener();
 }
 
 void SecurityUIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
@@ -234,6 +244,7 @@ void SecurityUIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
     }
 
     sessionWrapper_->UpdateInstanceId(instanceId);
+    NotifyBrandColorChange(instanceId);
 }
 
 void SecurityUIExtensionPattern::UpdateWant(const AAFwk::Want& want)
@@ -345,6 +356,7 @@ void SecurityUIExtensionPattern::OnConnect()
     host->AddChild(contentNode_, 0);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     surfaceNode->CreateNodeInRenderThread();
+    isUeaConnecting_ = true;
     FireOnRemoteReadyCallback();
     auto focusHub = host->GetFocusHub();
     bool isFocused = focusHub && focusHub->IsCurrentFocus();
@@ -408,6 +420,7 @@ void SecurityUIExtensionPattern::OnDisconnect(bool isAbnormal)
     CHECK_NULL_VOID(host);
     host->RemoveChild(contentNode_);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    isUeaConnecting_ = false;
 }
 
 void SecurityUIExtensionPattern::FireBindModalCallback()
@@ -449,6 +462,7 @@ void SecurityUIExtensionPattern::NotifyForeground()
         PLATFORM_LOGI("The state is changing from '%{public}s' to 'FOREGROUND'.", ToString(state_));
         state_ = AbilityState::FOREGROUND;
         sessionWrapper_->NotifyForeground();
+        NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
     }
 }
 
@@ -467,6 +481,7 @@ void SecurityUIExtensionPattern::NotifyDestroy()
         state_ != AbilityState::NONE) {
         PLATFORM_LOGI("The state is changing from '%{public}s' to 'DESTRUCTION'.", ToString(state_));
         state_ = AbilityState::DESTRUCTION;
+        isUeaConnecting_ = false;
         sessionWrapper_->NotifyDestroy();
         sessionWrapper_->DestroySession();
     }
@@ -533,6 +548,33 @@ void SecurityUIExtensionPattern::OnAttachToFrameNode()
         accessibilitySAObserverCallback_);
 #endif
     PLATFORM_LOGI("OnAttachToFrameNode");
+}
+
+void SecurityUIExtensionPattern::RegisterBrandColorChangeListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    NG::BrandColorChangeCallback internalCallback =
+        [weak = WeakClaim(this), instanceId = instanceId_](
+            int32_t, const std::optional<Color>&,
+            const std::optional<NG::BrandColorStrategy>&) {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            ContainerScope scope(instanceId);
+            pattern->NotifyBrandColorChange(instanceId);
+        };
+    storage->RegisterBrandColorChangeListener(instanceId_, host->GetId(), internalCallback);
+}
+
+void SecurityUIExtensionPattern::UnRegisterBrandColorChangeListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->UnregisterBrandColorChangeListener(instanceId_, host->GetId());
 }
 
 void SecurityUIExtensionPattern::OnDetachFromFrameNode(FrameNode* frameNode)
@@ -660,6 +702,7 @@ void SecurityUIExtensionPattern::FireOnRemoteReadyCallback()
     CHECK_NULL_VOID(eventHub);
     eventHub->FireOnRemoteReadyCallback(
         MakeRefPtr<NG::SecurityUIExtensionProxy>(sessionWrapper_, Claim(this)));
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
 }
 
 void SecurityUIExtensionPattern::FireOnTerminatedCallback(
@@ -912,6 +955,9 @@ void SecurityUIExtensionPattern::DumpInfo()
         .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
     DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
         .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_)
+        .append(", lastSentBrandColorStr: ").append(lastSentBrandColorStr_).append(", isUeaConnecting: ")
+        .append(std::to_string(isUeaConnecting_)));
 }
 
 void SecurityUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
@@ -932,6 +978,9 @@ void SecurityUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1).c_str());
     json->Put("dpiFollowStrategyEffective: ",
         std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy())).c_str());
+    json->Put("brandColorStr: ", brandColorStr_.c_str());
+    json->Put("lastSentBrandColorStr: ", lastSentBrandColorStr_.c_str());
+    json->Put("isUeaConnecting: ", std::to_string(isUeaConnecting_).c_str());
 }
 
 const char* SecurityUIExtensionPattern::ToString(AbilityState state)
@@ -1212,5 +1261,84 @@ void SecurityUIExtensionPattern::UpdateWMSUIExtProperty(UIContentBusinessCode co
         return;
     }
     SendBusinessData(code, data, BusinessDataSendType::ASYNC, subSystemId);
+}
+
+void SecurityUIExtensionPattern::NotifyBrandColorChangeToUEA(
+    int32_t instanceId, const std::string& brandColorStr)
+{
+    CHECK_NULL_VOID(sessionWrapper_);
+    if (state_ != AbilityState::FOREGROUND || !isUeaConnecting_) {
+        PLATFORM_LOGW("NotifyBrandColorChangeToUEA: skip, "
+            "state=%{public}d, isUeaConnecting=%{public}d",
+            static_cast<int32_t>(state_), isUeaConnecting_);
+        return;
+    }
+    if (!brandColorStr.empty()) {
+        auto brandColor = Color::FromString(brandColorStr);
+        if (brandColor.GetAlpha() == 0) {
+            PLATFORM_LOGW("NotifyBrandColorChangeToUEA: brandColor is transparent, skip, "
+                "instanceId=%{public}d, brandColorStr=%{public}s",
+                instanceId, brandColorStr.c_str());
+            return;
+        }
+    }
+    if (brandColorStr == lastSentBrandColorStr_) {
+        PLATFORM_LOGI("NotifyBrandColorChangeToUEA: brandColorStr not changed, skip, "
+            "instanceId=%{public}d, brandColorStr=%{public}s",
+            instanceId, brandColorStr.c_str());
+        return;
+    }
+    AAFwk::Want want;
+    want.SetParam(BRAND_COLOR_KEY, brandColorStr);
+    PLATFORM_LOGI("NotifyBrandColorChangeToUEA: instanceId=%{public}d, "
+        "brandColorStr=%{public}s, sessionId=%{public}d",
+        instanceId, brandColorStr.c_str(), GetSessionId());
+    sessionWrapper_->SendBusinessData(
+        UIContentBusinessCode::NOTIFY_BRAND_COLOR_CHANGE, want,
+        BusinessDataSendType::ASYNC, RSSubsystemId::ABILITY_UIEXT);
+    lastSentBrandColorStr_ = brandColorStr;
+}
+
+void SecurityUIExtensionPattern::NotifyBrandColorChange(int32_t instanceId)
+{
+    auto brandColorStr = GetBrandColorStr();
+    NotifyBrandColorChangeToUEA(instanceId, brandColorStr);
+    brandColorStr_ = brandColorStr;
+}
+
+std::string SecurityUIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) const
+{
+    auto brandColor = TokenThemeStorage::GetInstance()->ResolveBrandColor(themeScopeId);
+    if (!brandColor.has_value()) {
+        PLATFORM_LOGW("ResolveBrandColor: themeColors is null, "
+                "themeScopeId=%{public}d, instanceId=%{public}d",
+            themeScopeId, instanceId_);
+        return DEFAULT_BRAND_COLOR_STR;
+    }
+    if (brandColor.value().GetAlpha() == 0) {
+        PLATFORM_LOGW("ResolveBrandColor: brandColor is transparent, "
+            "instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+            instanceId_, brandColor.value().ToString().c_str());
+        return DEFAULT_BRAND_COLOR_STR;
+    }
+    PLATFORM_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+        instanceId_, brandColor.value().ToString().c_str());
+    return brandColor.value().ToString();
+}
+
+std::string SecurityUIExtensionPattern::GetBrandColorStr() const
+{
+    auto hostNode = GetHost();
+    int32_t themeScopeId = hostNode ? hostNode->GetThemeScopeId() : 0;
+    return ResolveBrandColor(themeScopeId);
+}
+
+bool SecurityUIExtensionPattern::OnThemeScopeUpdate(int32_t themeScopeId)
+{
+    PLATFORM_LOGI("OnThemeScopeUpdate: themeScopeId=%{public}d, instanceId=%{public}d, sessionId=%{public}d",
+        themeScopeId, instanceId_, GetSessionId());
+    brandColorStr_ = ResolveBrandColor(themeScopeId);
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
+    return true;
 }
 } // namespace OHOS::Ace::NG

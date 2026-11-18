@@ -54,7 +54,7 @@ void SetXImpl(Ark_HoverEvent peer,
     auto location = info->GetLocalLocation();
     auto optX = x ? Converter::OptConvertPtr<float>(x) : std::nullopt;
     auto xValue = optX.value_or(DEFAULT_VALUE);
-    location.SetX(xValue, location.GetXAnimationOption());
+    location.SetX(PipelineBase::Vp2PxWithCurrentDensity(xValue), location.GetXAnimationOption());
     info->SetLocalLocation(location);
 }
 Opt_Float64 GetYImpl(Ark_HoverEvent peer)
@@ -74,7 +74,7 @@ void SetYImpl(Ark_HoverEvent peer,
     auto location = info->GetLocalLocation();
     auto optY = y ? Converter::OptConvertPtr<float>(y) : std::nullopt;
     auto yValue = optY.value_or(DEFAULT_VALUE);
-    location.SetY(yValue, location.GetYAnimationOption());
+    location.SetY(PipelineBase::Vp2PxWithCurrentDensity(yValue), location.GetYAnimationOption());
     info->SetLocalLocation(location);
 }
 Opt_Float64 GetWindowXImpl(Ark_HoverEvent peer)
@@ -94,7 +94,7 @@ void SetWindowXImpl(Ark_HoverEvent peer,
     auto location = info->GetGlobalLocation();
     auto optWX = windowX ? Converter::OptConvertPtr<float>(windowX) : std::nullopt;
     const auto windowXValue = optWX.value_or(DEFAULT_VALUE);
-    location.SetX(windowXValue, location.GetXAnimationOption());
+    location.SetX(PipelineBase::Vp2PxWithCurrentDensity(windowXValue), location.GetXAnimationOption());
     info->SetGlobalLocation(location);
 }
 Opt_Float64 GetWindowYImpl(Ark_HoverEvent peer)
@@ -114,7 +114,7 @@ void SetWindowYImpl(Ark_HoverEvent peer,
     auto location = info->GetGlobalLocation();
     auto optWY = windowY ? Converter::OptConvertPtr<float>(windowY) : std::nullopt;
     const auto windowYValue = optWY.value_or(DEFAULT_VALUE);
-    location.SetY(windowYValue, location.GetYAnimationOption());
+    location.SetY(PipelineBase::Vp2PxWithCurrentDensity(windowYValue), location.GetYAnimationOption());
     info->SetGlobalLocation(location);
 }
 Opt_Float64 GetDisplayXImpl(Ark_HoverEvent peer)
@@ -134,7 +134,7 @@ void SetDisplayXImpl(Ark_HoverEvent peer,
     auto location = info->GetScreenLocation();
     auto optDX = displayX ? Converter::OptConvertPtr<float>(displayX) : std::nullopt;
     const auto displayXValue = optDX.value_or(DEFAULT_VALUE);
-    location.SetX(displayXValue, location.GetXAnimationOption());
+    location.SetX(PipelineBase::Vp2PxWithCurrentDensity(displayXValue), location.GetXAnimationOption());
     info->SetScreenLocation(location);
 }
 Opt_Float64 GetDisplayYImpl(Ark_HoverEvent peer)
@@ -155,7 +155,7 @@ void SetDisplayYImpl(Ark_HoverEvent peer,
     auto location = info->GetScreenLocation();
     auto optDY = displayY ? Converter::OptConvertPtr<float>(displayY) : std::nullopt;
     const auto displayYValue = optDY.value_or(DEFAULT_VALUE);
-    location.SetY(displayYValue, location.GetYAnimationOption());
+    location.SetY(PipelineBase::Vp2PxWithCurrentDensity(displayYValue), location.GetYAnimationOption());
     info->SetScreenLocation(location);
 }
 void StopPropagationImpl(Ark_HoverEvent peer)
@@ -180,8 +180,9 @@ void SetGlobalDisplayXImpl(Ark_HoverEvent peer,
     const auto info = peer->GetEventInfo();
     CHECK_NULL_VOID(info);
     auto globalDisplayLocation = info->GetGlobalDisplayLocation();
+    const auto animation = globalDisplayLocation.GetXAnimationOption();
     auto globalDisplayXValue = Converter::OptConvertPtr<double>(globalDisplayX).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetX(globalDisplayXValue, globalDisplayLocation.GetXAnimationOption());
+    globalDisplayLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayXValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 Opt_Float64 GetGlobalDisplayYImpl(Ark_HoverEvent peer)
@@ -199,8 +200,9 @@ void SetGlobalDisplayYImpl(Ark_HoverEvent peer,
     const auto info = peer->GetEventInfo();
     CHECK_NULL_VOID(info);
     auto globalDisplayLocation = info->GetGlobalDisplayLocation();
+    const auto animation = globalDisplayLocation.GetYAnimationOption();
     auto globalDisplayYValue = Converter::OptConvertPtr<double>(globalDisplayY).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetY(globalDisplayYValue, globalDisplayLocation.GetYAnimationOption());
+    globalDisplayLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayYValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 } // HoverEventAccessor

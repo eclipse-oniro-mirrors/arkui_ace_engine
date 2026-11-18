@@ -52,6 +52,7 @@
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/dialog/dialog_layout_algorithm.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
 #include "core/components_ng/pattern/distortion_component/distortion_component_options.h"
@@ -1606,7 +1607,7 @@ RefPtr<FrameNode> DialogPattern::BuildMenu(const std::vector<ButtonInfo>& button
             button = CreateButton(buttons[i], i, true, true, size);
         }
         CHECK_NULL_RETURN(button, nullptr);
-        auto buttonFrameNode = DynamicCast<FrameNode>(button);
+        auto buttonFrameNode = button;
         CHECK_NULL_RETURN(buttonFrameNode, nullptr);
         auto props = buttonFrameNode->GetLayoutProperty();
         CHECK_NULL_RETURN(props, nullptr);
@@ -1759,6 +1760,10 @@ void DialogPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     json->PutExtAttr("edgeLightMode",
         EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str(),
         filter);
+    json->PutExtAttr("adaptToHandedness",
+        HandednessFollowModeToString(
+            dialogProperties_.adaptToHandedness.value_or(HandednessFollowMode::NONE)).c_str(),
+        filter);
     json->PutExtAttr("distortionEnabled", needDistortion_.value_or(false) ? "true" : "false", filter);
     json->PutExtAttr("edgeLightEnabled", needFlowLight_.value_or(false) ? "true" : "false", filter);
     json->PutExtAttr("hasSystemMaterial", dialogProperties_.systemMaterial ? "true" : "false", filter);
@@ -1907,6 +1912,7 @@ void DialogPattern::UpdateAlignmentAndOffset()
     auto dialogProp = GetDialogProperties();
     props->UpdateDialogAlignment(dialogProp.alignment);
     props->UpdateDialogOffset(dialogProp.offset);
+    props->UpdateAdaptToHandedness(dialogProp.adaptToHandedness.value_or(HandednessFollowMode::NONE));
 }
 
 void DialogPattern::OnLanguageConfigurationUpdate()
@@ -2471,6 +2477,10 @@ void DialogPattern::DumpInfo()
         "EdgeLightMode: " +
         EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)));
     DumpLog::GetInstance().AddDesc(
+        "AdaptToHandedness: " +
+        HandednessFollowModeToString(
+            dialogProperties_.adaptToHandedness.value_or(HandednessFollowMode::NONE)));
+    DumpLog::GetInstance().AddDesc(
         "DistortionEnabled: " + std::string(needDistortion_.value_or(false) ? "true" : "false"));
     DumpLog::GetInstance().AddDesc(
         "EdgeLightEnabled: " + std::string(needFlowLight_.value_or(false) ? "true" : "false"));
@@ -2596,6 +2606,12 @@ void DialogPattern::OnWindowSizeChanged(int32_t width, int32_t height, WindowSiz
         InitParentWindowRect();
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         isFoldStatusChanged_ = false;
+        // Window size changed: the cached anchor position (window-relative coordinates)
+        // may be stale. Set a flag so the next layout pass re-queries the anchor from
+        // HandednessManager instead of using the stale cached value.
+        if (handednessLayoutCaptured_) {
+            needRefreshAnchorPos_ = true;
+        }
     }
 }
 
@@ -2723,6 +2739,9 @@ void DialogPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         DistortionModeToString(dialogProperties_.distortionMode.value_or(DistortionMode::DISTORTION_AUTO)).c_str());
     json->Put("EdgeLightMode",
         EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str());
+    json->Put("AdaptToHandedness",
+        HandednessFollowModeToString(
+            dialogProperties_.adaptToHandedness.value_or(HandednessFollowMode::NONE)).c_str());
     json->Put("DistortionEnabled", needDistortion_.value_or(false) ? "true" : "false");
     json->Put("EdgeLightEnabled", needFlowLight_.value_or(false) ? "true" : "false");
 }
@@ -3060,7 +3079,7 @@ void DialogPattern::AddForceSplitRatioListener()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     forceSplitMgr->AddForceSplitRatioListener(
         host->GetId(), [weakHost = AceType::WeakClaim(AceType::RawPtr(host))](float splitRatio) {
@@ -3076,9 +3095,85 @@ void DialogPattern::RemoveForceSplitRatioListener()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     forceSplitMgr->RemoveForceSplitRatioListener(host->GetId());
+}
+
+CommandResult DialogPattern::ResolveMenuCommandTarget(
+    const std::unique_ptr<JsonValue>& params, RefPtr<FrameNode>& target)
+{
+    if (!dialogProperties_.isMenu) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    auto menu = menuNode_.Upgrade();
+    CHECK_NULL_RETURN(menu, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto index = params->GetInt("buttonIndex", -1);
+    auto count = static_cast<int32_t>(menu->GetChildren().size());
+    if (index < -1 || index >= count) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto row = AceType::DynamicCast<FrameNode>(menu->GetChildAtIndex(index == -1 ? count - 1 : index));
+    CHECK_NULL_RETURN(row, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    target = AceType::DynamicCast<FrameNode>(row->GetFirstChild());
+    CHECK_NULL_RETURN(target, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto text = AceType::DynamicCast<FrameNode>(target->GetFirstChild());
+    return text && text->GetPattern<TextPattern>()
+        ? CommandResult::Success() : CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+}
+
+CommandResult DialogPattern::ResolveDialogCommandTarget(
+    const std::unique_ptr<JsonValue>& json, RefPtr<FrameNode>& target)
+{
+    auto name = json->GetString("cmd");
+    auto params = json->GetValue("params");
+    if (name == "actionMenuClick") {
+        return ResolveMenuCommandTarget(params, target);
+    }
+    const bool sheet = name == "actionSheetClick";
+    if (dialogProperties_.type != (sheet ? DialogType::ACTION_SHEET : DialogType::ALERT_DIALOG)) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    const auto index = params->GetInt(sheet ? "index" : "buttonIndex");
+    if (sheet && params->GetString("clickType") == "sheet") {
+        auto iter = contentNodeMap_.find(DialogContentNode::SHEET);
+        if (iter == contentNodeMap_.end() || !iter->second) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto container = iter->second;
+        if (index < 0 || index >= static_cast<int32_t>(container->GetChildren().size())) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+        auto row = AceType::DynamicCast<FrameNode>(container->GetChildAtIndex(index));
+        CHECK_NULL_RETURN(row, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        target = AceType::DynamicCast<FrameNode>(row->GetFirstChild());
+    } else {
+        CHECK_NULL_RETURN(buttonContainer_, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto buttons = GetButtons();
+        if (index < 0 || index >= static_cast<int32_t>(buttons.size())) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+        target = buttons[index];
+    }
+    return CommandResult::Success();
+}
+
+CommandResult DialogPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command,
+        { "alertDialogButtonClick", "actionSheetClick", "actionMenuClick" }, CommandErrorType::EXECUTE_FAIL,
+        [this](const std::unique_ptr<JsonValue>& json) {
+            RefPtr<FrameNode> target;
+            auto result = ResolveDialogCommandTarget(json, target);
+            if (!result.success) {
+                return result;
+            }
+            CHECK_NULL_RETURN(target, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+            auto hub = target->GetEventHub<EventHub>();
+            auto gesture = target->GetOrCreateGestureEventHub();
+            return hub && hub->IsEnabled() && gesture && gesture->GetClickEvent()
+                ? CommandResult::Success() : CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        });
 }
 
 int32_t DialogPattern::OnInjectionEvent(const std::string& command)
@@ -3158,7 +3253,7 @@ bool DialogPattern::HandleAlertDialogButtonClickCmd(const std::unique_ptr<JsonVa
             "The index value exceeds the actual total number of buttons!", btnIndex);
         return false;
     }
-    auto buttonFrameNode = DynamicCast<FrameNode>(btnNodes.at(btnIndex));
+    auto buttonFrameNode = btnNodes.at(btnIndex);
     CHECK_NULL_RETURN(buttonFrameNode, false);
     RefPtr<GestureEventHub> gestureHub = buttonFrameNode->GetOrCreateGestureEventHub();
     CHECK_NULL_RETURN(gestureHub, false);
@@ -3211,9 +3306,15 @@ void DialogPattern::ReportShow()
         UiSessionManager::GetInstance()->ReportComponentChangeEvent("onVisibleChange", "ActionSheet.show",
             ComponentEventType::COMPONENT_EVENT_DIALOG);
     } else if (dialogProperties_.isMenu) {
-        UiSessionManager::GetInstance()->ReportComponentChangeEvent("onVisibleChange", "ActionMenu.show",
-            ComponentEventType::COMPONENT_EVENT_DIALOG);
+        UiSessionManager::GetInstance()->ReportComponentChangeEvent(
+            "onVisibleChange", "ActionMenu.show", ComponentEventType::COMPONENT_EVENT_DIALOG);
     }
+    CHECK_NULL_VOID(contentRenderContext_);
+    auto materialNode = contentRenderContext_->GetHost();
+    CHECK_NULL_VOID(materialNode);
+    auto ctx = materialNode->GetContext();
+    CHECK_NULL_VOID(ctx);
+    ctx->AddTaskOverlayNodeMaterialArea(materialNode, "Dialog ReportShow");
 #endif
 }
 
@@ -3398,7 +3499,7 @@ int32_t DialogPattern::HandleActionButtonClick(int32_t index)
         ReportActionSheetOnInjectionEvent(false, "button index out of range", -1, index);
         return RET_FAILED;
     }
-    auto buttonFrameNode = DynamicCast<FrameNode>(btnNodes.at(index));
+    auto buttonFrameNode = btnNodes.at(index);
     CHECK_NULL_RETURN(buttonFrameNode, RET_FAILED);
     RefPtr<GestureEventHub> gestureHub = buttonFrameNode->GetOrCreateGestureEventHub();
     CHECK_NULL_RETURN(gestureHub, RET_FAILED);
@@ -3828,5 +3929,24 @@ void DialogPattern::PlayDistortion()
         }
     }, onFinishEvent_);
     TAG_LOGI(AceLogTag::ACE_DIALOG, "Distortion animation applied successfully");
+}
+
+PopupSide DialogPattern::GetCachedPopupSide() const
+{
+    return static_cast<PopupSide>(cachedPopupSideValue_);
+}
+
+void DialogPattern::SetCachedPopupSide(PopupSide side)
+{
+    cachedPopupSideValue_ = static_cast<int32_t>(side);
+}
+
+void DialogPattern::ResetHandednessCache()
+{
+    handednessLayoutCaptured_ = false;
+    needRefreshAnchorPos_ = false;
+    cachedPopupSideValue_ = static_cast<int32_t>(PopupSide::CENTER);
+    cachedAnchorPos_.reset();
+    cachedAnchorNodeId_ = -1;
 }
 } // namespace OHOS::Ace::NG

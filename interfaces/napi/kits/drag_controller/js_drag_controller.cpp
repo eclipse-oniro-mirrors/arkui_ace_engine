@@ -80,6 +80,7 @@ constexpr int32_t SOURCE_TYPE_TOUCH = 2;
 constexpr int32_t PEN_POINTER_ID = 102;
 constexpr int32_t CREATE_PIXELMAP_DELAY_TIME = 80;
 constexpr char AUTO_HIDE_COMPONENT_UNIQUE_IDS[] = "autoHideComponentUniqueIds";
+constexpr napi_type_tag DRAG_ACTION_TYPE_TAG = { 0x7e8f9a0b1c2d3e4f, 0x5a6b7c8d9e0f1021 };
 
 using DragNotifyMsg = Msdp::DeviceStatus::DragNotifyMsg;
 using DragRet = OHOS::Ace::DragRet;
@@ -257,6 +258,7 @@ public:
                 }
             },
             nullptr, nullptr);
+        napi_type_tag_object(env, result, &DRAG_ACTION_TYPE_TAG);
 
         /* insert callback functions */
         const char* funName = "on";
@@ -437,6 +439,11 @@ private:
 
     static DragAction* ConvertDragAction(napi_env env, napi_value thisVar)
     {
+        bool isDragAction = false;
+        napi_check_object_type_tag(env, thisVar, &DRAG_ACTION_TYPE_TAG, &isDragAction);
+        if (!isDragAction) {
+            return nullptr;
+        }
         DragAction* dragAction = nullptr;
         napi_unwrap(env, thisVar, (void**)&dragAction);
         if (dragAction) {
@@ -1121,7 +1128,8 @@ bool CreatePreviewNodeAndScale(std::shared_ptr<DragControllerAsyncCtx> asyncCtx,
 
 void HideDragPreviewWindow(std::shared_ptr<DragControllerAsyncCtx> asyncCtx)
 {
-    auto container = Container::CurrentSafely();
+    CHECK_NULL_VOID(asyncCtx);
+    auto container = AceEngine::Get().GetContainer(asyncCtx->instanceId);
     CHECK_NULL_VOID(container);
     auto taskExecutor = container->GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);

@@ -28,6 +28,7 @@
 #include "base/geometry/axis.h"
 #include "base/geometry/dimension.h"
 #include "base/geometry/point.h"
+#include "base/json/json_util.h"
 #include "base/memory/ace_type.h"
 #include "base/utils/utils.h"
 #include "core/components/slider/slider_theme.h"
@@ -3177,6 +3178,116 @@ HWTEST_F(SliderPatternTestNg, MoveStep002, TestSize.Level1)
     layoutProperty->UpdateDirection(Axis::VERTICAL);
     sliderPattern->MoveStep(false);
     EXPECT_NE(sliderPattern, nullptr);
+}
+
+/**
+ * @tc.name: SliderPatternTest_DumpSimplify_WithInteractionInfo
+ * @tc.desc: Test DumpSimplifyInfoOnlyForParamConfig writes value/min/max/step when interactionInfo is enabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternTestNg, SliderPatternTest_DumpSimplify_WithInteractionInfo, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Slider node and set paint properties.
+     */
+    auto sliderPattern = AceType::MakeRefPtr<SliderPattern>();
+    ASSERT_NE(sliderPattern, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::SLIDER_ETS_TAG, -1, sliderPattern);
+    sliderPattern->AttachToFrameNode(frameNode);
+    ASSERT_NE(frameNode, nullptr);
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateValue(VALUE);
+    paintProperty->UpdateMin(MIN);
+    paintProperty->UpdateMax(MAX);
+    paintProperty->UpdateStep(STEP);
+
+    /**
+     * @tc.steps: step2. Dump simplify info with interactionInfo enabled.
+     */
+    std::shared_ptr<JsonValue> json = JsonUtil::Create(true);
+    ASSERT_NE(json, nullptr);
+    ParamConfig config;
+    config.interactionInfo = true;
+    sliderPattern->DumpSimplifyInfoOnlyForParamConfig(json, config);
+
+    /**
+     * @tc.steps: step3. Check value/min/max/step in lower camelCase.
+     */
+    ASSERT_TRUE(json->Contains("value"));
+    EXPECT_EQ(json->GetValue("value")->GetString(), std::to_string(VALUE));
+    ASSERT_TRUE(json->Contains("min"));
+    EXPECT_EQ(json->GetValue("min")->GetString(), std::to_string(MIN));
+    ASSERT_TRUE(json->Contains("max"));
+    EXPECT_EQ(json->GetValue("max")->GetString(), std::to_string(MAX));
+    ASSERT_TRUE(json->Contains("step"));
+    EXPECT_EQ(json->GetValue("step")->GetString(), std::to_string(STEP));
+}
+
+/**
+ * @tc.name: SliderPatternTest_DumpSimplify_WithoutInteractionInfo
+ * @tc.desc: Test DumpSimplifyInfoOnlyForParamConfig writes nothing when interactionInfo is disabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternTestNg, SliderPatternTest_DumpSimplify_WithoutInteractionInfo, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Slider node and set paint properties.
+     */
+    auto sliderPattern = AceType::MakeRefPtr<SliderPattern>();
+    ASSERT_NE(sliderPattern, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::SLIDER_ETS_TAG, -1, sliderPattern);
+    sliderPattern->AttachToFrameNode(frameNode);
+    ASSERT_NE(frameNode, nullptr);
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateValue(VALUE);
+    paintProperty->UpdateMin(MIN);
+    paintProperty->UpdateMax(MAX);
+    paintProperty->UpdateStep(STEP);
+
+    /**
+     * @tc.steps: step2. Dump simplify info with interactionInfo disabled.
+     */
+    std::shared_ptr<JsonValue> json = JsonUtil::Create(true);
+    ASSERT_NE(json, nullptr);
+    ParamConfig config;
+    config.interactionInfo = false;
+    sliderPattern->DumpSimplifyInfoOnlyForParamConfig(json, config);
+    EXPECT_EQ(json->ToString(), "{}");
+}
+
+/**
+ * @tc.name: SliderPatternTest_DumpSimplify_PartialProperties
+ * @tc.desc: Test DumpSimplifyInfoOnlyForParamConfig only writes the properties that have been set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternTestNg, SliderPatternTest_DumpSimplify_PartialProperties, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Slider node and set value only.
+     */
+    auto sliderPattern = AceType::MakeRefPtr<SliderPattern>();
+    ASSERT_NE(sliderPattern, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::SLIDER_ETS_TAG, -1, sliderPattern);
+    sliderPattern->AttachToFrameNode(frameNode);
+    ASSERT_NE(frameNode, nullptr);
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateValue(VALUE);
+
+    /**
+     * @tc.steps: step2. Dump simplify info with interactionInfo enabled.
+     */
+    std::shared_ptr<JsonValue> json = JsonUtil::Create(true);
+    ASSERT_NE(json, nullptr);
+    ParamConfig config;
+    config.interactionInfo = true;
+    sliderPattern->DumpSimplifyInfoOnlyForParamConfig(json, config);
+    EXPECT_TRUE(json->Contains("value"));
+    EXPECT_FALSE(json->Contains("min"));
+    EXPECT_FALSE(json->Contains("max"));
+    EXPECT_FALSE(json->Contains("step"));
 }
 
 } // namespace OHOS::Ace::NG

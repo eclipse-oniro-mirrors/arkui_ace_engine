@@ -43,7 +43,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::Claim(new GaugeThemeWrapper());
-            ParsePattern(themeConstants, AceType::DynamicCast<GaugeTheme>(wrapper));
+            ParsePattern(themeConstants, RefPtr<GaugeTheme>(wrapper));
             return wrapper;
         }
     };

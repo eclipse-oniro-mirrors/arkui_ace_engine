@@ -14,8 +14,11 @@
  */
 
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 #include <cstdint>
+
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include <functional>
 #include <unordered_map>
 
@@ -1555,7 +1558,9 @@ void ViewAbstract::ResetSafeAreaPadding()
     ACE_RESET_LAYOUT_PROPERTY(LayoutProperty, SafeAreaPadding);
 }
 
-void ViewAbstract::SetSafeAreaInset(
+namespace SafeAreaInsetView {
+
+void SetSafeAreaInset(
     FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
 {
     CHECK_NULL_VOID(frameNode);
@@ -1622,8 +1627,8 @@ void ViewAbstract::SetSafeAreaInset(
         return;
     }
 
-    const bool optionsChanged = !layoutProperty->GetSafeAreaInset().has_value() ||
-        layoutProperty->GetSafeAreaInset().value() != effectiveOptions;
+    const auto* currentOptions = layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset();
+    const bool optionsChanged = !currentOptions || *currentOptions != effectiveOptions;
     layoutProperty->UpdateSafeAreaInset(effectiveOptions);
     if (frameNode->GetSafeAreaInsetNode() != insetContainer) {
         frameNode->SetSafeAreaInsetNode(insetContainer);
@@ -1636,13 +1641,13 @@ void ViewAbstract::SetSafeAreaInset(
     }
 }
 
-void ViewAbstract::ResetSafeAreaInset(FrameNode* frameNode)
+void ResetSafeAreaInset(FrameNode* frameNode)
 {
     CHECK_NULL_VOID(frameNode);
     auto layoutProperty = frameNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInset().has_value() &&
-        !layoutProperty->GetSafeAreaInsetContribution().HasValue()) {
+    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset() &&
+        !layoutProperty->GetSafeAreaInsetState().GetSafeAreaInsetContribution().HasValue()) {
         return;
     }
     frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
@@ -1651,6 +1656,8 @@ void ViewAbstract::ResetSafeAreaInset(FrameNode* frameNode)
     frameNode->ResetSafeAreaPadding();
     frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
+
+} // namespace SafeAreaInsetView
 
 void ViewAbstract::SetSafeAreaPadding(FrameNode* frameNode, const CalcLength& value)
 {
@@ -3694,6 +3701,13 @@ void ViewAbstract::SetHitTestMode(HitTestMode hitTestMode)
     auto gestureHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeGestureEventHub();
     CHECK_NULL_VOID(gestureHub);
     gestureHub->SetHitTestMode(hitTestMode);
+}
+
+void ViewAbstract::SetAgentControlMode(const std::optional<AgentControlMode>& mode)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
 }
 
 void ViewAbstract::SetOnTouchTestFunc(NG::OnChildTouchTestFunc&& onChildTouchTest)
@@ -7480,7 +7494,7 @@ void ViewAbstract::SetOverlayBuilder(FrameNode* frameNode, const RefPtr<NG::UINo
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -7518,7 +7532,7 @@ void ViewAbstract::AddOverlayToFrameNode(const RefPtr<NG::FrameNode>& overlayNod
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -8479,6 +8493,12 @@ void ViewAbstract::SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode)
     gestureHub->SetHitTestMode(hitTestMode);
 }
 
+void ViewAbstract::SetAgentControlMode(FrameNode* frameNode, const std::optional<AgentControlMode>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    frameNode->SetAgentControlMode(mode);
+}
+
 void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity)
 {
     CHECK_NULL_VOID(frameNode);
@@ -8670,7 +8690,7 @@ void ViewAbstract::SetOverlayNode(FrameNode* frameNode, FrameNode* node, const N
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -10141,6 +10161,18 @@ void ViewAbstract::ResetBlender(FrameNode* frameNode)
     renderContext->ResetBlender();
 }
 
+void ViewAbstract::SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // only EXQUISITE level devices take effect
+    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        return;
+    }
+    renderContext->UpdateVibrancyMode(mode);
+}
+
 void ViewAbstract::SetDragPreviewOptions(FrameNode* frameNode, const DragPreviewOption& previewOption)
 {
     CHECK_NULL_VOID(frameNode);
@@ -10408,6 +10440,20 @@ void ViewAbstract::SetKeyboardShortcut(FrameNode* frameNode, const std::string& 
     }
     eventHub->SetKeyboardShortcut(value, key, onKeyboardShortcutAction);
     eventManager->AddKeyboardShortcutNode(WeakPtr<NG::FrameNode>(frameNodeRef));
+}
+
+void ViewAbstract::RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+    const std::vector<ModifierKey>& keys)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pipeline = frameNode->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto eventManager = pipeline->GetEventManager();
+    CHECK_NULL_VOID(eventManager);
+    auto eventHub = frameNode->GetEventHub<EventHub>();
+    CHECK_NULL_VOID(eventHub);
+    auto key = eventManager->GetKeyboardShortcutKeys(keys);
+    eventHub->RemoveKeyboardShortcut(value, key);
 }
 
 void ViewAbstract::SetOnAppear(FrameNode* frameNode, std::function<void()> &&onAppear)

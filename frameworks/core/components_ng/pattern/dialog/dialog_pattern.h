@@ -18,11 +18,13 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 #include "base/geometry/ng/offset_t.h"
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/common/autofill/auto_fill_trigger_state_holder.h"
+#include "core/common/force_split/force_split_constants.h"
 #include "core/components/dialog/dialog_properties.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/common/properties/text_style.h"
@@ -37,6 +39,7 @@ namespace OHOS::Ace::NG {
 class InspectorFilter;
 class TextLayoutProperty;
 class OverlayManager;
+enum class PopupSide;
 
 enum class DialogContentNode {
     TITLE = 0,
@@ -266,6 +269,16 @@ public:
     bool IsUIExtensionSubWindow() const
     {
         return isUIExtensionSubWindow_;
+    }
+
+    std::optional<ForceSplitPageColumnType> GetCachedSplitColumnType() const
+    {
+        return cachedSplitColumnType_;
+    }
+
+    void SetCachedSplitColumnType(ForceSplitPageColumnType columnType)
+    {
+        cachedSplitColumnType_ = columnType;
     }
 
     RectF GetHostWindowRect() const
@@ -551,6 +564,9 @@ private:
     void ReportActionSheetOnInjectionEvent(bool result,
         std::string reason, int32_t sheetIndex = -1, int32_t buttonIndex = -1);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
+    CommandResult ResolveMenuCommandTarget(const std::unique_ptr<JsonValue>& params, RefPtr<FrameNode>& target);
+    CommandResult ResolveDialogCommandTarget(const std::unique_ptr<JsonValue>& json, RefPtr<FrameNode>& target);
     std::vector<RefPtr<FrameNode>> GetButtons();
     bool HandleAlertDialogButtonClickCmd(const std::unique_ptr<JsonValue>& json);
     void ReportAlertDialogOnInjectionEvent(bool result, std::string reason,
@@ -615,6 +631,7 @@ private:
     std::function<void()> onWillDisappearCallback_ = nullptr;
     std::unordered_map<DialogContentNode, RefPtr<FrameNode>> contentNodeMap_;
     bool isUIExtensionSubWindow_ = false;
+    std::optional<ForceSplitPageColumnType> cachedSplitColumnType_;
     bool isDialogDisposed_ = false;
     bool refreshOnWindowShow_ = false;
     RectF hostWindowRect_;
@@ -623,6 +640,28 @@ private:
     bool hasExtraNodeForDistortion_ = false;
     bool isVertical_ = false;
     std::function<void()> onFinishEvent_ = nullptr;
+
+    // ========== Handedness layout cache ==========
+    // Handedness-dependent inputs (grip-hand side, anchor position) are captured on the
+    // first layout pass and reused on subsequent re-layouts so the dialog stays stable.
+    bool handednessLayoutCaptured_ = false;
+    bool needRefreshAnchorPos_ = false;
+    int32_t cachedPopupSideValue_ = 1; // PopupSide::CENTER
+    std::optional<OffsetF> cachedAnchorPos_;
+    int32_t cachedAnchorNodeId_ = -1;
+
+public:
+    bool IsHandednessLayoutCaptured() const { return handednessLayoutCaptured_; }
+    void MarkHandednessLayoutCaptured() { handednessLayoutCaptured_ = true; }
+    bool NeedRefreshAnchorPos() const { return needRefreshAnchorPos_; }
+    void SetNeedRefreshAnchorPos(bool need) { needRefreshAnchorPos_ = need; }
+    PopupSide GetCachedPopupSide() const;
+    void SetCachedPopupSide(PopupSide side);
+    const std::optional<OffsetF>& GetCachedAnchorPos() const { return cachedAnchorPos_; }
+    void SetCachedAnchorPos(const OffsetF& pos) { cachedAnchorPos_ = pos; }
+    int32_t GetCachedAnchorNodeId() const { return cachedAnchorNodeId_; }
+    void SetCachedAnchorNodeId(int32_t nodeId) { cachedAnchorNodeId_ = nodeId; }
+    void ResetHandednessCache();
 };
 } // namespace OHOS::Ace::NG
 

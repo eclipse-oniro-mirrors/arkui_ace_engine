@@ -59,6 +59,8 @@ ohos_shared_library("ace_form_render") {
 
   public_configs = [ ":form_render_config" ]
 
+  version_script = "libace_form_render.map"
+
   deps = [ "$ace_root/interfaces/inner_api/ace:ace_uicontent" ]
 
   external_deps = [

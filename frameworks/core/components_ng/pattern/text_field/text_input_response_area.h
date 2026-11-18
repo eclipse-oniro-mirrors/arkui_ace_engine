@@ -68,7 +68,8 @@ public:
         return 0.0f;
     }
 
-    void SetHotZoneRect(DimensionRect& hotZoneRegion, float iconSize, float hotZoneHeight);
+    void SetHotZoneRect(DimensionRect& hotZoneRegion, float iconSize, float hotZoneHeight,
+        float imageOffsetX = 0.0f);
 
 protected:
     Alignment GetStackAlignment(const TextDirection& userDirection);

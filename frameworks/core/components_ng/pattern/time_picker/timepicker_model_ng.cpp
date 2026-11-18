@@ -584,6 +584,7 @@ void TimePickerDialogModelNG::SetTimePickerDialogShow(PickerDialogInfo& pickerDi
     properties.systemMaterial = pickerDialog.systemMaterial;
     properties.distortionMode = pickerDialog.distortionMode;
     properties.edgeLightMode = pickerDialog.edgeLightMode;
+    properties.adaptToHandedness = pickerDialog.adaptToHandedness;
 
     std::map<std::string, PickerTime> timePickerProperty;
     timePickerProperty["start"] = pickerDialog.parseStartTime;
@@ -591,7 +592,7 @@ void TimePickerDialogModelNG::SetTimePickerDialogShow(PickerDialogInfo& pickerDi
     if (pickerDialog.isSelectedTime == true) {
         timePickerProperty["selected"] = pickerDialog.pickerTime;
     }
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     executor->PostTask(
         [properties, settingData, timePickerProperty, dialogEvent, dialogCancelEvent, dialogLifeCycleEvent, buttonInfos,

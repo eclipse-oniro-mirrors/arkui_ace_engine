@@ -36,6 +36,7 @@
 #include "core/components_ng/render/adapter/transition_modifier.h"
 #include "core/components_ng/pattern/particle/particle_pattern.h"
 #include "frameworks/core/components_ng/render/image_painter.h"
+#include "base/utils/system_properties.h"
 #undef private
 #undef protected
 

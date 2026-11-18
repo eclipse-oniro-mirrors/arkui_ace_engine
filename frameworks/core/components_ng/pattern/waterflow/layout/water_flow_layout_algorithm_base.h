@@ -79,6 +79,9 @@ public:
     int32_t measuredEndIndex_ = -1;
 
 protected:
+    void BeginTargetPreparation();
+    bool YieldTargetPreparation(LayoutWrapper* wrapper);
+    void ReleaseTargetPreparationItems(LayoutWrapper* wrapper);
     /**
      * @brief Register an IdleTask to preload (create/measure/layout) items in cache range.
      */

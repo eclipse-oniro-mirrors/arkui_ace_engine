@@ -126,7 +126,7 @@ bool TextPickerColumnPattern::OnDirtyLayoutWrapperSwap(
 
     CHECK_NULL_RETURN(isChange, false);
     CHECK_NULL_RETURN(dirty, false);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<TextPickerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);

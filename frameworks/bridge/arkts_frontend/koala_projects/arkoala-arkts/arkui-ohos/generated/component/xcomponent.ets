@@ -141,6 +141,18 @@ export class ArkXComponentPeer extends ArkCommonMethodPeer {
     setBufferQueueCountAttribute(value: int32): void {
         ArkUIGeneratedNativeModule._XComponentAttribute_setBufferQueueCount(this.peer.ptr, value)
     }
+    setEnableSurfaceVisibilityLifecycleAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._XComponentAttribute_setEnableSurfaceVisibilityLifecycle(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setHdrBrightness1Attribute(brightness: double | undefined, type?: HdrType): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (brightness !== undefined) {
@@ -213,6 +225,9 @@ export interface XComponentAttribute extends CommonMethod {
     bufferQueueCount(value: int32): this {
         throw new Error('Unimplemented method bufferQueueCount')
     }
+    enableSurfaceVisibilityLifecycle(value: boolean | undefined): this {
+        throw new Error('Unimplemented method enableSurfaceVisibilityLifecycle')
+    }
     hdrBrightness(brightness: double | undefined, type?: HdrType): this {
         throw new Error('Unimplemented method hdrBrightness')
     }
@@ -271,6 +286,11 @@ export class ArkXComponentComponent extends ArkCommonMethodComponent implements 
     public bufferQueueCount(value: int32): this {
         const value_casted = value as (int32)
         this.getPeer()?.setBufferQueueCountAttribute(value_casted)
+        return this
+    }
+    public enableSurfaceVisibilityLifecycle(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setEnableSurfaceVisibilityLifecycleAttribute(value_casted)
         return this
     }
     public hdrBrightness(brightness: double | undefined, type?: HdrType): this {

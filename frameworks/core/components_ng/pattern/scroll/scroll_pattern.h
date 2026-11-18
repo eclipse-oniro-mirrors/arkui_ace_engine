@@ -149,6 +149,7 @@ public:
 
     void OnAnimateStop() override;
     bool UpdateCurrentOffset(float offset, int32_t source) override;
+    void UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom) override;
     void ScrollToEdge(ScrollEdgeType scrollEdgeType, bool smooth) override;
 
     void CheckScrollToEdge();
@@ -220,7 +221,7 @@ public:
     {
         if (intervalSize_ != intervalSize) {
             intervalSize_ = intervalSize;
-            TAG_LOGI(AceLogTag::ACE_SCROLL, "scroll setIntervalSize:%{public}f", intervalSize.Value());
+            TAG_LOGD(AceLogTag::ACE_SCROLL, "scroll setIntervalSize:%{public}f", intervalSize.Value());
             scrollSnapUpdate_ = true;
         }
     }
@@ -461,6 +462,7 @@ private:
     void BeforeSyncGeometryProperties(const DirtySwapConfig& config) override;
     void ReportOnItemScrollEvent(const std::string& event);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     double currentOffset_ = 0.0;
     double lastOffset_ = 0.0;

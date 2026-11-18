@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TABS_TABS_MODEL_H
 
 #include <mutex>
+#include <optional>
 
 #include "base/geometry/dimension.h"
 #include "base/memory/referenced.h"
@@ -40,6 +41,12 @@ namespace OHOS::Ace {
 enum class TabsCacheMode {
     CACHE_BOTH_SIDE = 0,
     CACHE_LATEST_SWITCHED
+};
+
+enum class BarOverlapMode {
+    STANDARD = 0,
+    STACK = 1,
+    SAFE_AREA_PADDING = 2,
 };
 
 enum class TabJsResType {
@@ -139,6 +146,7 @@ struct BarFloatingStyleParameters {
     std::optional<Dimension> offsetX;
     std::optional<Dimension> offsetY;
     std::optional<Dimension> maxWidth;
+    bool isLocalizedOffsetX = false;
 
     RefPtr<ResourceObject> smallBarWidthObject;
     RefPtr<ResourceObject> mediumBarWidthObject;
@@ -158,7 +166,8 @@ struct BarFloatingStyleParameters {
                (barBottomMargin == parameters.barBottomMargin) && (maskColor == parameters.maskColor) &&
                (maskHeight == parameters.maskHeight) && (adaptToHandedness == parameters.adaptToHandedness) &&
                (systemMaterial == parameters.systemMaterial) && (offsetX == parameters.offsetX) &&
-               (offsetY == parameters.offsetY) && (maxWidth == parameters.maxWidth);
+               (offsetY == parameters.offsetY) && (maxWidth == parameters.maxWidth) &&
+               (isLocalizedOffsetX == parameters.isLocalizedOffsetX);
     }
 };
 
@@ -171,6 +180,7 @@ struct BarTopFloatingStyleParameters {
     std::optional<Dimension> offsetX;
     std::optional<Dimension> offsetY;
     std::optional<Dimension> maxWidth;
+    bool isLocalizedOffsetX = false;
 
     RefPtr<ResourceObject> barWidthObject;
     RefPtr<ResourceObject> barSideMarginObject;
@@ -187,7 +197,7 @@ struct BarTopFloatingStyleParameters {
                (barTopMargin == parameters.barTopMargin) && (maskColor == parameters.maskColor) &&
                (maskHeight == parameters.maskHeight) &&
                (offsetX == parameters.offsetX) && (offsetY == parameters.offsetY) &&
-               (maxWidth == parameters.maxWidth);
+               (maxWidth == parameters.maxWidth) && (isLocalizedOffsetX == parameters.isLocalizedOffsetX);
     }
 };
 
@@ -227,6 +237,7 @@ public:
     virtual void SetDividerColorByUser(bool isByUser) = 0;
     virtual void SetFadingEdge(bool fadingEdge) = 0;
     virtual void SetBarOverlap(bool barOverlap) = 0;
+    virtual void SetBarOverlapMode(BarOverlapMode barOverlapMode) {}
     virtual void SetOnChangeEvent(std::function<void(const BaseEventInfo*)>&& onChangeEvent) = 0;
     virtual void SetBarBackgroundColor(const Color& backgroundColor) = 0;
     virtual void SetBarBackgroundColorByUser(bool isByUser) = 0;
@@ -261,6 +272,7 @@ public:
     virtual void SetSidebarFooter(const RefPtr<AceType>& footer) {}
     virtual void SetSidebarBottomBar(const RefPtr<AceType>& bottomBar) {}
     virtual void SetSidebarSearchableOptions(const NG::TabsSidebarSearchableOptions& options) {}
+    virtual void SetShowSidebarControlButton(bool showControlButton) {}
     virtual void SetBarDisplayModeBreakpoint(const NG::TabBarDisplayModeBreakpoint& breakpoint) {}
     virtual void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) {}
     virtual void SetKeepTabBarInSideBar(bool keepTabBarInSideBar) {}

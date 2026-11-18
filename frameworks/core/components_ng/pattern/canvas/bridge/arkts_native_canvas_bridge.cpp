@@ -171,11 +171,11 @@ void InvokeOnReadyCallback(
         std::function<void(CanvasUnit)> cb =
             [drawingContext](CanvasUnit u) { drawingContext->SetUnit(u); };
         canvasModifier->setUpdateContextCallback(
-            reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(pattern)), &cb);
+            reinterpret_cast<ArkUINodeHandle>(static_cast<AceType*>(AceType::RawPtr(pattern))), &cb);
     }
     if (canvasModifier && canvasModifier->setRSCanvasForDrawingContext) {
         canvasModifier->setRSCanvasForDrawingContext(
-            reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(pattern)));
+            reinterpret_cast<ArkUINodeHandle>(static_cast<AceType*>(AceType::RawPtr(pattern))));
     }
     std::vector<Local<JSValueRef>> argv;
     argv.emplace_back(jsDrawingContext);

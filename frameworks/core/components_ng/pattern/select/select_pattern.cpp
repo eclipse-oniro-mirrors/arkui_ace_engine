@@ -372,6 +372,7 @@ void SelectPattern::ShowSelectMenu()
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
+    context->AddTaskOverlayNodeMaterialArea(host, "Select ShowSelectMenu");
     auto overlayManager = context->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
     UpdateTargetSize();
@@ -2025,7 +2026,7 @@ void SelectPattern::ToJsonOptionMaxlines(std::unique_ptr<JsonValue>& json, const
         auto menuItemModifier = NG::NodeModifier::GetMenuItemInnerModifier();
         CHECK_NULL_VOID(menuItemModifier);
         for (size_t i = 0; i < options_.size(); ++i) {
-            auto textNode = AceType::DynamicCast<FrameNode>(menuItemModifier->getTextNode(options_[i]));
+            auto textNode = menuItemModifier->getTextNode(options_[i]);
             CHECK_NULL_VOID(textNode);
             auto props = textNode->GetLayoutProperty<TextLayoutProperty>();
             CHECK_NULL_VOID(props);
@@ -2744,6 +2745,11 @@ void SelectPattern::ShowOptions(int32_t index)
         return;
     }
     ShowSelectMenu();
+}
+
+CommandResult SelectPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onSelect" });
 }
 
 int32_t SelectPattern::OnInjectionEvent(const std::string& command)

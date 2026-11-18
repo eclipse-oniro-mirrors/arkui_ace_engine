@@ -50,6 +50,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabContentTabBarVisibilityModifier.identity, TabContentTabBarVisibilityModifier, { visibility, displayMode });
         return this;
       }
+      sidebarSection(value: SidebarSection): this {
+        modifierWithKey(this._modifiersWithKeys, TabContentSidebarSectionModifier.identity, TabContentSidebarSectionModifier, value);
+        return this;
+      }
     }
     
     class TabContentTabBarModifier extends ModifierWithKey<SubTabBarStyle | BottomTabBarStyle> {
@@ -171,6 +175,26 @@ function loadComponent(): ComponentObj | undefined {
           this.stageValue.displayMode !== this.value.displayMode;
       }
     }
+
+    class TabContentSidebarSectionModifier extends ModifierWithKey<SidebarSection> {
+      constructor(value: SidebarSection) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabcontentsidebarsection');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabContent.resetSidebarSection(node);
+        } else {
+          getUINativeModule().tabContent.setSidebarSection(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue.title, this.value.title) ||
+          this.stageValue.order !== this.value.order ||
+          this.stageValue.titleStyle !== this.value.titleStyle;
+      }
+    }
     
     loadComponent.componentObj = { 'component': ArkTabContentComponent };
   }
@@ -229,6 +253,10 @@ class JSTabContent extends JSContainerBase {
 
   static tabBarVisibility(visibility: any, displayMode?: any): void {
     getUINativeModule().tabContent.setTabBarVisibility(true, visibility, displayMode);
+  }
+
+  static sidebarSection(value: any): void {
+    getUINativeModule().tabContent.setSidebarSection(true, value);
   }
 
   static attributeModifier(modifier: any): void {

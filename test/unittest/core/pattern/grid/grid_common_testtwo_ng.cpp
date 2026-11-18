@@ -1065,6 +1065,10 @@ HWTEST_F(GridCommonTestTwoNg, FireDrag004, TestSize.Level1)
     // drag the item out of this Grid.
     eventHub_->FireOnItemDragLeave(dragInfo, -1);
     FlushUITasks();
+    const decltype(pattern_->info_.gridMatrix_) restoredMatrix = { { 0, { { 0, 0 }, { 1, 1 } } },
+        { 1, { { 0, 2 }, { 1, 3 } } } };
+    EXPECT_EQ(pattern_->info_.gridMatrix_, restoredMatrix);
+    EXPECT_FALSE(pattern_->info_.hasMultiLineItem_);
     /*
      *  0 1
      *  2 3
@@ -1086,6 +1090,166 @@ HWTEST_F(GridCommonTestTwoNg, FireDrag004, TestSize.Level1)
     EXPECT_TRUE(IsEqual(GetItemRect(1), Rect(0, 0, WIDTH / 2, ITEM_MAIN_SIZE)));
     EXPECT_TRUE(IsEqual(GetItemRect(2), Rect(0, 100, WIDTH / 2, ITEM_MAIN_SIZE)));
     EXPECT_TRUE(IsEqual(GetItemRect(3), Rect(120, 100, WIDTH / 2, ITEM_MAIN_SIZE)));
+}
+
+/**
+ * @tc.name: FireDrag005
+ * @tc.desc: An external drag leaving Grid restores an incomplete last line.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCommonTestTwoNg, FireDrag005, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetEditable(true);
+    model.SetSupportAnimation(true);
+    CreateFixedItems(3);
+    CreateDone();
+
+    GestureEvent info;
+    info.SetGlobalPoint(Point(270.f, 50.f));
+    eventHub_->HandleOnItemDragStart(info);
+
+    ItemDragInfo dragInfo;
+    dragInfo.SetX(0);
+    dragInfo.SetY(0);
+    eventHub_->FireOnItemDragEnter(dragInfo);
+    eventHub_->FireOnItemDragMove(dragInfo, -1, 1);
+    FlushUITasks();
+
+    eventHub_->FireOnItemDragLeave(dragInfo, -1);
+    FlushUITasks();
+    using GridMatrix = decltype(pattern_->info_.gridMatrix_);
+    const GridMatrix restoredMatrix = { { 0, { { 0, 0 }, { 1, 1 } } }, { 1, { { 0, 2 } } } };
+    EXPECT_EQ(pattern_->info_.gridMatrix_, restoredMatrix);
+    EXPECT_FALSE(pattern_->info_.hasMultiLineItem_);
+    EXPECT_TRUE(IsEqual(GetItemRect(2), Rect(0, 100, WIDTH / 2, ITEM_MAIN_SIZE)));
+}
+
+/**
+ * @tc.name: FireDrag006
+ * @tc.desc: Leaving an options Grid keeps the rows of a cross-axis spanning item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCommonTestTwoNg, FireDrag006, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.irregularIndexes = { 1 };
+    option.getSizeByIndex = [](int32_t) { return GridItemSize { 1, 2 }; };
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetLayoutOptions(option);
+    model.SetEditable(true);
+    model.SetSupportAnimation(true);
+    CreateFixedItems(4);
+    CreateDone();
+#ifndef TEST_IRREGULAR_GRID
+    // Only the legacy layout tracks cross-axis spanning items via hasBigItem_;
+    // the irregular layout path derives positions from its own solver.
+    EXPECT_TRUE(pattern_->info_.hasBigItem_);
+#endif
+    EXPECT_FALSE(pattern_->info_.hasMultiLineItem_);
+    // The spanning item keeps one row and occupies both columns before and
+    // after the drag. The irregular filler marks the extra spanning cell with
+    // -itemIndex (grid_irregular_filler.cpp FillOne), while the legacy layout
+    // repeats the item index in every covered cell.
+    using GridMatrix = decltype(pattern_->info_.gridMatrix_);
+#ifdef TEST_IRREGULAR_GRID
+    const GridMatrix restoredMatrix = { { 0, { { 0, 0 } } }, { 1, { { 0, 1 }, { 1, -1 } } },
+        { 2, { { 0, 2 }, { 1, 3 } } } };
+#else
+    const GridMatrix restoredMatrix = { { 0, { { 0, 0 } } }, { 1, { { 0, 1 }, { 1, 1 } } },
+        { 2, { { 0, 2 }, { 1, 3 } } } };
+#endif
+#ifdef TEST_IRREGULAR_GRID
+    // The irregular layout keeps each item's own size instead of stretching it
+    // to the column width, so compare against the recorded pre-drag position.
+    const auto originalRect = GetItemRect(3);
+#endif
+
+    GestureEvent info;
+    info.SetGlobalPoint(Point(270.f, 50.f));
+    eventHub_->HandleOnItemDragStart(info);
+
+    ItemDragInfo dragInfo;
+    dragInfo.SetX(0);
+    dragInfo.SetY(0);
+    eventHub_->FireOnItemDragEnter(dragInfo);
+    eventHub_->FireOnItemDragMove(dragInfo, -1, 3);
+    FlushUITasks();
+    eventHub_->FireOnItemDragLeave(dragInfo, -1);
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.gridMatrix_, restoredMatrix);
+    EXPECT_FALSE(pattern_->info_.hasMultiLineItem_);
+#ifdef TEST_IRREGULAR_GRID
+    EXPECT_TRUE(IsEqual(GetItemRect(3), originalRect));
+#else
+    EXPECT_TRUE(IsEqual(GetItemRect(3), Rect(120, 200, WIDTH / 2, ITEM_MAIN_SIZE)));
+#endif
+}
+
+/**
+ * @tc.name: FireDrag007
+ * @tc.desc: Leaving Grid restores a real multi-row item after an external drag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCommonTestTwoNg, FireDrag007, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetEditable(true);
+    model.SetSupportAnimation(true);
+    CreateBigItem(0, 1, 0, 0, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE * 2);
+    CreateFixedItems(3);
+    CreateDone();
+    ASSERT_TRUE(pattern_->info_.hasMultiLineItem_);
+    const auto originalMatrix = pattern_->info_.gridMatrix_;
+    const auto originalRect = GetItemRect(0);
+
+    GestureEvent info;
+    info.SetGlobalPoint(Point(270.f, 50.f));
+    eventHub_->HandleOnItemDragStart(info);
+
+    ItemDragInfo dragInfo;
+    dragInfo.SetX(0);
+    dragInfo.SetY(0);
+    eventHub_->FireOnItemDragEnter(dragInfo);
+    eventHub_->FireOnItemDragMove(dragInfo, -1, 2);
+    FlushUITasks();
+    eventHub_->FireOnItemDragLeave(dragInfo, -1);
+    FlushUITasks();
+
+    EXPECT_EQ(pattern_->info_.gridMatrix_, originalMatrix);
+    EXPECT_TRUE(pattern_->info_.hasMultiLineItem_);
+    EXPECT_TRUE(IsEqual(GetItemRect(0), originalRect));
+}
+
+/**
+ * @tc.name: LargeItemForwardLineHeight001
+ * @tc.desc: A tall single-row item must not change a preceding row's height.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCommonTestTwoNg, LargeItemForwardLineHeight001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    ViewAbstract::SetHeight(CalcLength(150.0f));
+    CreateBigItem(0, 1, 0, 0, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE * 2);
+    CreateFixedItems(1);
+    CreateGridItems(1, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE * 3);
+    CreateFixedItems(6);
+    CreateDone();
+    ASSERT_TRUE(pattern_->info_.hasMultiLineItem_);
+    auto firstLine = pattern_->info_.lineHeightMap_.find(0);
+    ASSERT_NE(firstLine, pattern_->info_.lineHeightMap_.end());
+    EXPECT_FLOAT_EQ(firstLine->second, ITEM_MAIN_SIZE);
+
+    UpdateCurrentOffset(-ITEM_MAIN_SIZE - 1);
+    ASSERT_EQ(pattern_->info_.startMainLineIndex_, 1);
+    firstLine = pattern_->info_.lineHeightMap_.find(0);
+    ASSERT_NE(firstLine, pattern_->info_.lineHeightMap_.end());
+    EXPECT_FLOAT_EQ(firstLine->second, ITEM_MAIN_SIZE);
 }
 
 /**

@@ -16,10 +16,11 @@
 #include <ani.h>
 #include <array>
 #include <cstdint>
+#include <iterator>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "base/log/log_wrapper.h"
@@ -756,8 +757,9 @@ class SmartGestureMonitorRegistry final {
 public:
     static bool Register(ani_env* env, int32_t instanceId, ani_fn_object callback)
     {
-        auto iter = states_.find(instanceId);
-        if (iter != states_.end()) {
+        std::lock_guard<std::mutex> lock(context_.mutex);
+        auto iter = context_.states.find(instanceId);
+        if (iter != context_.states.end()) {
             for (const auto& state : iter->second) {
                 if (state && state->MatchesCallback(env, callback)) {
                     return true;
@@ -766,68 +768,78 @@ public:
         }
         auto state = SmartGestureMonitorState::Create(env, instanceId, callback);
         CHECK_NULL_RETURN(state, false);
-        states_[instanceId].emplace_back(std::move(state));
+        context_.states[instanceId].emplace_back(std::move(state));
         return true;
     }
 
     static bool Unregister(ani_env* env, int32_t instanceId, ani_fn_object callback)
     {
         std::shared_ptr<SmartGestureMonitorState> stateToDetach;
-        auto iter = states_.find(instanceId);
-        if (iter == states_.end() || iter->second.empty()) {
-            return false;
-        }
-        auto& stateStack = iter->second;
-        for (auto reverseIter = stateStack.rbegin(); reverseIter != stateStack.rend(); ++reverseIter) {
-            auto state = *reverseIter;
-            if (!state || !state->MatchesCallback(env, callback)) {
-                continue;
+        bool removed = false;
+        {
+            std::lock_guard<std::mutex> lock(context_.mutex);
+            auto iter = context_.states.find(instanceId);
+            if (iter == context_.states.end() || iter->second.empty()) {
+                return false;
             }
-            stateToDetach = state;
-            stateStack.erase(std::next(reverseIter).base());
-            break;
+            auto& stateStack = iter->second;
+            for (auto reverseIter = stateStack.rbegin(); reverseIter != stateStack.rend(); ++reverseIter) {
+                auto state = *reverseIter;
+                if (!state || !state->MatchesCallback(env, callback)) {
+                    continue;
+                }
+                stateToDetach = state;
+                stateStack.erase(std::next(reverseIter).base());
+                removed = true;
+                break;
+            }
+            if (stateStack.empty()) {
+                context_.states.erase(iter);
+            }
+            context_.DeferDetachLocked(stateToDetach);
         }
-        if (stateStack.empty()) {
-            states_.erase(iter);
+        if (stateToDetach) {
+            stateToDetach->Detach();
         }
-        if (!stateToDetach) {
-            return false;
-        }
-        InvokeScope::DetachOrDefer(std::move(stateToDetach));
-        return true;
+        return removed;
     }
 
     static bool Clear(int32_t instanceId)
     {
         std::vector<std::shared_ptr<SmartGestureMonitorState>> statesToDetach;
-        auto iter = states_.find(instanceId);
-        if (iter == states_.end() || iter->second.empty()) {
-            return false;
+        {
+            std::lock_guard<std::mutex> lock(context_.mutex);
+            auto iter = context_.states.find(instanceId);
+            if (iter == context_.states.end() || iter->second.empty()) {
+                return false;
+            }
+            statesToDetach = std::move(iter->second);
+            context_.states.erase(iter);
+            context_.DeferDetachLocked(statesToDetach);
         }
-        statesToDetach = std::move(iter->second);
-        states_.erase(iter);
-
-        for (auto& state : statesToDetach) {
-            InvokeScope::DetachOrDefer(std::move(state));
+        for (const auto& state : statesToDetach) {
+            if (state) {
+                state->Detach();
+            }
         }
         return true;
     }
 
     static bool HasMonitor(int32_t instanceId)
     {
-        auto iter = states_.find(instanceId);
-        return iter != states_.end() && !iter->second.empty();
+        std::lock_guard<std::mutex> lock(context_.mutex);
+        auto iter = context_.states.find(instanceId);
+        return iter != context_.states.end() && !iter->second.empty();
     }
 
     static OHOS::Ace::NG::SmartGestureHandlingResolution Invoke(
         int32_t instanceId, const SmartGestureProposal& defaultProposal)
     {
-        auto iter = states_.find(instanceId);
-        if (iter == states_.end() || iter->second.empty()) {
+        InvokeScope invokeScope(context_, instanceId);
+        const auto& states = invokeScope.GetStates();
+        if (states.empty()) {
             return CreateAcceptedResolution();
         }
-        auto states = iter->second;
-        InvokeScope invokeScope;
 
         for (auto stateIter = states.rbegin(); stateIter != states.rend(); ++stateIter) {
             auto state = *stateIter;
@@ -846,12 +858,12 @@ public:
 
 private:
     using InvokeScope = NG::SmartGestureMonitorInvokeScope<SmartGestureMonitorState>;
+    using RegistryContext = NG::SmartGestureMonitorRegistryContext<SmartGestureMonitorState>;
 
-    static std::unordered_map<int32_t, std::vector<std::shared_ptr<SmartGestureMonitorState>>> states_;
+    static RegistryContext context_;
 };
 
-std::unordered_map<int32_t, std::vector<std::shared_ptr<SmartGestureMonitorState>>>
-    SmartGestureMonitorRegistry::states_;
+SmartGestureMonitorRegistry::RegistryContext SmartGestureMonitorRegistry::context_;
 
 void InstallRegistryBackedMonitor(const RefPtr<SmartGestureManager>& manager, int32_t instanceId)
 {

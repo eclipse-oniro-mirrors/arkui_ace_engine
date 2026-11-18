@@ -65,6 +65,8 @@ CJ_EXPORT void FfiOHOSAceFrameworkListSetDivider(DividerParams params);
 CJ_EXPORT void FfiOHOSAceFrameworkListSetEditMode(bool flag);
 CJ_EXPORT void FfiOHOSAceFrameworkListSetEdgeEffect(int32_t edgeEffect);
 CJ_EXPORT void FfiOHOSAceFrameworkListSetEdgeEffectWithOption(int32_t edgeEffect, bool options);
+CJ_EXPORT void FfiOHOSAceFrameworkListSetEdgeEffectWithOptions(
+    int32_t edgeEffect, bool alwaysEnabled, int32_t effectEdge);
 CJ_EXPORT void FfiOHOSAceFrameworkListSetCachedCount(int32_t cachedCount);
 CJ_EXPORT void FfiOHOSAceFrameworkListSetScrollBar(int32_t barState);
 CJ_EXPORT void FfiOHOSAceFrameworkListScrollBarColor(uint32_t color);
@@ -120,6 +122,19 @@ CJ_EXPORT void FfiOHOSAceFrameworkListSetOnItemDragLeaveCallback(void (*callback
 CJ_EXPORT void FfiOHOSAceFrameworkListSetOnItemDropCallback(void (*callback)(
     CJPosition itemDragInfo, int32_t itemIndex, int32_t insertIndex, bool isSuccess));
 CJ_EXPORT int64_t FfiOHOSAceFrameworkListScrollerCtor();
+struct CJListRectResult {
+    double x;
+    double y;
+    double width;
+    double height;
+    int32_t errorCode;
+};
+struct CJListVisibleContentResult {
+    int32_t index;
+    int32_t itemGroupArea;
+    int32_t itemIndexInGroup;
+    int32_t errorCode;
+};
 CJ_EXPORT CJRectResult FfiOHOSAceFrameworkListScrollerGetItemRectInGroup(
     int64_t selfId, int32_t index, int32_t indexInGroup);
 CJ_EXPORT void FfiOHOSAceFrameworkListScrollerScrollToItemInGroup(
@@ -128,6 +143,15 @@ CJ_EXPORT CJVisibleListContentInfo FfiOHOSAceFrameworkListScrollerGetVisibleList
     int64_t selfId, double x, double y);
 CJ_EXPORT void FfiOHOSAceFrameworkListScrollerCloseAllSwipeActions(int64_t selfId);
 CJ_EXPORT void FfiOHOSAceFrameworkListScrollerCloseAllSwipeActionsWithCallback(int64_t selfId,
+    void (*onFinishCallback)());
+CJ_EXPORT CJListRectResult FfiOHOSAceFrameworkListScrollerGetItemRectInGroupV2(
+    int64_t selfId, int32_t index, int32_t indexInGroup);
+CJ_EXPORT int32_t FfiOHOSAceFrameworkListScrollerScrollToItemInGroupV2(
+    int64_t selfId, int32_t index, int32_t indexInGroup, bool smooth, int32_t align);
+CJ_EXPORT CJListVisibleContentResult FfiOHOSAceFrameworkListScrollerGetVisibleListContentInfoV2(
+    int64_t selfId, double x, double y);
+CJ_EXPORT int32_t FfiOHOSAceFrameworkListScrollerCloseAllSwipeActionsV2(int64_t selfId);
+CJ_EXPORT int32_t FfiOHOSAceFrameworkListScrollerCloseAllSwipeActionsWithCallbackV2(int64_t selfId,
     void (*onFinishCallback)());
 }
 

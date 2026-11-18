@@ -1886,6 +1886,83 @@ typedef enum {
 } ArkUI_ErrorCode;
 
 /**
+ * @brief Sets the font color for the text style of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param color Font color, in 0xARGB format. For example, <b>0xFF182431</b>.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetColor(
+    ArkUI_PickerComponentTextStyle* style, uint32_t color);
+
+/**
+ * @brief Sets the font size for the text style of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param fontSize Font size, in fp.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetFontSize(
+    ArkUI_PickerComponentTextStyle* style, float fontSize);
+
+/**
+ * @brief Sets the font weight for the text style of the picker component.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param fontWeight Font weight. The value is an enumerated value of {@link ArkUI_FontWeight}.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetFontWeight(
+    ArkUI_PickerComponentTextStyle* style, ArkUI_FontWeight fontWeight);
+
+/**
+ * @brief Sets the minimum font size for the text style of the picker component. Used with
+ * **maxFontSize** to enable font scaling. When both **minFontSize** and **maxFontSize** are set,
+ * **fontSize** is ignored.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param minFontSize Minimum font size, in fp.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetMinFontSize(
+    ArkUI_PickerComponentTextStyle* style, float minFontSize);
+
+/**
+ * @brief Sets the maximum font size for the text style of the picker component. Used with
+ * **minFontSize** to enable font scaling. When both **minFontSize** and **maxFontSize** are set,
+ * **fontSize** is ignored.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param maxFontSize Maximum font size, in fp.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize(
+    ArkUI_PickerComponentTextStyle* style, float maxFontSize);
+
+/**
+ * @brief Sets the text overflow behavior for the text style of the picker component. This property has no
+ * effect when set to <b>ARKUI_TEXT_OVERFLOW_MARQUEE</b>.
+ *
+ * @param style Pointer to the {@link ArkUI_PickerComponentTextStyle} instance.
+ * @param overflow Text overflow behavior. The value is an enumerated value of {@link ArkUI_TextOverflow}.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the **style** parameter is a null pointer.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_PickerComponentTextStyle_SetOverflow(
+    ArkUI_PickerComponentTextStyle* style, ArkUI_TextOverflow overflow);
+
+/**
  * @brief defines the enumerated value of the extended security zone.
  *
  * @since 12
@@ -6856,6 +6933,58 @@ ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundRadius(OH_ArkUI_Te
     float* topLeft, float* topRight, float* bottomLeft, float* bottomRight);
 
 /**
+ * @brief Set the border width of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderWidth border width of the text background, in vp.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderWidth(
+    OH_ArkUI_TextEditorTextStyle* style, float borderWidth);
+
+/**
+ * @brief Get the border width of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderWidth border width of the text background, in vp.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderWidth(
+    OH_ArkUI_TextEditorTextStyle* style, float* borderWidth);
+
+/**
+ * @brief Set the border color of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderColor border color of the text background, in 0xARGB format.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_SetTextBackgroundBorderColor(
+    OH_ArkUI_TextEditorTextStyle* style, uint32_t borderColor);
+
+/**
+ * @brief Get the border color of the text background in the text style.
+ *
+ * @param style <b>TextEditor</b> text style.
+ * @param borderColor border color of the text background, in 0xARGB format.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_TextEditorTextStyle_GetTextBackgroundBorderColor(
+    OH_ArkUI_TextEditorTextStyle* style, uint32_t* borderColor);
+
+/**
  * @brief Set the preset typing style with styled string controller.
  *
  * @param controller <b>TextEditor</b> styled string controller.
@@ -7232,7 +7361,7 @@ typedef enum {
 /**
  * @brief Defines the line spacing options for text.
  *
- * @since 26.0.0
+ * @since 26.0.1
  */
 typedef struct OH_ArkUI_NativeModule_LineSpacingOptions OH_ArkUI_NativeModule_LineSpacingOptions;
 
@@ -7240,7 +7369,7 @@ typedef struct OH_ArkUI_NativeModule_LineSpacingOptions OH_ArkUI_NativeModule_Li
  * @brief Creates an <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
  *
  * @return Returns the pointer to the <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
- * @since 26.0.0
+ * @since 26.0.1
  */
 OH_ArkUI_NativeModule_LineSpacingOptions* OH_ArkUI_NativeModule_LineSpacingOptions_Create();
 
@@ -7248,7 +7377,7 @@ OH_ArkUI_NativeModule_LineSpacingOptions* OH_ArkUI_NativeModule_LineSpacingOptio
  * @brief Destroys an <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
  *
  * @param options Pointer to the <b>OH_ArkUI_NativeModule_LineSpacingOptions</b> object.
- * @since 26.0.0
+ * @since 26.0.1
  */
 void OH_ArkUI_NativeModule_LineSpacingOptions_Destroy(OH_ArkUI_NativeModule_LineSpacingOptions* options);
 
@@ -7259,7 +7388,7 @@ void OH_ArkUI_NativeModule_LineSpacingOptions_Destroy(OH_ArkUI_NativeModule_Line
  * @param onlyBetweenLines Whether line spacing only takes effect between lines.
  * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
  *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
- * @since 26.0.0
+ * @since 26.0.1
  */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines(
     OH_ArkUI_NativeModule_LineSpacingOptions* options, bool onlyBetweenLines);
@@ -7271,7 +7400,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines(
  * @param onlyBetweenLines Pointer to the boolean value to receive the flag.
  * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
  *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
- * @since 26.0.0
+ * @since 26.0.1
  */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines(
     const OH_ArkUI_NativeModule_LineSpacingOptions* options, bool* onlyBetweenLines);

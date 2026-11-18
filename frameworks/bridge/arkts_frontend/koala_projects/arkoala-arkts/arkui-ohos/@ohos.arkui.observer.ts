@@ -15,6 +15,8 @@ declare namespace uiObserver {
     type Callback_<T,V = void> = (data: T) => V
       
     export class UIObserver {
+        onNodeSensitiveInput(id: int, key: string, callback: object, dispatcher: object): void;
+        offNodeSensitiveInput(id: int, key: string, callback?: object): void;
         on(type: string, callback: object): void;
         off(type: string, callback?: object): void;
 

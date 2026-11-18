@@ -347,6 +347,9 @@ if (ace_engine_feature_asbng_path == "") {
 
 ace_platforms = []
 
+_ace_map_dir = rebase_path("$ace_root/build", root_build_dir)
+ace_module_map_files = exec_script("build/list_map_files.py", [ _ace_map_dir ], "list lines")
+
 _ace_adapter_dir = rebase_path("$ace_root/adapter", root_build_dir)
 _adapters = exec_script("build/search.py", [ _ace_adapter_dir ], "list lines")
 foreach(item, _adapters) {

@@ -174,6 +174,7 @@ public:
     void ShowOptions(int32_t index);
     bool ParseCommand(const std::string& command, int32_t& targetIndex, std::string& targetValue);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool FindOptionIndexByValue(const std::string& value, int32_t& index);
     void ReportInjectResult(const std::string& event, bool success, const std::string& reason = "");
     bool ReportOnSelectEvent(int32_t index, const std::string& value);

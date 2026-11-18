@@ -20,28 +20,23 @@ namespace {
 const char* ANI_SHAPE_NAME = "@ohos.arkui.shape.PathShape";
 } // namespace
 
-void ANICreatePathShapeWithParam(
-    ani_env* env, [[maybe_unused]] ani_object object, [[maybe_unused]] ani_object aniOption)
+ani_long ANICreatePathShape(
+    ani_env* env, [[maybe_unused]] ani_object aniClass, [[maybe_unused]] ani_object aniOption)
 {
-    if (GetIsUndefinedObject(env, aniOption)) {
-        return;
+    ani_class cls;
+    if (ANI_OK != env->FindClass(ANI_SHAPE_NAME, &cls)) {
+        LOGE("PathShape find class fail");
+        return 0;
     }
-    if (!IsInstanceOfCls(env, object, ANI_SHAPE_NAME)) {
-        return;
+    std::string commands = "";
+    if (!GetIsUndefinedObject(env, aniOption)) {
+        commands = ParseCommands(env, aniOption);
     }
-    std::string commands = ParseCommands(env, aniOption);
     PathPeer* shapePeer = new PathPeer();
     auto path = AceType::MakeRefPtr<Path>();
     path->SetValue(commands);
     shapePeer->pathShape = path;
-
-    ani_status status;
-    if ((status = env->Object_SetPropertyByName_Long(
-             object, "basicShapeResult", reinterpret_cast<ani_long>(shapePeer))) != ANI_OK) {
-        LOGE("PathShape set addr failed, status:%{public}d", status);
-        delete shapePeer;
-        return;
-    }
+    return reinterpret_cast<ani_long>(shapePeer);
 }
 
 PathPeer* GetPathShape(ani_env* env, ani_object obj)
@@ -151,14 +146,20 @@ ani_status PathShape::BindPathShape(ani_env* env)
     }
 
     std::array methods = {
-        ani_native_function {
-            "<ctor>", "C{@ohos.arkui.shape.PathShapeOptions}:", reinterpret_cast<void*>(ANICreatePathShapeWithParam) },
         ani_native_function { "commands", nullptr, reinterpret_cast<void*>(ANIPathShapeCommands) },
         ani_native_function { "position", nullptr, reinterpret_cast<void*>(ANIPathShapePosition) },
         ani_native_function { "offset", nullptr, reinterpret_cast<void*>(ANIPathShapeOffset) },
         ani_native_function { "fill", nullptr, reinterpret_cast<void*>(ANIPathShapeColor) },
     };
     ani_status tmp = env->Class_BindNativeMethods(cls, methods.data(), methods.size());
+    if (ANI_OK != tmp) {
+        return ANI_ERROR;
+    };
+    std::array staticMethods = {
+        ani_native_function { "create", nullptr, reinterpret_cast<void*>(ANICreatePathShape) },
+        ani_native_function { "nativeDestroy", nullptr, reinterpret_cast<void*>(ANIDestroyShape<PathPeer>) },
+    };
+    tmp = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
     if (ANI_OK != tmp) {
         return ANI_ERROR;
     };

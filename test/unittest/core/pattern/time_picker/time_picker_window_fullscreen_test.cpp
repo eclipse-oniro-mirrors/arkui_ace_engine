@@ -253,4 +253,40 @@ HWTEST_F(TimePickerWindowFullscreenTest, TimePickerOnWindowSizeChanged006, TestS
     EXPECT_TRUE(timePickerPattern->IsWindowFullscreen());
 }
 
+/**
+ * @tc.name: TimePickerOnWindowSizeChanged007
+ * @tc.desc: Test OnWindowSizeChanged with MOVE reason (early return, no state change)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TimePickerWindowFullscreenTest, TimePickerOnWindowSizeChanged007, TestSize.Level1)
+{
+    auto timePickerNode = FrameNode::GetOrCreateFrameNode(
+        V2::TIME_PICKER_ETS_TAG, 1, []() { return AceType::MakeRefPtr<TimePickerRowPattern>(); });
+    ASSERT_NE(timePickerNode, nullptr);
+    auto timePickerPattern = timePickerNode->GetPattern<TimePickerRowPattern>();
+    ASSERT_NE(timePickerPattern, nullptr);
+
+    EXPECT_TRUE(timePickerPattern->IsWindowFullscreen());
+    timePickerPattern->OnWindowSizeChanged(TEST_WIDTH, TEST_HEIGHT, WindowSizeChangeReason::MOVE);
+    EXPECT_TRUE(timePickerPattern->IsWindowFullscreen());
+}
+
+/**
+ * @tc.name: TimePickerOnWindowSizeChanged008
+ * @tc.desc: Test OnWindowSizeChanged with DRAG_MOVE reason (early return, no state change)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TimePickerWindowFullscreenTest, TimePickerOnWindowSizeChanged008, TestSize.Level1)
+{
+    auto timePickerNode = FrameNode::GetOrCreateFrameNode(
+        V2::TIME_PICKER_ETS_TAG, 1, []() { return AceType::MakeRefPtr<TimePickerRowPattern>(); });
+    ASSERT_NE(timePickerNode, nullptr);
+    auto timePickerPattern = timePickerNode->GetPattern<TimePickerRowPattern>();
+    ASSERT_NE(timePickerPattern, nullptr);
+
+    EXPECT_TRUE(timePickerPattern->IsWindowFullscreen());
+    timePickerPattern->OnWindowSizeChanged(TEST_WIDTH, TEST_HEIGHT, WindowSizeChangeReason::DRAG_MOVE);
+    EXPECT_TRUE(timePickerPattern->IsWindowFullscreen());
+}
+
 } // namespace OHOS::Ace::NG

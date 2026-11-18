@@ -17,7 +17,7 @@ import { ResetReuseTestsV2 } from '../../v2_tests/resetReuseTestsV2'
 import { PageController } from '../../lib/pageController'
 import { TestRunner } from '../../lib/testRunner'
 
-import router from '@system.router'
+import { router } from '@kit.ArkUI'
 
 @Entry
 @ComponentV2

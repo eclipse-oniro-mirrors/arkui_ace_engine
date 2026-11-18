@@ -3363,6 +3363,8 @@ TextBackgroundStyle Convert(const Ark_TextBackgroundStyle& src)
         Validator::ValidateNonPercent(dst.backgroundRadius->radiusBottomLeft);
         Validator::ValidateNonPercent(dst.backgroundRadius->radiusBottomRight);
     }
+    dst.borderWidth = Converter::OptConvert<Dimension>(src.borderWidth);
+    dst.borderColor = Converter::OptConvert<Color>(src.borderColor);
     return dst;
 }
 
@@ -4625,6 +4627,12 @@ void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptions
     if (lightEffectOptions.has_value()) {
         immersiveOptions.lightEffectOptions = lightEffectOptions;
     }
+    auto colorBlendMode = Converter::OptConvert<int32_t>(src.colorBlendMode);
+    if (colorBlendMode.has_value() &&
+        colorBlendMode.value() >= static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) &&
+        colorBlendMode.value() <= static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS)) {
+        immersiveOptions.colorBlendMode = static_cast<MaterialColorBlendMode>(colorBlendMode.value());
+    }
 
     dst = immersiveOptions;
 }
@@ -4707,6 +4715,16 @@ void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitle
         case ARK_SHEET_TITLE_BAR_HOVER_MODE_STACK: dst = SheetTitleBarHoverMode::STACK; break;
         case ARK_SHEET_TITLE_BAR_HOVER_MODE_SAFE_AREA_PADDING: dst = SheetTitleBarHoverMode::SAFE_AREA_PADDING; break;
         default: LOGE("Unexpected enum value in Ark_SheetTitleBarHoverMode: %{public}d", src);
+    }
+}
+
+template<>
+void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& src)
+{
+    switch (src) {
+        case ARK_SHADOW_CLIP_MODE_DEFAULT_SHAPE: dst = ShadowClipMode::DEFAULT_SHAPE; break;
+        case ARK_SHADOW_CLIP_MODE_BOUNDS_SHAPE: dst = ShadowClipMode::BOUNDS_SHAPE; break;
+        default: LOGE("Unexpected enum value in Ark_ShadowClipMode: %{public}d", src);
     }
 }
 } // namespace OHOS::Ace::NG::Converter

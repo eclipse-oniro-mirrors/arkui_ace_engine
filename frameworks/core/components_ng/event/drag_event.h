@@ -288,6 +288,8 @@ protected:
     DragEventActuator(const WeakPtr<GestureEventHub>& gestureEventHub);
 
 private:
+    void EnsurePanRecognizer();
+    void EnsureLongPressRecognizers();
     void UpdatePreviewOptionFromModifier(const RefPtr<FrameNode>& frameNode);
     void UpdatePreviewOptionDefaultAttr(const RefPtr<FrameNode>& frameNode);
     // check the current node's status to decide if it can initiate one drag operation

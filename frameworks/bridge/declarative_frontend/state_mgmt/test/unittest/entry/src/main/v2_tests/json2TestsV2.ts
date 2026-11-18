@@ -25,9 +25,9 @@ import { eq, neq, gt, lt, ITestFile } from '../lib/testRunner';
 
 // 声明 JSON2 主类
 declare class JSON2 {
-  static stringify<T>(value: T): string;
+  static stringify<T>(value: T, ignoreReadOnlyProperties?: boolean): string;
   static parse(text: string): any;
-  static toAliasedObject<T extends object>(value: T): T;
+  static toAliasedObject<T extends object>(value: T, ignoreReadOnlyProperties?: boolean): T;
   static parseStructure(text: string, objects: Map<string, object>): unknown;
   static parseTRP(str: string): { type?: string, refId?: string, payload?: string };
   static forEach(col: object, callback: (val: unknown, key: string|number) => void): void;

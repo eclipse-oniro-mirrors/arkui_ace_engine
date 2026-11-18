@@ -164,7 +164,7 @@ void LayoutAlgorithm::SetWidthPercentSensitive(LayoutWrapper *layoutWrapper, boo
 void OverflowCollector::AccumulateFromWrapper(const RefPtr<LayoutWrapper>& child)
 {
     CHECK_NULL_VOID(child);
-    auto frameNode = AceType::DynamicCast<FrameNode>(child->GetHostNode());
+    auto frameNode = child->GetHostNode();
     CHECK_NULL_VOID(frameNode);
     auto layoutProperty = frameNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);

@@ -21,7 +21,15 @@
 
 namespace OHOS::Ace::NG {
 
-namespace {} // namespace
+namespace {
+class KeyboardResetTestTextFieldPattern : public TextFieldPattern {
+    DECLARE_ACE_TYPE(KeyboardResetTestTextFieldPattern, TextFieldPattern);
+
+public:
+    MOCK_METHOD(void, DoKeyboardResetPlatform,
+        (const RefPtr<FrameNode>& host, bool needToResetKeyboard, bool isDynamic), (override));
+};
+} // namespace
 
 class TextFieldPatternTestFive : public TextInputBases {
 public:
@@ -198,6 +206,73 @@ HWTEST_F(TextFieldPatternTestFive, CheckAndUpdateInputTypeForOTP002, TestSize.Le
 
     EXPECT_EQ(layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED), TextInputType::NUMBER);
     EXPECT_EQ(pattern_->GetKeyboard(), TextInputType::NUMBER);
+}
+
+/**
+ * @tc.name: CheckAndUpdateInputTypeForOTP003
+ * @tc.desc: repeated number property updates keep the OTP keyboard without resetting it
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestFive, CheckAndUpdateInputTypeForOTP003, TestSize.Level0)
+{
+    auto pattern = AceType::MakeRefPtr<KeyboardResetTestTextFieldPattern>();
+    auto node = FrameNode::CreateFrameNode(
+        V2::TEXTINPUT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    auto layoutProperty = node->GetLayoutProperty<TextFieldLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateTextInputType(TextInputType::NUMBER);
+    layoutProperty->UpdatePlaceholder(u"请输入验证码");
+    EXPECT_CALL(*pattern, DoKeyboardResetPlatform(_, true, false)).Times(1);
+    pattern->OnModifyDone();
+    EXPECT_EQ(pattern->GetKeyboard(), TextInputType::ONE_TIME_CODE_NUMBER);
+    ASSERT_TRUE(Mock::VerifyAndClearExpectations(AceType::RawPtr(pattern)));
+
+    EXPECT_CALL(*pattern, DoKeyboardResetPlatform(_, false, false)).Times(3);
+    pattern->OnModifyDone();
+    layoutProperty->UpdateTextInputType(TextInputType::NUMBER);
+    pattern->OnModifyDone();
+    layoutProperty->UpdateTextInputType(TextInputType::NUMBER);
+    layoutProperty->UpdatePlaceholder(u"Verification Code");
+    pattern->OnModifyDone();
+
+    EXPECT_EQ(layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED), TextInputType::ONE_TIME_CODE_NUMBER);
+    EXPECT_EQ(pattern->GetKeyboard(), TextInputType::ONE_TIME_CODE_NUMBER);
+}
+
+/**
+ * @tc.name: CheckAndUpdateInputTypeForOTP004
+ * @tc.desc: OTP normalization preserves keyboard resets for action and effective type changes
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestFive, CheckAndUpdateInputTypeForOTP004, TestSize.Level0)
+{
+    auto pattern = AceType::MakeRefPtr<KeyboardResetTestTextFieldPattern>();
+    auto node = FrameNode::CreateFrameNode(
+        V2::TEXTINPUT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    auto layoutProperty = node->GetLayoutProperty<TextFieldLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateTextInputType(TextInputType::NUMBER);
+    layoutProperty->UpdatePlaceholder(u"请输入验证码");
+    EXPECT_CALL(*pattern, DoKeyboardResetPlatform(_, true, false)).Times(4);
+    pattern->CheckIfNeedToResetKeyboard();
+    EXPECT_EQ(pattern->GetKeyboard(), TextInputType::ONE_TIME_CODE_NUMBER);
+
+    layoutProperty->UpdateTextInputType(TextInputType::NUMBER);
+    pattern->UpdateTextInputAction(TextInputAction::SEARCH);
+    pattern->CheckIfNeedToResetKeyboard();
+    EXPECT_EQ(pattern->GetKeyboard(), TextInputType::ONE_TIME_CODE_NUMBER);
+    EXPECT_EQ(pattern->GetAction(), TextInputAction::SEARCH);
+
+    layoutProperty->UpdateTextInputType(TextInputType::NUMBER);
+    layoutProperty->UpdatePlaceholder(u"请输入手机号");
+    pattern->CheckIfNeedToResetKeyboard();
+    EXPECT_EQ(layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED), TextInputType::NUMBER);
+    EXPECT_EQ(pattern->GetKeyboard(), TextInputType::NUMBER);
+
+    layoutProperty->UpdateTextInputType(TextInputType::TEXT);
+    layoutProperty->UpdatePlaceholder(u"请输入验证码");
+    pattern->CheckIfNeedToResetKeyboard();
+    EXPECT_EQ(pattern->GetKeyboard(), TextInputType::TEXT);
 }
 
 /**

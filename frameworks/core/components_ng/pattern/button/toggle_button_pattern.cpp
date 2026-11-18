@@ -908,6 +908,11 @@ bool ToggleButtonPattern::ParseCommand(const std::string& command, bool& isOn)
     return true;
 }
 
+CommandResult ToggleButtonPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t ToggleButtonPattern::OnInjectionEvent(const std::string& command)
 {
     bool isOn = false;

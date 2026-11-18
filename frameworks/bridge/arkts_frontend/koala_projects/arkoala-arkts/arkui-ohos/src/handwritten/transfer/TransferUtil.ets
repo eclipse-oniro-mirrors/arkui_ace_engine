@@ -78,7 +78,7 @@ export class TransferUtil {
     // get nodePtr Value on arkts1.1
     static getNodePtrValue(input: Object): KPointer {
         const result = TransferUtil.invokeModuleFunction('@ohos.arkui.node', 'getNodePtrValue', input);
-        return result ? Double.toLong(result.unwrap() as number) : 0;
+        return result ? Double.toLong(result.unwrap() as number) : 0 as long;
     }
 
     // get nativeRef on arkts1.1. 

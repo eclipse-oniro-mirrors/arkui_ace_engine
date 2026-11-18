@@ -119,6 +119,7 @@ enum class SheetType;
 enum class SourceTool;
 enum class SourceType;
 enum class SpanType;
+enum class BarOverlapMode;
 enum class SuperscriptStyle;
 enum class SwipeActionState : uint32_t;
 enum class TabAnimateMode;

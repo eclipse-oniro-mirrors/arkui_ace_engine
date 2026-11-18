@@ -22,6 +22,7 @@
 #include "core/common/container.h"
 #include "base/utils/utf_helper.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/frame_node_adopted_compensation.h"
 #include "core/components_ng/manager/select_content_overlay/select_overlay_holder.h"
 #include "core/components_ng/pattern/scrollable/nestable_scroll_container.h"
 #include "core/components_ng/pattern/text/text_event_hub.h"
@@ -463,8 +464,9 @@ OffsetF TextSelectionChild::GetChildPaintOffsetWithoutTransform() const
         CHECK_NULL_RETURN(renderContext, {});
         offset += renderContext->GetPaintRectWithoutTransform().GetOffset();
         auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
-        if (ancestor && parent->IsAdopted() && parent->UseAdoptedCompensation()) {
-            offset += parent->GetAdoptedCompensationOffset();
+        if (ancestor && parent->IsAdopted() &&
+            FrameNodeAdoptedCompensation::UseAdoptedCompensation(parent.GetRawPtr())) {
+            offset += FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(parent.GetRawPtr());
         }
         parent = ancestor;
     }

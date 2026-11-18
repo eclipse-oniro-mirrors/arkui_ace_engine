@@ -474,6 +474,21 @@ void WaterFlowModelNG::SetSyncLoad(FrameNode* frameNode, bool syncLoad)
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(WaterFlowLayoutProperty, SyncLoad, syncLoad, frameNode);
 }
 
+void WaterFlowModelNG::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetScrollPlaceholder(frameNode, std::move(provider));
+}
+
+void WaterFlowModelNG::SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetScrollPlaceholder(std::move(provider));
+}
+
 bool WaterFlowModelNG::GetSyncLoad(FrameNode* frameNode)
 {
     bool result = true;
@@ -829,15 +844,20 @@ bool WaterFlowModelNG::GetScrollEnabled(FrameNode* frameNode)
     return value;
 }
 
-void WaterFlowModelNG::SetScrollToIndex(
-    FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment, std::optional<float> extraOffset)
+void WaterFlowModelNG::SetScrollToIndex(FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment,
+    std::optional<float> extraOffset, int32_t fastScrollMode)
 {
     // call SetScrollToIndexMultiThread by multi thread
-    FREE_NODE_CHECK(frameNode, SetScrollToIndex, frameNode, index, animation, alignment, extraOffset);
+    FREE_NODE_CHECK(frameNode, SetScrollToIndex, frameNode, index, animation, alignment, extraOffset, fastScrollMode);
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<WaterFlowPattern>();
     CHECK_NULL_VOID(pattern);
     pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+    const auto mode = static_cast<FastScrollMode>(fastScrollMode);
+    if (animation && IsFastScrollEnabled(mode)) {
+        pattern->ScrollToIndexFastScroll(index, true, static_cast<ScrollAlign>(alignment), extraOffset, mode);
+        return;
+    }
     pattern->ScrollToIndex(index, animation, static_cast<ScrollAlign>(alignment), extraOffset);
 }
 

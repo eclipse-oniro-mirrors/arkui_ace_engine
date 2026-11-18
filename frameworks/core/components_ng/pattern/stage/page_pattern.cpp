@@ -172,13 +172,13 @@ void PagePattern::TriggerPageTransition(const std::function<void()>& onFinish, P
             ACE_SCOPED_TRACE_COMMERCIAL("Router Page Transition End");
 #ifndef CROSS_PLATFORM
             PerfMonitor::GetPerfMonitor()->End(PerfConstants::ABILITY_OR_PAGE_SWITCH, true);
+#endif
             auto pipeline = pattern->GetContext();
             if (pipeline) {
                 auto mgr = pipeline->GetContentChangeManager();
                 CHECK_NULL_VOID(mgr);
                 mgr->OnPageTransitionEnd(pattern->GetHost());
             }
-#endif
         }
         auto host = pattern->GetHost();
         CHECK_NULL_VOID(host);
@@ -633,14 +633,12 @@ void PagePattern::FirePageTransitionStart(PageTransitionType type)
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     pipeline->SetTHPNotifyState(ThpNotifyState::ROUTER_TRANSITION);
-#ifndef CROSS_PLATFORM
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnTransitionAdded(host->GetId());
     if (type == PageTransitionType::ENTER_PUSH || type == PageTransitionType::ENTER_POP) {
         mgr->OnContentChangeStart(host, ChangeType::PAGE);
     }
-#endif
 }
 
 void PagePattern::FirePageTransitionFinish()
@@ -658,11 +656,9 @@ void PagePattern::FirePageTransitionFinish()
     CHECK_NULL_VOID(pipeline);
     pipeline->SetTHPNotifyState(ThpNotifyState::DEFAULT);
     pipeline->PostTaskResponseRegion(DEFAULT_DELAY_THP);
-#ifndef CROSS_PLATFORM
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnTransitionRemoved(host->GetId());
-#endif
 }
 
 void PagePattern::StopPageTransition()
@@ -1297,14 +1293,12 @@ ScopeFocusAlgorithm PagePattern::GetScopeFocusAlgorithm()
 
 void PagePattern::ContentChangeByDetaching(PipelineContext* pipeline)
 {
-#ifndef CROSS_PLATFORM
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     mgr->OnTransitionRemoved(host->GetId());
-#endif
 }
 
 bool PagePattern::GetComponentInfo(const std::string& id, std::string& info)

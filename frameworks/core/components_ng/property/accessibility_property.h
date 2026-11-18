@@ -499,8 +499,11 @@ public:
      * Get path from root to node which hit the hoverPoint.
      * return: path contains nodes whose border cover the hoverPoint.
      */
+    using HoverTestStopPredicate = std::function<bool(const RefPtr<FrameNode>&)>;
     static AccessibilityHoverTestPath HoverTest(
         const PointF& point, const RefPtr<FrameNode>& root, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo);
+    static AccessibilityHoverTestPath HoverTest(const PointF& point, const RefPtr<FrameNode>& root,
+        std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, const HoverTestStopPredicate& stopAtHost);
 
     /*
      * Judge whether a node can be accessibility focused.
@@ -669,7 +672,8 @@ public:
 private:
     // node should be not-null
     static bool HoverTestRecursive(const PointF& parentPoint, const RefPtr<FrameNode>& node,
-        AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, bool& ancestorGroupFlag);
+        AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo, bool& ancestorGroupFlag,
+        const HoverTestStopPredicate& stopAtHost = {});
 
     struct RecursiveParam {
         bool hitTarget;
@@ -678,7 +682,7 @@ private:
 
     static bool ProcessHoverTestRecursive(const PointF& noOffsetPoint, const RefPtr<FrameNode>& node,
         AccessibilityHoverTestPath& path, std::unique_ptr<HoverTestDebugTraceInfo>& debugInfo,
-        RecursiveParam recursiveParam);
+        RecursiveParam recursiveParam, const HoverTestStopPredicate& stopAtHost = {});
 
     static std::unique_ptr<JsonValue> CreateNodeSearchInfo(
         const RefPtr<FrameNode>& node, const PointF& parentPoint, bool& ancestorGroupFlag);

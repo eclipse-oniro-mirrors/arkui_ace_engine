@@ -26,6 +26,7 @@
 #include "core/components_ng/svg/base/svg_bounding_box_context.h"
 #include "core/components_ng/svg/parse/svg_attributes_parser.h"
 #include "frameworks/core/components_ng/svg/svg_utils.h"
+#include "base/geometry/matrix4.h"
 
 namespace OHOS::Ace::NG {
 
@@ -246,6 +247,11 @@ protected:
     std::vector<RefPtr<SvgNode>> children_;
     std::string nodeId_;
     std::string transform_;
+    Matrix4 cachedTransformMatrix_;
+    bool transformMatrixCached_ = false;
+    // transformVec/transformOrigin are only set during parsing, so cache never expires
+    std::optional<Matrix4> transformVecMatrixCache_;
+    std::optional<SvgLengthScaleRule> transformVecCacheKey_;
     std::map<std::string, std::vector<float>> animateTransform_;
 
     SvgBaseAttribute attributes_;

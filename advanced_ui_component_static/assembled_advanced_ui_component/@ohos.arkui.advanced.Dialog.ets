@@ -1695,7 +1695,7 @@ struct CustomDialogContentComponent {
         ForEach((this.buttons as Array<ButtonOptions>).slice(0, VERTICAL_BUTTON_MAX_COUNT.toInt()),
           (item: ButtonOptions, index: int) => {
             this.buildButtonWithDivider((this.buttons as Array<ButtonOptions>)?.length === HORIZON_BUTTON_MAX_COUNT ?
-              HORIZON_BUTTON_MAX_COUNT - index - 1 : index);
+              HORIZON_BUTTON_MAX_COUNT - index - 1 : Int.toDouble(index));
           }, (item: ButtonOptions) => item.value.toString());
       }
     }

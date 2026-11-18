@@ -50,6 +50,18 @@ interface IReusePool {
  */
 interface CustomComponentContext {
   getReusePool(): IReusePool | undefined;
+  getDefaultReusePool(): IDefaultReusePool | undefined;
+}
+
+/**
+ * The IDefaultReusePool API provides the features related to the default reuse pool
+ * of a custom component (getDefaultReusePool API, @since 26.1.0).
+ * clearCache releases cached (recycled) nodes progressively; specifying reuseId
+ * limits the release to that reuseId group. Non-existent or empty-string reuseId
+ * has no side effect; undefined clears all groups.
+ */
+interface IDefaultReusePool {
+  clearCache(reuseId?: string): void;
 }
 
 /**

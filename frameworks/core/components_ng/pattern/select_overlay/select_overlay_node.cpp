@@ -89,6 +89,7 @@ constexpr int32_t OPTION_INDEX_AI_WRITE = 8;
 constexpr int32_t OPTION_INDEX_AI_MENU = 9;
 constexpr int32_t OPTION_INDEX_ASK_CELIA = 10;
 constexpr int32_t OPTION_INDEX_AUTO_FILL = 11;
+constexpr int32_t OPTION_INDEX_TRANSLATE_INPUT = 12;
 constexpr int32_t ANIMATION_DURATION1 = 350;
 constexpr int32_t ANIMATION_DURATION2 = 150;
 constexpr int32_t ANIMATION_DURATION3 = 100;
@@ -955,6 +956,7 @@ static constexpr LinearMapNode<MenuItemEnabledMapFunc> IS_MENUITEM_ENABLED_MAP[]
     { OH_DEFAULT_SELECT_ALL, +[](const SelectMenuInfo& info){ return info.showCopyAll; } },
     { OH_DEFAULT_SHARE, +[](const SelectMenuInfo& info){ return info.showShare; } },
     { OH_DEFAULT_TRANSLATE, +[](const SelectMenuInfo& info){ return info.showTranslate; } },
+    { OH_DEFAULT_TRANSLATE_INPUT, +[](const SelectMenuInfo& info){ return info.showTranslateInput; } },
 };
 static_assert(IsSorted(IS_MENUITEM_ENABLED_MAP), "IS_MENUITEM_ENABLED_MAP array must be sorted to work properly");
 static_assert(IsSortedWithDetailedLog<IS_MENUITEM_ENABLED_MAP>(),
@@ -998,6 +1000,8 @@ static constexpr LinearMapNode<SymbolIdMapFunc> GET_SYMBOL_ID_MAP[] = {
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) { return theme->GetShareSymbolId(); } },
     { OH_DEFAULT_TRANSLATE,
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) { return theme->GetTranslateSymbolId(); } },
+    { OH_DEFAULT_TRANSLATE_INPUT,
+        +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) { return theme->GetTranslateSymbolId(); } },
 };
 static_assert(IsSorted(GET_SYMBOL_ID_MAP), "GET_SYMBOL_ID_MAP array must be sorted to work properly");
 static_assert(IsSortedWithDetailedLog<GET_SYMBOL_ID_MAP>(),
@@ -1031,6 +1035,8 @@ static constexpr LinearMapNode<GetItemContentLabelFunc> GET_ITEM_CONTENT_LABEL_M
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) -> std::string { return theme->GetShareLabel(); } },
     { OH_DEFAULT_TRANSLATE,
         +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) -> std::string { return theme->GetTranslateLabel(); } },
+    { OH_DEFAULT_TRANSLATE_INPUT,
+        +[](const RefPtr<OHOS::Ace::TextOverlayTheme>& theme) -> std::string { return theme->GetTranslateInput(); } },
 };
 static_assert(IsSorted(GET_ITEM_CONTENT_LABEL_MAP), "GET_ITEM_CONTENT_LABEL_MAP array must be sorted to work properly");
 static_assert(IsSortedWithDetailedLog<GET_ITEM_CONTENT_LABEL_MAP>(),
@@ -1780,6 +1786,10 @@ void GetOptionsParamsHasSymbol(
         params.back().symbolId = theme->GetAskCeliaSymbolId();
         params.back().isAskCeliaOption = true;
     }
+    if (info->menuInfo.showTranslateInput && TextSystemMenu::IsShowTranslateInput()) {
+        params.emplace_back(theme->GetTranslateInput(), GetMenuCallbackWithContainerId(
+            info->menuCallback.onTranslateInput), "", info->menuInfo.showTranslateInput, theme->GetTranslateSymbolId());
+    }
 }
 
 std::vector<OptionParam> GetOptionsParams(const std::shared_ptr<SelectOverlayInfo>& info)
@@ -1807,6 +1817,7 @@ std::unordered_map<std::string, std::function<void()>> GetSystemCallback(
         { OH_DEFAULT_SEARCH, info->menuCallback.onSearch },
         { OH_DEFAULT_SHARE, info->menuCallback.onShare },
         { OH_DEFAULT_CAMERA_INPUT, info->menuCallback.onCameraInput },
+        { OH_DEFAULT_TRANSLATE_INPUT, info->menuCallback.onTranslateInput },
         { OH_DEFAULT_AI_WRITE, info->menuCallback.onAIWrite },
         { OH_DEFAULT_AI_MENU_PHONE, ConvertToVoidFunction(
             info->menuCallback.onAIMenuOption, OH_DEFAULT_AI_MENU_PHONE) },
@@ -1849,7 +1860,7 @@ std::string GetSystemIconPath(const std::string& id, const std::string& iconPath
     if (id == OH_DEFAULT_AUTO_FILL) {
         return iconTheme->GetIconPath(InternalResource::ResourceId::IC_AUTO_FILL_SVG);
     }
-    if (id == OH_DEFAULT_TRANSLATE) {
+    if (id == OH_DEFAULT_TRANSLATE || id == OH_DEFAULT_TRANSLATE_INPUT) {
         return iconTheme->GetIconPath(InternalResource::ResourceId::IC_TRANSLATE_SVG);
     }
     if (id == OH_DEFAULT_SEARCH) {
@@ -2274,7 +2285,7 @@ void SetSubMenuItemBuildCallback(const RefPtr<FrameNode>& menuItem, RefPtr<Frame
     if (!param.subMenuItems.empty()) {
         auto subMenuBuildCallback = [ param, isUsingMouse,
             weakMenuItem = AceType::WeakClaim(menuItem.GetRawPtr())]() mutable -> RefPtr<UINode> {
-            auto menuItem = AceType::DynamicCast<FrameNode>(weakMenuItem.Upgrade());
+            auto menuItem = weakMenuItem.Upgrade();
             auto themeScopId = menuItem ? menuItem->GetThemeScopeId() : 0;
             auto targetNodeId = ElementRegister::GetInstance()->MakeUniqueId();
             return CreateInnerMenuWithItems(param.subMenuItems, targetNodeId, isUsingMouse, true, themeScopId);
@@ -3152,6 +3163,7 @@ void SelectOverlayNode::NewMaterialMoreAnimation(bool noAnimation)
 
     extensionProperty->UpdateVisibility(VisibleType::VISIBLE);
     extensionMenuStatus_ = FrameNodeStatus::VISIBLE;
+    pipeline->AddTaskOverlayNodeMaterialArea(extensionMenu_, "extensionMenu");
     UpdateMoreOrBackSymbolOptions(false, true);
     AnimationOption extensionOption;
     extensionOption.SetDuration(ANIMATION_DURATION2);
@@ -3180,12 +3192,6 @@ void SelectOverlayNode::PlaySelectMenuToExtensionAnimation(
     CHECK_NULL_VOID(selectMenu_);
     CHECK_NULL_VOID(selectMenuInner_);
     CHECK_NULL_VOID(extensionMenu_);
-    auto selectProperty = selectMenu_->GetLayoutProperty();
-    CHECK_NULL_VOID(selectProperty);
-    auto selectMenuInnerProperty = selectMenuInner_->GetLayoutProperty();
-    CHECK_NULL_VOID(selectMenuInnerProperty);
-    auto extensionProperty = extensionMenu_->GetLayoutProperty();
-    CHECK_NULL_VOID(extensionProperty);
     auto selectContext = selectMenu_->GetRenderContext();
     CHECK_NULL_VOID(selectContext);
     auto selectMenuInnerContext = selectMenuInner_->GetRenderContext();
@@ -3193,27 +3199,8 @@ void SelectOverlayNode::PlaySelectMenuToExtensionAnimation(
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
 
-    auto containerId = pipeline->GetInstanceId();
-    FinishCallback callback = [selectProperty, selectMenuInnerProperty, extensionProperty, id = containerId,
-        weak = WeakClaim(this), weakExtensionMenu = WeakClaim(RawPtr(extensionMenu_)), onFinish]() {
-        ContainerScope scope(id);
-        selectProperty->UpdateVisibility(VisibleType::GONE);
-        selectMenuInnerProperty->UpdateVisibility(VisibleType::GONE);
-        extensionProperty->UpdateVisibility(VisibleType::VISIBLE);
-        auto selectOverlay = weak.Upgrade();
-        CHECK_NULL_VOID(selectOverlay);
-        selectOverlay->SetAnimationStatus(false);
-        auto extensionMenu = weakExtensionMenu.Upgrade();
-        CHECK_NULL_VOID(extensionMenu);
-        auto child = FindAccessibleFocusNodeInExtMenu(extensionMenu);
-        auto target = AceType::DynamicCast<FrameNode>(child);
-        if (target) {
-            target->OnAccessibilityEvent(AccessibilityEventType::REQUEST_FOCUS);
-        }
-        if (onFinish) {
-            onFinish();
-        }
-    };
+    auto callback = CreateSelectMenuToExtensionFinishCallback(onFinish);
+    CHECK_NULL_VOID(callback);
     AnimationOption selectOption;
     selectOption.SetDuration(ANIMATION_DURATION3);
     const RefPtr<CubicCurve> cubicCurve = AceType::MakeRefPtr<CubicCurve>(0.26, 0.00, 0.60, 0.00);
@@ -3226,6 +3213,72 @@ void SelectOverlayNode::PlaySelectMenuToExtensionAnimation(
     selectMenu_->MarkDirtyNode(PROPERTY_UPDATE_LAYOUT);
     pipeline->FlushUITasks();
     AnimationUtils::CloseImplicitAnimation(GetContextRefPtr());
+}
+
+std::function<void()> SelectOverlayNode::CreateSelectMenuToExtensionFinishCallback(
+    const std::function<void()>& onFinish)
+{
+    CHECK_NULL_RETURN(selectMenu_, nullptr);
+    CHECK_NULL_RETURN(selectMenuInner_, nullptr);
+    CHECK_NULL_RETURN(extensionMenu_, nullptr);
+    auto selectProperty = selectMenu_->GetLayoutProperty();
+    CHECK_NULL_RETURN(selectProperty, nullptr);
+    auto selectMenuInnerProperty = selectMenuInner_->GetLayoutProperty();
+    CHECK_NULL_RETURN(selectMenuInnerProperty, nullptr);
+    auto extensionProperty = extensionMenu_->GetLayoutProperty();
+    CHECK_NULL_RETURN(extensionProperty, nullptr);
+    auto pipeline = GetContext();
+    CHECK_NULL_RETURN(pipeline, nullptr);
+    return [selectProperty, selectMenuInnerProperty, extensionProperty, id = pipeline->GetInstanceId(),
+        weak = WeakClaim(this), weakExtensionMenu = WeakClaim(RawPtr(extensionMenu_)), onFinish]() {
+        ContainerScope scope(id);
+        auto selectOverlay = weak.Upgrade();
+        CHECK_NULL_VOID(selectOverlay);
+        auto extensionMenu = weakExtensionMenu.Upgrade();
+        CHECK_NULL_VOID(extensionMenu);
+        if (!selectOverlay->isExtensionMenu_ || selectOverlay->extensionMenu_ != extensionMenu) {
+            return;
+        }
+        // Make the extension menu available before hiding the currently focused more button.
+        extensionProperty->UpdateVisibility(VisibleType::VISIBLE);
+        if (onFinish) {
+            onFinish();
+        }
+        selectProperty->UpdateVisibility(VisibleType::GONE);
+        selectMenuInnerProperty->UpdateVisibility(VisibleType::GONE);
+        selectOverlay->SetAnimationStatus(false);
+        selectOverlay->RequestExtensionMenuAccessibilityFocusAfterLayout(extensionMenu);
+    };
+}
+
+void SelectOverlayNode::RequestExtensionMenuAccessibilityFocusAfterLayout(const RefPtr<FrameNode>& extensionMenu)
+{
+    CHECK_NULL_VOID(extensionMenu);
+    auto pipeline = GetContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->AddAfterLayoutTask([weak = WeakClaim(this), weakExtensionMenu = WeakClaim(RawPtr(extensionMenu)),
+        id = pipeline->GetInstanceId()]() {
+        ContainerScope scope(id);
+        auto selectOverlay = weak.Upgrade();
+        CHECK_NULL_VOID(selectOverlay);
+        auto extensionMenu = weakExtensionMenu.Upgrade();
+        CHECK_NULL_VOID(extensionMenu);
+        if (!selectOverlay->IsOnMainTree() || !selectOverlay->isExtensionMenu_ ||
+            selectOverlay->extensionMenu_ != extensionMenu || !extensionMenu->IsVisible()) {
+            return;
+        }
+        auto pattern = selectOverlay->GetPattern<SelectOverlayPattern>();
+        CHECK_NULL_VOID(pattern);
+        auto info = pattern->GetSelectOverlayInfo();
+        CHECK_NULL_VOID(info);
+        if (!info->menuInfo.menuIsShow) {
+            return;
+        }
+        auto target = AceType::DynamicCast<FrameNode>(FindAccessibleFocusNodeInExtMenu(extensionMenu));
+        CHECK_NULL_VOID(target);
+        target->OnAccessibilityEvent(AccessibilityEventType::REQUEST_FOCUS);
+    });
+    pipeline->RequestFrame();
 }
 
 void SelectOverlayNode::PlayExtensionMenuLightAnimation(
@@ -3830,6 +3883,14 @@ void SelectOverlayNode::GetFlexibleOptionsParams(const std::shared_ptr<SelectOve
         params.back().isAskCeliaOption = true;
         paramIds.emplace_back(OH_DEFAULT_ASK_CELIA);
     }
+    if (!isShowInDefaultMenu_[OPTION_INDEX_TRANSLATE_INPUT] && info->menuInfo.showTranslateInput &&
+        TextSystemMenu::IsShowTranslateInput()) {
+        auto iconPath = iconTheme ? iconTheme->GetIconPath(InternalResource::ResourceId::IC_TRANSLATE_SVG) : "";
+        auto label = textOverlayTheme ? textOverlayTheme->GetTranslateInput() : "";
+        params.emplace_back(label, iconPath, GetMenuCallbackWithContainerId(info->menuCallback.onTranslateInput),
+            GetSymbolFunc(OH_DEFAULT_TRANSLATE_INPUT));
+        paramIds.emplace_back(OH_DEFAULT_TRANSLATE_INPUT);
+    }
 }
 
 void SelectOverlayNode::addMenuOptionItemsParams(
@@ -4276,16 +4337,16 @@ std::optional<float> SelectOverlayNode::GetParentWidth()
     return renderContext->GetPaintRectWithoutTransform().Width();
 }
 
-RefPtr<UiMaterial>& SelectOverlayNode::GetMenuUiMaterial(ColorMode colorMode)
+RefPtr<UiMaterial> SelectOverlayNode::GetMenuUiMaterial(ColorMode colorMode)
 {
-    static RefPtr<UiMaterial> menuMaterial_ = AceType::MakeRefPtr<UiMaterial>();
-    menuMaterial_->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+    auto menuMaterial = AceType::MakeRefPtr<UiMaterial>();
+    menuMaterial->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
     ImmersiveOptions options {
         .style = UiMaterialStyle::THICK,
         .colorMode = colorMode,
     };
-    menuMaterial_->SetImmersiveOptions(options);
-    return menuMaterial_;
+    menuMaterial->SetImmersiveOptions(options);
+    return menuMaterial;
 }
 
 void SelectOverlayNode::UpdateNewMaterialProperties(const RefPtr<FrameNode>& frameNode, ColorMode colorMode)
@@ -4295,8 +4356,8 @@ void SelectOverlayNode::UpdateNewMaterialProperties(const RefPtr<FrameNode>& fra
         CHECK_NULL_VOID(renderContext);
         if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::SMOOTH) {
             renderContext->UpdateBackBlurStyle(std::nullopt);
-            ViewAbstract::SetSystemMaterialForOverlay(
-                AceType::RawPtr(frameNode), AceType::RawPtr(GetMenuUiMaterial(colorMode)));
+            auto menuMaterial = GetMenuUiMaterial(colorMode);
+            ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(frameNode), AceType::RawPtr(menuMaterial));
         } else {
             // 降档材质
             auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
@@ -4333,6 +4394,7 @@ bool SelectOverlayNode::AddSystemDefaultOptions(float maxWidth, float& allocated
     ShowAIWrite(maxWidth, allocatedSize, info, theme->GetAIWrite());
     ShowAIMenuOptions(maxWidth, allocatedSize, info, theme->GetAiMenuOptionName(info->menuInfo.aiMenuOptionType));
     ShowAskCelia(maxWidth, allocatedSize, info, theme->GetAskCelia());
+    ShowTranslateInput(maxWidth, allocatedSize, info, theme->GetTranslateInput());
     if (isDefaultBtnOverMaxWidth_) {
         isDefaultBtnOverMaxWidth_ = false;
         return true;
@@ -4610,6 +4672,28 @@ void SelectOverlayNode::ShowCamera(
     }
 }
 
+void SelectOverlayNode::ShowTranslateInput(
+    float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label)
+{
+    if (info->menuInfo.showTranslateInput && TextSystemMenu::IsShowTranslateInput()) {
+        CHECK_EQUAL_VOID(isDefaultBtnOverMaxWidth_, true);
+        float buttonWidth = 0.0f;
+        ButtonBasicInfo buttonBasicInfo = { .data = label, .buttonType = SelectOverlayMenuButtonType::NORMAL };
+        auto button = BuildButton(info, info->menuCallback.onTranslateInput, GetId(), buttonWidth, buttonBasicInfo);
+        CHECK_NULL_VOID(button);
+        if (GreatOrEqual(maxWidth - allocatedSize, buttonWidth)) {
+            button->MountToParent(selectMenuInner_);
+            allocatedSize += buttonWidth;
+            isShowInDefaultMenu_[OPTION_INDEX_TRANSLATE_INPUT] = true;
+        } else {
+            button.Reset();
+            isDefaultBtnOverMaxWidth_ = true;
+        }
+    } else {
+        isShowInDefaultMenu_[OPTION_INDEX_TRANSLATE_INPUT] = true;
+    }
+}
+
 void SelectOverlayNode::ShowAIMenuOptions(
     float maxWidth, float& allocatedSize, std::shared_ptr<SelectOverlayInfo>& info, const std::string& label)
 {
@@ -4799,6 +4883,8 @@ const std::vector<MenuItemParam> SelectOverlayNode::GetSystemMenuItemParams(
 
     AddMenuItemParamIf(menuInfo.isAskCeliaEnabled && TextSystemMenu::IsShowAskCelia(), OH_DEFAULT_ASK_CELIA,
         theme->GetAskCelia(), systemItemParams);
+    AddMenuItemParamIf(menuInfo.showTranslateInput && TextSystemMenu::IsShowTranslateInput(),
+        OH_DEFAULT_TRANSLATE_INPUT, theme->GetTranslateInput(), systemItemParams);
     return systemItemParams;
 }
 
@@ -5163,6 +5249,11 @@ void SelectOverlayNode::ShowSelectOverlay(bool animation)
 {
     auto pattern = GetPattern<SelectOverlayPattern>();
     CHECK_NULL_VOID(pattern);
+
+    auto ctx = GetContext();
+    if (ctx) {
+        ctx->AddTaskOverlayNodeMaterialArea(selectMenu_, "SelectOverlayNode ShowSelectOverlay");
+    }
 
     // In SelectOverlayMode::MENU_ONLY mode, SelectOverlay controls the animation by self.
     if (pattern->GetMode() == SelectOverlayMode::MENU_ONLY) {
@@ -5733,6 +5824,7 @@ int32_t SelectOverlayNode::ConvertToIntMenuId(const std::string& menuId)
         { OH_DEFAULT_SELECT_ALL, NativeMenuId::ID_SELECT_ALL },
         { OH_DEFAULT_COLLABORATION_SERVICE, NativeMenuId::ID_COLLABORATION_SERVICE },
         { OH_DEFAULT_CAMERA_INPUT, NativeMenuId::ID_CAMERA_INPUT },
+        { OH_DEFAULT_TRANSLATE_INPUT, NativeMenuId::ID_TRANSLATE_INPUT },
         { OH_DEFAULT_AI_WRITE, NativeMenuId::ID_AI_WRITE },
         { OH_DEFAULT_TRANSLATE, NativeMenuId::ID_TRANSLATE },
         { OH_DEFAULT_SEARCH, NativeMenuId::ID_SEARCH },
@@ -5762,6 +5854,7 @@ std::string SelectOverlayNode::ConvertToStrMenuId(int32_t menuId)
         { NativeMenuId::ID_SELECT_ALL, OH_DEFAULT_SELECT_ALL },
         { NativeMenuId::ID_COLLABORATION_SERVICE, OH_DEFAULT_COLLABORATION_SERVICE },
         { NativeMenuId::ID_CAMERA_INPUT, OH_DEFAULT_CAMERA_INPUT },
+        { NativeMenuId::ID_TRANSLATE_INPUT, OH_DEFAULT_TRANSLATE_INPUT },
         { NativeMenuId::ID_AI_WRITE, OH_DEFAULT_AI_WRITE },
         { NativeMenuId::ID_TRANSLATE, OH_DEFAULT_TRANSLATE },
         { NativeMenuId::ID_SEARCH, OH_DEFAULT_SEARCH },
@@ -5776,7 +5869,7 @@ std::string SelectOverlayNode::ConvertToStrMenuId(int32_t menuId)
         { NativeMenuId::ID_PASSWORD_VAULT, OH_DEFAULT_PASSWORD_VAULT },
     };
     auto nativeMenuIdStart = static_cast<int32_t>(NativeMenuId::ID_CUT);
-    auto nativeMenuIdEnd = static_cast<int32_t>(NativeMenuId::ID_PASSWORD_VAULT);
+    auto nativeMenuIdEnd = static_cast<int32_t>(NativeMenuId::ID_TRANSLATE_INPUT);
     if (menuId < nativeMenuIdStart || menuId > nativeMenuIdEnd) {
         return std::to_string(menuId);
     }

@@ -114,6 +114,14 @@ struct TouchEvent final : public PointerEvent {
     bool isMouseTouchTest = false;
     bool isFalsified = false;
     bool isInjected = false;
+    // Set only for input events authenticated by the platform input service as controller events.
+    bool isAgent = false;
+    int32_t agentWindowId = -1;
+    // Internal authenticated injector identity; never a SAF session or an application event field.
+    int32_t callingUid = -1;
+    // SAF session identity is independent of agentWindowId and is valid only when explicitly provided by MMI.
+    bool hasSafSessionId = false;
+    uint64_t safSessionId = 0;
     bool isPrivacyMode = false;
     bool isPassThroughMode = false;
     bool isGenerate = false;
@@ -214,13 +222,7 @@ public:
     {
         return localLocation_;
     }
-    Offset GetCurrentLocalLocation() const
-    {
-        if (currentLocalLocationGetter_) {
-            return currentLocalLocationGetter_();
-        }
-        return localLocation_;
-    }
+    Offset GetCurrentLocalLocation() const;
     TouchLocationInfo& SetCurrentLocalLocationGetter(CurrentLocalLocationGetter&& currentLocalLocationGetter)
     {
         currentLocalLocationGetter_ = std::move(currentLocalLocationGetter);
@@ -307,6 +309,7 @@ public:
     const std::list<std::shared_ptr<MMI::PointerEvent>>& GetHistoryPointerEvent() const;
     void SetPointerEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent);
     const std::shared_ptr<MMI::PointerEvent>& GetPointerEvent() const;
+    bool IsAgent() const;
     void SetTouchEventsEnd(bool isTouchEventsEnd);
     bool GetTouchEventsEnd() const;
     TouchEvent ConvertToTouchEvent() const;

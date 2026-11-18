@@ -167,7 +167,7 @@ HWTEST_F(IsolatedPatternTestNg, IsolatedPatternTest002, TestSize.Level1)
      /**
      * @tc.steps: step4. call DumpInfo.
      */
-    auto want = AceType::DynamicCast<WantWrapOhos>(wantWrap)->GetWant();
+    auto want = wantWrap->GetWant();
     auto resourcePath = want.GetStringParam(RESOURCE_PATH);
     auto abcPath = want.GetStringParam(ABC_PATH);
     auto entryPoint = want.GetStringParam(ENTRY_POINT);

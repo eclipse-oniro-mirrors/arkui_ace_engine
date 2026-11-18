@@ -368,7 +368,6 @@ public:
     {
         return isFalsifyCancel_;
     }
-#ifdef SECURITY_COMPONENT_ENABLE
     void SetDisplayX(double displayX)
     {
         displayX_ = displayX;
@@ -398,7 +397,6 @@ public:
     {
         return secCompHandleEvent_;
     }
-#endif
 
 private:
     bool repeat_ = false;
@@ -415,11 +413,9 @@ private:
     // Will be used in drag.
     int32_t pointerId_ = 0;
     int32_t pointerEventId_ = 0;
-#ifdef SECURITY_COMPONENT_ENABLE
     double displayX_ = 0.0;
     double displayY_ = 0.0;
     std::shared_ptr<JsonValue> secCompHandleEvent_;
-#endif
     std::shared_ptr<MMI::PointerEvent> pointerEvent_;
     std::shared_ptr<MMI::PointerEvent> clickPointerEvent_;
     Point globalPoint_;

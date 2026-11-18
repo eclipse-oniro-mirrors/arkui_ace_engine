@@ -56,7 +56,10 @@ public:
             activeIndicatorColor_ = colors->CompBackgroundEmphasize();
             bottomTabIconOn_ = colors->IconEmphasize();
             bottomTabIconOff_ = colors->IconFourth();
+            bottomTabSymbolOn_ = colors->IconEmphasize();
             bottomTabSymbolOff_ = colors->IconTertiary();
+            iconEmphasize_ = colors->IconEmphasize();
+            fontEmphasize_ = colors->FontEmphasize();
             topTabBarBackgroundColor_ = colors->CompBackgroundSecondary();
         }
     }

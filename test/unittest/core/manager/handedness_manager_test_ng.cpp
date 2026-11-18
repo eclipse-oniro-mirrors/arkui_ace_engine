@@ -20,6 +20,7 @@
 #define private public
 #define protected public
 #include "core/components_ng/manager/handedness/handedness_manager.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/common/event_manager.h"
 
 #include "base/utils/system_properties.h"
@@ -101,7 +102,7 @@ void HandednessManagerTestNg::SetUpTestSuite()
     MockPipelineContext::SetUp();
     auto pipeline = MockPipelineContext::GetCurrent();
     pipeline->window_ = std::make_shared<NiceMock<MockWindow>>();
-    auto pipelineBase = AceType::DynamicCast<PipelineBase>(pipeline);
+    RefPtr<PipelineBase> pipelineBase = pipeline;
     MockContainer::SetUp(pipelineBase);
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     pipeline->SetThemeManager(themeManager);
@@ -327,6 +328,111 @@ HWTEST_F(HandednessManagerTestNg, QueryPopupSideByHoldingHand003, TestSize.Level
     manager->SetOperatingHand(1);
     // posture=0 in test env => CENTER
     EXPECT_EQ(manager->QueryPopupSideByHoldingHand(), PopupSide::CENTER);
+}
+
+// ================ CalcPopupSide ================
+
+/**
+ * @tc.name: CalcPopupSide001
+ * @tc.desc: posture=1 (left holding), operatingHand=0 (unrecognized) => LEFT (fallback to holding hand)
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide001, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(1, 0), PopupSide::LEFT);
+}
+
+/**
+ * @tc.name: CalcPopupSide002
+ * @tc.desc: posture=1 (left holding), operatingHand=1 (left) => LEFT
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide002, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(1, 1), PopupSide::LEFT);
+}
+
+/**
+ * @tc.name: CalcPopupSide003
+ * @tc.desc: posture=1 (left holding), operatingHand=2 (right, crossed) => CENTER
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide003, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(1, 2), PopupSide::CENTER);
+}
+
+/**
+ * @tc.name: CalcPopupSide004
+ * @tc.desc: posture=2 (right holding), operatingHand=0 (unrecognized) => RIGHT (fallback to holding hand)
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide004, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(2, 0), PopupSide::RIGHT);
+}
+
+/**
+ * @tc.name: CalcPopupSide005
+ * @tc.desc: posture=2 (right holding), operatingHand=2 (right) => RIGHT
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide005, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(2, 2), PopupSide::RIGHT);
+}
+
+/**
+ * @tc.name: CalcPopupSide006
+ * @tc.desc: posture=2 (right holding), operatingHand=1 (left, crossed) => CENTER
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide006, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(2, 1), PopupSide::CENTER);
+}
+
+/**
+ * @tc.name: CalcPopupSide007
+ * @tc.desc: posture=3 (both hands holding), operatingHand=1 => LEFT
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide007, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(3, 1), PopupSide::LEFT);
+}
+
+/**
+ * @tc.name: CalcPopupSide008
+ * @tc.desc: posture=3 (both hands holding), operatingHand=2 => RIGHT
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide008, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(3, 2), PopupSide::RIGHT);
+}
+
+/**
+ * @tc.name: CalcPopupSide009
+ * @tc.desc: posture=3 (both hands holding), operatingHand=0 (unrecognized) => CENTER
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide009, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(3, 0), PopupSide::CENTER);
+}
+
+/**
+ * @tc.name: CalcPopupSide010
+ * @tc.desc: posture=0/16/-1 (unknown or invalid) => CENTER
+ * @tc.type: FUNC
+ */
+HWTEST_F(HandednessManagerTestNg, CalcPopupSide010, TestSize.Level1)
+{
+    EXPECT_EQ(HandednessManager::CalcPopupSide(0, 1), PopupSide::CENTER);
+    EXPECT_EQ(HandednessManager::CalcPopupSide(0, 2), PopupSide::CENTER);
+    EXPECT_EQ(HandednessManager::CalcPopupSide(16, 1), PopupSide::CENTER);
+    EXPECT_EQ(HandednessManager::CalcPopupSide(-1, 0), PopupSide::CENTER);
 }
 
 // ================ QueryAnchorPosition (no-arg overload) ================

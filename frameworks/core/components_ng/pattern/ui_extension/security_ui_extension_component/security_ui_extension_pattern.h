@@ -23,6 +23,8 @@
 #include "core/components_ng/pattern/ui_extension/platform_pattern.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_hub.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
 
 namespace OHOS::Ace {
@@ -89,6 +91,7 @@ public:
     void OnExtensionDetachToDisplay();
 
     void OnAttachContext(PipelineContext *context) override;
+    void OnDetachContext(PipelineContext *context) override;
     void AfterMountToParent() override;
     void OnSyncGeometryNode(const DirtySwapConfig& config) override;
     void OnWindowShow() override;
@@ -172,6 +175,22 @@ public:
         return isWindowModeFollowHost_;
     }
 
+    void NotifyBrandColorChangeToUEA(
+        int32_t instanceId, const std::string& brandColorStr);
+    void NotifyBrandColorChange(int32_t instanceId);
+    std::string GetBrandColorStr() const;
+    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    std::string ResolveBrandColor(int32_t themeScopeId) const;
+    void RegisterBrandColorChangeListener();
+    void UnRegisterBrandColorChangeListener();
+    // Called after brand color is successfully sent to UEA (via Want or BusinessData).
+    // Updates both brandColorStr_ (current cache) and lastSentBrandColorStr_ (dedup record).
+    void SetLastSentBrandColorStr(const std::string& brandColorStr)
+    {
+        brandColorStr_ = brandColorStr;
+        lastSentBrandColorStr_ = brandColorStr;
+    }
+
 protected:
     void UpdateSessionInstanceId(int32_t instanceId);
     void Initialize();
@@ -234,6 +253,9 @@ protected:
     std::map<UIContentBusinessCode, BusinessDataUECConsumeReplyCallback> businessDataUECConsumeReplyCallbacks_;
     std::shared_ptr<AccessibilitySAObserverCallback> accessibilitySAObserverCallback_;
 
+    std::string brandColorStr_ = DEFAULT_BRAND_COLOR_STR;
+    std::string lastSentBrandColorStr_;
+    bool isUeaConnecting_ = false;
     ACE_DISALLOW_COPY_AND_MOVE(SecurityUIExtensionPattern);
 };
 } // namespace OHOS::Ace::NG

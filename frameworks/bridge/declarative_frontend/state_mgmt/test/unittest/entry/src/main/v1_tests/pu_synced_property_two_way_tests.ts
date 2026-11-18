@@ -65,10 +65,10 @@ declare class ObservedObject {
   static IsObservedObject(value: any): boolean;
   static GetRawObject(value: any): any;
   static createNew<T>(value: T, owner?: IPropertySubscriber): T;
-  static removeOwningProperty(obj: any, owner: IPropertySubscriber): void;
-  static addOwningProperty(obj: any, owner: IPropertySubscriber): void;
-  static unregisterPropertyReadCb(obj: any): void;
-  static registerPropertyReadCb(obj: any, cb: Function, context: any): void;
+  static removeOwningProperty(obj: any, owner: IPropertySubscriber): boolean;
+  static addOwningProperty(obj: any, owner: IPropertySubscriber): boolean;
+  static unregisterPropertyReadCb(obj: any): boolean;
+  static registerPropertyReadCb(obj: any, cb: Function, context: any): boolean;
 }
 
 declare class SyncedViewRegistry {
@@ -146,7 +146,7 @@ interface IViewPropertiesChangeSubscriber extends IPropertySubscriber {
 declare class TrackedObject {
   static needsPropertyReadCb(value: any): boolean;
   static notifyObjectValueAssignment(oldValue: any, newValue: any,
-    notifyFunc: Function, notifyTrackFunc: Function, context: any): void;
+    notifyFunc: Function, notifyTrackFunc: Function, context: any): boolean;
   static ___TRACKED_PREFIX: string;
 }
 
@@ -201,11 +201,11 @@ declare class ObservedPropertyAbstractPU<T> {
     getUnmonitored(): T;
     set(value: T): void;
     addSubscriber(subscriber: IPropertySubscriber): void;
-    removeSubscriber(subscriber: IPropertySubscriber): void;
+    removeSubscriber(subscriber: IPropertySubscriber, id?: number): void;
     numberOfSubscrbers(): number;
     aboutToBeDeleted(): void;
     debugInfo(): string;
-    setIsFake(isFake: boolean): void;
+    __setIsFake_ObservedPropertyAbstract_Internal(isFake: boolean): void;
 
 }
   

@@ -28,6 +28,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "bridge/declarative_frontend/view_stack_processor.h"
 #include "core/components/common/properties/text_enums.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/date_picker/picker_model.h"
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 #include "core/components_ng/pattern/time_picker/timepicker_model.h"
@@ -50,6 +51,8 @@ const std::vector<DistortionMode> DIALOG_DISTORTION_MODE = { DistortionMode::DIS
     DistortionMode::DISTORTION_ENABLED, DistortionMode::DISTORTION_DISABLED };
 const std::vector<EdgeLightMode> DIALOG_EDGELIGHT_MODE = { EdgeLightMode::EDGELIGHT_AUTO,
     EdgeLightMode::EDGELIGHT_ENABLED, EdgeLightMode::EDGELIGHT_DISABLED };
+const std::vector<HandednessFollowMode> DIALOG_HANDEDNESS_FOLLOW_MODE = { HandednessFollowMode::NONE,
+    HandednessFollowMode::FOLLOW_ANCHOR, HandednessFollowMode::FOLLOW_GRIP_HAND };
 
 PickerTime ParseTime(
     const EcmaVM* vm, const Local<JSValueRef>& timeVal, PickerTime defaultTime, bool startEndCheckValue)
@@ -584,6 +587,15 @@ void ParseTimePickerDialogMaterial(
         auto edgeLightMode = edgeLightModeValue->ToNumber(vm)->Int32Value(vm);
         if (edgeLightMode >= 0 && edgeLightMode < static_cast<int32_t>(DIALOG_EDGELIGHT_MODE.size())) {
             pickerDialog.edgeLightMode = DIALOG_EDGELIGHT_MODE[edgeLightMode];
+        }
+    }
+
+    auto adaptToHandednessValue = ArkTSUtils::GetProperty(vm, paramObject, "adaptToHandedness");
+    if (adaptToHandednessValue->IsNumber()) {
+        auto adaptToHandedness = adaptToHandednessValue->ToNumber(vm)->Int32Value(vm);
+        if (adaptToHandedness >= 0 &&
+            adaptToHandedness < static_cast<int32_t>(DIALOG_HANDEDNESS_FOLLOW_MODE.size())) {
+            pickerDialog.adaptToHandedness = DIALOG_HANDEDNESS_FOLLOW_MODE[adaptToHandedness];
         }
     }
 }

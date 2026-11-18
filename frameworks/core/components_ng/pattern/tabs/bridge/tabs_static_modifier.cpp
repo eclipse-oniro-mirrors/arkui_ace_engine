@@ -80,6 +80,16 @@ RefPtr<ResourceObject> GetResourceObjectFromOptResourceColor(const Opt_ResourceC
     return GetResourceObject(opt.value.value3);
 }
 
+// Extract ResourceObject from Ark_ResourceStr (union of String + Resource).
+// selector 0 = string literal, selector 1 = Ark_Resource.
+RefPtr<ResourceObject> GetResourceObjectFromResourceStr(const Ark_ResourceStr& resStr)
+{
+    if (resStr.selector != SELECTOR_ID_1) {
+        return nullptr;
+    }
+    return GetResourceObject(resStr.value1);
+}
+
 std::optional<int32_t> ProcessBindableIndex(FrameNode* frameNode, const Opt_Union_I32_Bindable_I32& value)
 {
     std::optional<int32_t> result;
@@ -100,6 +110,67 @@ std::optional<int32_t> ProcessBindableIndex(FrameNode* frameNode, const Opt_Unio
         },
         [] {});
     return result;
+}
+
+void ParseVisibilityMap(const Ark_TabViewCustomization& arkCust, TabViewCustomization& customization)
+{
+    auto visMapOpt = Converter::GetOptPtr(&arkCust.visibilityMap);
+    if (!visMapOpt) {
+        return;
+    }
+    for (Ark_Int32 i = 0; i < visMapOpt->size; ++i) {
+        if (visMapOpt->keys[i] < 0) {
+            continue;
+        }
+        auto vis = visMapOpt->values[i];
+        if (vis >= ARK_TAB_VISIBILITY_VISIBLE && vis <= ARK_TAB_VISIBILITY_HIDDEN) {
+            customization.visibilityMap[visMapOpt->keys[i]] = static_cast<TabVisibility>(vis);
+        }
+    }
+}
+
+void ParseSectionMap(const Ark_TabViewCustomization& arkCust, TabViewCustomization& customization)
+{
+    auto secMapOpt = Converter::GetOptPtr(&arkCust.sectionMap);
+    if (!secMapOpt) {
+        return;
+    }
+    for (Ark_Int32 i = 0; i < secMapOpt->size; ++i) {
+        if (secMapOpt->keys[i] < 0) {
+            continue;
+        }
+        const auto& arkSec = secMapOpt->values[i];
+        SidebarSection section;
+        section.title = Converter::OptConvert<std::string>(arkSec.title).value_or("");
+        section.resourceTitleObject = GetResourceObjectFromResourceStr(arkSec.title);
+        auto orderOpt = Converter::GetOptPtr(&arkSec.order);
+        if (orderOpt && orderOpt.value() >= 0) {
+            section.order = orderOpt.value();
+        }
+        auto titleStyleOpt = Converter::GetOptPtr(&arkSec.titleStyle);
+        if (titleStyleOpt) {
+            auto styleVal = static_cast<Ark_SidebarSectionTitleStyle>(titleStyleOpt.value());
+            if (styleVal >= ARK_SIDEBAR_SECTION_TITLE_STYLE_STANDARD &&
+                styleVal <= ARK_SIDEBAR_SECTION_TITLE_STYLE_EMPHASIZED) {
+                section.titleStyle = static_cast<SidebarSectionTitleStyle>(styleVal);
+            }
+        }
+        customization.sectionMap[secMapOpt->keys[i]] = std::move(section);
+    }
+}
+
+void ParseOrderMap(const Ark_TabViewCustomization& arkCust, TabViewCustomization& customization)
+{
+    auto orderMapOpt = Converter::GetOptPtr(&arkCust.orderMap);
+    if (!orderMapOpt) {
+        return;
+    }
+    for (Ark_Int32 i = 0; i < orderMapOpt->size; ++i) {
+        if (orderMapOpt->keys[i] < 0 || orderMapOpt->values[i] < 0) {
+            continue;
+        }
+        customization.orderMap[orderMapOpt->keys[i]] = orderMapOpt->values[i];
+    }
 }
 } // namespace
 }
@@ -639,6 +710,17 @@ void SetBarOverlapImpl(Ark_NativePointer node,
         return;
     }
     TabsModelStatic::SetBarOverlap(frameNode, *convValue);
+}
+void SetBarOverlap1Impl(Ark_NativePointer node,
+                        const Opt_BarOverlapMode* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelStatic::SetBarOverlapMode(frameNode, BarOverlapMode::STANDARD);
+        return;
+    }
+    TabsModelStatic::SetBarOverlapMode(frameNode, static_cast<BarOverlapMode>(value->value));
 }
 void SetBarBackgroundColorImpl(Ark_NativePointer node,
                                const Opt_ResourceColor* value)
@@ -1254,6 +1336,36 @@ void SetSidebarBottomBarImpl(Ark_NativePointer node,
         TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
     }
 }
+void SetShowSideBarControlButtonImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    if (!convValue) {
+        TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+        return;
+    }
+    TabsModelNG::SetShowSidebarControlButton(frameNode, *convValue);
+}
+
+void SetTabViewCustomizationImpl(Ark_NativePointer node,
+                                 const Opt_TabViewCustomization* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        TabsModelNG::ResetTabViewCustomization(frameNode);
+        return;
+    }
+    const auto& arkCust = optValue.value();
+    TabViewCustomization customization;
+    ParseVisibilityMap(arkCust, customization);
+    ParseSectionMap(arkCust, customization);
+    ParseOrderMap(arkCust, customization);
+    TabsModelNG::SetTabViewCustomization(frameNode, customization);
+}
 } // TabsAttributeModifier
 const GENERATED_ArkUITabsModifier* GetTabsModifier()
 {
@@ -1280,6 +1392,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetDividerImpl,
         TabsAttributeModifier::SetNestedScrollImpl,
         TabsAttributeModifier::SetBarOverlapImpl,
+        TabsAttributeModifier::SetBarOverlap1Impl,
         TabsAttributeModifier::SetBarBackgroundColorImpl,
         TabsAttributeModifier::SetBarGridAlignImpl,
         TabsAttributeModifier::SetCustomContentTransitionImpl,
@@ -1311,6 +1424,8 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarDisplayStyleImpl,
         TabsAttributeModifier::SetSidebarFooterImpl,
         TabsAttributeModifier::SetSidebarBottomBarImpl,
+        TabsAttributeModifier::SetShowSideBarControlButtonImpl,
+        TabsAttributeModifier::SetTabViewCustomizationImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,
         TabsAttributeModifier::SetBarBackgroundBlurStyle1Impl,

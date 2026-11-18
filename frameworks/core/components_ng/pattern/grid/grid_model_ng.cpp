@@ -1159,6 +1159,21 @@ void GridModelNG::SetSyncLoad(FrameNode* frameNode, bool syncLoad)
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(GridLayoutProperty, SyncLoad, syncLoad, frameNode);
 }
 
+void GridModelNG::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetScrollPlaceholder(frameNode, std::move(provider));
+}
+
+void GridModelNG::SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<GridPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetScrollPlaceholder(std::move(provider));
+}
+
 bool GridModelNG::GetSyncLoad(FrameNode* frameNode)
 {
     bool result = true;

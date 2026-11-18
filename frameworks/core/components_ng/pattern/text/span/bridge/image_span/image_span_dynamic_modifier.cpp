@@ -115,6 +115,8 @@ void SetImageSpanTextBackgroundStyle(ArkUINodeHandle node, void* option)
     font.backgroundColor = parseOption->color;
     font.backgroundRadius = borderRadius;
     font.backgroundRadius->multiValued = true;
+    font.borderWidth = parseOption->borderWidth;
+    font.borderColor = parseOption->borderColor;
     ImageSpanView::SetPlaceHolderStyle(frameNode, font);
 }
 
@@ -131,6 +133,8 @@ void ResetImageSpanTextBackgroundStyle(ArkUINodeHandle node)
     font.backgroundColor = Color(0x00000000);
     font.backgroundRadius = borderRadius;
     font.backgroundRadius->multiValued = true;
+    font.borderWidth = Dimension(0, OHOS::Ace::DimensionUnit::VP);
+    font.borderColor = Color(0x00000000);
     ImageSpanView::SetPlaceHolderStyle(frameNode, font);
 }
 
@@ -144,6 +148,8 @@ void GetImageSpanTextBackgroundStyle(ArkUINodeHandle node, ArkUITextBackgroundSt
     options->topRight = styleOptions.backgroundRadius->radiusTopRight->Value();
     options->bottomLeft = styleOptions.backgroundRadius->radiusBottomLeft->Value();
     options->bottomRight = styleOptions.backgroundRadius->radiusBottomRight->Value();
+    options->borderWidth = styleOptions.borderWidth.value_or(Dimension(0, DimensionUnit::VP)).Value();
+    options->borderColor = styleOptions.borderColor.value_or(Color(0x00000000)).GetValue();
 }
 
 void SetImageSpanBaselineOffset(

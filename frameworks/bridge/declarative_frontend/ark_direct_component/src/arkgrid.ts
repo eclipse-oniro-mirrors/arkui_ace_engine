@@ -620,6 +620,20 @@ function loadComponent(): ComponentObj | undefined {
         }
       }
     }
+    class GridScrollPlaceholderModifier extends ModifierWithKey<PlaceholderProvider | undefined> {
+      constructor(value: PlaceholderProvider | undefined) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('gridScrollPlaceholder');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().grid.resetScrollPlaceholder(node);
+        }
+        else {
+          getUINativeModule().grid.setScrollPlaceholder(node, this.value);
+        }
+      }
+    }
     class GridEditModeOptionsModifier extends ModifierWithKey<EditModeOptions | undefined> {
       constructor(options: EditModeOptions | undefined) {
         super(options);
@@ -843,6 +857,11 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, GridSyncLoadModifier.identity, GridSyncLoadModifier, value);
         return this;
       }
+      scrollPlaceholder(provider: PlaceholderProvider | undefined): this {
+        modifierWithKey(this._modifiersWithKeys, GridScrollPlaceholderModifier.identity,
+          GridScrollPlaceholderModifier, provider);
+        return this;
+      }
       editModeOptions(options: EditModeOptions | undefined): this {
         modifierWithKey(
             this._modifiersWithKeys, GridEditModeOptionsModifier.identity, GridEditModeOptionsModifier, options);
@@ -995,6 +1014,9 @@ class JSGrid extends JSContainerBase {
   }
   static syncLoad(value: any): void {
     getUINativeModule().grid.setSyncLoad(true, value);
+  }
+  static scrollPlaceholder(provider: any): void {
+    getUINativeModule().grid.setScrollPlaceholder(true, provider);
   }
   static supportEmptyBranchInLazyLoading(value: any): void {
     getUINativeModule().grid.setSupportLazyLoadingEmptyBranch(true, value);

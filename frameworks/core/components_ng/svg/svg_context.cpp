@@ -100,6 +100,7 @@ void SvgContext::OnAnimationFinished()
         auto animator = it->second.Upgrade();
         if (!animator) {
             TAG_LOGW(AceLogTag::ACE_IMAGE, "null animator in map");
+            it = animators_.erase(it);
             continue;
         }
         ++it;

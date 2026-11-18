@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_GAUGE_GAUGE_PAINT_PROPERTY_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_GAUGE_GAUGE_PAINT_PROPERTY_H
 
+#include "base/i18n/localization.h"
 #include "core/common/container.h"
 #include "core/common/resource/resource_object.h"
 #include "core/components/common/layout/constants.h"
@@ -130,8 +131,17 @@ public:
             return;
         }
         json->PutExtAttr("value", StringUtils::DoubleToString(propValue_.value_or(0)).c_str(), filter);
-        json->PutExtAttr("max", StringUtils::DoubleToString(propMax_.value_or(100)).c_str(), filter);
+        json->PutExtAttr("max", StringUtils::DoubleToString(propMax_.value_or(DEFAULT_MAX_VALUE)).c_str(), filter);
         json->PutExtAttr("min", StringUtils::DoubleToString(propMin_.value_or(0)).c_str(), filter);
+        bool isNonZh = Localization::GetInstance()->GetLanguage() != "zh";
+        auto maxValue = static_cast<int32_t>(std::round(propMax_.value_or(DEFAULT_MAX_VALUE)));
+        json->PutExtAttr("localizedMax",
+            (isNonZh ? Localization::GetInstance()->NumberFormat(maxValue) : std::to_string(maxValue)).c_str(),
+            filter);
+        auto minValue = static_cast<int32_t>(std::round(propMin_.value_or(0)));
+        json->PutExtAttr("localizedMin",
+            (isNonZh ? Localization::GetInstance()->NumberFormat(minValue) : std::to_string(minValue)).c_str(),
+            filter);
         json->PutExtAttr("startAngle", StringUtils::DoubleToString(propStartAngle_.value_or(0)).c_str(), filter);
         json->PutExtAttr("endAngle", StringUtils::DoubleToString(propEndAngle_.value_or(360)).c_str(), filter);
         json->PutExtAttr("isSensitive", std::to_string(GetIsSensitive().value_or(false)).c_str(), filter);

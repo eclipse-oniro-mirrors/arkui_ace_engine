@@ -68,15 +68,15 @@ void FormRenderer::PreInitUIContent(const OHOS::AAFwk::Want& want, const OHOS::A
     uiContent_->SetFormHeight(uiHeight > 0.0f ? uiHeight : 0.0f);
     lastBorderWidth_ = borderWidth_;
     uiContent_->SetFontScaleFollowSystem(fontScaleFollowSystem_);
-    uiContent_->SetFormImageCacheThreshold(formJsInfo.isSupportMoreImages ?
-        FORM_MULTI_IMAGE_CACHE_THRESHOLD : DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
-    uiContent_->UpdateFormSharedImage(formJsInfo.imageDataMap);
-    uiContent_->UpdateFormData(formJsInfo.formData);
     auto connectToRender = want.GetRemoteObject(CONNECT_TO_RENDER);
     if (!connectToRender) {
         HILOG_ERROR("FormRenderer::PreInitUIContent connectToRender is null");
     }
     uiContent_->PreInitializeForm(nullptr, formJsInfo.formSrc, nullptr, connectToRender);
+    uiContent_->SetFormImageCacheThreshold(formJsInfo.isSupportMoreImages ?
+        FORM_MULTI_IMAGE_CACHE_THRESHOLD : DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
+    uiContent_->UpdateFormSharedImage(formJsInfo.imageDataMap);
+    uiContent_->UpdateFormData(formJsInfo.formData);
     backgroundColor_ = want.GetStringParam(OHOS::AppExecFwk::Constants::PARAM_FORM_TRANSPARENCY_KEY);
     if (!backgroundColor_.empty()) {
         uiContent_->SetFormBackgroundColor(backgroundColor_);

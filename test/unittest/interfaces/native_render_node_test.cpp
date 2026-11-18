@@ -35,6 +35,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "frameworks/base/error/error_code.h"
 #include "frameworks/core/components_ng/base/frame_node.h"
+#include "frameworks/core/components_ng/base/frame_node_adopted_compensation.h"
 #include "frameworks/core/components_ng/base/mixed_mount_registry.h"
 
 using namespace testing;
@@ -1756,14 +1757,14 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest012, TestSize.Level1)
     ASSERT_NE(parentFrameNode, nullptr);
     ASSERT_NE(childFrameNode, nullptr);
     EXPECT_TRUE(childFrameNode->IsAdopted());
-    EXPECT_TRUE(childFrameNode->UseAdoptedCompensation());
+    EXPECT_TRUE(NG::FrameNodeAdoptedCompensation::UseAdoptedCompensation(childFrameNode));
     EXPECT_EQ(childFrameNode->GetAdoptParent().GetRawPtr(), parentFrameNode);
     EXPECT_EQ(childFrameNode->GetCoordinateAncestorNodeOfFrame().GetRawPtr(), parentFrameNode);
     EXPECT_EQ(parentFrameNode->GetCoordinateAncestorNodeOfFrame().GetRawPtr(), rootFrameNode);
 
     ASSERT_EQ(OH_ArkUI_NativeModule_RemoveAdoptedChild(parentNode, childNode), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_FALSE(childFrameNode->IsAdopted());
-    EXPECT_FALSE(childFrameNode->UseAdoptedCompensation());
+    EXPECT_FALSE(NG::FrameNodeAdoptedCompensation::UseAdoptedCompensation(childFrameNode));
     EXPECT_EQ(childFrameNode->GetAdoptParent(), nullptr);
     ASSERT_EQ(OH_ArkUI_NativeModule_RemoveAdoptedChild(rootNode, parentNode), ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -1807,7 +1808,7 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest013, TestSize.Level1)
     auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
     ASSERT_NE(childFrameNode, nullptr);
     EXPECT_FALSE(childFrameNode->IsAdopted());
-    EXPECT_FALSE(childFrameNode->UseAdoptedCompensation());
+    EXPECT_FALSE(NG::FrameNodeAdoptedCompensation::UseAdoptedCompensation(childFrameNode));
 }
 
 /**
@@ -1847,7 +1848,7 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest014, TestSize.Level1)
         ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
     auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
     ASSERT_NE(childFrameNode, nullptr);
-    EXPECT_FALSE(childFrameNode->UseAdoptedCompensation());
+    EXPECT_FALSE(NG::FrameNodeAdoptedCompensation::UseAdoptedCompensation(childFrameNode));
     OH_ArkUI_Matrix4_Dispose(matrix);
 }
 
@@ -1877,7 +1878,7 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest015, TestSize.Level1)
         scaleX, 0.0f, 0.0f, 0.0f,
         0.0f, scaleY, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f,
+        offsetX, offsetY, 0.0f, 1.0f,
     };
     auto matrix = OH_ArkUI_Matrix4_CreateByElements(elements);
     ASSERT_NE(matrix, nullptr);
@@ -1887,14 +1888,17 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest015, TestSize.Level1)
 
     auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
     ASSERT_NE(childFrameNode, nullptr);
-    EXPECT_EQ(childFrameNode->GetAdoptedCompensationOffset(), NG::OffsetF(offsetX, offsetY));
-    EXPECT_FLOAT_EQ(childFrameNode->GetAdoptedCompensationScale().x, scaleX);
-    EXPECT_FLOAT_EQ(childFrameNode->GetAdoptedCompensationScale().y, scaleY);
+    EXPECT_EQ(NG::FrameNodeAdoptedCompensation::GetAdoptedCompensationOffset(childFrameNode),
+        NG::OffsetF(offsetX, offsetY));
+    EXPECT_FLOAT_EQ(
+        NG::FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(childFrameNode).x, scaleX);
+    EXPECT_FLOAT_EQ(
+        NG::FrameNodeAdoptedCompensation::GetAdoptedCompensationScale(childFrameNode).y, scaleY);
     NG::PointF point(1.0f, 2.0f);
-    childFrameNode->ApplyAdoptedCompensationToPoint(point);
-    EXPECT_FLOAT_EQ(point.GetX(), 22.0f);
-    EXPECT_FLOAT_EQ(point.GetY(), 66.0f);
-    childFrameNode->RevertAdoptedCompensationFromPoint(point);
+    NG::FrameNodeAdoptedCompensation::ApplyAdoptedCompensationToPoint(childFrameNode, point);
+    EXPECT_FLOAT_EQ(point.GetX(), 12.0f);
+    EXPECT_FLOAT_EQ(point.GetY(), 26.0f);
+    NG::FrameNodeAdoptedCompensation::RevertAdoptedCompensationFromPoint(childFrameNode, point);
     EXPECT_FLOAT_EQ(point.GetX(), 1.0f);
     EXPECT_FLOAT_EQ(point.GetY(), 2.0f);
     OH_ArkUI_Matrix4_Dispose(matrix);

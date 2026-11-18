@@ -15,12 +15,14 @@
 #ifndef FOUNDATION_ACE_ADAPTER_OHOS_ENTRANCE_UI_SESSION_MANAGER_OHOS_H
 #define FOUNDATION_ACE_ADAPTER_OHOS_ENTRANCE_UI_SESSION_MANAGER_OHOS_H
 
+#include "interfaces/inner_api/ui_session/ui_content_errors.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 #include <atomic>
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <shared_mutex>
 #include <string>
@@ -36,6 +38,13 @@
 namespace OHOS::Ace {
 class UiSessionManagerOhos : public UiSessionManager {
 public:
+    ACE_FORCE_EXPORT std::vector<std::string> GetSplitPageSceneRulesForDetection(int32_t processId);
+    ACE_FORCE_EXPORT bool IsSplitPageSceneQueryCurrent(int32_t processId, const std::string& generation);
+    ACE_FORCE_EXPORT bool HasPendingSplitPageSceneQuery(int32_t processId);
+    ACE_FORCE_EXPORT void CancelSplitPageSceneQuery(int32_t processId, const std::string& generation);
+    // Query generations identify the request being completed, independent of registered rules.
+    ACE_FORCE_EXPORT void ReportSplitPageSceneQueryResult(
+        int32_t processId, const std::string& sceneJson, const std::string& generation);
     void ReportClickEvent(const std::string& data) override;
     void ReportSearchEvent(const std::string& data) override;
     void ReportTextChangeEvent(const std::string& data) override;
@@ -83,8 +92,10 @@ public:
     void SaveForSendCommandFunction(NotifySendCommandFunction&& function) override;
     void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) override;
     void NotifyAllWebPattern(bool isRegister) override;
-    void NotifySendCommandPattern(int32_t id, const std::string& command) override;
-    int32_t NotifySendCommandSyncPattern(int32_t id, const std::string& command) override;
+    void NotifySendCommandPattern(
+        int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth) override;
+    int32_t NotifySendCommandSyncPattern(
+        int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth) override;
     void SaveRegisterForWebFunction(NotifyAllWebFunction&& function) override;
     void SaveGetHitTestInfoCallback(GetHitTestInfoFunction&& function) override;
     void GetLatestHitTestNodeInfosForTouch(InteractionParamConfig config) override;
@@ -135,7 +146,7 @@ public:
     void SendArkWebImagesById(int32_t windowId, const std::map<int32_t, std::map<int32_t,
         std::shared_ptr<Media::PixelMap>>>& webImages, MultiImageQueryErrorCode arkWebErrorCode) override;
     void GetVisibleInspectorTree(ParamConfig config = ParamConfig()) override;
-    void SendCommand(const std::string& command) override;
+    void SendCommand(const std::string& command, const SecurityAuthInfo& securityAuth) override;
     void SaveSendCommandFunction(SendCommandFunction&& function) override;
     void SaveRelaxedCommandFunction(RelaxedCommandFunction&& function) override;
     void RegisterPipeLineExeAppAIFunction(ExeAppAIFunctionFunction&& callback) override;
@@ -160,6 +171,7 @@ public:
     int32_t UnregisterPageSceneRules(int32_t processId, const std::string& ruleSetId) override;
     int32_t GetPageScene(int32_t processId, const std::string& ruleJsonOrRuleSetId) override;
     bool GetPageSceneRulesRegistered() override;
+    std::vector<std::pair<int32_t, std::string>> GetActivePageSceneRuleJsons() override;
     void ReportPageSceneEvent(int32_t processId, const std::string& sceneJson, bool isGetResult) override;
     void CompleteGetPageScene(int32_t processId) override;
     void NotifyPageSceneNodeChanged(const std::string& nodeTag, bool isAttach) override;
@@ -170,6 +182,7 @@ public:
     void FlushPendingSearchClicksIfStable() override;
     void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) override;
     void SaveWebPageSceneFunction(WebPageSceneFunction&& function) override;
+    void SavePageSceneResponseObserverFunction(PageSceneResponseObserverFunction&& function) override;
     bool IsWebSourceEnabled(const std::string& ruleJson);
     void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) override;
     void ComponentTreeQuery(const ComponentTreeQueryRequest& request) override;
@@ -181,10 +194,19 @@ public:
     // UI-thread validation of an internal detection request; does not change IPC.
     ACE_FORCE_EXPORT bool IsSearchPageSceneRuleCurrent(
         int32_t processId, const std::string& ruleSetId, const std::string& generation) override;
+    void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) override;
+    void NotifySendCommandPatternWithResult(int32_t id, const std::string& command,
+        const CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth) override;
+    void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
+    void SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
+    void SendCommandWithResult(const std::string& command, const CommandResultCallback& finishCallback,
+        const SecurityAuthInfo& securityAuth) override;
+    CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) override;
 
 private:
-    bool PostToCurrentTranslateManager(const char* caller,
-        std::function<void(const std::shared_ptr<UiTranslateManager>&)>&& task);
+    bool HasSplitPageSceneRuleSet(int32_t processId, const std::string& ruleSetId);
+    bool PostToCurrentTranslateManager(
+        const char* caller, std::function<void(const std::shared_ptr<UiTranslateManager>&)>&& task);
     void GetArkUIPageTranslateFunctions(PageTranslateTextFunction& getTextFunction,
         PageTranslateTextFunction& startFunction, PageTranslateEndFunction& endFunction,
         PageTranslateResetFunction& resetFunction, PageTranslateResultFunction& resultFunction);
@@ -208,8 +230,45 @@ private:
         bool arkuiEnabled = true;
         bool webEnabled = false;
         bool includeUnfocusableTextInput = false;
+        // A rule declared for the RESPONSE scene failed schema validation: an empty or invalid
+        // ruleId, or a rule without a page/customControls condition. The whole ruleSet must be
+        // rejected with PARAM_INVALID instead of being silently dropped (AC-1.12).
+        bool invalidResponseRule = false;
         std::vector<PageSceneRuleInfo> rules;
     };
+
+    struct SplitPageSceneRuleSetInfo {
+        std::string ruleSetId;
+        std::string ruleJson;
+    };
+    struct SplitPageSceneRegistration {
+        int32_t ownerPid;
+        SplitPageSceneRuleSetInfo ruleSet;
+    };
+    // One request transaction; each parser populates only its own scene entry.
+    struct PageSceneRegistrationPlan {
+        std::optional<PageSceneRuleSetInfo> legacyRules;
+        SplitPageSceneRuleSetInfo splitRules;
+    };
+    int32_t RegisterSplitPageSceneRules(int32_t processId, const std::string& ruleJson);
+    void PrepareConnectedRegistration(const std::string& json, PageSceneRegistrationPlan& plan) const;
+    void PrepareLegacyRegistration(const std::string& json, PageSceneRegistrationPlan& plan) const;
+    // SPLIT registration helpers suffixed Locked require the caller to hold pageSceneMutex_.
+    bool ConflictsWithSplitRegistrationLocked(int32_t pid, const std::string& id) const;
+    void StampPageSceneRegistrationLocked(PageSceneRegistrationPlan& plan);
+    bool OwnsSplitPageSceneRegistrationLocked(int32_t processId) const;
+    // Caller must hold pageSceneMutex_ while using the pointer; reset/replacement invalidates it.
+    const SplitPageSceneRuleSetInfo* FindOwnedSplitRuleSetLocked(int32_t processId) const;
+    int32_t UnregisterSplitPageSceneRules(int32_t processId, const std::string& ruleSetId);
+    int32_t CompletePageSceneRegistration(int32_t processId, const PageSceneRegistrationPlan& plan);
+    bool RemoveSplitRuleSetLocked(int32_t processId, const std::string& id);
+    bool HasProcessPageSceneRulesLocked(int32_t processId) const;
+    // The application process has one SPLIT registration, independent of Web rules.
+    // All accesses are protected by pageSceneMutex_; Locked helpers do not acquire the lock themselves.
+    std::optional<SplitPageSceneRegistration> splitPageSceneRegistration_;
+    std::set<int32_t> pendingSplitPageSceneProcesses_;
+    // Distinguishes report state for each registration; queued tasks resolve the current registration.
+    int64_t nextSplitRegistrationId_ = 0;
 
     // Search scene (UISession PageScene 搜索功能识别): per-process dual ruleSet.
     struct SearchPageSceneRuleSetInfo {
@@ -219,7 +278,6 @@ private:
     };
 
     PageSceneRuleSetInfo ExtractPageSceneRuleSetInfo(const std::string& ruleJson) const;
-    std::string ExtractPageSceneRuleSetId(const std::string& ruleJson) const;
     bool IsSearchPageSceneRuleJson(const std::string& ruleJson) const;
     std::string ExtractSearchPageSceneRuleSetId(const std::string& ruleJson) const;
     int32_t RegisterSearchPageSceneRules(int32_t processId, const std::string& ruleJson);
@@ -242,12 +300,36 @@ private:
     bool IsPageSceneRuleAffectedByNodeStateChange(
         const PageSceneRuleSetInfo& ruleSetInfo, const PageSceneRuleInfo& rule,
         PageSceneNodeStateChange stateChange) const;
+    bool CanRegisterSplitRuleSetLocked(int32_t processId, const std::string& ruleSetId) const;
+    // Caller must hold pageSceneMutex_; these pending-state cleanup helpers do not acquire it.
     void ErasePendingPageSceneRulesLocked(int32_t processId);
     void ErasePendingLegacyPageSceneRulesLocked(int32_t processId);
     void ErasePendingSearchPageSceneRulesLocked(int32_t processId, const std::string& ruleSetId);
     void TriggerPageSceneDetect(int32_t processId, const std::string& ruleJson, bool isGetResult);
-    int32_t ExtractRuleJsonAndWebEnabled(int32_t processId,
-        const std::string& ruleJsonOrRuleSetId, std::string& ruleJson, bool& webEnabled);
+    int32_t ExtractRuleJsonAndWebEnabled(int32_t processId, const std::string& ruleJsonOrRuleSetId,
+        std::string& ruleJson, bool& webEnabled, std::string* splitRuleJson = nullptr);
+    int32_t RegisterResponsePageSceneRules(int32_t processId, const std::string& ruleJson);
+    int32_t RegisterLegacyPageSceneRules(
+        int32_t processId, const PageSceneRuleSetInfo& ruleSetInfo, const std::string& ruleJson);
+    void UnregisterLegacyPageSceneRules(int32_t processId, const std::string& ruleSetId, bool hasSearchRules);
+    struct PageSceneQueryPlan {
+        std::string legacyJson;
+        std::string splitJson;
+        bool webEnabled = false;
+    };
+    bool ExtractRegisteredTextQueryLocked(
+        int32_t processId, const std::string& id, std::string& json, bool& webEnabled);
+    void SetTextQueryRule(const PageSceneRuleSetInfo& rules, std::string& json, bool& webEnabled);
+    void PrepareSplitQueryLocked(int32_t processId, PageSceneQueryPlan& plan);
+    bool TryExtractSplitQueryLocked(int32_t processId, const std::string& ruleJsonOrRuleSetId,
+        std::string& ruleJson, bool& webEnabled, std::string& splitRuleJson);
+    int32_t ResolveLegacyRuleLocked(
+        int32_t processId, const std::string& ruleJsonOrRuleSetId, std::string& ruleJson, bool& webEnabled);
+    void CompleteLegacyPageSceneQueryLocked(int32_t processId);
+
+    // Caller must hold pageSceneMutex_ for these registration helpers.
+    void RefreshPageSceneRegistrationLocked();
+    std::string FindRegisteredSplitQueryLocked(int32_t pid, const std::string& id) const;
 
     int32_t pageTranslateScope_ = 0;
     int32_t pageTranslateOwnerPid_ = -1;
@@ -259,9 +341,17 @@ private:
     std::unordered_map<int32_t, PageSceneRuleSetInfo> pageSceneRuleSets_;
     std::unordered_map<int32_t, std::unordered_map<std::string, SearchPageSceneRuleSetInfo>> searchPageSceneRuleSets_;
     uint64_t nextSearchRuleGeneration_ = 0;
-    std::set<int32_t> pendingPageSceneGets_;
+    struct PageSceneQueryState {
+        bool legacyPending = false;
+        std::string splitGeneration;
+    };
+    // One entry blocks all query types until both branches finish.
+    std::map<int32_t, PageSceneQueryState> pageSceneQueries_;
+    int64_t nextSplitQueryGeneration_ = 0;
     std::set<std::pair<int32_t, std::string>> pendingPageSceneDetectRules_;
     std::set<std::pair<int32_t, std::string>> pendingSearchPageSceneDetectRules_;
+    SendCommandWithResultFunction relaxedCommandWithResultFunction_;
+    PageSceneResponseObserverFunction responseObserverFunction_;
 };
 
 } // namespace OHOS::Ace

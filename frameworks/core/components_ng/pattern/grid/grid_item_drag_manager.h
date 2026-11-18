@@ -138,8 +138,9 @@ private:
      * @brief Driven by the host Grid on every real scroll frame while an item floats or
      * is dragged, with the scroll source. Interrupts a float (long press without any
      * drag update) as soon as another finger scrolls the container, and arms the edge
-     * auto-scroll suppression for the rest of that drag; a real drag is never
-     * interrupted, so one finger can drag while another scrolls.
+     * auto-scroll suppression plus the coexistence session flag for the rest of that
+     * drag; a real drag is never interrupted, so one finger can drag while another
+     * scrolls.
      * @param source The scroll source of this frame, see ScrollablePattern.
      */
     void HandleContainerScroll(int32_t source);
@@ -333,6 +334,42 @@ private:
     int32_t FindSwapTarget(int32_t currentIndex, const OffsetF& delta);
 
     /**
+     * @brief Fallback swap target for a dragged item whose index the container scroll left
+     * behind the laid out range, so the matrix based FindSwapTarget can no longer score
+     * candidates for it. Picks the item that currently occupies the cell the dragged item
+     * is visually held over. Restricted to the one finger dragging plus one finger
+     * scrolling coexistence session, to LTR and to items spanning a single cell.
+     * @param currentIndex The ForEach-local index of the dragged item.
+     * @param info The current GridLayoutInfo.
+     * @return The ForEach-local index to swap with, or currentIndex when not recoverable.
+     */
+    int32_t FindVisualSwapTarget(int32_t currentIndex, const GridLayoutInfo& info) const;
+
+    /**
+     * @brief Finds the laid out row whose main axis span contains the given position,
+     * falling back to the nearest row when the position sits in a gap or outside.
+     * @param dragMainCenter Main axis position of the dragged item center, viewport space.
+     * @param mainGap The gap between rows.
+     * @param info The current GridLayoutInfo.
+     * @return The row index, or -1 when nothing is laid out.
+     */
+    int32_t FindVisualRow(float dragMainCenter, float mainGap, const GridLayoutInfo& info) const;
+
+    /**
+     * @brief Finds the column whose cross axis span contains the given position, falling
+     * back to the nearest column when the position sits in a gap or outside.
+     * @param grid The host Grid FrameNode.
+     * @param layoutProperty The Grid layout property.
+     * @param dragCrossCenter Cross axis position of the dragged item center.
+     * @param crossGap The gap between columns.
+     * @param info The current GridLayoutInfo.
+     * @return The column index, or -1 when it cannot be resolved.
+     */
+    int32_t FindVisualCol(const RefPtr<FrameNode>& grid,
+        const RefPtr<GridLayoutProperty>& layoutProperty, float dragCrossCenter,
+        float crossGap, const GridLayoutInfo& info) const;
+
+    /**
      * @brief Gets the main axis size of the item at the given index.
      * Falls back to row height if the item node is not rendered, or DEFAULT_ITEM_SIZE.
      * @param currentIndex The ForEach-local index of the item.
@@ -512,6 +549,12 @@ private:
      * Re-evaluates nearby scaling and swap targets as the grid scrolls.
      */
     void HandleScrollCallback();
+
+    /**
+     * @brief Re-evaluates nearby scaling and swap targets when the container is
+     * scrolled by a finger while the drag pointer (e.g. mouse) is idle.
+     */
+    void TriggerSwapOnContainerScroll();
 
     /**
      * @brief Checks whether the dragged item is within the auto-scroll hot zone.
@@ -804,6 +847,12 @@ private:
     // cleared again as soon as that finger leaves the container. Only then is the drag
     // edge auto-scroll suppressed, a second finger merely resting on the Grid is not.
     bool suppressAutoScroll_ = false;
+    // Armed by HandleContainerScroll() when a second finger really scrolled the Grid
+    // during this drag, kept until the session ends. It is the gate of the visual
+    // fallback in FindVisualSwapTarget(), so that fallback stays scoped to the one
+    // finger dragging plus one finger scrolling coexistence case and never kicks in for
+    // a lone dragging finger, a wheel/crown scroll or a programmatic scroll.
+    bool coexistScrollDriven_ = false;
     bool autoScrollForward_ = false; // true = scroll toward end (bottom/right)
     bool inAutoScrollHotZone_ = false; // true when finger is in top/bottom hot zone during drag
     OffsetF dragOffset_;
@@ -817,6 +866,7 @@ private:
     Shadow prevShadow_;
     int32_t prevZIndex_ = 0;
     GridItemDragState dragState_ = GridItemDragState::IDLE;
+    bool isMouseDrag_ = false;
     bool isDragAnimationStopped_ = false;
     std::map<WeakPtr<RenderContext>, VectorF> scaleNode_;
     std::map<WeakPtr<RenderContext>, VectorF> prevScaleNode_;

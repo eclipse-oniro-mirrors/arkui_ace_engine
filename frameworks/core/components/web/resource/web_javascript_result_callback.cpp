@@ -398,7 +398,7 @@ void WebJavaScriptResultCallBack::GetJavaScriptObjectMethodsV2(int32_t objectId,
 
 void WebJavaScriptResultCallBack::GetJavaScriptResultV3(const std::vector<std::shared_ptr<NWebHapValue>>& args,
     const std::string& method, const std::string& objectName,
-    const NWebJavaScriptResultCallBack::JsCallInfo& callInfo, std::shared_ptr<NWebHapValue> result)
+    std::shared_ptr<NWebJsCallInfo> callInfo, std::shared_ptr<NWebHapValue> result)
 {
     // webcontroller not support object, so the callInfo fields are not used
     (void)callInfo;
@@ -408,7 +408,7 @@ void WebJavaScriptResultCallBack::GetJavaScriptResultV3(const std::vector<std::s
 
 void WebJavaScriptResultCallBack::GetJavaScriptResultFlowbufV3(const std::vector<std::shared_ptr<NWebHapValue>>& args,
     const std::string& method, const std::string& objectName,
-    const NWebJavaScriptResultCallBack::JsCallInfo& callInfo, std::shared_ptr<NWebHapValue> result)
+    std::shared_ptr<NWebJsCallInfo> callInfo, std::shared_ptr<NWebHapValue> result)
 {
     (void)callInfo;
     (void)args;

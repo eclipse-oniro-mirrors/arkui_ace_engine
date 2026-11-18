@@ -19,8 +19,12 @@
 
 #include "base/log/log.h"
 #include "base/memory/ace_type.h"
+#include "bridge/arkts_frontend/ani_local_scope.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/observer_handler.h"
+#include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/node_sensitive_input.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 using NavIdAndListenersMap =
@@ -62,6 +66,8 @@ namespace OHOS::Ace {
 class UiObserver {
 public:
     explicit UiObserver(int32_t instanceId) : id_(instanceId) {}
+
+    int32_t GetInstanceId() const { return id_; }
 
     static ani_object CreateSize(ani_env* env, ani_double width, ani_double height)
     {
@@ -1969,6 +1975,181 @@ static std::string ANIUtils_ANIStringToStdString(ani_env* env, ani_string ani_st
     return content;
 }
 
+namespace {
+struct SensitiveInputAniListener {
+    ani_vm* vm = nullptr;
+    ani_ref callback = nullptr;
+    ani_ref dispatcher = nullptr;
+    bool active = true;
+
+    ~SensitiveInputAniListener()
+    {
+        ani_env* env = nullptr;
+        if (vm && vm->GetEnv(ANI_VERSION_1, &env) == ANI_OK && env) {
+            if (callback) {
+                env->GlobalReference_Delete(callback);
+            }
+            if (dispatcher) {
+                env->GlobalReference_Delete(dispatcher);
+            }
+        }
+    }
+};
+using SensitiveInputAniListeners = std::vector<std::shared_ptr<SensitiveInputAniListener>>;
+using SensitiveInputAniNodes = std::unordered_map<int32_t, SensitiveInputAniListeners>;
+std::unordered_map<int32_t, SensitiveInputAniNodes> sensitiveInputAniListeners;
+
+void ClearSensitiveInputAniListeners(SensitiveInputAniListeners& listeners)
+{
+    for (const auto& listener : listeners) {
+        listener->active = false;
+    }
+    listeners.clear();
+}
+
+void ClearSensitiveInputAniInstance(int32_t instanceId)
+{
+    auto instance = sensitiveInputAniListeners.find(instanceId);
+    if (instance == sensitiveInputAniListeners.end()) {
+        return;
+    }
+    for (auto& [id, listeners] : instance->second) {
+        ClearSensitiveInputAniListeners(listeners);
+    }
+    sensitiveInputAniListeners.erase(instance);
+}
+
+RefPtr<NG::FrameNode> ResolveSensitiveInputNode(int32_t instanceId, ani_int id, const std::string& inspectorId)
+{
+    ContainerScope scope(instanceId);
+    auto node = id >= 0 ? AceType::DynamicCast<NG::FrameNode>(
+        ElementRegister::GetInstance()->GetUINodeById(id)) : NG::Inspector::GetFrameNodeByKey(inspectorId);
+    CHECK_NULL_RETURN(node, nullptr);
+    auto context = node->GetContextRefPtr();
+    if (!context || context->GetInstanceId() != instanceId || node->GetTag() == V2::ROOT_ETS_TAG ||
+        node->GetTag() == V2::STAGE_ETS_TAG || node->GetTag() == V2::PAGE_ETS_TAG) {
+        return nullptr;
+    }
+    return node;
+}
+
+void NotifySensitiveInputForAni(const RefPtr<NG::FrameNode>& node, const NG::NodeSensitiveInputInfo& info)
+{
+    auto context = node->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+    auto instance = sensitiveInputAniListeners.find(context->GetInstanceId());
+    if (instance == sensitiveInputAniListeners.end()) {
+        return;
+    }
+    auto found = instance->second.find(node->GetId());
+    if (found == instance->second.end()) {
+        return;
+    }
+    auto snapshot = found->second;
+    for (const auto& listener : snapshot) {
+        ani_env* env = nullptr;
+        if (!listener->active || listener->vm->GetEnv(ANI_VERSION_1, &env) != ANI_OK || !env) {
+            continue;
+        }
+        ScopedAniLocalScope localScope(env);
+        ani_class cls = nullptr;
+        ani_static_method fromPtr = nullptr;
+        if (env->FindClass("arkui.component.common.RawInputEventWrapperInternal", &cls) != ANI_OK ||
+            env->Class_FindStaticMethod(cls, "fromPtr", nullptr, &fromPtr) != ANI_OK) {
+            continue;
+        }
+        auto peer = NG::CreateNodeSensitiveInputPeer(info, AceType::RawPtr(node));
+        if (!peer) {
+            continue;
+        }
+        ani_ref owner = nullptr;
+        if (env->Class_CallStaticMethod_Ref(cls, fromPtr, &owner, reinterpret_cast<ani_long>(peer.get())) != ANI_OK) {
+            continue;
+        }
+        peer.release();
+        env->Object_CallMethodByName_Void(static_cast<ani_object>(listener->dispatcher), "dispatchInput",
+            "ziC{arkui.component.common.RawInputEventWrapper}l:", static_cast<ani_boolean>(info.isAgent),
+            static_cast<ani_int>(info.type), owner, reinterpret_cast<ani_long>(AceType::RawPtr(node)));
+    }
+}
+} // namespace
+
+static void OnNodeSensitiveInput(ani_env* env, ani_object object, ani_int id, ani_string inspectorId,
+    ani_object callback, ani_object dispatcher)
+{
+    auto observer = Unwrapp(env, object);
+    CHECK_NULL_VOID(observer);
+    auto node = ResolveSensitiveInputNode(
+        observer->GetInstanceId(), id, ANIUtils_ANIStringToStdString(env, inspectorId));
+    CHECK_NULL_VOID(node);
+    const auto instanceId = observer->GetInstanceId();
+    if (sensitiveInputAniListeners.count(instanceId) == 0) {
+        node->GetContextRefPtr()->SetDestroyHandler([instanceId]() {
+            ClearSensitiveInputAniInstance(instanceId);
+        });
+    }
+    auto& listeners = sensitiveInputAniListeners[instanceId][node->GetId()];
+    for (const auto& listener : listeners) {
+        ani_boolean equal = ANI_FALSE;
+        if (env->Reference_StrictEquals(listener->callback, callback, &equal) == ANI_OK && equal) {
+            return;
+        }
+    }
+    auto listener = std::make_shared<SensitiveInputAniListener>();
+    if (env->GetVM(&listener->vm) != ANI_OK ||
+        env->GlobalReference_Create(callback, &listener->callback) != ANI_OK ||
+        env->GlobalReference_Create(dispatcher, &listener->dispatcher) != ANI_OK) {
+        return;
+    }
+    listeners.emplace_back(std::move(listener));
+    node->PushDestroyCallbackWithTag([instanceId, id = node->GetId()]() {
+        auto instance = sensitiveInputAniListeners.find(instanceId);
+        if (instance == sensitiveInputAniListeners.end()) {
+            return;
+        }
+        auto found = instance->second.find(id);
+        if (found != instance->second.end()) {
+            ClearSensitiveInputAniListeners(found->second);
+            instance->second.erase(found);
+        }
+        }, "ArkUISensitiveInputAni");
+    NG::UIObserverHandler::GetInstance().SetNodeSensitiveInputHandleFuncForAni(NotifySensitiveInputForAni);
+}
+
+static void OffNodeSensitiveInput(ani_env* env, ani_object object, ani_int id, ani_string inspectorId,
+    ani_object callback)
+{
+    auto observer = Unwrapp(env, object);
+    CHECK_NULL_VOID(observer);
+    auto node = ResolveSensitiveInputNode(
+        observer->GetInstanceId(), id, ANIUtils_ANIStringToStdString(env, inspectorId));
+    CHECK_NULL_VOID(node);
+    auto instance = sensitiveInputAniListeners.find(observer->GetInstanceId());
+    if (instance == sensitiveInputAniListeners.end()) {
+        return;
+    }
+    auto found = instance->second.find(node->GetId());
+    if (found == instance->second.end()) {
+        return;
+    }
+    ani_boolean all = ANI_FALSE;
+    env->Reference_IsUndefined(callback, &all);
+    auto& listeners = found->second;
+    listeners.erase(std::remove_if(listeners.begin(), listeners.end(), [env, callback, all](const auto& listener) {
+        ani_boolean equal = ANI_FALSE;
+        env->Reference_StrictEquals(listener->callback, callback, &equal);
+        if (all || equal) {
+            listener->active = false;
+            return true;
+        }
+        return false;
+        }), listeners.end());
+    if (listeners.empty()) {
+        node->RemoveDestroyCallbackWithTag("ArkUISensitiveInputAni");
+        instance->second.erase(found);
+    }
+}
+
 static void On([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object object, ani_string type, ani_fn_object fnObj)
 {
     if (fnObj == nullptr) {
@@ -3464,6 +3645,10 @@ bool ANI_ConstructorForAni(ani_env* env)
     }
 
     std::array methodsObserver = {
+        ani_native_function {
+            "onNodeSensitiveInput", nullptr, reinterpret_cast<void*>(OHOS::Ace::OnNodeSensitiveInput) },
+        ani_native_function {
+            "offNodeSensitiveInput", nullptr, reinterpret_cast<void*>(OHOS::Ace::OffNodeSensitiveInput) },
         ani_native_function { "on", "C{std.core.String}C{std.core.Object}:", reinterpret_cast<void*>(OHOS::Ace::On) },
         ani_native_function { "off", "C{std.core.String}C{std.core.Object}:", reinterpret_cast<void*>(OHOS::Ace::Off) },
         ani_native_function {

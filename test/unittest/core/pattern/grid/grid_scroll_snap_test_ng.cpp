@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -23,6 +24,9 @@
 
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
+#include "core/animation/select_motion.h"
+#include "core/gestures/drag_constants.h"
+#include "core/gestures/drag_event.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #define private public
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
@@ -34,6 +38,9 @@ namespace {
 constexpr int32_t GRID_ITEM_NUMBER = 10; // 2 columns x 5 rows of 100px items
 constexpr float GRID_CONTENT_HEIGHT = 500.0f;
 constexpr float GRID_MAX_OFFSET = GRID_CONTENT_HEIGHT - HEIGHT; // 100.0f
+constexpr int32_t SNAP_GRID_ITEM_NUMBER = 30;
+constexpr int32_t HORIZONTAL_RTL_DIRECTION = 2;
+constexpr int32_t MAX_SNAP_ANIMATION_TICKS = 100;
 
 ScrollSnapStrategy MakeStrategy(ScrollSnapAlign align)
 {
@@ -54,6 +61,98 @@ ScrollSnapStrategy MakeProviderStrategy(std::function<double(double)> snapFunc)
 } // namespace
 
 class GridScrollSnapTestNg : public GridTestNg {};
+
+/**
+ * @tc.name: SelectWithScroll_001
+ * @tc.desc: A mouse release can start snap before the last box-selection motion frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollSnapTestNg, SelectWithScroll_001, TestSize.Level1)
+{
+    constexpr float edgeDistance = 30.0f;
+    constexpr float centerAnchor = 50.0f;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetMultiSelectable(true);
+    model.SetScrollSnapStrategy(MakeStrategy(ScrollSnapAlign::CENTER));
+    CreateGridItems(GRID_ITEM_NUMBER, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateDone();
+
+    GestureEvent event;
+    event.SetInputEventType(InputEventType::MOUSE_BUTTON);
+    const Offset start(ITEM_MAIN_SIZE / 2.0f, ITEM_MAIN_SIZE / 2.0f);
+    event.SetLocalLocation(start);
+    event.SetGlobalLocation(start);
+    event.SetRawGlobalLocation(start);
+    pattern_->HandleDragStart(event);
+    const Offset edge(start.GetX(), HEIGHT + edgeDistance);
+    event.SetLocalLocation(edge);
+    event.SetGlobalLocation(edge);
+    event.SetRawGlobalLocation(edge);
+    pattern_->HandleDragUpdate(event);
+    auto motion = pattern_->selectMotion_;
+    ASSERT_NE(motion, nullptr);
+    ASSERT_FALSE(motion->IsCompleted());
+    motion->OnTimestampChanged(0.0f, 0.0f, false);
+    FlushUITasks();
+    const double offsetBeforeRelease = pattern_->GetTotalOffset();
+    ASSERT_GT(offsetBeforeRelease, 0.0);
+    ASSERT_LT(offsetBeforeRelease, GRID_MAX_OFFSET);
+    ASSERT_LT(motion->GetCurrentPosition(), 0.0);
+
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    scrollable->HandleTouchUp();
+    ASSERT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
+    pattern_->HandleDragEnd();
+
+    // Animator notifies the motion listener before it checks IsCompleted().
+    motion->OnTimestampChanged(16.0f, 0.0f, false);
+    EXPECT_TRUE(motion->IsCompleted());
+    FlushUITasks();
+    EXPECT_DOUBLE_EQ(pattern_->GetTotalOffset(), offsetBeforeRelease);
+}
+
+/**
+ * @tc.name: HandleOnDragStatusCallback_001
+ * @tc.desc: Dropping after drag hot-zone scrolling settles to the nearest Grid item anchor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollSnapTestNg, HandleOnDragStatusCallback_001, TestSize.Level1)
+{
+    constexpr int32_t dragItemCount = 20;
+    constexpr float dragScrollDistance = 70.0f;
+    constexpr float centerAnchor = 50.0f;
+    MockPipelineContext::GetCurrent()->SetMinPlatformVersion(11);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetScrollSnapStrategy(MakeStrategy(ScrollSnapAlign::CENTER));
+    CreateGridItems(dragItemCount, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateDone();
+
+    auto drag = AceType::MakeRefPtr<NotifyDragEvent>();
+    drag->SetX(WIDTH / 2.0f);
+    drag->SetY(HEIGHT - 5.0f);
+    pattern_->HandleOnDragStatusCallback(DragEventType::START, drag);
+    pattern_->HandleOnDragStatusCallback(DragEventType::MOVE, drag);
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    FlushUITasks();
+    UpdateCurrentOffset(static_cast<float>(pattern_->GetTotalOffset()) - dragScrollDistance, SCROLL_FROM_AXIS);
+    ASSERT_DOUBLE_EQ(pattern_->GetTotalOffset(), dragScrollDistance);
+
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    pattern_->HandleOnDragStatusCallback(DragEventType::LEAVE, drag);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(scrollable->state_, Scrollable::AnimationState::IDLE);
+
+    pattern_->HandleOnDragStatusCallback(DragEventType::DROP, drag);
+    FlushUITasks();
+    EXPECT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
+}
 
 /**
  * @tc.name: SnapTypeGate001
@@ -459,9 +558,7 @@ HWTEST_F(GridScrollSnapTestNg, CrossRowLayoutNotSupported015, TestSize.Level1)
 
 /**
  * @tc.name: SnapRangeConstrainedByContentOffsets016
- * @tc.desc: Feat-20260806915268 AC-2.4 (2026-09-15 scope): the snap target range honors
- *           contentStartOffset/contentEndOffset per the List snap spec — the lower bound is
- *           contentStartOffset (not 0) and the upper bound already includes contentEndOffset.
+ * @tc.desc: Snap bounds use the same first-item origin as GetTotalOffset and preserve the leading gap.
  */
 HWTEST_F(GridScrollSnapTestNg, SnapRangeConstrainedByContentOffsets016, TestSize.Level1)
 {
@@ -474,32 +571,142 @@ HWTEST_F(GridScrollSnapTestNg, SnapRangeConstrainedByContentOffsets016, TestSize
     CreateGridItems(GRID_ITEM_NUMBER, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
     CreateDone();
 
-    // Candidates start after the leading gap; the first CENTER anchor (row 0) is negative and
-    // must clamp up to contentStartOffset instead of 0.
-    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMinOffset(), CONTENT_START_OFFSET);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), -CONTENT_START_OFFSET);
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMinOffset(), -CONTENT_START_OFFSET);
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), GRID_MAX_OFFSET + CONTENT_END_OFFSET);
     auto candidates = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::CENTER);
     ASSERT_FALSE(candidates.empty());
     EXPECT_FLOAT_EQ(
         ScrollSnapUtils::ClampSnapOffset(candidates.front().offset, pattern_->GetItemSnapMinOffset(),
             pattern_->GetItemSnapMaxOffset()),
-        CONTENT_START_OFFSET);
+        -CONTENT_START_OFFSET);
 
-    // Release at the initial position (offset 0, gap fully visible): threshold selection
-    // picks the row-1 anchor (-30) and the final target clamps up to contentStartOffset (20),
-    // never resting inside the leading gap.
+    // A CENTER target beyond the leading boundary stays at the initial position.
     SnapAnimationOptions options;
     options.snapDelta = 5.0f;
     options.animationVelocity = 0.0f;
-    ASSERT_TRUE(pattern_->StartSnapAnimation(options));
-    int32_t ticks = 0;
-    while (!MockAnimationManager::GetInstance().AllFinished() && ticks < 100) {
-        MockAnimationManager::GetInstance().Tick();
-        FlushUITasks();
-        ++ticks;
-    }
+    EXPECT_FALSE(pattern_->StartSnapAnimation(options));
     ASSERT_TRUE(MockAnimationManager::GetInstance().AllFinished());
-    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), CONTENT_START_OFFSET);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), -CONTENT_START_OFFSET);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).GetY(), CONTENT_START_OFFSET);
 }
+
+class GridSnapContentOffsetsTest : public GridTestNg,
+    public testing::WithParamInterface<std::tuple<ScrollSnapAlign, int32_t>> {
+public:
+    void CreateOffsetGrid()
+    {
+        auto [align, direction] = GetParam();
+        auto model = CreateGrid();
+        ViewAbstract::SetWidth(CalcLength(400.0f));
+        ViewAbstract::SetHeight(CalcLength(400.0f));
+        if (direction == 0) {
+            model.SetColumnsTemplate("1fr 1fr");
+            model.SetRowsGap(Dimension(10.0f));
+        } else {
+            model.SetRowsTemplate("1fr 1fr");
+            model.SetColumnsGap(Dimension(10.0f));
+        }
+        ViewAbstract::SetLayoutDirection(
+            direction == HORIZONTAL_RTL_DIRECTION ? TextDirection::RTL : TextDirection::LTR);
+        model.SetScrollSnapStrategy(MakeStrategy(align));
+        ScrollableModelNG::SetContentStartOffset(CONTENT_START_OFFSET);
+        ScrollableModelNG::SetContentEndOffset(CONTENT_END_OFFSET);
+        CreateGridItems(SNAP_GRID_ITEM_NUMBER, 100.0f, 100.0f);
+        CreateDone();
+    }
+
+    void FinishSnap()
+    {
+        auto& manager = MockAnimationManager::GetInstance();
+        for (int32_t tick = 0; tick < MAX_SNAP_ANIMATION_TICKS && !manager.AllFinished(); ++tick) {
+            manager.Tick();
+            FlushUITasks();
+        }
+        ASSERT_TRUE(manager.AllFinished());
+    }
+
+    float GetLogicalStart(int32_t index)
+    {
+        const auto rect = GetChildRect(frameNode_, index);
+        const auto direction = std::get<1>(GetParam());
+        if (direction == 0) {
+            return rect.GetY();
+        }
+        return direction == HORIZONTAL_RTL_DIRECTION ? 400.0f - rect.Right() : rect.GetX();
+    }
+};
+
+/**
+ * @tc.name: CandidatesAndSettledGeometryHonorContentOffsets
+ * @tc.desc: Cached, tracked and cold candidates agree; actual item geometry respects START/END insets.
+ */
+HWTEST_P(GridSnapContentOffsetsTest, CandidatesAndSettledGeometryHonorContentOffsets, TestSize.Level1)
+{
+    CreateOffsetGrid();
+    const auto align = std::get<0>(GetParam());
+    const float expectedAnchor = align == ScrollSnapAlign::START ? 200.0f :
+        (align == ScrollSnapAlign::END ? -50.0f : 70.0f);
+    auto verifyCandidate = [expectedAnchor](const std::vector<SnapCandidate>& candidates) {
+        auto item = std::find_if(candidates.begin(), candidates.end(),
+            [](const SnapCandidate& candidate) { return candidate.index == 4; });
+        ASSERT_NE(item, candidates.end());
+        EXPECT_FLOAT_EQ(item->offset, expectedAnchor);
+    };
+    verifyCandidate(pattern_->BuildItemSnapCandidates(align));
+    pattern_->BeginTrackedItemSnap(pattern_->GetTotalOffset());
+    verifyCandidate(pattern_->BuildTrackedItemSnapCandidates(align));
+    pattern_->snapItemGeometryCache_.clear();
+    verifyCandidate(pattern_->BuildItemSnapCandidates(align));
+
+    pattern_->ScrollTo(250.0f);
+    FlushUITasks();
+    SnapAnimationOptions options;
+    ASSERT_TRUE(pattern_->StartSnapAnimation(options));
+    FinishSnap();
+    if (align == ScrollSnapAlign::START) {
+        EXPECT_NEAR(GetLogicalStart(4), CONTENT_START_OFFSET, 0.01f);
+    } else if (align == ScrollSnapAlign::END) {
+        EXPECT_NEAR(GetLogicalStart(10) + 100.0f, 400.0f - CONTENT_END_OFFSET, 0.01f);
+    } else {
+        EXPECT_NEAR(GetLogicalStart(8) + 50.0f, 200.0f, 0.01f);
+    }
+}
+
+/**
+ * @tc.name: FirstAndLastItemsPreserveContentOffsets
+ * @tc.desc: Boundary clamping preserves the first and last item gaps and an aligned edge stays still.
+ */
+HWTEST_P(GridSnapContentOffsetsTest, FirstAndLastItemsPreserveContentOffsets, TestSize.Level1)
+{
+    CreateOffsetGrid();
+    const auto align = std::get<0>(GetParam());
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMinOffset(), -CONTENT_START_OFFSET);
+    // Fifteen 100px rows with fourteen 10px gaps, plus the trailing inset, minus the viewport.
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), 1270.0f);
+    SnapAnimationOptions options;
+    if (align == ScrollSnapAlign::START) {
+        EXPECT_FALSE(pattern_->StartSnapAnimation(options));
+        pattern_->ScrollTo(-10.0f);
+        FlushUITasks();
+        ASSERT_TRUE(pattern_->StartSnapAnimation(options));
+        FinishSnap();
+        EXPECT_NEAR(GetLogicalStart(0), CONTENT_START_OFFSET, 0.01f);
+        EXPECT_NEAR(pattern_->GetTotalOffset(), -CONTENT_START_OFFSET, 0.01f);
+    } else if (align == ScrollSnapAlign::END) {
+        pattern_->ScrollTo(1260.0f);
+        FlushUITasks();
+        ASSERT_TRUE(pattern_->StartSnapAnimation(options));
+        FinishSnap();
+        EXPECT_NEAR(GetLogicalStart(28) + 100.0f, 400.0f - CONTENT_END_OFFSET, 0.01f);
+        EXPECT_NEAR(pattern_->GetTotalOffset(), 1270.0f, 0.01f);
+        EXPECT_FALSE(pattern_->StartSnapAnimation(options));
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(AlignAndDirection, GridSnapContentOffsetsTest,
+    testing::Combine(testing::Values(ScrollSnapAlign::START, ScrollSnapAlign::END, ScrollSnapAlign::CENTER),
+        testing::Values(0, 1, HORIZONTAL_RTL_DIRECTION)));
 
 /**
  * @tc.name: AxisDirectionMapsToListSemantics017
@@ -1355,6 +1562,8 @@ struct ItemSnapFlingOptions {
     float height = 120.0f;
     bool lazy = false;
     float initialOffset = 6022.2f;
+    float contentStartOffset = 0.0f;
+    float contentEndOffset = 0.0f;
 };
 
 // Keep takeover asynchronous so touch/new-fling cancellation runs before the queued task.
@@ -1419,6 +1628,8 @@ public:
         ViewAbstract::SetHeight(CalcLength(300.0f));
         model.SetColumnsTemplate("1fr 1fr");
         model.SetRowsGap(Dimension(options.gap));
+        ScrollableModelNG::SetContentStartOffset(options.contentStartOffset);
+        ScrollableModelNG::SetContentEndOffset(options.contentEndOffset);
         model.SetOnScrollStop([this]() { ++scrollStops_; });
         if (options.configured) {
             model.SetScrollSnapStrategy(MakeStrategy(options.align));
@@ -1496,9 +1707,9 @@ public:
             if (horizontal && rtl) {
                 start = viewport - start - mainSize;
             }
-            const float anchor = align == ScrollSnapAlign::START ? start :
+            const float anchor = align == ScrollSnapAlign::START ? start - pattern_->GetContentStartOffset() :
                 (align == ScrollSnapAlign::CENTER ? start + mainSize / 2.0f - viewport / 2.0f :
-                    start + mainSize - viewport);
+                    start + mainSize - viewport + pattern_->GetContentEndOffset());
             nearest = std::min(nearest, std::abs(anchor));
         }
         EXPECT_NEAR(nearest, 0.0f, 0.01f);
@@ -1575,6 +1786,30 @@ INSTANTIATE_TEST_SUITE_P(AlignSpeedHeightGap, GridItemSnapGeometryTest,
     testing::Combine(testing::Values(ScrollSnapAlign::START, ScrollSnapAlign::CENTER, ScrollSnapAlign::END),
         testing::Values(-6000.0f, -1500.0f, -250.0f, 6000.0f, 1500.0f, 250.0f),
         testing::Bool(), testing::Values(0.0f, 10.0f, 30.0f), testing::Bool()));
+
+class GridItemSnapContentOffsetsTest : public GridItemSnapTakeoverTest,
+    public testing::WithParamInterface<std::tuple<ScrollSnapAlign, float>> {};
+
+HWTEST_P(GridItemSnapContentOffsetsTest, FlingSettlesWithContentOffsets, TestSize.Level1)
+{
+    auto [align, velocity] = GetParam();
+    ItemSnapFlingOptions options;
+    options.align = align;
+    options.velocity = velocity;
+    options.mixed = true;
+    options.lazy = true;
+    options.contentStartOffset = CONTENT_START_OFFSET;
+    options.contentEndOffset = CONTENT_END_OFFSET;
+    auto scroll = CreateFling(options);
+    ASSERT_EQ(scroll->state_, Scrollable::AnimationState::FRICTION);
+    AdvanceToTakeover(scroll);
+    FinishSnap();
+    VerifyVisibleAnchor(align);
+}
+
+INSTANTIATE_TEST_SUITE_P(AlignAndVelocity, GridItemSnapContentOffsetsTest,
+    testing::Combine(testing::Values(ScrollSnapAlign::START, ScrollSnapAlign::END, ScrollSnapAlign::CENTER),
+        testing::Values(-1500.0f, 1500.0f)));
 
 class GridItemSnapReleaseTest : public GridItemSnapTakeoverTest,
     public testing::WithParamInterface<std::tuple<float, float, uint64_t>> {};
@@ -1840,6 +2075,55 @@ HWTEST_F(GridItemSnapTakeoverTest, NaturalStopRejectsOvershootingAndStaleSamples
     EXPECT_FLOAT_EQ(scroll->GetCurrentPos(), current);
     property->GetUpdateCallback()(target - 5.0f);
     EXPECT_FLOAT_EQ(scroll->GetCurrentPos(), target);
+}
+
+/**
+ * @tc.name: ScrollSnapStrategyDump001
+ * @tc.desc: Feat-20260806915268: the configured snap strategy is visible in the inspector
+ *           attribute tree (ToJsonValue) and the pattern advance dumps (JSON + text) in all
+ *           three forms: unset (NONE), built-in align, custom provider.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollSnapTestNg, ScrollSnapStrategyDump001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateGridItems(GRID_ITEM_NUMBER, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateDone();
+    const InspectorFilter filter;
+
+    // Unset: the default form is dumped like List's scrollSnapAlign.
+    auto json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapAlign.NONE");
+
+    // Built-in align form.
+    GridModelNG::SetScrollSnapStrategy(AceType::RawPtr(frameNode_), MakeStrategy(ScrollSnapAlign::CENTER));
+    json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapAlign.CENTER");
+
+    // Custom provider form: closures are not serializable, only the form is dumped.
+    GridModelNG::SetScrollSnapStrategy(
+        AceType::RawPtr(frameNode_), MakeProviderStrategy([](double velocity) { return 50.0; }));
+    json = JsonUtil::Create(true);
+    layoutProperty_->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("scrollSnapStrategy"), "ScrollSnapOffsetProvider");
+
+    // Pattern advance JSON dump mirrors the same value.
+    auto advanceJson = JsonUtil::Create(true);
+    pattern_->DumpAdvanceInfo(advanceJson);
+    EXPECT_EQ(advanceJson->GetString("ScrollSnapStrategy"), "ScrollSnapOffsetProvider");
+
+    // Reset returns to the default; the text dump follows suit.
+    GridModelNG::ResetScrollSnapStrategy(AceType::RawPtr(frameNode_));
+    DumpLog::GetInstance().description_.clear();
+    pattern_->DumpAdvanceInfo();
+    std::string allDesc;
+    for (const auto& line : DumpLog::GetInstance().description_) {
+        allDesc += line;
+    }
+    EXPECT_NE(allDesc.find("ScrollSnapStrategy: ScrollSnapAlign.NONE\n"), std::string::npos);
 }
 
 } // namespace OHOS::Ace::NG

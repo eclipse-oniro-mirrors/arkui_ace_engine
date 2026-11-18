@@ -234,21 +234,25 @@ public:
         return 0;
     }
     void SetMemoryName(std::string pixelMapName) const override {}
+    bool ReadPixel(int32_t x, int32_t y, uint32_t& pixel) const override
+    {
+        return false;
+    }
 };
 
 class NWebDragDataDummy : public NWeb::NWebDragData {
 public:
     std::string GetLinkURL() override
     {
-        return "";
+        return linkUrl_;
     }
     std::string GetFragmentText() override
     {
-        return "";
+        return fragmentText_;
     }
     std::string GetFragmentHtml() override
     {
-        return "";
+        return fragmentHtml_;
     }
     bool GetPixelMapSetting(const void** data, size_t& len, int& width, int& height) override
     {
@@ -293,7 +297,7 @@ public:
     }
     std::string GetImageFileName() override
     {
-        return "";
+        return imageFileName_;
     }
     void ClearImageFileNames() override {}
     DragOperationsMask GetAllowedDragOperation() const override
@@ -308,6 +312,13 @@ public:
     {
         isDataCleared_ = true;
     }
+
+    // Configurable getters for HandleOnDragStart tests; defaults keep legacy behavior
+    // (all empty), so existing tests using NWebDragDataDummy are unaffected.
+    std::string imageFileName_;
+    std::string fragmentText_;
+    std::string fragmentHtml_;
+    std::string linkUrl_;
 };
 
 class NWebDragDataTrueDummy : public NWeb::NWebDragData {
@@ -627,7 +638,7 @@ HWTEST_F(WebPatternAddTestNg, OnDragFileNameStart, TestSize.Level1)
     ASSERT_NE(aceUnifiedData, nullptr);
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     ASSERT_NE(mockUdmfClient, nullptr);
-    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
                                      ElementsAreArray({ "file:///abc/dragdrop/test.txt" })))
         .WillOnce(Return(false));
     webPattern->OnDragFileNameStart(aceUnifiedData, "test.txt");
@@ -1028,17 +1039,17 @@ HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_002, TestSize.Level1)
     ASSERT_NE(mockUdmfClient, nullptr);
     EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
     EXPECT_CALL(*mockUdmfClient,
-        AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+        AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
             ElementsAreArray({ "file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" })))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddPlainTextRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "This is some fragment text"))
+        AddPlainTextRecord(RefPtr<UnifiedData>(aceUnifiedData), "This is some fragment text"))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddHtmlRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "<p>This is some fragment html</p>", ""))
+        AddHtmlRecord(RefPtr<UnifiedData>(aceUnifiedData), "<p>This is some fragment html</p>", ""))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddLinkRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
+        AddLinkRecord(RefPtr<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
         .Times(1);
     RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
     webPattern->HandleOnDragStart(info);
@@ -1245,7 +1256,7 @@ HWTEST_F(WebPatternAddTestNg, HandleOnDragDropFile001, TestSize.Level1)
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     EXPECT_NE(mockUdmfClient, nullptr);
     std::vector<std::string> urlVec = { "abc/dragdrop/test.txt" };
-    EXPECT_CALL(*mockUdmfClient, GetFileUriEntry(AceType::DynamicCast<UnifiedData>(aceUnifiedData), _))
+    EXPECT_CALL(*mockUdmfClient, GetFileUriEntry(RefPtr<UnifiedData>(aceUnifiedData), _))
         .WillOnce(testing::Invoke([&](const RefPtr<UnifiedData>& data, std::vector<std::string>& outUrlVec) {
             outUrlVec = urlVec;
             EXPECT_FALSE(outUrlVec.empty());
@@ -1562,20 +1573,20 @@ HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_003, TestSize.Level1)
     ASSERT_NE(mockUdmfClient, nullptr);
     EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
     EXPECT_CALL(*mockUdmfClient,
-        AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+        AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
             ElementsAreArray({ "file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" })))
         .WillOnce(Return(true));
     EXPECT_CALL(*mockUdmfClient,
-        AddPlainTextRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "This is some fragment text"))
+        AddPlainTextRecord(RefPtr<UnifiedData>(aceUnifiedData), "This is some fragment text"))
         .Times(1);
     // After RewriteHtmlImgSrc, the html should contain the rewritten fileUri instead of the original src.
     std::string expectedHtml =
         R"(<img src="file:///data/storage/el2/base/haps/entry/temp/dragdrop/example_image.jpg" alt="test">)";
     EXPECT_CALL(*mockUdmfClient,
-        AddHtmlRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), expectedHtml, ""))
+        AddHtmlRecord(RefPtr<UnifiedData>(aceUnifiedData), expectedHtml, ""))
         .Times(1);
     EXPECT_CALL(*mockUdmfClient,
-        AddLinkRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
+        AddLinkRecord(RefPtr<UnifiedData>(aceUnifiedData), "https://example.com", "Example Link Title"))
         .Times(1);
     RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
     webPattern->HandleOnDragStart(info);
@@ -1645,7 +1656,7 @@ HWTEST_F(WebPatternAddTestNg, OnDragFileNameStart_002, TestSize.Level1)
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     ASSERT_NE(mockUdmfClient, nullptr);
     std::string expectedUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
-    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
                                      ElementsAreArray({ expectedUri })))
         .WillOnce(Return(false));
     std::string result = webPattern->OnDragFileNameStart(aceUnifiedData, "test.jpg");
@@ -1656,11 +1667,12 @@ HWTEST_F(WebPatternAddTestNg, OnDragFileNameStart_002, TestSize.Level1)
 }
 
 /**
- * @tc.name: BuildImageDataUri_001
- * @tc.desc: BuildImageDataUri reads a bmp temp file and returns a data: URI with image/bmp mime.
+ * @tc.name: HandleOnDragStart_NoTagForImageDrag_001
+ * @tc.desc: Image drag (fileName non-empty): HTML <img src> rewritten to three-slash
+ *   file:/// form and SetTagProperty NOT called.
  * @tc.type: FUNC
  */
-HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_001, TestSize.Level1)
+HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_NoTagForImageDrag_001, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto* stack = ViewStackProcessor::GetInstance();
@@ -1674,35 +1686,42 @@ HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_001, TestSize.Level1)
     ASSERT_NE(webPattern, nullptr);
     webPattern->OnModifyDone();
     ASSERT_NE(webPattern->delegate_, nullptr);
-    // Write a temp file with known content, mimicking what Blink writes to tempDir_/dragdrop/<fileName>.
-    std::string fullName = "/data/local/tmp/test_drag_image_build_data_uri_001.bmp";
-    std::string fileContent = "BMPFakeImageContent001";
-    {
-        std::ofstream ofs(fullName, std::ofstream::binary);
-        if (!ofs.is_open()) {
-            GTEST_SKIP() << "Cannot write temp file, skip: " << fullName;
-        }
-        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
-        ofs.close();
-    }
-    std::string dataUri = webPattern->BuildImageDataUri(fullName, "jpg1.bmp");
-    EXPECT_FALSE(dataUri.empty());
-    EXPECT_EQ(dataUri.substr(0, sizeof("data:image/bmp;base64,") - 1), std::string("data:image/bmp;base64,"));
-    // Base64Util is mocked in unit tests; verify the data: URI carries the encoded payload.
-    std::string payload = dataUri.substr(sizeof("data:image/bmp;base64,") - 1);
-    EXPECT_FALSE(payload.empty());
-    std::string decoded;
-    EXPECT_TRUE(Base64Util::Decode(payload, decoded));
-    std::remove(fullName.c_str());
+    webPattern->delegate_->pixelMap_ = AccessibilityManager::MakeRefPtr<PixelMapImpl>();
+    webPattern->delegate_->tempDir_ = "/data/storage/el2/base/haps/entry/temp";
+    auto mockNWebDragData = std::make_shared<NWebDragDataDummy>();
+    mockNWebDragData->imageFileName_ = "test.jpg";
+    std::string originalHtml = R"(<img src="old.png" alt="drag image">)";
+    mockNWebDragData->fragmentHtml_ = originalHtml;
+    webPattern->delegate_->dragData_ = mockNWebDragData;
+    RefPtr<UnifiedData> aceUnifiedData = AceType::MakeRefPtr<UnifiedDataImpl>();
+    ASSERT_NE(aceUnifiedData, nullptr);
+    auto mockUdmfClient = static_cast<MockUdmfClient*>(UdmfClient::GetInstance());
+    ASSERT_NE(mockUdmfClient, nullptr);
+    EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
+    std::string expectedUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.jpg";
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(aceUnifiedData, ElementsAreArray({ expectedUri })))
+        .WillOnce(Return(true));
+    // Capture the HTML record content to verify the <img src> rewrite.
+    std::string capturedHtml;
+    EXPECT_CALL(*mockUdmfClient, AddHtmlRecord(aceUnifiedData, _, ""))
+        .WillOnce([&capturedHtml](const RefPtr<UnifiedData>&, const std::string& htmlContent,
+                      const std::string&) { capturedHtml = htmlContent; });
+    // Image drag: the records_to_entries tag must NOT be set.
+    EXPECT_CALL(*mockUdmfClient, SetTagProperty(_, _)).Times(0);
+    RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    webPattern->HandleOnDragStart(info);
+    EXPECT_NE(capturedHtml.find(expectedUri), std::string::npos);
+    EXPECT_EQ(capturedHtml.find("old.png"), std::string::npos);
 #endif
 }
 
 /**
- * @tc.name: BuildImageDataUri_002
- * @tc.desc: BuildImageDataUri maps webp extension to image/webp mime.
+ * @tc.name: HandleOnDragStart_TagForTextDrag_001
+ * @tc.desc: Text drag (fileName empty, plainContent non-empty): SetTagProperty IS called
+ *   with the records_to_entries_data_format tag; no AddFileUriRecord.
  * @tc.type: FUNC
  */
-HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_002, TestSize.Level1)
+HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_TagForTextDrag_001, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto* stack = ViewStackProcessor::GetInstance();
@@ -1716,31 +1735,35 @@ HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_002, TestSize.Level1)
     ASSERT_NE(webPattern, nullptr);
     webPattern->OnModifyDone();
     ASSERT_NE(webPattern->delegate_, nullptr);
-    std::string fullName = "/data/local/tmp/test_drag_image_build_data_uri_002.webp";
-    std::string fileContent = "WebPFakeContent002";
-    {
-        std::ofstream ofs(fullName, std::ofstream::binary);
-        if (!ofs.is_open()) {
-            GTEST_SKIP() << "Cannot write temp file, skip: " << fullName;
-        }
-        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
-        ofs.close();
-    }
-    std::string dataUri = webPattern->BuildImageDataUri(fullName, "1000.webp");
-    EXPECT_FALSE(dataUri.empty());
-    EXPECT_EQ(dataUri.substr(0, sizeof("data:image/webp;base64,") - 1), std::string("data:image/webp;base64,"));
-    std::string payload = dataUri.substr(sizeof("data:image/webp;base64,") - 1);
-    EXPECT_FALSE(payload.empty());
-    std::remove(fullName.c_str());
+    webPattern->delegate_->pixelMap_ = AccessibilityManager::MakeRefPtr<PixelMapImpl>();
+    auto mockNWebDragData = std::make_shared<NWebDragDataDummy>();
+    mockNWebDragData->fragmentText_ = "plain drag text";
+    webPattern->delegate_->dragData_ = mockNWebDragData;
+    RefPtr<UnifiedData> aceUnifiedData = AceType::MakeRefPtr<UnifiedDataImpl>();
+    ASSERT_NE(aceUnifiedData, nullptr);
+    auto mockUdmfClient = static_cast<MockUdmfClient*>(UdmfClient::GetInstance());
+    ASSERT_NE(mockUdmfClient, nullptr);
+    EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
+    // fileName is empty: no file uri record expected.
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(_, _)).Times(0);
+    EXPECT_CALL(*mockUdmfClient, AddPlainTextRecord(aceUnifiedData, "plain drag text")).Times(1);
+    // Text drag: the records_to_entries tag must be set.
+    EXPECT_CALL(*mockUdmfClient,
+        SetTagProperty(aceUnifiedData, "records_to_entries_data_format"))
+        .Times(1);
+    RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    webPattern->HandleOnDragStart(info);
 #endif
 }
 
 /**
- * @tc.name: BuildImageDataUri_003
- * @tc.desc: BuildImageDataUri returns empty string when the temp file does not exist (fallback path).
+ * @tc.name: HandleOnDragStart_NoRewriteWhenTempDirEmpty_001
+ * @tc.desc: fileName non-empty but tempDir_ empty: fullName stays empty so the HTML
+ *   <img src> rewrite must NOT fire; HTML record keeps the original img src. The tag
+ *   is dropped for image drags (fileName non-empty) regardless of tempDir_.
  * @tc.type: FUNC
  */
-HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_003, TestSize.Level1)
+HWTEST_F(WebPatternAddTestNg, HandleOnDragStart_NoRewriteWhenTempDirEmpty_001, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
     auto* stack = ViewStackProcessor::GetInstance();
@@ -1754,162 +1777,34 @@ HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_003, TestSize.Level1)
     ASSERT_NE(webPattern, nullptr);
     webPattern->OnModifyDone();
     ASSERT_NE(webPattern->delegate_, nullptr);
-    // Non-existent path: BuildImageDataUri should return "" so HandleOnDragStart falls back to file://.
-    std::string dataUri = webPattern->BuildImageDataUri("/data/local/tmp/nonexistent_drag_image_003.bmp", "jpg1.bmp");
-    EXPECT_TRUE(dataUri.empty());
-#endif
-}
-
-/**
- * @tc.name: BuildImageDataUri_004
- * @tc.desc: BuildImageDataUri maps jpg extension to image/jpeg mime and png to image/png mime.
- * @tc.type: FUNC
- */
-HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_004, TestSize.Level1)
-{
-#ifdef OHOS_STANDARD_SYSTEM
-    auto* stack = ViewStackProcessor::GetInstance();
-    ASSERT_NE(stack, nullptr);
-    auto nodeId = stack->ClaimNodeId();
-    auto frameNode =
-        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
-    ASSERT_NE(frameNode, nullptr);
-    stack->Push(frameNode);
-    auto webPattern = frameNode->GetPattern<WebPattern>();
-    ASSERT_NE(webPattern, nullptr);
-    webPattern->OnModifyDone();
-    ASSERT_NE(webPattern->delegate_, nullptr);
-    std::string fileContent = "JpgPngContent004";
-    // jpg -> image/jpeg
-    std::string jpgPath = "/data/local/tmp/test_drag_image_build_data_uri_004.jpg";
-    {
-        std::ofstream ofs(jpgPath, std::ofstream::binary);
-        if (!ofs.is_open()) {
-            GTEST_SKIP() << "Cannot write temp file, skip: " << jpgPath;
-        }
-        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
-        ofs.close();
-    }
-    std::string jpgUri = webPattern->BuildImageDataUri(jpgPath, "img.jpg");
-    EXPECT_EQ(jpgUri.substr(0, sizeof("data:image/jpeg;base64,") - 1), std::string("data:image/jpeg;base64,"));
-    std::remove(jpgPath.c_str());
-    // png -> image/png
-    std::string pngPath = "/data/local/tmp/test_drag_image_build_data_uri_004.png";
-    {
-        std::ofstream ofs(pngPath, std::ofstream::binary);
-        if (!ofs.is_open()) {
-            GTEST_SKIP() << "Cannot write temp file, skip: " << pngPath;
-        }
-        ofs.write(fileContent.data(), static_cast<std::streamsize>(fileContent.size()));
-        ofs.close();
-    }
-    std::string pngUri = webPattern->BuildImageDataUri(pngPath, "img.png");
-    EXPECT_EQ(pngUri.substr(0, sizeof("data:image/png;base64,") - 1), std::string("data:image/png;base64,"));
-    std::remove(pngPath.c_str());
-#endif
-}
-
-/**
- * @tc.name: BuildImageDataUri_005
- * @tc.desc: BuildImageDataUri returns empty string when the file exceeds the size cap (fallback to file://).
- * @tc.type: FUNC
- */
-HWTEST_F(WebPatternAddTestNg, BuildImageDataUri_005, TestSize.Level1)
-{
-#ifdef OHOS_STANDARD_SYSTEM
-    auto* stack = ViewStackProcessor::GetInstance();
-    ASSERT_NE(stack, nullptr);
-    auto nodeId = stack->ClaimNodeId();
-    auto frameNode =
-        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
-    ASSERT_NE(frameNode, nullptr);
-    stack->Push(frameNode);
-    auto webPattern = frameNode->GetPattern<WebPattern>();
-    ASSERT_NE(webPattern, nullptr);
-    webPattern->OnModifyDone();
-    ASSERT_NE(webPattern->delegate_, nullptr);
-    // Write a file larger than the 10MB cap. BuildImageDataUri must skip it and return "" so the
-    // caller falls back to the file:// path (avoids OOM from inlining huge images into HTML).
-    std::string fullName = "/data/local/tmp/test_drag_image_build_data_uri_005.bmp";
-    constexpr size_t overSize = 10 * 1024 * 1024 + 1; // 10MB + 1 byte
-    {
-        std::ofstream ofs(fullName, std::ofstream::binary);
-        if (!ofs.is_open()) {
-            GTEST_SKIP() << "Cannot write temp file, skip: " << fullName;
-        }
-        std::vector<char> chunk(1024 * 1024, 'x'); // 1MB chunks
-        for (size_t i = 0; i + chunk.size() <= overSize; i += chunk.size()) {
-            ofs.write(chunk.data(), static_cast<std::streamsize>(chunk.size()));
-        }
-        ofs.write(chunk.data(), static_cast<std::streamsize>(overSize % chunk.size()));
-        ofs.flush();
-        if (!ofs.good()) {
-            std::remove(fullName.c_str());
-            GTEST_SKIP() << "Cannot write full temp file, skip: " << fullName;
-        }
-        ofs.close();
-    }
-    std::string dataUri = webPattern->BuildImageDataUri(fullName, "big.bmp");
-    EXPECT_TRUE(dataUri.empty());
-    std::remove(fullName.c_str());
-#endif
-}
-
-/**
- * @tc.name: RewriteHtmlImgSrc_DataUri_001
- * @tc.desc: RewriteHtmlImgSrc replaces <img src> with a data: URI (the new cross-device execution branch).
- * @tc.type: FUNC
- */
-HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_DataUri_001, TestSize.Level1)
-{
-#ifdef OHOS_STANDARD_SYSTEM
-    auto* stack = ViewStackProcessor::GetInstance();
-    ASSERT_NE(stack, nullptr);
-    auto nodeId = stack->ClaimNodeId();
-    auto frameNode =
-        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
-    ASSERT_NE(frameNode, nullptr);
-    stack->Push(frameNode);
-    auto webPattern = frameNode->GetPattern<WebPattern>();
-    ASSERT_NE(webPattern, nullptr);
-    webPattern->OnModifyDone();
-    ASSERT_NE(webPattern->delegate_, nullptr);
-    // HTML from Blink CreateMarkup is lowercase double-quoted: <img src="..." style="...">
-    std::string html = R"(<img src="dragdrop://sandbox-link" style="width:100px;height:100px;">)";
-    std::string dataUri = "data:image/bmp;base64,Qk1QRmFrZUltYWdlQ29udGVudDAwMQ==";
-    webPattern->RewriteHtmlImgSrc(html, dataUri);
-    auto srcPos = html.find("src=\"");
-    ASSERT_NE(srcPos, std::string::npos);
-    auto srcEnd = html.find("\"", srcPos + sizeof("src=\"") - 1);
-    ASSERT_NE(srcEnd, std::string::npos);
-    std::string extracted = html.substr(srcPos + sizeof("src=\"") - 1, srcEnd - (srcPos + sizeof("src=\"") - 1));
-    EXPECT_EQ(extracted, dataUri);
-#endif
-}
-
-/**
- * @tc.name: RewriteHtmlImgSrc_DataUri_002
- * @tc.desc: RewriteHtmlImgSrc leaves HTML unchanged when there is no <img tag (data: URI variant).
- * @tc.type: FUNC
- */
-HWTEST_F(WebPatternAddTestNg, RewriteHtmlImgSrc_DataUri_002, TestSize.Level1)
-{
-#ifdef OHOS_STANDARD_SYSTEM
-    auto* stack = ViewStackProcessor::GetInstance();
-    ASSERT_NE(stack, nullptr);
-    auto nodeId = stack->ClaimNodeId();
-    auto frameNode =
-        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
-    ASSERT_NE(frameNode, nullptr);
-    stack->Push(frameNode);
-    auto webPattern = frameNode->GetPattern<WebPattern>();
-    ASSERT_NE(webPattern, nullptr);
-    webPattern->OnModifyDone();
-    ASSERT_NE(webPattern->delegate_, nullptr);
-    std::string html = R"(<p>no image here</p>)";
-    std::string original = html;
-    webPattern->RewriteHtmlImgSrc(html, "data:image/png;base64,AAAA");
-    EXPECT_EQ(html, original);
+    webPattern->delegate_->pixelMap_ = AccessibilityManager::MakeRefPtr<PixelMapImpl>();
+    // tempDir_ left empty: OnDragFileNameStart uses its hardcoded /data/storage/... fallback.
+    auto mockNWebDragData = std::make_shared<NWebDragDataDummy>();
+    mockNWebDragData->imageFileName_ = "fallback.jpg";
+    std::string originalHtml = R"(<img src="original_src.png" alt="keep me">)";
+    mockNWebDragData->fragmentHtml_ = originalHtml;
+    webPattern->delegate_->dragData_ = mockNWebDragData;
+    RefPtr<UnifiedData> aceUnifiedData = AceType::MakeRefPtr<UnifiedDataImpl>();
+    ASSERT_NE(aceUnifiedData, nullptr);
+    auto mockUdmfClient = static_cast<MockUdmfClient*>(UdmfClient::GetInstance());
+    ASSERT_NE(mockUdmfClient, nullptr);
+    EXPECT_CALL(*mockUdmfClient, CreateUnifiedData()).WillOnce(Return(aceUnifiedData));
+    // OnDragFileNameStart still adds a file uri record from its hardcoded fallback path.
+    std::string fallbackUri = "file:///data/storage/el2/base/haps/entry/temp/dragdrop/fallback.jpg";
+    EXPECT_CALL(*mockUdmfClient, AddFileUriRecord(aceUnifiedData, ElementsAreArray({ fallbackUri })))
+        .WillOnce(Return(true));
+    // Capture the HTML record content to verify NO rewrite happened.
+    std::string capturedHtml;
+    EXPECT_CALL(*mockUdmfClient, AddHtmlRecord(aceUnifiedData, _, ""))
+        .WillOnce([&capturedHtml](const RefPtr<UnifiedData>&, const std::string& htmlContent,
+                      const std::string&) { capturedHtml = htmlContent; });
+    // fileName non-empty: image drag, tag must NOT be set.
+    EXPECT_CALL(*mockUdmfClient, SetTagProperty(_, _)).Times(0);
+    RefPtr<OHOS::Ace::DragEvent> info = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    webPattern->HandleOnDragStart(info);
+    // fullName was empty, so the rewrite must not have fired: original src preserved.
+    EXPECT_NE(capturedHtml.find("original_src.png"), std::string::npos);
+    EXPECT_EQ(capturedHtml.find(fallbackUri), std::string::npos);
 #endif
 }
 } // namespace OHOS::Ace::NG

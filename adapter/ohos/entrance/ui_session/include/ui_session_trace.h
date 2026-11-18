@@ -16,11 +16,20 @@
 #ifndef FOUNDATION_ACE_ADAPTER_OHOS_ENTRANCE_UI_SESSION_TRACE_H
 #define FOUNDATION_ACE_ADAPTER_OHOS_ENTRANCE_UI_SESSION_TRACE_H
 
+#include <cstdint>
+
+#include "ui/base/macros.h"
+
 #define UI_SESSION_SCOPED_TRACE(fmt, ...) UiSessionScopedTrace uiSessionScopedTrace(fmt, ##__VA_ARGS__)
 
 namespace OHOS::Ace {
 void UiSessionTraceBegin(const char* name);
 void UiSessionTraceEnd();
+// Process-local diagnostic switch; captures made while enabled are not performance samples.
+ACE_FORCE_EXPORT void UiSessionSetCommandTraceDiagnosticEnabled(bool enabled);
+void UiSessionCommandRequestTraceBegin(const char* commandType);
+void UiSessionCommandResultTraceBegin(uint64_t requestId);
+void UiSessionCommandResultTraceEnd(uint64_t requestId);
 
 class UiSessionScopedTrace final {
 public:

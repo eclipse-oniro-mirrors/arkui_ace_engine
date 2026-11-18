@@ -194,6 +194,11 @@ public:
         const std::shared_ptr<UIObserverListener>& listener, const RefPtr<NG::NodeRenderStatusMonitor>& monitor);
     static void UnRegisterNodeRenderStateChangeCallback(
         RefPtr<NG::FrameNode> frameNode, napi_value callback, const RefPtr<NG::NodeRenderStatusMonitor>& monitor);
+    static void RegisterNodeSensitiveInputCallback(RefPtr<NG::FrameNode> frameNode,
+        const std::shared_ptr<UIObserverListener>& listener, napi_value callback);
+    static void UnRegisterNodeSensitiveInputCallback(RefPtr<NG::FrameNode> frameNode, napi_value callback);
+    static void HandleNodeSensitiveInput(
+        const RefPtr<NG::FrameNode>& frameNode, const NG::NodeSensitiveInputInfo& info);
 
     static bool ParseStringFromNapi(napi_env env, napi_value val, std::string& str);
     static bool MatchValueType(napi_env env, napi_value value, napi_valuetype targetType);
@@ -263,6 +268,8 @@ private:
         specifiedAfterPanEndListeners_;
     static std::unordered_map<NG::FrameNode*, std::shared_ptr<NodeRenderListener>>
         specifiedNodeRenderStateListeners_;
+    static std::unordered_map<NG::FrameNode*, std::list<std::shared_ptr<UIObserverListener>>>
+        specifiedNodeSensitiveInputListeners_;
     
     static std::list<std::shared_ptr<UIObserverListener>> textChangeEventListeners_;
     static std::unordered_map<std::string, std::list<std::shared_ptr<UIObserverListener>>>

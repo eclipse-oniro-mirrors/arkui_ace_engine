@@ -243,7 +243,7 @@ bool ScrollPattern::IsScrollEdgeFinish() const
 
 bool ScrollPattern::SetScrollProperties(const RefPtr<LayoutWrapper>& dirty, const RefPtr<FrameNode>& host)
 {
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<ScrollLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);
@@ -815,13 +815,13 @@ bool ScrollPattern::UpdateCurrentOffset(float delta, int32_t source)
     }
 #endif
     if (IsCrashTop()) {
-        TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashTop();]");
+        TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashTop();]");
 #ifdef SUPPORT_DIGITAL_CROWN
         SetReachBoundary(true);
 #endif
         HandleCrashTop();
     } else if (IsCrashBottom()) {
-        TAG_LOGI(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashBottom();]");
+        TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "UpdateCurrentOffset==>[HandleCrashBottom();]");
 #ifdef SUPPORT_DIGITAL_CROWN
         SetReachBoundary(true);
 #endif
@@ -833,6 +833,14 @@ bool ScrollPattern::UpdateCurrentOffset(float delta, int32_t source)
     }
 #endif
     return true;
+}
+
+void ScrollPattern::UpdateAnimateOverScroll(int32_t source, bool isAtTop, bool isAtBottom)
+{
+    animateOverScrollStart_ =
+        (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtTop && !NearZero(currentOffset_);
+    animateOverScrollEnd_ = (source == SCROLL_FROM_ANIMATION_CONTROLLER) && isAtBottom &&
+                            !NearEqual(currentOffset_, -scrollableDistance_);
 }
 
 void ScrollPattern::OnAnimateStop()
@@ -854,8 +862,8 @@ void ScrollPattern::ScrollToEdge(ScrollEdgeType scrollEdgeType, bool smooth)
         return;
     }
     float distance = scrollEdgeType == ScrollEdgeType::SCROLL_TOP
-                         ? -currentOffset_ + contentStartOffset_
-                         : (-scrollableDistance_ - currentOffset_ - contentEndOffset_);
+                         ? -currentOffset_
+                         : (-scrollableDistance_ - currentOffset_);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     ACE_SCOPED_TRACE("Scroll ScrollToEdge scrollEdgeType:%zu, offset:%f, id:%d", scrollEdgeType, distance,
@@ -880,9 +888,11 @@ void ScrollPattern::ScrollBy(float pixelX, float pixelY, bool smooth, const std:
     float position = currentOffset_ + distance;
     SetIsOverScroll(false);
     if (smooth) {
-        AnimateTo(-position, fabs(distance) * UNIT_CONVERT / SCROLL_BY_SPEED, Curves::EASE_OUT, true, false, false);
+        AnimateTo(-position - contentStartOffset_, fabs(distance) * UNIT_CONVERT / SCROLL_BY_SPEED, Curves::EASE_OUT,
+            true, false, false);
         return;
     }
+    ScheduleCapiScrollCommand(false);
     JumpToPosition(position);
 }
 
@@ -899,7 +909,7 @@ void ScrollPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScrollTyp
     if (smooth && scrollType == AccessibilityScrollType::SCROLL_HALF) {
         float position = currentOffset_ + distance;
         SetIsOverScroll(false);
-        AnimateTo(-position, HALF_PAGE_SCROLL_DURATION, Curves::LINEAR, false, false, false);
+        AnimateTo(-position - contentStartOffset_, HALF_PAGE_SCROLL_DURATION, Curves::LINEAR, false, false, false);
         return;
     }
     ScrollBy(distance, distance, smooth);
@@ -919,10 +929,11 @@ void ScrollPattern::JumpToPosition(float position, int32_t source)
 
 void ScrollPattern::ScrollTo(float position)
 {
+    ScheduleCapiScrollCommand(true);
     SetAnimateCanOverScroll(GetCanStayOverScroll());
     JumpToPosition(-position - contentStartOffset_, SCROLL_FROM_JUMP);
     SetIsOverScroll(GetCanStayOverScroll());
-    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO, false);
 }
 
 void ScrollPattern::DoJump(float position, int32_t source)
@@ -2140,6 +2151,11 @@ void ScrollPattern::ReportOnItemScrollEvent(const std::string& event)
 void ScrollPattern::FillReportOnItemStopParams(std::unique_ptr<JsonValue>& params)
 {
     params->Put("offset", GetCurrentPosition());
+}
+
+CommandResult ScrollPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
 }
 
 int32_t ScrollPattern::OnInjectionEvent(const std::string& command)

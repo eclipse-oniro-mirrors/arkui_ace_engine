@@ -311,28 +311,6 @@ Ark_CanvasGradient CreateConicGradientImpl(Ark_CanvasRenderer peer,
     canvasGradientPeer->SetGradient(gradient);
     return canvasGradientPeer;
 }
-Opt_image_PixelMap GetPixelMapImpl(Ark_CanvasRenderer peer,
-                                   Ark_Float64 sx,
-                                   Ark_Float64 sy,
-                                   Ark_Float64 sw,
-                                   Ark_Float64 sh)
-{
-    auto invalid = Converter::ArkValue<Opt_image_PixelMap>(Ark_Empty());
-    CHECK_NULL_RETURN(peer, invalid);
-    auto peerImpl = reinterpret_cast<CanvasRendererPeerImpl*>(peer);
-    CHECK_NULL_RETURN(peerImpl, invalid);
-    auto x = Converter::Convert<double>(sx);
-    auto y = Converter::Convert<double>(sy);
-    auto width = Converter::Convert<double>(sw);
-    auto height = Converter::Convert<double>(sh);
-    auto pixelMap = peerImpl->GetPixelMap(x, y, width, height);
-    CHECK_NULL_RETURN(pixelMap, invalid);
-    auto pixelMapPeer = PeerUtils::CreatePeer<image_PixelMapPeer>();
-    CHECK_NULL_RETURN(pixelMapPeer, invalid);
-    pixelMapPeer->pixelMap = pixelMap;
-    auto ret = Converter::ArkValue<Opt_image_PixelMap>(pixelMapPeer);
-    return ret;
-}
 Array_F64 GetLineDashImpl(Ark_CanvasRenderer peer)
 {
     CHECK_NULL_RETURN(peer, {});
@@ -1102,7 +1080,6 @@ const GENERATED_ArkUICanvasRendererAccessor* GetCanvasRendererAccessor()
         CanvasRendererAccessor::CreatePatternImpl,
         CanvasRendererAccessor::CreateRadialGradientImpl,
         CanvasRendererAccessor::CreateConicGradientImpl,
-        CanvasRendererAccessor::GetPixelMapImpl,
         CanvasRendererAccessor::GetLineDashImpl,
         CanvasRendererAccessor::SetLineDashImpl,
         CanvasRendererAccessor::ClearRectImpl,
