@@ -877,23 +877,23 @@ HWTEST_F(ListScrollSnapTestNg, ScrollSnapStrategyInspectorDump001, TestSize.Leve
     CreateEqualItems();
     auto layoutProperty = frameNode_->GetLayoutProperty<ListLayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
-    auto Dump = [&layoutProperty]() {
+    auto dump = [&layoutProperty]() {
         auto json = JsonUtil::Create(true);
         layoutProperty->ToJsonValue(json, InspectorFilter());
         return json->GetString("scrollSnapStrategy");
     };
-    EXPECT_EQ(Dump(), "ScrollSnapAlign.NONE");
+    EXPECT_EQ(dump(), "ScrollSnapAlign.NONE");
     SetStrategy(MakeAlign(ScrollSnapAlign::START));
-    EXPECT_EQ(Dump(), "ScrollSnapAlign.START");
+    EXPECT_EQ(dump(), "ScrollSnapAlign.START");
     SetStrategy(MakeAlign(ScrollSnapAlign::CENTER));
-    EXPECT_EQ(Dump(), "ScrollSnapAlign.CENTER");
+    EXPECT_EQ(dump(), "ScrollSnapAlign.CENTER");
     SetStrategy(MakeAlign(ScrollSnapAlign::END));
-    EXPECT_EQ(Dump(), "ScrollSnapAlign.END");
+    EXPECT_EQ(dump(), "ScrollSnapAlign.END");
     SetStrategy(MakeProvider([](double) { return 100.0; }));
-    EXPECT_EQ(Dump(), "ScrollSnapOffsetProvider");
+    EXPECT_EQ(dump(), "ScrollSnapOffsetProvider");
     ListModelNG::ResetScrollSnapStrategy(AceType::RawPtr(frameNode_));
     FlushUITasks();
-    EXPECT_EQ(Dump(), "ScrollSnapAlign.NONE");
+    EXPECT_EQ(dump(), "ScrollSnapAlign.NONE");
 }
 
 /**
@@ -904,34 +904,34 @@ HWTEST_F(ListScrollSnapTestNg, ScrollSnapStrategyInspectorDump001, TestSize.Leve
 HWTEST_F(ListScrollSnapTestNg, ScrollSnapStrategyInspectorDump002, TestSize.Level1)
 {
     /**
-     * @tc.steps: step1. Dump standalone layout properties of the three scrollable families
+     * @tc.steps: step1. dump standalone layout properties of the three scrollable families
  *               for unset / CENTER align / provider configurations
      * @tc.expected: all three serialize identical strings for every configuration
      */
     auto listProp = AceType::MakeRefPtr<ListLayoutProperty>();
     auto gridProp = AceType::MakeRefPtr<GridLayoutProperty>();
     auto flowProp = AceType::MakeRefPtr<WaterFlowLayoutProperty>();
-    auto Dump = [](const RefPtr<LayoutProperty>& prop) {
+    auto dump = [](const RefPtr<LayoutProperty>& prop) {
         auto json = JsonUtil::Create(true);
         prop->ToJsonValue(json, InspectorFilter());
         return json->GetString("scrollSnapStrategy");
     };
-    EXPECT_EQ(Dump(listProp), Dump(gridProp));
-    EXPECT_EQ(Dump(listProp), Dump(flowProp));
-    EXPECT_EQ(Dump(listProp), "ScrollSnapAlign.NONE");
+    EXPECT_EQ(dump(listProp), dump(gridProp));
+    EXPECT_EQ(dump(listProp), dump(flowProp));
+    EXPECT_EQ(dump(listProp), "ScrollSnapAlign.NONE");
     ScrollSnapStrategy center = MakeAlign(ScrollSnapAlign::CENTER);
     listProp->UpdateScrollSnapStrategy(center);
     gridProp->UpdateScrollSnapStrategy(center);
     flowProp->UpdateScrollSnapStrategy(center);
-    EXPECT_EQ(Dump(listProp), Dump(gridProp));
-    EXPECT_EQ(Dump(listProp), Dump(flowProp));
-    EXPECT_EQ(Dump(listProp), "ScrollSnapAlign.CENTER");
+    EXPECT_EQ(dump(listProp), dump(gridProp));
+    EXPECT_EQ(dump(listProp), dump(flowProp));
+    EXPECT_EQ(dump(listProp), "ScrollSnapAlign.CENTER");
     ScrollSnapStrategy provider = MakeProvider([](double) { return 100.0; });
     listProp->UpdateScrollSnapStrategy(provider);
     gridProp->UpdateScrollSnapStrategy(provider);
     flowProp->UpdateScrollSnapStrategy(provider);
-    EXPECT_EQ(Dump(listProp), Dump(gridProp));
-    EXPECT_EQ(Dump(listProp), Dump(flowProp));
-    EXPECT_EQ(Dump(listProp), "ScrollSnapOffsetProvider");
+    EXPECT_EQ(dump(listProp), dump(gridProp));
+    EXPECT_EQ(dump(listProp), dump(flowProp));
+    EXPECT_EQ(dump(listProp), "ScrollSnapOffsetProvider");
 }
 } // namespace OHOS::Ace::NG
