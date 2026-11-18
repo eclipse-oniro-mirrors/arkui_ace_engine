@@ -105,7 +105,7 @@ bool ModelPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, 
     auto geometryNode = dirty->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, false);
 
-    auto mainProperty = DynamicCast<ModelPaintProperty>(host->GetPaintProperty<ModelPaintProperty>());
+    auto mainProperty = host->GetPaintProperty<ModelPaintProperty>();
     auto widthScale = mainProperty->GetRenderWidth().value_or(1.0);
     auto heightScale = mainProperty->GetRenderHeight().value_or(1.0);
     auto backgroundColor = mainProperty->GetBackgroundColor().value_or(0x00000000);
@@ -177,7 +177,7 @@ void ModelPattern::HandleTouchEvent(const TouchEventInfo& info)
     CHECK_NULL_VOID(modelAdapter_);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto mainProperty = DynamicCast<ModelPaintProperty>(host->GetPaintProperty<ModelPaintProperty>());
+    auto mainProperty = host->GetPaintProperty<ModelPaintProperty>();
     bool repaint = modelAdapter_->HandleTouchEvent(info, mainProperty);
     if (repaint) {
         MarkDirtyNode(PROPERTY_UPDATE_RENDER);
@@ -307,7 +307,7 @@ void ModelPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspector
     Pattern::ToJsonValue(json, filter);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto mainProperty = DynamicCast<ModelPaintProperty>(host->GetPaintProperty<ModelPaintProperty>());
+    auto mainProperty = host->GetPaintProperty<ModelPaintProperty>();
     CHECK_NULL_VOID(mainProperty);
     auto widthScale = mainProperty->GetRenderWidth().value_or(1.0);
     auto heightScale = mainProperty->GetRenderHeight().value_or(1.0);
