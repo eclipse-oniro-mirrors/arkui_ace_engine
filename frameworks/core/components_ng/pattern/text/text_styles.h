@@ -477,8 +477,8 @@ ACE_FORCE_EXPORT TextStyle CreateTextStyleUsingTheme(const std::unique_ptr<FontS
     const std::unique_ptr<TextLineStyle>& textLineStyle, const RefPtr<TextTheme>& textTheme, bool isSymbol = false,
     const RefPtr<Pattern>& pattern = nullptr);
 
-void CreateTextStyleUsingTheme(const RefPtr<TextLayoutProperty>& property, const RefPtr<TextTheme>& textTheme,
-    TextStyle& textStyle, bool isSymbol, const RefPtr<Pattern>& pattern = nullptr);
+ACE_FORCE_EXPORT void CreateTextStyleUsingTheme(const RefPtr<TextLayoutProperty>& property,
+    const RefPtr<TextTheme>& textTheme, TextStyle& textStyle, bool isSymbol, const RefPtr<Pattern>& pattern = nullptr);
 
 void UpdateTextStyleFromProperty(const RefPtr<TextLayoutProperty>& property, const RefPtr<TextTheme>& textTheme,
     TextStyle& textStyle, const RefPtr<Pattern>& pattern = nullptr);

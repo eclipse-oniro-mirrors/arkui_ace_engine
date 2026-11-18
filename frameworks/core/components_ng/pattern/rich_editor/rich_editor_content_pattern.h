@@ -46,11 +46,28 @@ class RichEditorContentLayoutAlgorithm : public BoxLayoutAlgorithm {
         auto parentGeometryNode = richEditorNode->GetGeometryNode();
         CHECK_NULL_VOID(geometryNode && parentGeometryNode);
         geometryNode->SetFrameSize(parentGeometryNode->GetFrameSize());
+        // Measure child nodes (e.g. AutoFill icon) with child constraint so they
+        // get a frame size. The icon sets a fixed ideal size via
+        // UpdateUserDefinedIdealSize to avoid MATCH_PARENT centering.
+        auto layoutProperty = layoutWrapper->GetLayoutProperty();
+        if (layoutProperty) {
+            auto constraint = layoutProperty->CreateChildConstraint();
+            for (auto&& child : layoutWrapper->GetAllChildrenWithBuild()) {
+                child->Measure(constraint);
+            }
+        }
     }
 
     void Layout(LayoutWrapper* layoutWrapper) override
     {
         ACE_SCOPED_TRACE("RichEditorContentLayoutAlgorithm::Layout");
+        // Layout children so they get their frame computed, but do NOT call
+        // PerformLayout — it would reposition children based on alignment
+        // (CENTER by default). The icon position is controlled by
+        // UpdateTransformTranslate, matching TextField's no-op Layout.
+        for (auto&& child : layoutWrapper->GetAllChildrenWithBuild()) {
+            child->Layout();
+        }
     }
 
     std::optional<SizeF> MeasureContent(const LayoutConstraintF& constraint, LayoutWrapper* layoutWrapper) override
@@ -152,6 +169,8 @@ public:
     {
         return weakPattern_.Upgrade();
     }
+
+    RefPtr<TextContentModifier> GetContentModifierInstance() const { return contentMod_; }
 
     WeakPtr<RichEditorPattern> weakPattern_;
     RefPtr<TextContentModifier> contentMod_ = nullptr;
