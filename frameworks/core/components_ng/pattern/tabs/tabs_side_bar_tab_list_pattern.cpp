@@ -177,7 +177,7 @@ void TabsSideBarTabListPattern::SetCurrentIndex(int32_t index)
 
 void TabsSideBarTabListPattern::UpdateTabItemTextAndIconColor(int32_t selectedIndex)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabTheme = host->GetTheme<TabTheme>(true);
     CHECK_NULL_VOID(tabTheme);
@@ -411,7 +411,7 @@ int32_t TabsSideBarTabListPattern::FindSwiperIndexForTabItem(const RefPtr<FrameN
 
 void TabsSideBarTabListPattern::UpdateTabItemStyle(int32_t index, bool selected)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabTheme = host->GetTheme<TabTheme>(true);
     CHECK_NULL_VOID(tabTheme);
@@ -1775,7 +1775,7 @@ void TabsSideBarTabListPattern::PlaySectionExpandCollapseAnimation(
 
 void TabsSideBarTabListPattern::RefreshSidebarTabVisibilityAndLayout()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
     CHECK_NULL_VOID(tabsNode);
@@ -1841,7 +1841,7 @@ void TabsSideBarTabListPattern::UpdateDirectVisibility(const RefPtr<FrameNode>& 
 
 void TabsSideBarTabListPattern::RebuildSections()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
     CHECK_NULL_VOID(tabsNode);
@@ -2473,7 +2473,7 @@ void TabsSideBarTabListPattern::ReorderWithSections(const RefPtr<UINode>& column
 void TabsSideBarTabListPattern::ApplyTabViewCustomization(
     const std::optional<TabViewCustomization>& customization)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
     CHECK_NULL_VOID(tabsNode);

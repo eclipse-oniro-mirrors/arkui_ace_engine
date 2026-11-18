@@ -1025,8 +1025,8 @@ void NavigationLayoutAlgorithm::MeasureForceSplitMaskNodes(
     CHECK_NULL_VOID(layoutWrapper);
     CHECK_NULL_VOID(hostNode);
     CHECK_NULL_VOID(navigationLayoutProperty);
-    auto leftMaskNode = AceType::DynamicCast<FrameNode>(hostNode->GetOrCreateMaskNode(true));
-    auto rightMaskNode = AceType::DynamicCast<FrameNode>(hostNode->GetOrCreateMaskNode(false));
+    auto leftMaskNode = hostNode->GetOrCreateMaskNode(true);
+    auto rightMaskNode = hostNode->GetOrCreateMaskNode(false);
     do {
         CHECK_NULL_BREAK(leftMaskNode);
         auto index = hostNode->GetChildIndexById(leftMaskNode->GetId());
@@ -1137,7 +1137,7 @@ void NavigationLayoutAlgorithm::LayoutForceSplitMaskNodes(
     CHECK_NULL_VOID(navigationGeometryNode);
     bool isRTL = AceApplicationInfo::GetInstance().IsRightToLeft();
     const auto& padding = navigationLayoutProperty->CreatePaddingAndBorder();
-    auto leftMaskNode = AceType::DynamicCast<FrameNode>(hostNode->GetOrCreateMaskNode(true));
+    auto leftMaskNode = hostNode->GetOrCreateMaskNode(true);
     do {
         CHECK_NULL_BREAK(leftMaskNode);
         if (!leftMaskNode->IsVisible()) {
@@ -1158,7 +1158,7 @@ void NavigationLayoutAlgorithm::LayoutForceSplitMaskNodes(
         nodeWrapper->Layout();
     } while (false);
 
-    auto rightMaskNode = AceType::DynamicCast<FrameNode>(hostNode->GetOrCreateMaskNode(false));
+    auto rightMaskNode = hostNode->GetOrCreateMaskNode(false);
     CHECK_NULL_VOID(rightMaskNode);
     if (!rightMaskNode->IsVisible()) {
         return;

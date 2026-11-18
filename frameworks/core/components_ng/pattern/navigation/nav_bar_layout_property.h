@@ -39,7 +39,7 @@ public:
     {
         auto copy = MakeRefPtr<NavBarLayoutProperty>();
         copy->NavDestinationLayoutPropertyBase::UpdateBaseLayoutProperty(
-            DynamicCast<NavDestinationLayoutPropertyBase>(this));
+            this);
         copy->propTitleMode_ = CloneTitleMode();
         return copy;
     }

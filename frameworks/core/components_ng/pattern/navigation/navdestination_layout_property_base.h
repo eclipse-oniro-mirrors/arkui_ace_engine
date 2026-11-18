@@ -69,7 +69,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto copy = MakeRefPtr<NavDestinationLayoutPropertyBase>();
-        copy->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        copy->LayoutProperty::UpdateLayoutProperty(this);
         copy->propHideTitleBar_ = CloneHideTitleBar();
         copy->propIsAnimatedTitleBar_ = CloneIsAnimatedTitleBar();
         copy->propTitleBarTranslateState_ = CloneTitleBarTranslateState();

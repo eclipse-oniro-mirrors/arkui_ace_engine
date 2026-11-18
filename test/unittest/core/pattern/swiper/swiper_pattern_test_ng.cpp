@@ -1084,7 +1084,7 @@ HWTEST_F(SwiperPatternTestNg, FindLazyForEachNode001, TestSize.Level1)
         onCreateNode, onUpdateNode, onGetKeys4Range, onGetTypes4Range, onSetActiveRange, true);
     ASSERT_NE(node, nullptr);
     auto result = swiperPattern->FindLazyForEachNode(node, true);
-    EXPECT_EQ(result.value(), AceType::DynamicCast<RepeatVirtualScrollNode>(node));
+    EXPECT_EQ(result.value(), node);
 }
 
 /**
@@ -1110,7 +1110,7 @@ HWTEST_F(SwiperPatternTestNg, FindLazyForEachNode002, TestSize.Level1)
         2, 2, 5, 0, onGetRid4Index, onRecycleItems, onActiveRange, onMoveFromTo, onPurge, onPurgeAll, onUpdateDirty);
     ASSERT_NE(node, nullptr);
     auto result = swiperPattern->FindLazyForEachNode(node, true);
-    EXPECT_EQ(result.value(), AceType::DynamicCast<RepeatVirtualScroll2Node>(node));
+    EXPECT_EQ(result.value(), node);
 }
 
 /**
@@ -1140,7 +1140,7 @@ HWTEST_F(SwiperPatternTestNg, FindForEachNode001, TestSize.Level1)
         onCreateNode, onUpdateNode, onGetKeys4Range, onGetTypes4Range, onSetActiveRange, true);
     ASSERT_NE(node, nullptr);
     auto result = swiperPattern->FindForEachNode(node, true);
-    EXPECT_EQ(result.value(), AceType::DynamicCast<RepeatVirtualScrollNode>(node));
+    EXPECT_EQ(result.value(), node);
 }
 
 /**
@@ -1166,7 +1166,7 @@ HWTEST_F(SwiperPatternTestNg, FindForEachNode002, TestSize.Level1)
         2, 2, 5, 0, onGetRid4Index, onRecycleItems, onActiveRange, onMoveFromTo, onPurge, onPurgeAll, onUpdateDirty);
     ASSERT_NE(node, nullptr);
     auto result = swiperPattern->FindForEachNode(node, true);
-    EXPECT_EQ(result.value(), AceType::DynamicCast<RepeatVirtualScroll2Node>(node));
+    EXPECT_EQ(result.value(), node);
 }
 
 /**
@@ -1210,7 +1210,7 @@ HWTEST_F(SwiperPatternTestNg, FindForEachNode004, TestSize.Level1)
     frameNode->children_.clear();
     frameNode->children_.emplace_back(node);
     auto result = swiperPattern->FindForEachNode(frameNode, true);
-    EXPECT_EQ(result.value(), AceType::DynamicCast<RepeatVirtualScroll2Node>(node));
+    EXPECT_EQ(result.value(), node);
 }
 
 /**

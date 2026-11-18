@@ -123,7 +123,7 @@ bool IsNodeInCurrentNavigationStack(const RefPtr<NavDestinationGroupNode>& node)
     auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(node->GetNavigationNode());
     CHECK_NULL_RETURN(navigationNode, node->GetInCurrentStack());
     auto pattern = navigationNode->GetPattern<NavigationPattern>();
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    RefPtr<FrameNode> frameNode = node;
     CHECK_NULL_RETURN(pattern && frameNode, node->GetInCurrentStack());
     return pattern->FindInCurStack(frameNode);
 }
@@ -219,7 +219,7 @@ bool NavDestinationGroupNode::IsNeedTitleTransition()
 
 void NavDestinationGroupNode::AddChildToGroup(const RefPtr<UINode>& child, int32_t slot)
 {
-    auto pattern = AceType::DynamicCast<Pattern>(GetPattern());
+    auto pattern = GetPattern();
     CHECK_NULL_VOID(pattern);
     auto contentNode = GetContentNode();
     if (!contentNode) {

@@ -307,7 +307,7 @@ HWTEST_F(SideBarViewTestNg, SideBarViewTestNg004, TestSize.Level1)
     sideLayoutAlgorithm->Measure(AccessibilityManager::RawPtr(layoutWrapper));
     sideLayoutAlgorithm->Layout(AccessibilityManager::RawPtr(layoutWrapper));
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto sideBarContainerLayoutAlgorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>
             (layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -397,7 +397,7 @@ HWTEST_F(SideBarViewTestNg, SideBarViewTestNg005, TestSize.Level1)
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(LayoutConstraintVaildSize);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto sideBarContainerLayoutAlgorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>
             (layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -459,7 +459,7 @@ HWTEST_F(SideBarViewTestNg, SideBarViewTestNg006, TestSize.Level1)
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(LayoutConstraintVaildSize);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto sideBarContainerLayoutAlgorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>
             (layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -497,7 +497,7 @@ HWTEST_F(SideBarViewTestNg, SideBarViewTestNg007, TestSize.Level1)
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(LayoutConstraintVaildSize);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto sideBarContainerLayoutAlgorithm = AceType::DynamicCast<SideBarContainerLayoutAlgorithm>
             (layoutAlgorithmWrapper->GetLayoutAlgorithm());

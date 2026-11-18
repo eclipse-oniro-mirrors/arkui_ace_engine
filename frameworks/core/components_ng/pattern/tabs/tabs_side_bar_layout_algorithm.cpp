@@ -62,7 +62,7 @@ void TabsSideBarLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 float TabsSideBarLayoutAlgorithm::MeasureHeaderContainer(LayoutWrapper* layoutWrapper, const SizeF& size)
 {
     CHECK_NULL_RETURN(layoutWrapper, 0.0f);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_RETURN(hostNode, 0.0f);
     auto sideBarPattern = hostNode->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_RETURN(sideBarPattern, 0.0f);
@@ -98,7 +98,7 @@ void TabsSideBarLayoutAlgorithm::MeasureHeaderContainerMaskNode(
     LayoutWrapper* layoutWrapper, const SizeF& size, float headerContainerHeight)
 {
     CHECK_NULL_VOID(layoutWrapper);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto sideBarPattern = hostNode->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sideBarPattern);
@@ -141,7 +141,7 @@ void TabsSideBarLayoutAlgorithm::MeasureHeaderContainerMaskNode(
 float TabsSideBarLayoutAlgorithm::MeasureBottomBarContainer(LayoutWrapper* layoutWrapper, const SizeF& size)
 {
     CHECK_NULL_RETURN(layoutWrapper, 0.0f);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_RETURN(hostNode, 0.0f);
     auto sideBarPattern = hostNode->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_RETURN(sideBarPattern, 0.0f);
@@ -177,7 +177,7 @@ void TabsSideBarLayoutAlgorithm::MeasureBottomBarMaskNode(
     LayoutWrapper* layoutWrapper, const SizeF& size, float bottomBarHeight)
 {
     CHECK_NULL_VOID(layoutWrapper);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto sideBarPattern = hostNode->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sideBarPattern);
@@ -220,7 +220,7 @@ void TabsSideBarLayoutAlgorithm::MeasureTabList(
     LayoutWrapper* layoutWrapper, const SizeF& size, float totalFixedHeight, float bottomFixedHeight)
 {
     CHECK_NULL_VOID(layoutWrapper);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto sideBarPattern = hostNode->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sideBarPattern);
@@ -263,7 +263,7 @@ void TabsSideBarLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     auto geometryNode = layoutWrapper->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
 
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto sideBarPattern = hostNode->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sideBarPattern);

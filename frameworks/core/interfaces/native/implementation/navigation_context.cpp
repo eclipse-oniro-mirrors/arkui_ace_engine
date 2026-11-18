@@ -724,7 +724,7 @@ bool NavigationStack::CreateHomeDestination(const WeakPtr<NG::UINode>& customNod
     }
     if (errorCode != ERROR_CODE_NO_ERROR) {
         auto navPathInfo = AceType::MakeRefPtr<JSNavPathInfoStatic>();
-        auto tempNode = AceType::DynamicCast<NG::UINode>(NavDestinationModelStatic::CreateFrameNode(0, navPathInfo));
+        RefPtr<NG::UINode> tempNode = NavDestinationModelStatic::CreateFrameNode(0, navPathInfo);
         if (!tempNode || !GetNavDestinationNodeInUINode(tempNode, desNode)) {
             return false;
         }
@@ -777,7 +777,7 @@ void NavigationStack::Push(const std::string& name, const RefPtr<NG::RouteInfo>&
     ParamType param = nullptr;
     if (routeInfo) {
         // the inherited from RouteInfo class required here for store the external specific type parameter
-        auto extRouteInfo = AceType::DynamicCast<RouteInfo>(routeInfo);
+        auto extRouteInfo = routeInfo;
         CHECK_NULL_VOID(extRouteInfo);
         param = ParamType(); // getting of the external specific type parameter may be here
     } else {
@@ -950,8 +950,7 @@ bool NavigationStack::CreateNodeByIndex(int32_t index, const WeakPtr<NG::UINode>
     if (errorCode != ERROR_CODE_NO_ERROR) {
         TAG_LOGE(AceLogTag::ACE_NAVIGATION, "can't find target destination by index, create empty node");
         auto navPathInfo = AceType::MakeRefPtr<JSNavPathInfoStatic>();
-        node = AceType::DynamicCast<NG::UINode>(
-            NavDestinationModelStatic::CreateFrameNode(0, navPathInfo));
+        node = NavDestinationModelStatic::CreateFrameNode(0, navPathInfo);
         auto navNode = AceType::DynamicCast<NG::NavDestinationGroupNode>(node);
         CHECK_NULL_RETURN(navNode, true);
         auto navDestinationPattern = AceType::DynamicCast<NG::NavDestinationPattern>(navNode->GetPattern());

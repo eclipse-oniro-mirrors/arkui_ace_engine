@@ -166,7 +166,7 @@ void TabsPattern::PerformanceCheckTabChange(
         CHECK_NULL_VOID(swiperNode);
         auto currentTabContentNode = AceType::DynamicCast<TabContentNode>(swiperNode->GetChildByIndex(currentIndex));
         CHECK_NULL_VOID(currentTabContentNode);
-        auto current = AceType::DynamicCast<UINode>(currentTabContentNode);
+        RefPtr<UINode> current = currentTabContentNode;
         while (current) {
             if (current->GetTag() == V2::PAGE_ETS_TAG) {
                 break;
@@ -2861,7 +2861,7 @@ void TabsPattern::SyncSideBarTabListIndicator(int32_t currentIndex)
     CHECK_NULL_VOID(sideBarNode_);
     auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sideBarPattern);
-    auto tabListNode = AceType::DynamicCast<FrameNode>(sideBarPattern->GetTabListNode());
+    auto tabListNode = sideBarPattern->GetTabListNode();
     CHECK_NULL_VOID(tabListNode);
     // Use TabsSideBarTabListPattern::SetCurrentIndex instead of TabBarPattern::OnTabBarIndexChange
     auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();

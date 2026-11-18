@@ -272,7 +272,7 @@ HWTEST_F(NavigationManagerTestNg, NavigationManagerTest004, TestSize.Level1)
         V2::UI_EXTENSION_COMPONENT_ETS_TAG, 22, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     ASSERT_NE(contentNode, nullptr);
     preNode->contentNode_ = contentNode;
-    auto preFrameNode = AceType::DynamicCast<FrameNode>(preNode);
+    RefPtr<FrameNode> preFrameNode = preNode;
     ASSERT_NE(preFrameNode, nullptr);
     navigationManager->SetNavNodeInTransition(nullptr, preFrameNode);
     navigationManager->SetPreNodeNeverSet(false);
@@ -305,7 +305,7 @@ HWTEST_F(NavigationManagerTestNg, NavigationManagerTest005, TestSize.Level1)
     auto contentNode = NavDestinationGroupNode::GetOrCreateGroupNode(
         V2::UI_EXTENSION_COMPONENT_ETS_TAG, 22, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     curNode->contentNode_ = contentNode;
-    auto curFrameNode = AceType::DynamicCast<FrameNode>(curNode);
+    RefPtr<FrameNode> curFrameNode = curNode;
     navigationManager->SetNavNodeInTransition(curFrameNode, nullptr);
     /**
      * @tc.steps: step3. Update current navigation render group property
@@ -338,7 +338,7 @@ HWTEST_F(NavigationManagerTestNg, NavigationManagerTest006, TestSize.Level1)
     auto contentNode = NavDestinationGroupNode::GetOrCreateGroupNode(
         V2::UI_EXTENSION_COMPONENT_ETS_TAG, 22, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     curNode->contentNode_ = contentNode;
-    auto curFrameNode = AceType::DynamicCast<FrameNode>(curNode);
+    RefPtr<FrameNode> curFrameNode = curNode;
     navigationManager->SetNavNodeInTransition(curFrameNode, nullptr);
     /**
      * @tc.steps: step3. Reset current navigation render group property
@@ -377,7 +377,7 @@ HWTEST_F(NavigationManagerTestNg, NavigationManagerTest007, TestSize.Level1)
      * @tc.steps: step3. Unconfig navigation and disable animation
      */
     auto preNode = AceType::DynamicCast<FrameNode>(navigationNode->GetNavBarNode());
-    auto curNode = AceType::DynamicCast<FrameNode>(navigationNode->GetTopDestination());
+    auto curNode = navigationNode->GetTopDestination();
     navigationManager->hasCacheNavigationNodeEnable_ = true;
     navigationNode->ResetTransitionAnimationNodeState(preNode, curNode);
 

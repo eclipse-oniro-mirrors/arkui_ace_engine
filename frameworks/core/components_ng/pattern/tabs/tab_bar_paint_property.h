@@ -34,7 +34,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto paintProperty = MakeRefPtr<TabBarPaintProperty>();
-        paintProperty->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        paintProperty->PaintProperty::UpdatePaintProperty(this);
         paintProperty->propIndicator_ = CloneIndicator();
         paintProperty->propFadingEdge_ = CloneFadingEdge();
         return paintProperty;
