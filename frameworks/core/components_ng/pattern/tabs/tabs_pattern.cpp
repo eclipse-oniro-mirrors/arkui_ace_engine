@@ -2823,10 +2823,37 @@ void TabsPattern::RegisterSideBarTabItems(bool update)
     auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
     CHECK_NULL_VOID(tabListPattern);
     auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
-    if (swiperPattern) {
-        auto currentIndex = swiperPattern->GetCurrentIndex();
-        tabListPattern->InitCurrentIndex(currentIndex);
+    CHECK_NULL_VOID(swiperPattern);
+    auto currentIndex = swiperPattern->GetCurrentIndex();
+    // Before Swiper's first layout, GetCurrentIndex() still returns the default 0
+    // while the pending index (e.g. Tabs created with a fixed index) is applied to
+    // Swiper only during its first layout (without a change event). This
+    // registration may also run before any TabContent is recorded, so tab items
+    // are created afterwards and styled by AddOrUpdateTabListItem using the
+    // pending index. Resolve the effective index with the chain used for tab item
+    // creation (IndexSetByUser, then Swiper index property), extended with the
+    // Tabs index property level in between: UpdateIndex() consumes IndexSetByUser
+    // into the Tabs index property, so that level covers the window where the
+    // pending value is already consumed but the Swiper property is not set yet.
+    // Otherwise currentIndex_ is clobbered to 0, and a later
+    // RefreshAllTabItemColors paints item 0 as selected on top of the item
+    // already styled with the pending index (double selection).
+    auto tabsLayoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    if (tabsLayoutProperty && tabsLayoutProperty->GetIndexSetByUser().has_value()) {
+        currentIndex = tabsLayoutProperty->GetIndexSetByUser().value();
+    } else if (tabsLayoutProperty && tabsLayoutProperty->GetIndex().has_value()) {
+        currentIndex = tabsLayoutProperty->GetIndex().value();
+    } else {
+        auto swiperLayoutProperty = swiperNode->GetLayoutProperty<SwiperLayoutProperty>();
+        if (swiperLayoutProperty && swiperLayoutProperty->GetIndex().has_value()) {
+            currentIndex = swiperLayoutProperty->GetIndex().value();
+        }
     }
+    auto tabContentNum = swiperNode->TotalChildCount();
+    if (currentIndex < 0 || (tabContentNum > 0 && currentIndex >= tabContentNum)) {
+        currentIndex = 0;
+    }
+    tabListPattern->InitCurrentIndex(currentIndex);
 }
 
 void TabsPattern::SyncSideBarTabListIndicator(int32_t currentIndex)

@@ -24,6 +24,7 @@
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -863,5 +864,39 @@ HWTEST_F(TabsSidebarTestNg, SidebarBottomBarTest006, TestSize.Level1)
     auto containerRect = bottomBarContainer->GetGeometryNode()->GetFrameRect();
     auto sideBarRect = sideBarNode->GetGeometryNode()->GetFrameRect();
     EXPECT_TRUE(containerRect.Bottom() <= sideBarRect.Bottom() + 1.0f);
+}
+
+/**
+ * @tc.name: SidebarInitialIndexFromFixedIndex001
+ * @tc.desc: In sidebar mode, the tab list display index is resolved from the fixed index set at
+ *           creation instead of Swiper's pre-layout default 0
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, SidebarInitialIndexFromFixedIndex001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with fixed index 2, then switch to sidebar mode
+     */
+    TabsModelNG model = CreateTabs(BarPosition::START, 2);
+    CreateTabContents(TABCONTENT_NUMBER);
+    model.SetBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
+    CreateTabsDone(model);
+
+    /**
+     * @tc.steps: step2. Get the sidebar tab list pattern
+     */
+    auto sideBarNode = pattern_->GetSideBarNode();
+    ASSERT_NE(sideBarNode, nullptr);
+    auto sideBarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
+    ASSERT_NE(sideBarPattern, nullptr);
+    auto tabListNode = sideBarPattern->GetTabListNode();
+    ASSERT_NE(tabListNode, nullptr);
+    auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+    ASSERT_NE(tabListPattern, nullptr);
+
+    /**
+     * @tc.expected: The display index follows the fixed index, so only item 2 is selected
+     */
+    EXPECT_EQ(tabListPattern->GetCurrentIndex(), 2);
 }
 } // namespace OHOS::Ace::NG
