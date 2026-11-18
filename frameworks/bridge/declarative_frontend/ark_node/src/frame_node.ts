@@ -50,6 +50,21 @@ interface ArkComponentCreator {
 
 const __componentCreator__ : ArkComponentCreator = {};
 
+// Progress is a miniaturized component: its native module, the NAPI component
+// module and the ArkTS component classes are loaded on demand. Resolving them
+// lazily inside the attribute getter charges dlopen, native attribute
+// registration and class definition to the first initialize()/style() call.
+// Resolve the factory once and warm it up while creating the node instead.
+function getProgressComponentCreator(): (node: NodePtr, type: ModifierType) => ArkProgressComponent {
+  if (__componentCreator__.createProgressComponent === undefined) {
+    getUINativeModule().loadNativeModule('Progress');
+    let module = globalThis.requireNapi('arkui.components.arkprogress');
+    module.loadComponent();
+    __componentCreator__.createProgressComponent = module.createComponent;
+  }
+  return __componentCreator__.createProgressComponent!;
+}
+
 enum ExpandMode {
   NOT_EXPAND = 0,
   EXPAND = 1,
@@ -1405,13 +1420,9 @@ const __creatorMap__ = new Map<string, (context: UIContext, options?: object) =>
       })
     }],
     ['Progress', (context: UIContext): FrameNode => {
+      const progressComponentCreator = getProgressComponentCreator();
       return new TypedFrameNode(context, 'Progress', (node: NodePtr, type: ModifierType): ArkProgressComponent => {
-        if (__componentCreator__.createProgressComponent === undefined) {
-          getUINativeModule().loadNativeModule('Progress');
-          let module = globalThis.requireNapi('arkui.components.arkprogress');
-          __componentCreator__.createProgressComponent = module.createComponent;
-        }
-        return __componentCreator__.createProgressComponent!(node, type);
+        return progressComponentCreator(node, type);
       })
     }],
     ['Scroll', (context: UIContext): FrameNode => {
@@ -1898,9 +1909,7 @@ const __attributeMap__ = new Map<string, (node: FrameNode) => ArkComponent>(
       if (!node.getNodePtr()) {
         return undefined;
       }
-      getUINativeModule().loadNativeModule('Progress');
-      let module = globalThis.requireNapi('arkui.components.arkprogress');
-      node._componentAttribute = module.createComponent(node.getNodePtr(), ModifierType.FRAME_NODE);
+      node._componentAttribute = getProgressComponentCreator()(node.getNodePtr(), ModifierType.FRAME_NODE);
       return node._componentAttribute;
     }],
     ['LoadingProgress', (node: FrameNode): ArkLoadingProgressComponent => {
