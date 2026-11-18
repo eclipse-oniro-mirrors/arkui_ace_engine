@@ -28,6 +28,22 @@
 #include "frameworks/core/components_ng/property/templates_parser.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+const char* ScrollSnapAlignToString(ScrollSnapAlign align)
+{
+    switch (align) {
+        case ScrollSnapAlign::START:
+            return "ScrollSnapAlign.START";
+        case ScrollSnapAlign::CENTER:
+            return "ScrollSnapAlign.CENTER";
+        case ScrollSnapAlign::END:
+            return "ScrollSnapAlign.END";
+        default:
+            return "ScrollSnapAlign.NONE";
+    }
+}
+}
+
 std::optional<ScrollSnapStrategy> WaterFlowLayoutProperty::GetScrollSnapStrategy() const
 {
     if (!snapAlign_) {
@@ -96,6 +112,10 @@ void WaterFlowLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, cons
     json->PutExtAttr("rowsGap", propRowsGap_.value_or(0.0_vp).ToString().c_str(), filter);
     json->PutExtAttr("layoutDirection", GetWaterflowDirectionStr().c_str(), filter);
     json->PutExtAttr("cachedCount", propCachedCount_.value_or(1), filter);
+    // Family-unified inspector dump: built-in align enum (unset -> effective NONE) or a
+    // mounted provider form marker (callbacks themselves are not serialized).
+    json->PutExtAttr("scrollSnapStrategy", snapHasProvider_ ? "ScrollSnapOffsetProvider" :
+        ScrollSnapAlignToString(snapAlign_.value_or(ScrollSnapAlign::NONE)), filter);
     auto jsonConstraintSize = JsonUtil::Create(true);
     if (itemLayoutConstraint_) {
         jsonConstraintSize->Put("minWidth", itemLayoutConstraint_->minSize.value_or(CalcSize())

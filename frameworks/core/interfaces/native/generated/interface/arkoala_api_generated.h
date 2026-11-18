@@ -26550,6 +26550,8 @@ typedef struct GENERATED_ArkUIListModifier {
                       const Opt_StickyStyle* value);
     void (*setScrollSnapAlign)(Ark_NativePointer node,
                                const Opt_ScrollSnapAlign* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setMaintainVisibleContentPosition)(Ark_NativePointer node,
                                               const Opt_Boolean* value);
     void (*setSupportEmptyBranchInLazyLoading)(Ark_NativePointer node,

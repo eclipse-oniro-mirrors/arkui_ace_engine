@@ -12112,6 +12112,20 @@ class ListScrollSnapAlignModifier extends ModifierWithKey {
   }
 }
 ListScrollSnapAlignModifier.identity = Symbol('listScrollSnapAlign');
+class ListScrollSnapStrategyModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().list.resetScrollSnapStrategy(node);
+    }
+    else {
+      getUINativeModule().list.setScrollSnapStrategy(node, this.value);
+    }
+  }
+}
+ListScrollSnapStrategyModifier.identity = Symbol('listScrollSnapStrategy');
 class ListDividerModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -12842,6 +12856,10 @@ class ArkListComponent extends ArkScrollable {
   }
   scrollSnapAlign(value) {
     modifierWithKey(this._modifiersWithKeys, ListScrollSnapAlignModifier.identity, ListScrollSnapAlignModifier, value);
+    return this;
+  }
+  scrollSnapStrategy(value) {
+    modifierWithKey(this._modifiersWithKeys, ListScrollSnapStrategyModifier.identity, ListScrollSnapStrategyModifier, value);
     return this;
   }
   nestedScroll(value) {

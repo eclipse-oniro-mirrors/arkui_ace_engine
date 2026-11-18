@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/list/list_layout_property.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
@@ -27,7 +28,52 @@ V2::ItemDivider ItemDividerFromJson(const std::unique_ptr<JsonValue>& json)
     divider.color = Color::ColorFromString(json->GetString("color"));
     return divider;
 }
+
+const char* ScrollSnapStrategyAlignToString(ScrollSnapAlign align)
+{
+    switch (align) {
+        case ScrollSnapAlign::START:
+            return "ScrollSnapAlign.START";
+        case ScrollSnapAlign::CENTER:
+            return "ScrollSnapAlign.CENTER";
+        case ScrollSnapAlign::END:
+            return "ScrollSnapAlign.END";
+        case ScrollSnapAlign::NONE:
+            return "ScrollSnapAlign.NONE";
+        default:
+            return "ScrollSnapAlign.NONE";
+    }
+}
 } // namespace
+
+std::optional<ScrollSnapStrategy> ListLayoutProperty::GetScrollSnapStrategy() const
+{
+    if (!snapStrategyAlign_) {
+        return std::nullopt;
+    }
+    return ScrollSnapStrategy { snapStrategyAlign_.value(), snapHasProvider_, snapApproachOffset_, snapOffset_ };
+}
+
+void ListLayoutProperty::UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy)
+{
+    if (snapStrategyAlign_ && !snapHasProvider_ && !strategy.hasProvider &&
+        snapStrategyAlign_.value() == strategy.align) {
+        return;
+    }
+    snapStrategyAlign_ = strategy.align;
+    snapHasProvider_ = strategy.hasProvider;
+    snapApproachOffset_ = strategy.calculateApproachOffset;
+    snapOffset_ = strategy.calculateSnapOffset;
+    UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+}
+
+void ListLayoutProperty::ResetScrollSnapStrategy()
+{
+    snapStrategyAlign_.reset();
+    snapHasProvider_ = false;
+    snapApproachOffset_ = nullptr;
+    snapOffset_ = nullptr;
+}
 
 void ListLayoutProperty::SetListItemFillPolicy(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
 {
@@ -61,6 +107,12 @@ void ListLayoutProperty::DumpInfo()
     auto scrollSnapAlign = propScrollSnapAlign_.value_or(ScrollSnapAlign::NONE);
     DumpLog::GetInstance().AddDesc(
         "scrollSnapAlign:" + std::to_string(static_cast<int32_t>(scrollSnapAlign)));
+    if (snapStrategyAlign_) {
+        DumpLog::GetInstance().AddDesc(std::string("scrollSnapStrategy:") +
+            (snapHasProvider_ ? "provider" : ScrollSnapStrategyAlignToString(snapStrategyAlign_.value())));
+    } else {
+        DumpLog::GetInstance().AddDesc("scrollSnapStrategy:unset");
+    }
     propSyncLoad_.value_or(false) ? DumpLog::GetInstance().AddDesc("syncLoad:true")
                                  : DumpLog::GetInstance().AddDesc("syncLoad:false");
 }
@@ -177,6 +229,16 @@ void ListLayoutProperty::ScrollSnapPropToJsonValue(
     } else {
         json->PutExtAttr("scrollSnapAlign", "ScrollSnapAlign.NONE", filter);
     }
+    // Inspector-visible final value of scrollSnapStrategy — built-in align
+    // enum, cleared state, or a mounted provider (callbacks themselves are not serialized).
+    // Family-unified convention (matches the sibling scrollSnapAlign above): an unset
+    // strategy serializes as the effective default ScrollSnapAlign.NONE.
+    if (snapHasProvider_) {
+        json->PutExtAttr("scrollSnapStrategy", "ScrollSnapOffsetProvider", filter);
+    } else {
+        json->PutExtAttr("scrollSnapStrategy",
+            ScrollSnapStrategyAlignToString(snapStrategyAlign_.value_or(ScrollSnapAlign::NONE)), filter);
+    }
     json->PutExtAttr("enableScrollInteraction", propScrollEnabled_.value_or(true), filter);
     json->PutExtAttr(
         "spaceWidth", propSpaceWidth_.value_or(Dimension(0, DimensionUnit::VP)).ToString().c_str(), filter);
@@ -218,6 +280,10 @@ void ListLayoutProperty::Clone(RefPtr<LayoutProperty> layoutProperty) const
     value->propSyncLoad_ = CloneSyncLoad();
     value->propCacheRange_ = CloneCacheRange();
     value->propItemFillPolicy_ = CloneItemFillPolicy();
+    value->snapStrategyAlign_ = snapStrategyAlign_;
+    value->snapHasProvider_ = snapHasProvider_;
+    value->snapApproachOffset_ = snapApproachOffset_;
+    value->snapOffset_ = snapOffset_;
 }
 
 void ListLayoutProperty::Reset()
@@ -243,5 +309,6 @@ void ListLayoutProperty::Reset()
     ResetSyncLoad();
     ResetCacheRange();
     ResetItemFillPolicy();
+    ResetScrollSnapStrategy();
 }
 } // namespace OHOS::Ace::NG

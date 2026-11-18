@@ -32,6 +32,7 @@
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/list/list_layout_property.h"
 #include "core/components_ng/pattern/list/list_model.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/list/list_position_controller.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
@@ -514,6 +515,89 @@ void JSList::SetScrollSnapAlign(int32_t scrollSnapAlign)
         param = ScrollSnapAlign(scrollSnapAlign);
     }
     ListModel::GetInstance()->SetScrollSnapAlign(param);
+}
+
+namespace {
+// scrollSnapStrategy provider plumbing on the JSView binding. The public provider works in
+// vp / vp-s while the scroll runtime consumes px; a non-number return becomes NaN and the shared
+// snap chain applies the natural-decay / handoff-position fallbacks.
+SnapOffsetFunc MakeJsSnapOffsetProvider(const JSRef<JSFunc>& func, const JSRef<JSObject>& receiver,
+    const JSExecutionContext& execCtx)
+{
+    return [func, receiver, execCtx](double velocity) -> double {
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx,
+            std::numeric_limits<double>::quiet_NaN()); // a dead context falls back to the natural target
+        auto params = ConvertToJSValues(CalcDimension(Dimension(velocity).ConvertToVp(), DimensionUnit::VP));
+        auto result = func->Call(receiver, params.size(), params.data());
+        if (!result->IsNumber()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return Dimension(result->ToNumber<double>(), DimensionUnit::VP).ConvertToPx();
+    };
+}
+
+SnapApproachOffsetFunc MakeJsSnapApproachOffsetProvider(const JSRef<JSFunc>& func,
+    const JSRef<JSObject>& receiver, const JSExecutionContext& execCtx)
+{
+    return [func, receiver, execCtx](double velocity, double decayOffset) -> double {
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx,
+            std::numeric_limits<double>::quiet_NaN()); // a dead context falls back to the natural decay
+        auto params = ConvertToJSValues(CalcDimension(Dimension(velocity).ConvertToVp(), DimensionUnit::VP),
+            CalcDimension(Dimension(decayOffset).ConvertToVp(), DimensionUnit::VP));
+        auto result = func->Call(receiver, params.size(), params.data());
+        if (!result->IsNumber()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return Dimension(result->ToNumber<double>(), DimensionUnit::VP).ConvertToPx();
+    };
+}
+} // namespace
+
+// Parses the provider object's two callbacks into the strategy. A missing approach is
+// tolerated (the chain falls back to natural decay); a missing snap makes it invalid.
+bool MakeJsProviderStrategy(const JSRef<JSObject>& obj, const JSRef<JSVal>& snapFuncValue,
+    const JSRef<JSVal>& approachFuncValue, ScrollSnapStrategy& strategy, const JSExecutionContext& execCtx)
+{
+    if (!snapFuncValue->IsFunction()) {
+        return false;
+    }
+    strategy.hasProvider = true;
+    strategy.calculateSnapOffset = MakeJsSnapOffsetProvider(JSRef<JSFunc>::Cast(snapFuncValue), obj, execCtx);
+    if (approachFuncValue->IsFunction()) {
+        strategy.calculateApproachOffset =
+            MakeJsSnapApproachOffsetProvider(JSRef<JSFunc>::Cast(approachFuncValue), obj, execCtx);
+    }
+    return true;
+}
+
+void JSList::SetScrollSnapStrategy(const JSCallbackInfo& args)
+{
+    ScrollSnapStrategy strategy;
+    bool valid = false;
+    if (args.Length() >= 1) {
+        const auto& value = args[0];
+        if (value->IsNumber()) {
+            auto align = value->ToNumber<int32_t>();
+            if (align > static_cast<int32_t>(ScrollSnapAlign::NONE) &&
+                align <= static_cast<int32_t>(ScrollSnapAlign::END)) {
+                strategy.align = static_cast<ScrollSnapAlign>(align);
+                valid = true;
+            }
+        } else if (value->IsObject()) {
+            auto obj = JSRef<JSObject>::Cast(value);
+            auto snapFuncValue = obj->GetProperty("calculateSnapOffset");
+            auto approachFuncValue = obj->GetProperty("calculateApproachOffset");
+            // A custom provider requires calculateSnapOffset to be a function.
+            valid = MakeJsProviderStrategy(obj, snapFuncValue, approachFuncValue, strategy,
+                args.GetExecutionContext());
+        }
+    }
+    if (valid) {
+        ListModel::GetInstance()->SetScrollSnapStrategy(strategy);
+    } else {
+        // undefined / null / invalid value clears the strategy (last-set-wins default).
+        ListModel::GetInstance()->ResetScrollSnapStrategy();
+    }
 }
 
 void JSList::SetDivider(const JSCallbackInfo& args)
@@ -1185,6 +1269,7 @@ void JSList::JSBind(BindingTarget globalObj)
     JSClass<JSList>::StaticMethod("nestedScroll", &JSList::SetNestedScroll);
     JSClass<JSList>::StaticMethod("enableScrollInteraction", &JSList::SetScrollEnabled);
     JSClass<JSList>::StaticMethod("scrollSnapAlign", &JSList::SetScrollSnapAlign);
+    JSClass<JSList>::StaticMethod("scrollSnapStrategy", &JSList::SetScrollSnapStrategy);
     JSClass<JSList>::StaticMethod("friction", &JSList::SetFriction);
     JSClass<JSList>::StaticMethod("focusWrapMode", &JSList::SetFocusWrapMode);
     JSClass<JSList>::StaticMethod("maintainVisibleContentPosition", &JSList::MaintainVisibleContentPosition);
