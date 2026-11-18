@@ -1362,7 +1362,7 @@ HWTEST_F(WebModelTestNg, SetOnControllerAttached009, TestSize.Level1)
     };
     WebModelNG webModelNG;
     webModelNG.SetOnControllerAttached(callback);
-    AceType::DynamicCast<WebPattern>(ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>()
         ->onControllerAttachedCallback_();
     EXPECT_NE(callCount, 0);
 #endif
@@ -1469,7 +1469,7 @@ HWTEST_F(WebModelTestNg, SetOverScrollId016, TestSize.Level1)
     WebModelNG webModelNG;
     auto OverScrollId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetOverScrollId(std::move(OverScrollId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnOverScrollEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1487,7 +1487,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedLifecycleChangeId017, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedLifecycleChangeId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedLifecycleChangeId(std::move(NativeEmbedLifecycleChangeId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedLifecycleChangeEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1505,7 +1505,7 @@ HWTEST_F(WebModelTestNg, SetNativeEmbedGestureEventId018, TestSize.Level1)
     WebModelNG webModelNG;
     auto NativeEmbedGestureEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetNativeEmbedGestureEventId(NativeEmbedGestureEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNativeEmbedGestureEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1856,7 +1856,7 @@ HWTEST_F(WebModelTestNg, SetFirstMeaningfulPaintId001, TestSize.Level1)
     auto firstMeaningfulPaintId = [&callCount](const std::shared_ptr<BaseEventInfo>& info) { callCount++; };
 
     webModelNG.SetFirstMeaningfulPaintId(std::move(firstMeaningfulPaintId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnFirstMeaningfulPaintEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1875,7 +1875,7 @@ HWTEST_F(WebModelTestNg, SetLargestContentfulPaintId001, TestSize.Level1)
     auto largestContentfulPaintId = [&callCount](const std::shared_ptr<BaseEventInfo>& info) { callCount++; };
 
     webModelNG.SetLargestContentfulPaintId(std::move(largestContentfulPaintId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnLargestContentfulPaintEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1894,7 +1894,7 @@ HWTEST_F(WebModelTestNg, SetNavigationEntryCommittedId001, TestSize.Level1)
     auto navigationEntryCommittedId = [&callCount](const std::shared_ptr<BaseEventInfo>& info) { callCount++; };
 
     webModelNG.SetNavigationEntryCommittedId(std::move(navigationEntryCommittedId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnNavigationEntryCommittedEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1914,7 +1914,7 @@ HWTEST_F(WebModelTestNg, SetIntelligentTrackingPreventionResultId001, TestSize.L
                                                      const std::shared_ptr<BaseEventInfo>& info) { callCount++; };
 
     webModelNG.SetIntelligentTrackingPreventionResultId(std::move(intelligentTrackingPreventionResultId));
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnIntelligentTrackingPreventionResultEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1933,7 +1933,7 @@ HWTEST_F(WebModelTestNg, SetRenderProcessNotRespondingId002, TestSize.Level1)
     auto renderProcessNotRespondingId = [&callCount](const BaseEventInfo* info) { callCount++; };
 
     webModelNG.SetRenderProcessNotRespondingId(renderProcessNotRespondingId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnRenderProcessNotRespondingEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -1952,7 +1952,7 @@ HWTEST_F(WebModelTestNg, SetRenderProcessRespondingId003, TestSize.Level1)
     auto renderProcessRespondingId = [&callCount](const BaseEventInfo* info) { callCount++; };
 
     webModelNG.SetRenderProcessRespondingId(renderProcessRespondingId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnRenderProcessRespondingEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2023,7 +2023,7 @@ HWTEST_F(WebModelTestNg, SetViewportFitChangedId006, TestSize.Level1)
     auto viewportFitChangedId = [&callCount](const BaseEventInfo* info) { callCount++; };
 
     webModelNG.SetViewportFitChangedId(viewportFitChangedId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnViewportFitChangedEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2044,7 +2044,7 @@ HWTEST_F(WebModelTestNg, SetOnInterceptKeyboardAttach007, TestSize.Level1)
         return {};
     };
     webModelNG.SetOnInterceptKeyboardAttach(onInterceptKeyboardAttach);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnInterceptKeyboardAttachEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2062,7 +2062,7 @@ HWTEST_F(WebModelTestNg, SetAdsBlockedEventId008, TestSize.Level1)
     WebModelNG webModelNG;
     auto adsBlockedEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetAdsBlockedEventId(adsBlockedEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnAdsBlockedEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
@@ -2210,7 +2210,7 @@ HWTEST_F(WebModelTestNg, SetScreenCaptureRequestEventId008, TestSize.Level1)
     WebModelNG webModelNG;
     auto screenCaptureRequestEventId = [&callCount](const BaseEventInfo* info) { callCount++; };
     webModelNG.SetScreenCaptureRequestEventId(screenCaptureRequestEventId);
-    AceType::DynamicCast<WebEventHub>(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>())
+    ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>()
         ->propOnScreenCaptureRequestEvent_(nullptr);
     EXPECT_NE(callCount, 0);
 #endif
