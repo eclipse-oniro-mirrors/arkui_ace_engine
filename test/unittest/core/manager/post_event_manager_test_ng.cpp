@@ -23,6 +23,7 @@
 #define private public
 #define protected public
 #include "core/common/event_manager.h"
+#include "core/components_ng/event/response_ctrl.h"
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
@@ -4074,5 +4075,194 @@ HWTEST_F(PostEventManagerTestNg, PostEventStateAndClearRemainingBranchTest001, T
     EXPECT_EQ(postEventManager_->postEventAction_.front().targetNode, otherNode);
     EXPECT_EQ(postEventManager_->postEventAction_.back().touchEvent.id, eventId + 1);
     EXPECT_EQ(postEventManager_->lastEventMap_.find(eventId), postEventManager_->lastEventMap_.end());
+}
+
+/**
+ * @tc.name: PostTouchEventWithStrategyMonopolize001
+ * @tc.desc: monopolize blocks posted touch event to component outside the monopolize component
+ * @tc.type: FUNC
+ */
+HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyMonopolize001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. init post event manager and event manager.
+     */
+    Init();
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    ScopedEventManagerBackup eventManagerBackup(pipelineContext);
+    pipelineContext->eventManager_ = AceType::MakeRefPtr<EventManager>();
+    auto responseCtrl = pipelineContext->eventManager_->GetResponseCtrl();
+    ASSERT_NE(responseCtrl, nullptr);
+
+    /**
+     * @tc.steps: step2. activate monopolize by first response on monopolize node.
+     */
+    auto monopolizeNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
+    monopolizeNode->GetOrCreateGestureEventHub()->monopolizeEvents_ = true;
+    responseCtrl->TrySetFirstResponse(WeakPtr<FrameNode>(monopolizeNode));
+    ASSERT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
+
+    /**
+     * @tc.steps: step3. post touch event to another component.
+     * @tc.expected: blocked at entry, no state recorded, monopolize state not reset.
+     */
+    auto targetNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -2, AceType::MakeRefPtr<Pattern>(), true);
+    RefPtr<NG::UINode> uiNode = targetNode;
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::DOWN;
+    auto result = postEventManager_->PostTouchEventWithStrategy(uiNode, std::move(touchEvent));
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(postEventManager_->postInputEventAction_.empty());
+    EXPECT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
+}
+
+/**
+ * @tc.name: PostTouchEventWithStrategyMonopolize002
+ * @tc.desc: monopolize component itself can receive posted touch event
+ * @tc.type: FUNC
+ */
+HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyMonopolize002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. init post event manager and event manager.
+     */
+    Init();
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    ScopedEventManagerBackup eventManagerBackup(pipelineContext);
+    pipelineContext->eventManager_ = AceType::MakeRefPtr<EventManager>();
+    auto responseCtrl = pipelineContext->eventManager_->GetResponseCtrl();
+    ASSERT_NE(responseCtrl, nullptr);
+
+    /**
+     * @tc.steps: step2. activate monopolize by first response on monopolize node.
+     */
+    auto monopolizeNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
+    monopolizeNode->GetOrCreateGestureEventHub()->monopolizeEvents_ = true;
+    responseCtrl->TrySetFirstResponse(WeakPtr<FrameNode>(monopolizeNode));
+    ASSERT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
+
+    /**
+     * @tc.steps: step3. post touch event to the monopolize component itself.
+     * @tc.expected: passes the monopolize gate, down event recorded.
+     */
+    RefPtr<NG::UINode> uiNode = monopolizeNode;
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::DOWN;
+    postEventManager_->PostTouchEventWithStrategy(uiNode, std::move(touchEvent));
+    EXPECT_EQ(postEventManager_->postInputEventAction_.size(), 1u);
+}
+
+/**
+ * @tc.name: PostTouchEventWithStrategyMonopolize003
+ * @tc.desc: monopolize blocks posted touch event to child of the monopolize component
+ * @tc.type: FUNC
+ */
+HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyMonopolize003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. init post event manager and event manager.
+     */
+    Init();
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    ScopedEventManagerBackup eventManagerBackup(pipelineContext);
+    pipelineContext->eventManager_ = AceType::MakeRefPtr<EventManager>();
+    auto responseCtrl = pipelineContext->eventManager_->GetResponseCtrl();
+    ASSERT_NE(responseCtrl, nullptr);
+
+    /**
+     * @tc.steps: step2. activate monopolize and create a child node of monopolize node.
+     */
+    auto monopolizeNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
+    monopolizeNode->GetOrCreateGestureEventHub()->monopolizeEvents_ = true;
+    responseCtrl->TrySetFirstResponse(WeakPtr<FrameNode>(monopolizeNode));
+    ASSERT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
+    auto childNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -2, AceType::MakeRefPtr<Pattern>(), true);
+    monopolizeNode->AddChild(childNode);
+
+    /**
+     * @tc.steps: step3. post touch event to the child node.
+     * @tc.expected: blocked at entry, no state recorded, monopolize state not reset.
+     */
+    RefPtr<NG::UINode> uiNode = childNode;
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::DOWN;
+    auto result = postEventManager_->PostTouchEventWithStrategy(uiNode, std::move(touchEvent));
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(postEventManager_->postInputEventAction_.empty());
+    EXPECT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
+}
+
+/**
+ * @tc.name: PostTouchEventWithStrategyMonopolize004
+ * @tc.desc: posted touch event passes when monopolize is not active
+ * @tc.type: FUNC
+ */
+HWTEST_F(PostEventManagerTestNg, PostTouchEventWithStrategyMonopolize004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. init post event manager and event manager, monopolize not active.
+     */
+    Init();
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    ScopedEventManagerBackup eventManagerBackup(pipelineContext);
+    pipelineContext->eventManager_ = AceType::MakeRefPtr<EventManager>();
+    auto responseCtrl = pipelineContext->eventManager_->GetResponseCtrl();
+    ASSERT_NE(responseCtrl, nullptr);
+    ASSERT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::INIT);
+
+    /**
+     * @tc.steps: step2. post touch event to a component.
+     * @tc.expected: passes the monopolize gate, down event recorded.
+     */
+    auto targetNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
+    RefPtr<NG::UINode> uiNode = targetNode;
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::DOWN;
+    postEventManager_->PostTouchEventWithStrategy(uiNode, std::move(touchEvent));
+    EXPECT_EQ(postEventManager_->postInputEventAction_.size(), 1u);
+}
+
+/**
+ * @tc.name: PostMouseEventWithStrategyMonopolize001
+ * @tc.desc: monopolize blocks posted mouse event
+ * @tc.type: FUNC
+ */
+HWTEST_F(PostEventManagerTestNg, PostMouseEventWithStrategyMonopolize001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. init post event manager and event manager.
+     */
+    Init();
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    ScopedEventManagerBackup eventManagerBackup(pipelineContext);
+    pipelineContext->eventManager_ = AceType::MakeRefPtr<EventManager>();
+    auto responseCtrl = pipelineContext->eventManager_->GetResponseCtrl();
+    ASSERT_NE(responseCtrl, nullptr);
+
+    /**
+     * @tc.steps: step2. activate monopolize by first response on monopolize node.
+     */
+    auto monopolizeNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -1, AceType::MakeRefPtr<Pattern>(), true);
+    monopolizeNode->GetOrCreateGestureEventHub()->monopolizeEvents_ = true;
+    responseCtrl->TrySetFirstResponse(WeakPtr<FrameNode>(monopolizeNode));
+    ASSERT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
+
+    /**
+     * @tc.steps: step3. post mouse event to another component.
+     * @tc.expected: blocked, no state recorded.
+     */
+    auto targetNode = AceType::MakeRefPtr<FrameNode>(ROOT_TAG, -2, AceType::MakeRefPtr<Pattern>(), true);
+    RefPtr<NG::UINode> uiNode = targetNode;
+    MouseEvent mouseEvent;
+    mouseEvent.action = MouseAction::PRESS;
+    auto result = postEventManager_->PostMouseEventWithStrategy(uiNode, std::move(mouseEvent));
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(postEventManager_->postMouseEventAction_.empty());
+    EXPECT_EQ(responseCtrl->state_, ResponseCtrl::MonopolizeState::ON);
 }
 } // namespace OHOS::Ace::NG
