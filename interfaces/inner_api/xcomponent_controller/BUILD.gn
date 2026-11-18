@@ -31,6 +31,9 @@ config("xcomponent_controller_config") {
 }
 
 ohos_shared_library("ace_xcomponent_controller") {
+  if (is_ohos) {
+    version_script = "$ace_root/build/libace_xcomponent_controller.map"
+  }
   if (current_os == "ohos") {
     sanitize = {
       integer_overflow = true
