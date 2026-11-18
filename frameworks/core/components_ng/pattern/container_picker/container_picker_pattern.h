@@ -421,6 +421,7 @@ private:
     bool isAllowPlayHaptic_ = true;
     bool isEnableHaptic_ = true;
     bool isUseDefaultFontColor_ = false;
+    Color cachedThemeFontColor_ = Color::BLACK;
     bool isModified_ = false;
 
     int32_t containerPickerId_ = -1;

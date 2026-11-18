@@ -552,6 +552,10 @@ void ContainerPickerPattern::UpdateDefaultTextStyle(RefPtr<FrameNode> node, Colo
         CHECK_NULL_VOID(textLayoutProperty);
         if (isUseDefaultFontColor_) {
             textLayoutProperty->UpdateTextColor(defaultColor);
+        } else if (textLayoutProperty->HasTextColor() &&
+                   textLayoutProperty->GetTextColor().value() == cachedThemeFontColor_ &&
+                   cachedThemeFontColor_ != defaultColor) {
+            textLayoutProperty->UpdateTextColor(defaultColor);
         }
     } else {
         auto& children = node->GetChildren();
@@ -828,6 +832,7 @@ void ContainerPickerPattern::CacheOriginalItemStyle(int32_t index,
     if (originalItemStyle_.find(index) != originalItemStyle_.end()) {
         return;
     }
+    cachedThemeFontColor_ = defaultColor;
     TextProperties orig;
     orig.fontSize = textLayoutProperty->HasFontSize()
         ? textLayoutProperty->GetFontSize().value() : defaultSize;
@@ -909,7 +914,9 @@ void ContainerPickerPattern::SetSelectedTextStyle(bool isUpdateTextStyle)
             RestoreItemOriginalStyle(index, textLayoutProperty, applyColor);
         }
         AddAnimationTextProperties(idx, textLayoutProperty);
-        UpdateTextNodeFontColor(textNode, applyColor);
+        if (HasSelectedTextStyle()) {
+            UpdateTextNodeFontColor(textNode, applyColor);
+        }
         idx++;
     }
 }
@@ -1531,7 +1538,7 @@ void ContainerPickerPattern::PlayInertialAnimation()
                 pattern->lastAnimationScroll_ = 0.0f;
             }
             pattern->isAnimationRunning_ = false;
-            if (!NearZero(pattern->mainDeltaSum_)) {
+            if (!NearZero(pattern->CalculateMiddleLineOffset())) {
                 pattern->PlaySpringAnimation();
             } else {
                 pattern->FireAnimationEndEvent();
