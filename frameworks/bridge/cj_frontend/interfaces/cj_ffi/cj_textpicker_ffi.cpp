@@ -135,7 +135,7 @@ void TextPickerDialogShow(std::vector<std::string> range, uint32_t selected, con
     properties.customStyle = false;
     properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));
 
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     executor->PostTask(
         [properties, settingData, dialogEvent, cancelEvent, weak = WeakPtr<NG::OverlayManager>(overlayManager)] {

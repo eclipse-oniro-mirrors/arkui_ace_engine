@@ -1566,4 +1566,98 @@ HWTEST_F(WindowSceneTest, DisposeSnapshotAndBlankWindow, TestSize.Level0)
     windowScene->frameNode_ = nullptr;
     windowScene->snapshotWindow_ = nullptr;
 }
+
+/**
+ * @tc.name: OnActivation_TryUseSnapshot_KeepSnapshot
+ * @tc.desc: Test OnActivation when TryUseSnapshot is true and HasPersistentSnapshot is true,
+ *           the snapshot window should be kept (not removed) and needSnapshot set to true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WindowSceneTest, OnActivation_TryUseSnapshot_KeepSnapshot, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create windowScene with STATE_DISCONNECT + showingInRecents + snapshotWindow_.
+     */
+    Rosen::SessionInfo sessionInfo = {
+        .abilityName_ = ABILITY_NAME,
+        .bundleName_ = BUNDLE_NAME,
+        .moduleName_ = MODULE_NAME,
+    };
+    auto session = ssm_->RequestSceneSession(sessionInfo);
+    ASSERT_NE(session, nullptr);
+    session->scenePersistence_ = sptr<Rosen::ScenePersistence>::MakeSptr("bundleName", 1);
+    auto windowScene = AceType::MakeRefPtr<WindowScene>(session);
+    ASSERT_NE(windowScene, nullptr);
+    auto frameNode = FrameNode::CreateFrameNode(V2::WINDOW_SCENE_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), windowScene);
+    windowScene->frameNode_ = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    ASSERT_NE(windowScene->GetHost(), nullptr);
+
+    session->SetSessionState(Rosen::SessionState::STATE_DISCONNECT);
+    session->SetShowRecent(true);
+    session->SetTryUseSnapshot(true);
+    auto key = Rosen::defaultStatus;
+    session->scenePersistence_->SetHasSnapshot(true, key);
+
+    auto snapshotWindowNode = FrameNode::CreateFrameNode(V2::WINDOW_SCENE_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), windowScene);
+    windowScene->snapshotWindow_ = AceType::RawPtr(snapshotWindowNode);
+    ASSERT_NE(windowScene->snapshotWindow_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call OnActivation, the tryUseSnapshot branch should keep snapshot window.
+     */
+    session->needSnapshot_ = false;
+    windowScene->OnActivation();
+    usleep(WAIT_SYNC_IN_NS);
+    EXPECT_NE(windowScene->snapshotWindow_, nullptr);
+    EXPECT_EQ(session->needSnapshot_, true);
+    EXPECT_EQ(session->GetShowRecent(), false);
+}
+
+/**
+ * @tc.name: OnActivation_TryUseSnapshot_FallbackToRemove
+ * @tc.desc: Test OnActivation when TryUseSnapshot is false, the snapshot window should be removed
+ *           and startingWindow recreated (fallback branch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WindowSceneTest, OnActivation_TryUseSnapshot_FallbackToRemove, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create windowScene with STATE_DISCONNECT + showingInRecents + snapshotWindow_.
+     */
+    Rosen::SessionInfo sessionInfo = {
+        .abilityName_ = ABILITY_NAME,
+        .bundleName_ = BUNDLE_NAME,
+        .moduleName_ = MODULE_NAME,
+    };
+    auto session = ssm_->RequestSceneSession(sessionInfo);
+    ASSERT_NE(session, nullptr);
+    session->scenePersistence_ = sptr<Rosen::ScenePersistence>::MakeSptr("bundleName", 1);
+    auto windowScene = AceType::MakeRefPtr<WindowScene>(session);
+    ASSERT_NE(windowScene, nullptr);
+    auto frameNode = FrameNode::CreateFrameNode(V2::WINDOW_SCENE_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), windowScene);
+    windowScene->frameNode_ = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    ASSERT_NE(windowScene->GetHost(), nullptr);
+
+    session->SetSessionState(Rosen::SessionState::STATE_DISCONNECT);
+    session->SetShowRecent(true);
+    session->SetTryUseSnapshot(false);
+    auto key = Rosen::defaultStatus;
+    session->scenePersistence_->SetHasSnapshot(true, key);
+
+    auto snapshotWindowNode = FrameNode::CreateFrameNode(V2::WINDOW_SCENE_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), windowScene);
+    windowScene->snapshotWindow_ = AceType::RawPtr(snapshotWindowNode);
+    ASSERT_NE(windowScene->snapshotWindow_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call OnActivation, the fallback branch should remove snapshot window.
+     */
+    windowScene->OnActivation();
+    usleep(WAIT_SYNC_IN_NS);
+    EXPECT_EQ(windowScene->snapshotWindow_, nullptr);
+    EXPECT_NE(windowScene->startingWindow_, nullptr);
+}
 } // namespace OHOS::Ace::NG

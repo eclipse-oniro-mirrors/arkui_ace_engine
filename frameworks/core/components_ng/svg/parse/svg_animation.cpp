@@ -213,7 +213,7 @@ void SvgAnimation::CreatePropertyAnimation(const T& originalValue, std::function
     } else {
         animator_ = CREATE_ANIMATOR(PipelineContext::GetCurrentContext());
         animator_->AddStopListener([weak = svgContext_]() {
-            auto context = AceType::DynamicCast<SvgContext>(weak.Upgrade());
+            auto context = weak.Upgrade();
             CHECK_NULL_VOID(context);
             context->OnAnimationFinished();
         });
@@ -223,6 +223,10 @@ void SvgAnimation::CreatePropertyAnimation(const T& originalValue, std::function
     }
 
     if (!CreatePropertyAnimate(std::move(callback), originalValue, animator_)) {
+        auto context = svgContext_.Upgrade();
+        if (context) {
+            context->RemoveAnimator(animator_->GetId());
+        }
         animator_ = nullptr;
         LOGW("CreatePropertyAnimate failed");
     }

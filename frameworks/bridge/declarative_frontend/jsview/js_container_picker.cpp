@@ -178,6 +178,12 @@ void JSContainerPicker::SetSelectionIndicator(const JSCallbackInfo& info)
 }
 
 namespace {
+constexpr int32_t FONT_WEIGHT_NUM_LIGHTER = 100;
+constexpr int32_t FONT_WEIGHT_NUM_NORMAL = 400;
+constexpr int32_t FONT_WEIGHT_NUM_MEDIUM = 500;
+constexpr int32_t FONT_WEIGHT_NUM_BOLD = 700;
+constexpr int32_t FONT_WEIGHT_NUM_BOLDER = 900;
+
 std::string ConvertWeightNumToString(int32_t weightNum)
 {
     static const std::string weightNames[] = {
@@ -188,7 +194,14 @@ std::string ConvertWeightNumToString(int32_t weightNum)
     if (weightNum >= 0 && weightNum < weightNamesSize) {
         return weightNames[weightNum];
     }
-    return "";
+    switch (weightNum) {
+        case FONT_WEIGHT_NUM_LIGHTER: return "lighter";
+        case FONT_WEIGHT_NUM_NORMAL: return "normal";
+        case FONT_WEIGHT_NUM_MEDIUM: return "medium";
+        case FONT_WEIGHT_NUM_BOLD: return "bold";
+        case FONT_WEIGHT_NUM_BOLDER: return "bolder";
+        default: return std::to_string(weightNum);
+    }
 }
 
 void ParsePickerTextColor(const JSRef<JSObject>& jsObj, NG::PickerTextStyle& textStyle)
@@ -216,7 +229,8 @@ void ParsePickerFontStyle(const JSRef<JSObject>& jsObj, NG::PickerTextStyle& tex
     if (!sizeVal->IsUndefined() && !sizeVal->IsNull()) {
         CalcDimension dim;
         RefPtr<ResourceObject> resObj;
-        if (JSViewAbstract::ParseLengthMetricsToPositiveDimension(sizeVal, dim, resObj)) {
+        if (JSViewAbstract::ParseJsDimension(sizeVal, dim, DimensionUnit::FP, resObj) &&
+            dim.IsValid() && !dim.IsNegative()) {
             textStyle.fontSize = Dimension(dim);
         }
     }
@@ -231,7 +245,10 @@ void ParsePickerFontStyle(const JSRef<JSObject>& jsObj, NG::PickerTextStyle& tex
         weightStr = ConvertWeightNumToString(weightVal->ToNumber<int32_t>());
     }
     if (!weightStr.empty()) {
-        textStyle.fontWeight = StringUtils::ParseFontWeight(weightStr).second;
+        auto parseResult = StringUtils::ParseFontWeight(weightStr);
+        if (parseResult.first) {
+            textStyle.fontWeight = parseResult.second;
+        }
     }
 }
 } // namespace
@@ -270,6 +287,12 @@ void JSContainerPicker::SetSelectedTextStyle(const JSCallbackInfo& info)
         if (JSViewAbstract::ParseJsInt32(overflowVal, overflow)) {
             textStyle.textOverflow = static_cast<Ace::TextOverflow>(overflow);
         }
+    }
+    if (!textStyle.fontSize.has_value() && !textStyle.textColor.has_value() &&
+        !textStyle.fontWeight.has_value() && !textStyle.minFontSize.has_value() &&
+        !textStyle.maxFontSize.has_value() && !textStyle.textOverflow.has_value()) {
+        NG::ContainerPickerModel::ResetSelectedTextStyle();
+        return;
     }
     NG::ContainerPickerModel::SetSelectedTextStyle(textStyle);
 }

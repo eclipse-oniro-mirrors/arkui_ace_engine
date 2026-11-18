@@ -433,6 +433,13 @@ void TouchEventActuator::TriggerCallBacks(TouchEventInfo& event)
 
 void TouchEventActuator::PublishDeveloperResponse(TouchEventInfo& event)
 {
+    // Only a node with a developer-visible touch callback can produce a RESPONSE operation.
+    // Pressed-state, focus, tips and other framework-internal touch listeners land in
+    // touchEvents_ as well, so gating on the public callback members is what keeps a plain
+    // component (for example a Button with no onClick/onTouch) from being reported.
+    if (!HasDeveloperTouchCallback()) {
+        return;
+    }
     const auto& changedTouches = event.GetChangedTouches();
     if (changedTouches.empty()) {
         return;

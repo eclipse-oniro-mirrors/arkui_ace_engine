@@ -76,7 +76,7 @@ RefPtr<FrameNode> XComponentStaticTestNg::CreateXComponentNode(bool isTypeNode)
 {
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
-    auto frameNode = AceType::DynamicCast<FrameNode>(XComponentModelStatic::CreateFrameNode(nodeId, isTypeNode));
+    auto frameNode = XComponentModelStatic::CreateFrameNode(nodeId, isTypeNode);
     return frameNode;
 }
 

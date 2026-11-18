@@ -2591,7 +2591,7 @@ private formatHour(hour24: number): string {
     if (firstPercent <= 0) {
       return 0;
     }
-    return this.firstColumnWidth * 100 / firstPercent;
+    return vp2px(this.firstColumnWidth * 100 / firstPercent);
   }
 
   private getColumnWidthPx(columnIndex: number): number {
@@ -2637,6 +2637,9 @@ private formatHour(hour24: number): string {
       return this.getMiddlePickerIndicator();
     }
     const indicator = this.selectionIndicator;
+    const validType = (indicator.type === PickerIndicatorType.BACKGROUND ||
+                       indicator.type === PickerIndicatorType.DIVIDER)
+                      ? indicator.type : PickerIndicatorType.BACKGROUND;
     const userBR = indicator.borderRadius;
     const defaultRadius = this.getAdjustedRadius();
     let tl: number = defaultRadius;
@@ -2710,7 +2713,7 @@ private formatHour(hour24: number): string {
       adjustedEndMargin = undefined;
     }
     return {
-      type: indicator.type,
+      type: validType,
       borderRadius: { topLeft: tl, topRight: tr, bottomLeft: bl, bottomRight: br } as BorderRadiuses,
       strokeWidth: adjustedStrokeWidth,
       dividerColor: indicator.dividerColor,

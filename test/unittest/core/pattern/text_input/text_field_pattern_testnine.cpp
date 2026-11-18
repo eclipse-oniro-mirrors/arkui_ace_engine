@@ -663,8 +663,7 @@ HWTEST_F(TextFieldPatternTestNine, OnKeyEvent001, TestSize.Level0)
     event.code = KeyCode::KEY_ENTER;
     pattern_->independentControlKeyboard_ = true;
     pattern_->showKeyBoardOnFocus_ = true;
-    pattern_->customKeyboard_ = AceType::DynamicCast<NG::UINode>(
-        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+    pattern_->customKeyboard_ = AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     pattern_->isCustomKeyboardAttached_ = true;
     auto ret = pattern_->OnKeyEvent(event);
     EXPECT_TRUE(ret);
@@ -1138,8 +1137,7 @@ HWTEST_F(TextFieldPatternTestNine, RequestKeyboardByFocusSwitch001, TestSize.Lev
     GetFocus();
 
     pattern_->showKeyBoardOnFocus_ = true;
-    pattern_->customKeyboard_ =  AceType::DynamicCast<NG::UINode>(
-        AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>()));
+    pattern_->customKeyboard_ =  AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     pattern_->customKeyboardBuilder_ = []() {
         RowModelNG rowModel;
         rowModel.Create(std::nullopt, nullptr, "");

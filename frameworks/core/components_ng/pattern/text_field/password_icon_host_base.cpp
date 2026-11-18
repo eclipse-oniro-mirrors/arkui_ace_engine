@@ -267,6 +267,12 @@ void PasswordIconHostBase<Derived, LayoutPropertyT>::CheckIfNeedToResetKeyboard(
     auto host = static_cast<Derived*>(this)->GetHost();
     CHECK_NULL_VOID(host);
     auto currentType = GetTextInputType();
+    if (keyboard_ == TextInputType::ONE_TIME_CODE_NUMBER && currentType == TextInputType::NUMBER) {
+        // A property update can restore NUMBER after OTP detection. Compare the
+        // effective type before resetting the keyboard or requesting it again.
+        auto layoutProperty = static_cast<Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
+        TryUpgradeToOtpType(layoutProperty.GetRawPtr(), currentType, isFilterChanged_);
+    }
     if (ShouldDoDynamicSwitch(currentType)) {
         DoDynamicSwitch(currentType);
         return;

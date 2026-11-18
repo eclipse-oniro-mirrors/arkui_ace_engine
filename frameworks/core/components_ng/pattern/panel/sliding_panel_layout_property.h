@@ -36,7 +36,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SlidingPanelLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propPanelType_ = ClonePanelType();
         value->propPanelMode_ = ClonePanelMode();
         value->propHasDragBar_ = CloneHasDragBar();

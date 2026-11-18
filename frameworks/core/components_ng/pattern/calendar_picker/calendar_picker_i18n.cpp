@@ -16,6 +16,8 @@
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_i18n.h"
 
 #include <algorithm>
+#include <mutex>
+#include <unordered_map>
 
 #include "unicode/calendar.h"
 #include "unicode/dtptngen.h"
@@ -33,63 +35,18 @@ icu::Locale CreateIcuLocale(const std::string& locale)
     std::replace(name.begin(), name.end(), '-', '_');
     return icu::Locale(name.c_str());
 }
-} // namespace
 
-int32_t CalendarPickerI18n::GetFirstDayOfWeek(const std::string& locale)
+std::string g_cachedLocale;
+bool g_cacheValid = false;
+std::vector<std::string> g_cachedSeparators;
+bool g_separatorsCached = false;
+std::unordered_map<int32_t, std::string> g_cachedNumbers;
+int32_t g_cachedFirstDayOfWeek = 0;
+bool g_firstDayCached = false;
+std::mutex g_cacheMutex;
+
+std::vector<std::string> ParseSeparatorsFromPattern(const std::string& patternStr)
 {
-    UErrorCode status = U_ZERO_ERROR;
-    auto cal = icu::Calendar::createInstance(CreateIcuLocale(locale), status);
-    if (status > U_ZERO_ERROR || cal == nullptr) {
-        delete cal;
-        return 0;
-    }
-    int32_t firstDay = cal->getFirstDayOfWeek();
-    delete cal;
-    return firstDay - 1;
-}
-
-std::string CalendarPickerI18n::LocalizeDateNumber(int32_t value, int32_t minDigits, const std::string& locale)
-{
-    auto fallback = [value, minDigits]() {
-        std::string str = std::to_string(value);
-        if (static_cast<int32_t>(str.length()) < minDigits) {
-            str = std::string(minDigits - str.length(), '0') + str;
-        }
-        return str;
-    };
-    UErrorCode status = U_ZERO_ERROR;
-    icu::number::LocalizedNumberFormatter formatter =
-        icu::number::NumberFormatter::withLocale(CreateIcuLocale(locale));
-    formatter = formatter.grouping(UNumberGroupingStrategy::UNUM_GROUPING_OFF);
-    formatter = formatter.integerWidth(icu::number::IntegerWidth::zeroFillTo(minDigits));
-    auto result = formatter.formatInt(value, status);
-    if (U_FAILURE(status)) {
-        return fallback();
-    }
-    icu::UnicodeString us = result.toString(status);
-    if (U_FAILURE(status)) {
-        return fallback();
-    }
-    std::string s;
-    us.toUTF8String(s);
-    return s;
-}
-
-std::vector<std::string> CalendarPickerI18n::GetDateSeparators(const std::string& locale)
-{
-    UErrorCode status = U_ZERO_ERROR;
-    auto* gen = icu::DateTimePatternGenerator::createInstance(CreateIcuLocale(locale), status);
-    if (U_FAILURE(status) || gen == nullptr) {
-        return {"/", "/"};
-    }
-    icu::UnicodeString pattern = gen->getBestPattern(icu::UnicodeString("yMMdd"), status);
-    delete gen;
-    if (U_FAILURE(status)) {
-        return {"/", "/"};
-    }
-    std::string patternStr;
-    pattern.toUTF8String(patternStr);
-
     std::vector<std::string> separators;
     std::string currentSep;
     bool inField = false;
@@ -118,11 +75,117 @@ std::vector<std::string> CalendarPickerI18n::GetDateSeparators(const std::string
             inField = false;
         }
     }
-    static constexpr size_t MIN_SEPARATOR_COUNT = 2;
-    if (separators.size() < MIN_SEPARATOR_COUNT) {
+    return separators;
+}
+
+void EnsureCacheValid(const std::string& locale)
+{
+    if (g_cacheValid && g_cachedLocale == locale) {
+        return;
+    }
+    g_cachedLocale = locale;
+    g_cacheValid = true;
+    g_cachedSeparators.clear();
+    g_cachedNumbers.clear();
+    g_separatorsCached = false;
+    g_firstDayCached = false;
+}
+} // namespace
+
+int32_t CalendarPickerI18n::GetFirstDayOfWeek(const std::string& locale)
+{
+    std::lock_guard<std::mutex> lock(g_cacheMutex);
+    EnsureCacheValid(locale);
+    if (g_firstDayCached) {
+        return g_cachedFirstDayOfWeek;
+    }
+    UErrorCode status = U_ZERO_ERROR;
+    auto cal = icu::Calendar::createInstance(CreateIcuLocale(locale), status);
+    if (status > U_ZERO_ERROR || cal == nullptr) {
+        delete cal;
+        return 0;
+    }
+    int32_t firstDay = cal->getFirstDayOfWeek();
+    delete cal;
+    g_cachedFirstDayOfWeek = firstDay - 1;
+    g_firstDayCached = true;
+    return g_cachedFirstDayOfWeek;
+}
+
+std::string CalendarPickerI18n::LocalizeDateNumber(int32_t value, int32_t minDigits, const std::string& locale)
+{
+    std::lock_guard<std::mutex> lock(g_cacheMutex);
+    EnsureCacheValid(locale);
+    int32_t key = value * 100 + minDigits;
+    auto it = g_cachedNumbers.find(key);
+    if (it != g_cachedNumbers.end()) {
+        return it->second;
+    }
+    auto fallback = [value, minDigits]() {
+        std::string str = std::to_string(value);
+        if (static_cast<int32_t>(str.length()) < minDigits) {
+            str = std::string(minDigits - str.length(), '0') + str;
+        }
+        return str;
+    };
+    UErrorCode status = U_ZERO_ERROR;
+    icu::number::LocalizedNumberFormatter formatter =
+        icu::number::NumberFormatter::withLocale(CreateIcuLocale(locale));
+    formatter = formatter.grouping(UNumberGroupingStrategy::UNUM_GROUPING_OFF);
+    formatter = formatter.integerWidth(icu::number::IntegerWidth::zeroFillTo(minDigits));
+    auto result = formatter.formatInt(value, status);
+    if (U_FAILURE(status)) {
+        return fallback();
+    }
+    icu::UnicodeString us = result.toString(status);
+    if (U_FAILURE(status)) {
+        return fallback();
+    }
+    std::string s;
+    us.toUTF8String(s);
+    g_cachedNumbers[key] = s;
+    return s;
+}
+
+std::vector<std::string> CalendarPickerI18n::GetDateSeparators(const std::string& locale)
+{
+    std::lock_guard<std::mutex> lock(g_cacheMutex);
+    EnsureCacheValid(locale);
+    if (g_separatorsCached) {
+        return g_cachedSeparators;
+    }
+    UErrorCode status = U_ZERO_ERROR;
+    auto* gen = icu::DateTimePatternGenerator::createInstance(CreateIcuLocale(locale), status);
+    if (U_FAILURE(status) || gen == nullptr) {
         return {"/", "/"};
     }
-    return {separators[0], separators[1]};
+    icu::UnicodeString pattern = gen->getBestPattern(icu::UnicodeString("yMMdd"), status);
+    delete gen;
+    if (U_FAILURE(status)) {
+        return {"/", "/"};
+    }
+    std::string patternStr;
+    pattern.toUTF8String(patternStr);
+    auto separators = ParseSeparatorsFromPattern(patternStr);
+    static constexpr size_t MIN_SEPARATOR_COUNT = 2;
+    if (separators.size() < MIN_SEPARATOR_COUNT) {
+        g_cachedSeparators = {"/", "/"};
+    } else {
+        g_cachedSeparators = {separators[0], separators[1]};
+    }
+    g_separatorsCached = true;
+    return g_cachedSeparators;
+}
+
+void CalendarPickerI18n::ClearCache()
+{
+    std::lock_guard<std::mutex> lock(g_cacheMutex);
+    g_cacheValid = false;
+    g_cachedLocale.clear();
+    g_cachedSeparators.clear();
+    g_cachedNumbers.clear();
+    g_separatorsCached = false;
+    g_firstDayCached = false;
 }
 
 } // namespace OHOS::Ace::NG

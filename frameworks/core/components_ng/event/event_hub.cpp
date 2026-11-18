@@ -1250,6 +1250,26 @@ void EventHub::SetKeyboardShortcut(
     keyboardShortcutSet->keyboardShortcut.emplace_back(keyboardShortcut);
 }
 
+void EventHub::RemoveKeyboardShortcut(const std::string& value, uint8_t keys)
+{
+    if (!keyboardShortcutSet_) {
+        return;
+    }
+    KeyboardShortcut keyboardShortcut;
+    for (auto&& ch : value) {
+        keyboardShortcut.value.push_back(static_cast<char>(std::toupper(ch)));
+    }
+    keyboardShortcut.keys = keys;
+    auto& shortcuts = keyboardShortcutSet_->keyboardShortcut;
+    for (auto iter = shortcuts.begin(); iter != shortcuts.end();) {
+        if (iter->IsEqualTrigger(keyboardShortcut)) {
+            iter = shortcuts.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
 void EventHub::ClearSingleKeyboardShortcut()
 {
     if (keyboardShortcutSet_ && keyboardShortcutSet_->keyboardShortcut.size() == 1) {

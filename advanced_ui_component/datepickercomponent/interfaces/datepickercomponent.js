@@ -3040,7 +3040,7 @@ export class DatePickerComponent extends ViewPU {
         if (firstPercent <= 0) {
             return 0;
         }
-        return this.firstColumnWidth * 100 / firstPercent;
+        return vp2px(this.firstColumnWidth * 100 / firstPercent);
     }
     getColumnWidthPx(columnIndex) {
         const totalWidth = this.getTotalWidthPx();
@@ -3081,6 +3081,9 @@ export class DatePickerComponent extends ViewPU {
             return this.getMiddlePickerIndicator();
         }
         const indicator = this.selectionIndicator;
+        const validType = (indicator.type === PickerIndicatorType.BACKGROUND ||
+            indicator.type === PickerIndicatorType.DIVIDER)
+            ? indicator.type : PickerIndicatorType.BACKGROUND;
         const userBR = indicator.borderRadius;
         const defaultRadius = this.getAdjustedRadius();
         let tl = defaultRadius;
@@ -3175,7 +3178,7 @@ export class DatePickerComponent extends ViewPU {
             adjustedEndMargin = undefined;
         }
         return {
-            type: indicator.type,
+            type: validType,
             borderRadius: { topLeft: tl, topRight: tr, bottomLeft: bl, bottomRight: br },
             strokeWidth: adjustedStrokeWidth,
             dividerColor: indicator.dividerColor,

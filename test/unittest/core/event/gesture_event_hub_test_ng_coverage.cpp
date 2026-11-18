@@ -215,7 +215,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage004, TestSize
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     gestureEventHub->dragEventActuator_->itemParentNode_ = patternNode;
     auto mockPn = AceType::MakeRefPtr<FullyMockedScrollable>();
@@ -269,7 +269,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage005, TestSize
     EXPECT_CALL(*pixmap, GetWidth()).WillRepeatedly(Return(200));
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->textDraggable_ = true;
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     textPattern->dragNode_ = childNode;
@@ -313,7 +313,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage006, TestSize
     EXPECT_CALL(*pixmap, GetWidth()).WillRepeatedly(Return(200));
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->textDraggable_ = true;
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     EXPECT_EQ(gestureEventHub->textDraggable_, true);
@@ -388,7 +388,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage009, TestSize
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     gestureEventHub->dragEventActuator_->itemParentNode_ = patternNode;
     auto mockPn = AceType::MakeRefPtr<FullyMockedScrollable>();
@@ -545,7 +545,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage013, TestSize
     dragPreviewDropInfo.extraInfo = "drag preview extraInfo";
     auto customNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
     dragPreviewDropInfo.customNode = customNode;
-    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return AceType::DynamicCast<NG::UINode>(node); };
+    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return node; };
     dragPreviewDropInfo.buildFunc = buildFunc;
     dragPreviewDropInfo.onlyForLifting = true;
     dragPreviewDropInfo.delayCreating = false;
@@ -609,7 +609,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage014, TestSize
     dragPreviewDropInfo.extraInfo = "drag preview extraInfo";
     auto customNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
     dragPreviewDropInfo.customNode = nullptr;
-    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return AceType::DynamicCast<NG::UINode>(node); };
+    auto buildFunc = [node = customNode]() -> RefPtr<NG::UINode> { return node; };
     dragPreviewDropInfo.buildFunc = buildFunc;
     dragPreviewDropInfo.onlyForLifting = false;
     dragPreviewDropInfo.delayCreating = true;
@@ -682,7 +682,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubTestCoverage015, TestSize
     ASSERT_NE(mainPipeline, nullptr);
     auto overlayManager = mainPipeline->GetOverlayManager();
     ASSERT_NE(overlayManager, nullptr);
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     gestureEventHub->dragEventActuator_->itemParentNode_ = patternNode;
     auto mockPn = AceType::MakeRefPtr<FullyMockedScrollable>();
@@ -791,7 +791,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubOnDragStartTestCoverage00
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     EXPECT_EQ(DragDropGlobalController::GetInstance().dragStartRequestStatus_, DragStartRequestStatus::READY);
 }
@@ -834,7 +834,7 @@ HWTEST_F(GestureEventHubTestCoverageNg, GestureEventHubOnDragStartTestCoverage00
     frameNode->GetOrCreateFocusHub();
     auto mainPipeline = PipelineContext::GetMainPipelineContext();
     auto overlayManager = mainPipeline->GetOverlayManager();
-    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    overlayManager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     gestureEvent.inputEventType_ = InputEventType::MOUSE_BUTTON;
     gestureEventHub->OnDragStart(gestureEvent, pipeline, frameNode, dragDropInfo, event);
     EXPECT_EQ(DragDropGlobalController::GetInstance().dragStartRequestStatus_, DragStartRequestStatus::READY);

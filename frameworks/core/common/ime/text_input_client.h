@@ -18,11 +18,13 @@
 
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 #include "base/memory/ace_type.h"
 #include "base/utils/string_utils.h"
 #include "base/utils/utf_helper.h"
+#include "base/view_data/ace_auto_fill_type.h"
 #include "core/common/ime/text_editing_value.h"
 #include "core/common/ime/text_input_action.h"
 #include "core/common/ime/text_input_type.h"
@@ -331,6 +333,20 @@ public:
     virtual void ResetOriginCaretPosition() {};
     virtual bool RecordOriginCaretPosition() { return false; };
     virtual bool IsShortCutBlocked() { return false; };
+    // Dispatch AutoFill processing to the concrete pattern (TextField / RichEditor).
+    // Virtual dispatch avoids cross-split-SO link-time symbol dependencies between
+    // the text_field and rich_editor component shared libraries.
+    virtual void ProcessAutoFillTrigger(AceAutoFillTriggerType triggerType) {}
+    virtual std::string GetAutoFillUserName() { return ""; }
+    virtual std::string GetAutoFillNewPassword() { return ""; }
+    virtual void SetAutoFillUserName(const std::string& userName) {}
+    virtual void SetAutoFillNewPassword(const std::string& newPassword) {}
+ 
+    // Shared mapping from AutoFill content type to the TextInputType that drives
+    // IME keyboard selection (e.g. password -> secure keyboard, email -> email
+    // keyboard). Lives on TextInputClient so both TextField and RichEditor can
+    // reuse it without a cross-component-SO static dependency.
+    ACE_FORCE_EXPORT static const std::unordered_map<AceAutoFillType, TextInputType>& GetAutoFillKeyboardMap();
 protected:
     int32_t instanceId_ = -1;
     bool shiftFlag_ = false;

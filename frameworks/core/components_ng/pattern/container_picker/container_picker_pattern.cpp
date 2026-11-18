@@ -908,6 +908,7 @@ void ContainerPickerPattern::SetSelectedTextStyle(bool isUpdateTextStyle)
         Color applyColor = textLayoutProperty->HasTextColor()
             ? textLayoutProperty->GetTextColor().value() : defaultColor;
         if (isCenter && HasSelectedTextStyle()) {
+            RestoreItemOriginalStyle(index, textLayoutProperty, applyColor);
             ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
         } else {
             RestoreItemOriginalStyle(index, textLayoutProperty, applyColor);

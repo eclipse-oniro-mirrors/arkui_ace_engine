@@ -426,7 +426,7 @@ HWTEST_F(MenuPatternTwoTestNg, MenuPatternTest090, TestSize.Level1)
     EXPECT_NE(parent->GetChildAtIndex(index + 1), nullptr);
     index = 2;
     childrenOne->tag_ = V2::JS_IF_ELSE_ETS_TAG;
-    auto uiNode = AceType::DynamicCast<UINode>(childrenOne);
+    RefPtr<UINode> uiNode = childrenOne;
     uiNode->children_ = { childrenOne, childrenTwo, childrenThree };
     ASSERT_NE(uiNode, nullptr);
     parent->parent_ = uiNode;
@@ -453,7 +453,7 @@ HWTEST_F(MenuPatternTwoTestNg, MenuPatternTest091, TestSize.Level1)
     parent->tag_ = V2::MENU_ITEM_GROUP_ETS_TAG;
     int32_t index = -1;
     bool press = true;
-    auto uiNode = AceType::DynamicCast<UINode>(childrenOne);
+    RefPtr<UINode> uiNode = childrenOne;
     uiNode->tag_ = V2::JS_IF_ELSE_ETS_TAG;
     ASSERT_NE(uiNode, nullptr);
     parent->parent_ = uiNode;

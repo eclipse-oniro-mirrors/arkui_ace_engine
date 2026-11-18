@@ -345,7 +345,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateInstanceCache001, TestSize.Leve
     // (distinct from the cached spares) and the cached count stays untouched.
     auto acquired = manager_->AcquireTemplateInstance("tpl");
     ASSERT_TRUE(acquired);
-    EXPECT_NE(acquired, AceType::DynamicCast<UINode>(nodes[spareSlots - 1])); // fresh build, not the spare
+    EXPECT_NE(acquired, RefPtr<UINode>(nodes[spareSlots - 1])); // fresh build, not the spare
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), spareSlots); // pool untouched by acquire
     auto synced = manager_->AcquireTemplateInstance("tpl");
     EXPECT_TRUE(synced);

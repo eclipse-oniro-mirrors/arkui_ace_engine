@@ -33,7 +33,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SliderLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propSliderLayoutStyle_ = CloneSliderLayoutStyle();
         return value;
     }

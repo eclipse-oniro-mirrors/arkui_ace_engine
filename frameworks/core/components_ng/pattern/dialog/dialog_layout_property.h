@@ -34,7 +34,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto props = MakeRefPtr<DialogLayoutProperty>();
-        props->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        props->LayoutProperty::UpdateLayoutProperty(this);
         props->propDialogAlignment_ = CloneDialogAlignment();
         props->propDialogOffset_ = CloneDialogOffset();
         props->propGridCount_ = CloneGridCount();

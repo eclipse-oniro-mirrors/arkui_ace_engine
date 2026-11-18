@@ -127,6 +127,26 @@ void AceViewOhos::HandleMouseEvent(const RefPtr<AceViewOhos>& view,
     }
 }
 
+// Proximity events are pen-specific internal states and must not enter the touch pipeline.
+// Otherwise they may be dispatched to a live touch session (same pointer id) and leak
+// TouchType::PROXIMITY_IN/OUT into the public onTouch callback.
+bool SkipProximityEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent, int32_t pointerAction)
+{
+    // Non-null in the current call path; a null event must not enter the touch pipeline,
+    // so treat it as handled (true) to stop dispatching for potential future callers.
+    CHECK_NULL_RETURN(pointerEvent, true);
+    if (pointerAction != MMI::PointerEvent::POINTER_ACTION_PROXIMITY_IN &&
+        pointerAction != MMI::PointerEvent::POINTER_ACTION_PROXIMITY_OUT) {
+        return false;
+    }
+    TAG_LOGD(AceLogTag::ACE_INPUTTRACKING,
+        "DispatchTouchEvent skip proximity event, eventId:%{public}d action:%{public}d",
+        pointerEvent->GetId(), pointerAction);
+    MMI::InputManager::GetInstance()->MarkProcessed(
+        pointerEvent->GetId(), pointerEvent->GetActionTime(), pointerEvent->IsMarkEnabled());
+    return true;
+}
+
 void AceViewOhos::DispatchTouchEvent(const RefPtr<AceViewOhos>& view,
     const std::shared_ptr<MMI::PointerEvent>& pointerEvent, const RefPtr<OHOS::Ace::NG::FrameNode>& node,
     const std::function<void()>& callback, bool isInjected)
@@ -146,6 +166,9 @@ void AceViewOhos::DispatchTouchEvent(const RefPtr<AceViewOhos>& view,
     LogPointInfo(pointerEvent, instanceId);
     DispatchEventToPerf(pointerEvent);
     int32_t pointerAction = pointerEvent->GetPointerAction();
+    if (SkipProximityEvent(pointerEvent, pointerAction)) {
+        return;
+    }
     if (pointerAction == MMI::PointerEvent::POINTER_ACTION_TOUCHPAD_ACTIVE) {
         view->ProcessTouchpadInteractionBegin(pointerEvent);
         return;

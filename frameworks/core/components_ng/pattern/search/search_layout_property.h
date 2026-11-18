@@ -34,7 +34,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SearchLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propSearchButton_ = CloneSearchButton();
         value->propCancelButtonStyle_ = CloneCancelButtonStyle();
         value->propCancelButtonUDSize_ = CloneCancelButtonUDSize();

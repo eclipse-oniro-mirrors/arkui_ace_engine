@@ -455,9 +455,6 @@ public:
         const std::unordered_set<int32_t>& persistentIds, uint8_t subSystemId) override;
     void EnableContainerModalCustomGesture(bool enable) override;
 
-    void RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback) override;
-    void UnregisterBrandColorChangeListener() override;
-
     void AddKeyFrameAnimateEndCallback(const std::function<void()>& callback) override;
     void AddKeyFrameNodeCallback(const std::function<
         void(std::shared_ptr<OHOS::Rosen::RSWindowKeyFrameNode>& keyFrameNode,

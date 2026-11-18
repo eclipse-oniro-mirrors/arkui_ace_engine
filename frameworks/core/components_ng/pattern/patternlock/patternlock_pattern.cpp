@@ -176,10 +176,10 @@ bool PatternLockPattern::InitVirtualNode()
     }
     auto accessibilityProperty = host->GetAccessibilityProperty<AccessibilityProperty>();
     accessibilityProperty->SetAccessibilityText(" ");
-    auto virtualFrameNode = AceType::DynamicCast<NG::FrameNode>(lineNode);
+    auto virtualFrameNode = lineNode;
     CHECK_NULL_RETURN(virtualFrameNode, false);
     virtualFrameNode->SetAccessibilityNodeVirtual();
-    virtualFrameNode->SetAccessibilityVirtualNodeParent(AceType::DynamicCast<NG::UINode>(host));
+    virtualFrameNode->SetAccessibilityVirtualNodeParent(host);
     virtualFrameNode->SetFirstAccessibilityVirtualNode();
     FrameNode::ProcessOffscreenNode(virtualFrameNode);
     accessibilityProperty->SaveAccessibilityVirtualNode(lineNode);

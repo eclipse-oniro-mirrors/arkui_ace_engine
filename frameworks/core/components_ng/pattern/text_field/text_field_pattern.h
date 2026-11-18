@@ -64,6 +64,7 @@
 #include "core/components_ng/pattern/text_field/error_decorator.h"
 #include "core/components_ng/pattern/text_field/text_editing_value_ng.h"
 #include "core/components_ng/pattern/text_field/text_content_type.h"
+#include "core/components_ng/pattern/text_field/auto_fill_host.h"
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
 #include "core/components_ng/pattern/text_field/auto_fill_controller.h"
 #endif
@@ -320,11 +321,13 @@ class ACE_FORCE_EXPORT TextFieldPattern : public ScrollablePattern,
                          public TextGestureSelector,
                          public LayoutInfoInterface,
                          public ICounterHost,
-                         public PasswordIconHostBase<TextFieldPattern, TextFieldLayoutProperty>,
+                         public CleanNodeHostBase<TextFieldPattern, TextFieldLayoutProperty>,
                          public PageTranslateNode,
-                         public CleanNodeHostBase<TextFieldPattern, TextFieldLayoutProperty> {
+                         public PasswordIconHostBase<TextFieldPattern, TextFieldLayoutProperty>,
+                         public AutoFillHostBase<TextFieldPattern, TextFieldLayoutProperty> {
     DECLARE_ACE_TYPE(TextFieldPattern, ScrollablePattern, TextDragBase, ValueChangeObserver, TextInputClient,
-        TextBase, Magnifier, TextGestureSelector, ICounterHost, IPasswordIconHost, PageTranslateNode, ICleanNodeHost);
+        TextBase, Magnifier, TextGestureSelector, ICounterHost, IPasswordIconHost, PageTranslateNode, ICleanNodeHost,
+        IAutoFillHost);
 
 public:
     void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
@@ -530,17 +533,21 @@ public:
     }
 
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-    const RefPtr<AutoFillController>& GetOrCreateAutoFillController()
+    RefPtr<Paragraph> GetAutoFillParagraph() override { return GetParagraph(); }
+    IAutoFillContentModifier* GetAutoFillContentModifier() override
     {
-        if (!autoFillController_) {
-            auto host = GetHost();
-            if (host) {
-                ACE_UINODE_TRACE(host);
-            }
-            autoFillController_ = MakeRefPtr<AutoFillController>(WeakClaim(this));
-        }
-        return autoFillController_;
+        return static_cast<IAutoFillContentModifier*>(RawPtr(textFieldContentModifier_));
     }
+    RefPtr<TextFieldTheme> GetAutoFillTheme() override { return GetTheme(); }
+    TextDirection GetAutoFillParagraphDirection(TextDirection fallback) override
+    {
+        CHECK_NULL_RETURN(paragraph_, fallback);
+        return paragraph_->GetParagraphStyle().direction;
+    }
+    // BeforeAutoFillAnimation hooks
+    std::u16string PrepareAutoFillText(const std::u16string& content) override;
+    bool IsAutoFillAnimationEnabled() const override;
+    void ExecuteAutoFillInsert(const std::u16string& content) override;
 #endif
 
 #if defined(IOS_PLATFORM)
@@ -1661,22 +1668,22 @@ public:
         return autoFillRequestSuccessOnFocus_;
     }
 
-    void SetAutoFillUserName(const std::string& userName)
+    void SetAutoFillUserName(const std::string& userName) override
     {
         autoFillUserName_ = userName;
     }
 
-    std::string GetAutoFillUserName()
+    std::string GetAutoFillUserName() override
     {
         return autoFillUserName_;
     }
 
-    std::string GetAutoFillNewPassword()
+    std::string GetAutoFillNewPassword() override
     {
         return autoFillNewPassword_;
     }
 
-    void SetAutoFillNewPassword(const std::string& newPassword)
+    void SetAutoFillNewPassword(const std::string& newPassword) override
     {
         autoFillNewPassword_ = newPassword;
     }
@@ -2106,9 +2113,7 @@ protected:
 
     // 是否独立控制键盘
     bool independentControlKeyboard_ = false;
-#ifdef ENABLE_AUTO_FILL_CONTROLLER
-    RefPtr<AutoFillController> autoFillController_;
-#endif
+    // autoFillController_ is now owned by AutoFillHostBase<TextFieldPattern, TextFieldLayoutProperty>
     virtual IMEClient GetIMEClientInfo();
     RefPtr<TextFieldSelectOverlay> selectOverlay_;
     /* --------- select AI detect ---------- */
@@ -2437,7 +2442,6 @@ private:
     void SetIsEnableSubWindowMenu();
     void OnReportPasteEvent(const RefPtr<FrameNode>& frameNode);
     void OnReportSubmitEvent(const RefPtr<FrameNode>& frameNode);
-    void BeforeAutoFillAnimation(const std::u16string& content, const AceAutoFillType& type);
     void ProcessAutoFillOnPaste();
     void HandleOnPasteCommon(const std::string& data);
     void HandleOnAutoFillSecurePaste(const std::string& data);

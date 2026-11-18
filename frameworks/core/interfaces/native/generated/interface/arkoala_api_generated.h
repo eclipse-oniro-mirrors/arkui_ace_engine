@@ -4299,6 +4299,15 @@ typedef struct Opt_BarMode {
     Ark_Tag tag;
     Ark_BarMode value;
 } Opt_BarMode;
+typedef enum Ark_BarOverlapMode {
+    ARK_BAR_OVERLAP_MODE_STANDARD = 0,
+    ARK_BAR_OVERLAP_MODE_STACK = 1,
+    ARK_BAR_OVERLAP_MODE_SAFE_AREA_PADDING = 2,
+} Ark_BarOverlapMode;
+typedef struct Opt_BarOverlapMode {
+    Ark_Tag tag;
+    Ark_BarOverlapMode value;
+} Opt_BarOverlapMode;
 typedef enum Ark_BarPosition {
     ARK_BAR_POSITION_START = 0,
     ARK_BAR_POSITION_END = 1,
@@ -5389,6 +5398,18 @@ typedef enum Ark_FunctionKey {
     ARK_FUNCTION_KEY_DPAD_DOWN = 15,
     ARK_FUNCTION_KEY_DPAD_LEFT = 16,
     ARK_FUNCTION_KEY_DPAD_RIGHT = 17,
+    ARK_FUNCTION_KEY_CAPS_LOCK = 18,
+    ARK_FUNCTION_KEY_SCROLL_LOCK = 20,
+    ARK_FUNCTION_KEY_PAUSE_BREAK = 21,
+    ARK_FUNCTION_KEY_NUM_LOCK = 22,
+    ARK_FUNCTION_KEY_INSERT = 23,
+    ARK_FUNCTION_KEY_DELETE = 24,
+    ARK_FUNCTION_KEY_HOME = 25,
+    ARK_FUNCTION_KEY_END = 26,
+    ARK_FUNCTION_KEY_PAGE_UP = 27,
+    ARK_FUNCTION_KEY_PAGE_DOWN = 28,
+    ARK_FUNCTION_KEY_ENTER = 29,
+    ARK_FUNCTION_KEY_BACKSPACE = 30,
 } Ark_FunctionKey;
 typedef struct Opt_FunctionKey {
     Ark_Tag tag;
@@ -5761,6 +5782,7 @@ typedef enum Ark_ImmersiveStrategy {
     ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
     ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
     ARK_IMMERSIVE_STRATEGY_BIND_SHEET_EXPAND_SAFE_AREA = 7,
+    ARK_IMMERSIVE_STRATEGY_TABS_EXPAND_SAFE_AREA = 9,
 } Ark_ImmersiveStrategy;
 typedef struct Opt_ImmersiveStrategy {
     Ark_Tag tag;
@@ -22380,6 +22402,7 @@ typedef struct Ark_ImmersiveOptionsInner {
     Opt_Boolean applyShadow;
     Opt_Boolean interactive;
     Opt_LightEffectOptionsInner lightEffect;
+    Opt_Int32 colorBlendMode;
 } Ark_ImmersiveOptionsInner;
 typedef struct Opt_ImmersiveOptionsInner {
     Ark_Tag tag;
@@ -28164,8 +28187,10 @@ typedef struct GENERATED_ArkUITabsModifier {
                        const Opt_DividerStyle* value);
     void (*setNestedScroll)(Ark_NativePointer node,
                             const Opt_TabsNestedScrollMode* value);
-    void (*setBarOverlap)(Ark_NativePointer node,
-                          const Opt_Boolean* value);
+    void (*setBarOverlap0)(Ark_NativePointer node,
+                           const Opt_Boolean* value);
+    void (*setBarOverlap1)(Ark_NativePointer node,
+                           const Opt_BarOverlapMode* value);
     void (*setBarBackgroundColor)(Ark_NativePointer node,
                                   const Opt_ResourceColor* value);
     void (*setBarGridAlign)(Ark_NativePointer node,
@@ -29414,6 +29439,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                             Ark_Int32 value);
     void (*setBufferQueueCount)(Ark_NativePointer node,
                                 Ark_Int32 value);
+    void (*setEnableSurfaceVisibilityLifecycle)(Ark_NativePointer node,
+                                                const Opt_Boolean* value);
     void (*setHdrBrightness1)(Ark_NativePointer node,
                               const Opt_Float64* brightness,
                               const Opt_HdrType* type);
@@ -29981,11 +30008,6 @@ typedef struct GENERATED_ArkUICanvasRendererAccessor {
                                               Ark_Float64 startAngle,
                                               Ark_Float64 x,
                                               Ark_Float64 y);
-    Opt_image_PixelMap (*getPixelMap)(Ark_CanvasRenderer peer,
-                                      Ark_Float64 sx,
-                                      Ark_Float64 sy,
-                                      Ark_Float64 sw,
-                                      Ark_Float64 sh);
     Array_F64 (*getLineDash)(Ark_CanvasRenderer peer);
     void (*setLineDash)(Ark_CanvasRenderer peer,
                         const Array_F64* segments);
@@ -33180,6 +33202,7 @@ typedef struct GENERATED_ArkUITextMenuItemIdAccessor {
     Ark_TextMenuItemId (*getAskAI)();
     Ark_TextMenuItemId (*getAutoFill)();
     Ark_TextMenuItemId (*getPasswordVault)();
+    Ark_TextMenuItemId (*getTRANSLATE_INPUT)();
 } GENERATED_ArkUITextMenuItemIdAccessor;
 
 typedef struct GENERATED_ArkUITextShadowStyleAccessor {

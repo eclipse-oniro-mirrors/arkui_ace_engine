@@ -986,7 +986,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest001, TestSize.Level1)
      * @tc.steps: step2. DynamicCast pattern to ICleanNodeHost.
      * @tc.expected: interface pointer is valid and basic methods don't crash.
      */
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_NE(hostInterface->GetHost(), nullptr);
     EXPECT_FALSE(hostInterface->IsDragging());
@@ -1014,7 +1014,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest002, TestSize.Level1)
     /**
      * @tc.steps: step2. verify interface getters reflect layout property values.
      */
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::CONSTANT);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
@@ -1116,7 +1116,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest005, TestSize.Level1)
         model.SetCancelButtonSymbol(false);
     });
     ASSERT_NE(pattern_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
 
     /**
@@ -1165,7 +1165,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest006, TestSize.Level1)
     /**
      * @tc.steps: step3. verify all interface getters return the set values.
      */
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCancelIconColor(), Color::RED);
     EXPECT_EQ(hostInterface->GetCancelIconSrc(), "/test/icon.svg");
@@ -1195,7 +1195,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest007, TestSize.Level1)
         model.SetCancelButtonSymbol(false);
     });
     ASSERT_NE(pattern_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
 
     /**
@@ -1226,7 +1226,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest007, TestSize.Level1)
     layoutProperty_->UpdateIconSrc("/test/cancel.png");
     layoutProperty_->UpdateBundleName("com.test.bn");
     layoutProperty_->UpdateModuleName("mod");
-    hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
 
     /**
@@ -1302,7 +1302,7 @@ HWTEST_F(TextFieldPatternTestThree, ICleanNodeHostTest009, TestSize.Level1)
         model.SetCancelButtonSymbol(false);
     });
     ASSERT_NE(pattern_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern_);
+    RefPtr<ICleanNodeHost> hostInterface = pattern_;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_FALSE(hostInterface->IsContentEmpty());
 

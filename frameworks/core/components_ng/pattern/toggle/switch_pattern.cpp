@@ -108,7 +108,7 @@ bool SwitchPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         currentOffset_ = GetSwitchWidth();
     }
 
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto switchLayoutAlgorithm = DynamicCast<SwitchLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(switchLayoutAlgorithm, false);
@@ -1558,7 +1558,7 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
     dragFrameMaterialParam.refractParams[0] = -0.008f + t * (-0.01f - (-0.008f));
     dragFrameMaterialParam.refractParams[1] = 0.15f + t * (0.13f - 0.15f);
     float dipScale = static_cast<float>(pipeline->GetDipScale());
-    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale);
+    auto filter = RosenEffectConverter::ConvertToFrostedGlassFilter(dragFrameMaterialParam, dipScale, nullptr);
     if (filter) {
         auto renderContext = dragFrameNode_->GetRenderContext();
         if (renderContext) {

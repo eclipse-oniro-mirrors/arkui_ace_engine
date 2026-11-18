@@ -31,7 +31,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<SecurityComponentPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propIconColor_ = CloneIconColor();
         value->propSymbolIconColor_ = CloneSymbolIconColor();
         value->propFontColor_ = CloneFontColor();

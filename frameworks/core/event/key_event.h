@@ -101,11 +101,7 @@ struct KeyEvent final : public NonPointerEvent {
     {
         return pressedCodes.size() > 1;
     }
-    bool IsFunctionKey() const
-    {
-        return (KeyCode::KEY_F1 <= code && code <= KeyCode::KEY_F12) ||
-               (KeyCode::KEY_DPAD_UP <= code && code <= KeyCode::KEY_DPAD_RIGHT) || KeyCode::KEY_TAB == code;
-    }
+    bool IsFunctionKey() const;
     bool IsEscapeKey() const
     {
         return KeyCode::KEY_ESCAPE == code;

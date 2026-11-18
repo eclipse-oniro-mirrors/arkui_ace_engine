@@ -49,6 +49,7 @@ class CalcDimensionRect;
 struct TextDetectConfig;
 struct TabBarSymbol;
 struct ImageInfoConfig;
+enum class FunctionKey;
 namespace NG {
 struct DrawingContext;
 } // namespace NG
@@ -852,31 +853,7 @@ public:
         return false;
     }
 
-    static std::string GetFunctionKeyName(FunctionKey functionkey)
-    {
-        std::map<FunctionKey, std::string> keyNameMap {
-            {FunctionKey::ESC, "ESC"},
-            {FunctionKey::F1, "F1"},
-            {FunctionKey::F2, "F2"},
-            {FunctionKey::F3, "F3"},
-            {FunctionKey::F4, "F4"},
-            {FunctionKey::F5, "F5"},
-            {FunctionKey::F6, "F6"},
-            {FunctionKey::F7, "F7"},
-            {FunctionKey::F8, "F8"},
-            {FunctionKey::F9, "F9"},
-            {FunctionKey::F10, "F10"},
-            {FunctionKey::F11, "F11"},
-            {FunctionKey::F12, "F12"},
-            {FunctionKey::TAB, "TAB"},
-            {FunctionKey::DPAD_UP, "DPAD_UP"},
-            {FunctionKey::DPAD_DOWN, "DPAD_DOWN"},
-            {FunctionKey::DPAD_LEFT, "DPAD_LEFT"},
-            {FunctionKey::DPAD_RIGHT, "DPAD_RIGHT"}
-        };
-        auto result = keyNameMap.find(functionkey);
-        return (result != keyNameMap.end()) ? result->second : std::string();
-    }
+    static std::string GetFunctionKeyName(FunctionKey functionkey);
 
     static bool CheckColor(const JSRef<JSVal>& jsValue, Color& result, const char* componentName, const char* propName);
     static bool CheckColor(

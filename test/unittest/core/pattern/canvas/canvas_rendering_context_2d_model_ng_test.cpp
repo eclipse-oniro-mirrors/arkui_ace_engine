@@ -140,7 +140,7 @@ HWTEST_F(CanvasRenderingContext2DModelNGTest, SetPattern001, TestSize.Level1)
 {
     auto nonPattern = AceType::MakeRefPtr<AceType>();
     model_->SetPattern(nonPattern);
-    EXPECT_EQ(model_->weakPattern_.Upgrade(), AceType::DynamicCast<CanvasPattern>(pattern_));
+    EXPECT_EQ(model_->weakPattern_.Upgrade(), pattern_);
 }
 
 HWTEST_F(CanvasRenderingContext2DModelNGTest, SetPattern002, TestSize.Level1)

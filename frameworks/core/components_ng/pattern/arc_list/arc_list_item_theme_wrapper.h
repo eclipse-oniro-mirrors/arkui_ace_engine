@@ -40,7 +40,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ArcListItemThemeWrapper>();
-            auto theme = AceType::DynamicCast<ArcListItemTheme>(wrapper);
+            RefPtr<ArcListItemTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

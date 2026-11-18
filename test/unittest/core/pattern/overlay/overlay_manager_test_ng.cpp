@@ -1869,7 +1869,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea3, TestSize.Level1)
 
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1000.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->height_ = 1800;
     sheetPattern->AvoidSafeArea();
     EXPECT_EQ(sheetPattern->keyboardHeight_, 200);
@@ -1885,7 +1885,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea3, TestSize.Level1)
      */
     sheetPattern->keyboardHeight_ = 0;
     pattern->selectController_->caretInfo_.rect.SetTop(1900.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     EXPECT_EQ(static_cast<int>(renderContext->GetTransformTranslate()->y.ConvertToPx()), 56);
     EXPECT_FALSE(sheetPattern->isScrolling_);
@@ -2307,7 +2307,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea6, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1500.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = expectedKeyboardHeight - (MockPipelineContext::GetCurrent()->GetRootHeight() -
@@ -2343,7 +2343,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea6, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1900.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = sheetPattern->pageHeight_ -
@@ -2495,7 +2495,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea7, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1400.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = expectedKeyboardHeight - (MockPipelineContext::GetCurrent()->GetRootHeight() -
@@ -2531,7 +2531,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea7, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1800.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = sheetPattern->pageHeight_ -
@@ -3015,7 +3015,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea10, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1500.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = expectedKeyboardHeight - (MockPipelineContext::GetCurrent()->GetRootHeight() -
@@ -3051,7 +3051,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea10, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1900.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = sheetPattern->pageHeight_ -
@@ -3199,7 +3199,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea11, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1400.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = expectedKeyboardHeight - (MockPipelineContext::GetCurrent()->GetRootHeight() -
@@ -3235,7 +3235,7 @@ HWTEST_F(OverlayManagerTestNg, TestSheetAvoidSafeArea11, TestSize.Level1)
      */
     safeAreaManager->keyboardInset_ = upKeyboard;
     pattern->selectController_->caretInfo_.rect.SetTop(1800.0f);
-    textFieldManager->onFocusTextField_ = AceType::DynamicCast<Pattern>(pattern);
+    textFieldManager->onFocusTextField_ = pattern;
     sheetPattern->AvoidSafeArea();
     expectedKeyboardHeight = 600.f;
     expectedSheetHeightUp = sheetPattern->pageHeight_ -

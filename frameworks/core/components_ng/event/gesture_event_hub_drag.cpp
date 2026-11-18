@@ -1977,9 +1977,11 @@ void GestureEventHub::StartDragForCustomBuilder(const GestureEvent& info, const 
     }
 
     TAG_LOGI(AceLogTag::ACE_DRAG, "Snapshot createSync failed, get thumbnail by async.");
-    auto callback = [id = Container::CurrentId(), pipeline, info, gestureEventHubPtr = AceType::Claim(this), frameNode,
-        dragDropInfo, event](std::shared_ptr<Media::PixelMap> pixelMap, int32_t arg, std::function<void()>
-        finishCallback) mutable {
+    auto weakPipeline = AceType::WeakClaim(AceType::RawPtr(pipeline));
+    auto weakFrameNode = AceType::WeakClaim(AceType::RawPtr(frameNode));
+    auto callback = [id = Container::CurrentId(), weakPipeline, info, weakGestureHub = AceType::WeakClaim(this),
+        weakFrameNode, dragDropInfo, event](std::shared_ptr<Media::PixelMap> pixelMap, int32_t arg,
+        std::function<void()> finishCallback) mutable {
         ContainerScope scope(id);
         ACE_SCOPED_TRACE("drag: get snapshot async done, post task to UI for next handling");
         TAG_LOGI(AceLogTag::ACE_DRAG, "Get thumbnail callback executed.");
@@ -1990,16 +1992,22 @@ void GestureEventHub::StartDragForCustomBuilder(const GestureEvent& info, const 
             DragDropBehaviorReporter::GetInstance().UpdateDragStartResult(DragStartResult::SNAPSHOT_FAIL);
 #endif
         }
-        auto taskScheduler = pipeline->GetTaskExecutor();
+        auto pipelineCtx = weakPipeline.Upgrade();
+        CHECK_NULL_VOID(pipelineCtx);
+        auto taskScheduler = pipelineCtx->GetTaskExecutor();
         CHECK_NULL_VOID(taskScheduler);
         taskScheduler->PostTask(
-            [pipeline, info, gestureEventHubPtr, frameNode, dragDropInfo, event, finishCallback]() {
+            [weakPipeline, info, weakGestureHub, weakFrameNode, dragDropInfo, event, finishCallback]() {
                 TAG_LOGI(AceLogTag::ACE_DRAG, "Get thumbnail finished, start drag.");
                 if (finishCallback) {
                     finishCallback();
                 }
+                auto gestureEventHubPtr = weakGestureHub.Upgrade();
                 CHECK_NULL_VOID(gestureEventHubPtr);
+                auto frameNode = weakFrameNode.Upgrade();
                 CHECK_NULL_VOID(frameNode);
+                auto pipeline = weakPipeline.Upgrade();
+                CHECK_NULL_VOID(pipeline);
                 gestureEventHubPtr->OnDragStart(info, pipeline, frameNode, dragDropInfo, event);
             },
             TaskExecutor::TaskType::UI, "ArkUIGestureDragStart");

@@ -786,7 +786,7 @@ HWTEST_F(StackNewTestNG, StackIgnoreLayoutSafeArea001, TestSize.Level0)
     IgnoreLayoutSafeAreaOpts opts = { .type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM,
         .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL };
     text->GetLayoutProperty()->UpdateIgnoreLayoutSafeAreaOpts(opts);
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
@@ -825,7 +825,7 @@ HWTEST_F(StackNewTestNG, StackIgnoreLayoutSafeArea002, TestSize.Level0)
     IgnoreLayoutSafeAreaOpts opts = { .type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM,
         .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL };
     childLayoutProperty->UpdateIgnoreLayoutSafeAreaOpts(opts);
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
@@ -1297,7 +1297,7 @@ HWTEST_F(StackNewTestNG, OnDirtyLayoutWrapperSwap003, TestSize.Level0)
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutAlgorithm = AceType::MakeRefPtr<LayoutAlgorithmWrapper>(pattern->CreateLayoutAlgorithm());
     layoutWrapper->SetLayoutAlgorithm(layoutAlgorithm);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
     auto stackLayoutAlgorithm =
         AceType::DynamicCast<StackLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

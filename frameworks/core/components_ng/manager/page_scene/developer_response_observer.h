@@ -67,6 +67,8 @@ private:
     void DispatchResponseReports(
         const std::map<int32_t, std::vector<std::pair<std::string, std::string>>>& payloadsByPid,
         const std::map<int32_t, RefPtr<TaskExecutor>>& executorByPid);
+    // Reports the scenes that were reported before but are no longer present, once each.
+    void DispatchResponseExits();
 
     bool active_ = false;
     std::mutex mutex_;

@@ -488,7 +488,7 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setNestedScroll(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
-    setBarOverlapAttribute(value: boolean | undefined): void {
+    setBarOverlap0Attribute(value: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
             thisSerializer.writeInt8(RuntimeType.OBJECT)
@@ -497,7 +497,19 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         } else {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
-        ArkUIGeneratedNativeModule._TabsAttribute_setBarOverlap(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        ArkUIGeneratedNativeModule._TabsAttribute_setBarOverlap0(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setBarOverlap1Attribute(value: BarOverlapMode | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as BarOverlapMode)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setBarOverlap1(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setBarBackgroundColorAttribute(value: ResourceColor | undefined): void {
@@ -1169,6 +1181,11 @@ export enum LayoutStyle {
     ALWAYS_AVERAGE_SPLIT = 1,
     SPACE_BETWEEN_OR_CENTER = 2
 }
+export enum BarOverlapMode {
+    STANDARD = 0,
+    STACK = 1,
+    SAFE_AREA_PADDING = 2
+}
 export enum TabsCacheMode {
     CACHE_BOTH_SIDE = 0,
     CACHE_LATEST_SWITCHED = 1
@@ -1320,6 +1337,9 @@ export interface TabsAttribute extends CommonMethod {
         throw new Error('Unimplemented method nestedScroll')
     }
     barOverlap(value: boolean | undefined): this {
+        throw new Error('Unimplemented method barOverlap')
+    }
+    barOverlap(value: BarOverlapMode | undefined): this {
         throw new Error('Unimplemented method barOverlap')
     }
     barBackgroundColor(value: ResourceColor | undefined): this {
@@ -1549,7 +1569,12 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     }
     public barOverlap(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
-        this.getPeer()?.setBarOverlapAttribute(value_casted)
+        this.getPeer()?.setBarOverlap0Attribute(value_casted)
+        return this
+    }
+    public barOverlap(value: BarOverlapMode | undefined): this {
+        const value_casted = value as (BarOverlapMode | undefined)
+        this.getPeer()?.setBarOverlap1Attribute(value_casted)
         return this
     }
     public barBackgroundColor(value: ResourceColor | undefined): this {

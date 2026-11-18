@@ -48,7 +48,7 @@ void ShowCalendarPickerDialog(const CalendarPickerDialogOption* option)
     const std::vector<ButtonInfo>* buttonInfosPtr =
         reinterpret_cast<const std::vector<ButtonInfo>*>(option->buttonInfos);
 
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
 
     executor->PostTask(

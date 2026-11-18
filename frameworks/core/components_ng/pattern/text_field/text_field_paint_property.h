@@ -31,7 +31,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<TextFieldPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propPlaceholderColor_ = ClonePlaceholderColor();
         value->propInputStyle_ = CloneInputStyle();
         value->propCursorColor_ = CloneCursorColor();

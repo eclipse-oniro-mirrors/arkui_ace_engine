@@ -277,7 +277,7 @@ void GestureEventHub::TriggerShouldParallelWith(
         if (item.Invalid()) {
             continue;
         }
-        auto recognizer = AceType::DynamicCast<NGGestureRecognizer>(item.Upgrade());
+        auto recognizer = item.Upgrade();
         if (!recognizer) {
             continue;
         }
@@ -1018,7 +1018,7 @@ void GestureEventHub::AddClickEvent(const RefPtr<ClickEvent>& clickEvent)
     SetCommonClickEvent(clickEventActuator_->GetClickEvent());
     SetFocusClickEvent(clickEventActuator_->GetClickEvent());
 
-    auto uiNode = AceType::DynamicCast<UINode>(GetFrameNode());
+    auto uiNode = GetFrameNode();
     CHECK_NULL_VOID(uiNode);
     uiNode->SetBuiltInEventRegistrationState(true);
 }

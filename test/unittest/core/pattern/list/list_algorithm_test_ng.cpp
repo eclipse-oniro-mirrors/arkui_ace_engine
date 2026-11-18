@@ -136,9 +136,9 @@ const PredictScanState PREDICT_SCAN_STATES[] = {
         Outcome::PREDICT_AND_POSITION, Outcome::PREDICT_AND_POSITION },
     { "ConstraintUnpositioned", false, false, true, false, false,
         Outcome::PREDICT_AND_POSITION, Outcome::PREDICT_AND_POSITION },
-    { "PreMeasuredDirtyUnpositioned", true, false, false, true, false, Outcome::POSITION, Outcome::WAIT_FOR_PARENT },
-    { "PreMeasuredDirtyPositioned", true, true, false, true, false, Outcome::POSITION, Outcome::PREDICT_AND_POSITION },
-    { "PreMeasuredConstraint", false, true, true, true, false, Outcome::POSITION, Outcome::PREDICT_AND_POSITION },
+    { "PreMeasuredDirtyUnpositioned", true, false, false, true, false, Outcome::POSITION, Outcome::POSITION },
+    { "PreMeasuredDirtyPositioned", true, true, false, true, false, Outcome::POSITION, Outcome::POSITION },
+    { "PreMeasuredConstraint", false, true, true, true, false, Outcome::POSITION, Outcome::POSITION },
 };
 using PredictScanParam = std::tuple<int32_t, bool, PredictScanState>;
 constexpr float SCAN_START = 100.0f;
@@ -1165,7 +1165,8 @@ void ListPredictScanTestNg::CheckScanResult(
         EXPECT_FLOAT_EQ(item.referencePos, forward ? SCAN_END + SCAN_SPACE : SCAN_START - SCAN_SPACE);
     }
     EXPECT_EQ(cachedCount, needParentLayout ? 0 : 1);
-    EXPECT_EQ(lastIndex, needParentLayout ? 1 : target_);
+    const int32_t expectedLastIndex = (needParentLayout && state.missing) ? 1 : target_;
+    EXPECT_EQ(lastIndex, expectedLastIndex);
     EXPECT_EQ(algorithm_->cachedItemPosition_.count(target_), needParentLayout ? 0 : 1);
 }
 

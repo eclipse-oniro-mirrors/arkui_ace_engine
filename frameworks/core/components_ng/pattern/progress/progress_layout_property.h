@@ -37,7 +37,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ProgressLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propType_ = CloneType();
         value->propStrokeWidth_ = CloneStrokeWidth();
         return value;

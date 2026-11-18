@@ -3815,6 +3815,12 @@ void BuildParsedConfig(Platform::ParsedConfig& parsedConfig,
     parsedConfig.mcc = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::SYSTEM_MCC);
     parsedConfig.mnc = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::SYSTEM_MNC);
     parsedConfig.fontId = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::SYSTEM_FONT_ID);
+    parsedConfig.themeSkin = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::THEME_SKIN);
+    parsedConfig.themeIcon = config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::THEME_ICON);
+    // One-shot font animation policy carried by the configuration item: absent or "true" keeps the
+    // existing reload transition, only "false" disables it for this single update.
+    parsedConfig.fontAnimationEnabled =
+        config->GetItem(OHOS::AppExecFwk::ConfigurationInner::APPLICATION_FONT_ANIMATION) != "false";
     // Process system language and preferred language
     auto isPreferredLanguage = config->GetItem(OHOS::AppExecFwk::GlobalConfigurationKey::IS_PREFERRED_LANGUAGE);
     if (isPreferredLanguage == IS_PREFERRED_LANGUAGE) {
@@ -8307,6 +8313,7 @@ void UIContentImpl::HandleBrandColorChanged(
 void UIContentImpl::UpdateBrandColor(
     const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
 {
+    ContainerScope scope(instanceId);
     auto context = weakContext.lock();
     CHECK_NULL_VOID(context);
     auto brandColorStr = context->GetBrandColorValue();
@@ -8314,6 +8321,7 @@ void UIContentImpl::UpdateBrandColor(
     CHECK_NULL_VOID(storage);
     if (brandColorStr.empty()) {
         storage->RemoveInstanceBrandColor(instanceId);
+        storage->UpdateInstanceDefaultTheme(instanceId);
         NotifyBrandColorChangeToUEC(instanceId, std::nullopt, std::nullopt);
         return;
     }
@@ -8321,11 +8329,12 @@ void UIContentImpl::UpdateBrandColor(
     info.brandColor = Color::FromString(brandColorStr);
     info.colorStrategy = static_cast<NG::BrandColorStrategy>(context->GetBrandColorStrategy());
     storage->StoreInstanceBrandColor(instanceId, info);
+    storage->UpdateInstanceDefaultTheme(instanceId);
+    NotifyBrandColorChangeToUEC(instanceId, info.brandColor, info.colorStrategy);
     auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
     CHECK_NULL_VOID(pipelineContext);
     auto rootNode = pipelineContext->GetRootElement();
     CHECK_NULL_VOID(rootNode);
-    ContainerScope scope(instanceId);
     rootNode->UpdateThemeScopeUpdate(0); // 0 means default theme scope id
 }
 
@@ -8336,36 +8345,6 @@ void UIContentImpl::NotifyBrandColorChangeToUEC(
     auto* storage = NG::TokenThemeStorage::GetInstance();
     CHECK_NULL_VOID(storage);
     storage->NotifyBrandColorChange(instanceId, brandColor, colorStrategy);
-}
-
-void UIContentImpl::RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback)
-{
-    auto* storage = NG::TokenThemeStorage::GetInstance();
-    CHECK_NULL_VOID(storage);
-    NG::BrandColorChangeCallback internalCallback =
-        [callback](int32_t instanceId, const std::optional<Color>& brandColor,
-            const std::optional<NG::BrandColorStrategy>& colorStrategy) {
-            if (!callback) {
-                return;
-            }
-            std::optional<uint32_t> rawColor;
-            if (brandColor.has_value()) {
-                rawColor = brandColor.value().GetValue();
-            }
-            std::optional<int32_t> rawStrategy;
-            if (colorStrategy.has_value()) {
-                rawStrategy = static_cast<int32_t>(colorStrategy.value());
-            }
-            callback(instanceId, rawColor, rawStrategy);
-        };
-    storage->RegisterBrandColorChangeListener(instanceId_, internalCallback);
-}
-
-void UIContentImpl::UnregisterBrandColorChangeListener()
-{
-    auto* storage = NG::TokenThemeStorage::GetInstance();
-    CHECK_NULL_VOID(storage);
-    storage->UnregisterBrandColorChangeListener(instanceId_);
 }
 
 bool UIContentImpl::IsBrandColorValid(const std::string& brandColorStr)

@@ -42,6 +42,25 @@ enum ValueArrayIndex {
 };
 
 constexpr int32_t DEFAULT_DISPLAYED_ITEM_COUNT = 7;
+constexpr int32_t ARKTS_FONT_WEIGHT_LIGHTER = 0;
+constexpr int32_t ARKTS_FONT_WEIGHT_NORMAL = 1;
+constexpr int32_t ARKTS_FONT_WEIGHT_REGULAR = 2;
+constexpr int32_t ARKTS_FONT_WEIGHT_MEDIUM = 3;
+constexpr int32_t ARKTS_FONT_WEIGHT_BOLD = 4;
+constexpr int32_t ARKTS_FONT_WEIGHT_BOLDER = 5;
+
+ArkUI_Int32 ConvertCppFontWeightToArk(FontWeight weight)
+{
+    switch (weight) {
+        case FontWeight::LIGHTER: return ARKTS_FONT_WEIGHT_LIGHTER;
+        case FontWeight::NORMAL: return ARKTS_FONT_WEIGHT_NORMAL;
+        case FontWeight::REGULAR: return ARKTS_FONT_WEIGHT_REGULAR;
+        case FontWeight::MEDIUM: return ARKTS_FONT_WEIGHT_MEDIUM;
+        case FontWeight::BOLD: return ARKTS_FONT_WEIGHT_BOLD;
+        case FontWeight::BOLDER: return ARKTS_FONT_WEIGHT_BOLDER;
+        default: return ARKTS_FONT_WEIGHT_NORMAL;
+    }
+}
 
 void SetContainerPickerCanLoop(ArkUINodeHandle node, int isLoop)
 {
@@ -395,7 +414,7 @@ ArkUI_PickerComponentTextStyle GetContainerPickerSelectedTextStyle(ArkUINodeHand
     }
     if (style.fontWeight.has_value()) {
         result.hasFontWeight = true;
-        result.fontWeight = static_cast<ArkUI_Int32>(style.fontWeight.value());
+        result.fontWeight = ConvertCppFontWeightToArk(style.fontWeight.value());
     }
     if (style.minFontSize.has_value()) {
         result.hasMinFontSize = true;

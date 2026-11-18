@@ -31,7 +31,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<GridItemLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRowStart_ = CloneRowStart();
         value->propRowEnd_ = CloneRowEnd();
         value->propColumnStart_ = CloneColumnStart();

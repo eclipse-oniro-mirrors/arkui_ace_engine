@@ -100,7 +100,7 @@ void ToastLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 size_t GetLineCount(const RefPtr<LayoutWrapper>& textWrapper, LayoutConstraintF& layoutConstraint)
 {
     textWrapper->Measure(layoutConstraint);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(textWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = textWrapper->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, 0);
     auto textLayoutAlgorithm = AceType::DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textLayoutAlgorithm, 0);

@@ -428,7 +428,7 @@ HWTEST_F(MenuTestTwoNg, MenuViewTestNgTextMaxLines001, TestSize.Level1)
     ASSERT_NE(optionNode, nullptr);
     auto optionPattern = optionNode->GetPattern<MenuItemPattern>();
     ASSERT_NE(optionPattern, nullptr);
-    auto textNode = AceType::DynamicCast<FrameNode>(optionPattern->GetTextNode());
+    auto textNode = optionPattern->GetTextNode();
     ASSERT_NE(textNode, nullptr);
     auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
     ASSERT_NE(textLayoutProperty, nullptr);

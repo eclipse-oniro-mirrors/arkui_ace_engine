@@ -31,6 +31,7 @@ namespace OHOS::Ace::NG {
 class ACE_EXPORT TokenThemeStorage final {
 public:
     static constexpr int32_t INVALID_THEME_SCOPE_ID = -3;
+    static constexpr int32_t INSTANCE_LEVEL_NODE_ID = -1;
 
     ACE_FORCE_EXPORT static TokenThemeStorage* GetInstance();
     ~TokenThemeStorage() = default;
@@ -65,16 +66,19 @@ public:
 
     // Instance brand color storage (key: instanceId, value: brandColor + colorStrategy)
     void StoreInstanceBrandColor(int32_t instanceId, const BrandColorInfo& info);
+    void UpdateInstanceDefaultTheme(int32_t instanceId);
     BrandColorInfo GetInstanceBrandColor(int32_t instanceId);
     void RemoveInstanceBrandColor(int32_t instanceId);
     void ClearAllInstanceBrandColors();
 
-    // UEC brand color change listener registration (per-instance callback queue)
-    void RegisterBrandColorChangeListener(int32_t instanceId, const BrandColorChangeCallback& callback);
-    void UnregisterBrandColorChangeListener(int32_t instanceId);
+    // UEC brand color change listener registration (key: instanceId + nodeId, one callback per pair)
+    void RegisterBrandColorChangeListener(int32_t instanceId, int32_t nodeId,
+        const BrandColorChangeCallback& callback);
+    void UnregisterBrandColorChangeListener(int32_t instanceId, int32_t nodeId);
     void NotifyBrandColorChange(int32_t instanceId, const std::optional<Color>& brandColor,
         const std::optional<BrandColorStrategy>& colorStrategy);
     std::optional<Color> GetThemeScopeBrandColor(int32_t themeScopeId);
+    std::optional<Color> ResolveBrandColor(TokenThemeScopeId themeScopeId);
 
 private:
     static constexpr int32_t SYSTEM_THEME_LIGHT_ID = -1;
@@ -106,7 +110,8 @@ private:
     std::unordered_map<int32_t, RefPtr<TokenTheme>> instanceDefaultThemerMap_;
     std::mutex instanceBrandColorMutex_;
 
-    std::unordered_map<int32_t, std::vector<BrandColorChangeCallback>> brandColorChangeListeners_;
+    // key: instanceId, value: (nodeId -> callback)
+    std::unordered_map<int32_t, std::unordered_map<int32_t, BrandColorChangeCallback>> brandColorChangeListeners_;
     std::mutex brandColorListenerMutex_;
 };
 

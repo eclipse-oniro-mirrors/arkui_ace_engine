@@ -166,7 +166,7 @@ int32_t GetTextLineHeight(const RefPtr<FrameNode>& textNode)
     auto textLayoutWrapper = textNode->CreateLayoutWrapper();
     CHECK_NULL_RETURN(textLayoutWrapper, 0);
     textLayoutWrapper->Measure(layoutConstraint);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(textLayoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = textLayoutWrapper->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, 0);
     auto textLayoutAlgorithm = AceType::DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textLayoutAlgorithm, 0);

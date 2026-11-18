@@ -217,7 +217,7 @@ bool FolderStackPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& d
     if (skipMeasure && skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto folderStackLayoutAlgorithm =
         DynamicCast<FolderStackLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -326,12 +326,12 @@ void FolderStackPattern::UpdateChildAlignment()
     auto controlPartsStackNode = AceType::DynamicCast<ControlPartsStackNode>(hostNode->GetControlPartsStackNode());
     if (controlPartsStackNode && controlPartsStackNode->GetLayoutProperty()) {
         auto controlPartsLayoutProperty =
-            AceType::DynamicCast<LayoutProperty>(controlPartsStackNode->GetLayoutProperty());
+            controlPartsStackNode->GetLayoutProperty();
         controlPartsLayoutProperty->UpdateAlignment(align);
     }
     auto hoverStackNode = AceType::DynamicCast<HoverStackNode>(hostNode->GetHoverNode());
     if (hoverStackNode && hoverStackNode->GetLayoutProperty()) {
-        auto hoverLayoutProperty = AceType::DynamicCast<LayoutProperty>(hoverStackNode->GetLayoutProperty());
+        auto hoverLayoutProperty = hoverStackNode->GetLayoutProperty();
         hoverLayoutProperty->UpdateAlignment(align);
     }
 }

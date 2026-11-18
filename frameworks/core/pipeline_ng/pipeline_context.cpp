@@ -161,6 +161,7 @@ constexpr int32_t MIN_IDLE_TIME = 1000;
 constexpr uint8_t SINGLECOLOR_UPDATE_ALPHA = 75;
 constexpr int8_t RENDERING_SINGLE_COLOR = 1;
 constexpr int32_t DELAY_TIME = 500;
+constexpr int32_t RELOAD_TRANSITION_DURATION = 400;
 constexpr int32_t PARAM_NUM = 2;
 constexpr int64_t MAX_MISS_COUNT = 3;
 constexpr int32_t MAX_FLUSH_COUNT = 2;
@@ -6221,10 +6222,13 @@ void PipelineContext::FlushReload(const ConfigurationChange& configurationChange
     };
     if (!onShow_) {
         changeTask();
+    } else if (!configurationChange.fontAnimationEnabled && configurationChange.OnlyFontChange()) {
+        // Safe to skip OnFlushReloadFinish: only fontScale, excluded by OnlyFontChange, registers after-reload tasks.
+        RecycleManager::Notify(configurationChange);
+        changeTask();
     } else {
         AnimationOption option;
-        const int32_t duration = 400;
-        option.SetDuration(duration);
+        option.SetDuration(RELOAD_TRANSITION_DURATION);
         option.SetCurve(Curves::FRICTION);
         RecycleManager::Notify(configurationChange);
         AnimationUtils::Animate(
@@ -6335,6 +6339,41 @@ void PipelineContext::AddWindowStateChangedCallback(int32_t nodeId)
         LOGW("AddWindowStateChangedCallback doesn't run on UI thread!");
     }
     onWindowStateChangedCallbacks_.emplace(nodeId);
+}
+
+void PipelineContext::AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("AddWindowVisibilityChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    onWindowVisibilityChangedCallbacks_.emplace(nodeId, callback);
+}
+
+void PipelineContext::RemoveWindowVisibilityChangedCallback(int32_t nodeId)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("RemoveWindowVisibilityChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    onWindowVisibilityChangedCallbacks_.erase(nodeId);
+}
+
+void PipelineContext::OnWindowVisibilityChanged(bool isVisible)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("OnWindowVisibilityChanged doesn't run on UI thread!");
+        return;
+    }
+    // iterate over a copy: a callback may re-enter and add/remove callbacks
+    // (e.g. XComponent detached during visibility change), which would
+    // otherwise invalidate iterators of onWindowVisibilityChangedCallbacks_
+    auto onWindowVisibilityChangedCallbacks = onWindowVisibilityChangedCallbacks_;
+    for (const auto& entry : onWindowVisibilityChangedCallbacks) {
+        if (entry.second) {
+            entry.second(isVisible);
+        }
+    }
 }
 
 void PipelineContext::RemoveWindowStateChangedCallback(int32_t nodeId)

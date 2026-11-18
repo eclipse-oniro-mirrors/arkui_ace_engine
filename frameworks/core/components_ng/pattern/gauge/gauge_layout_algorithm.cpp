@@ -56,7 +56,7 @@ void GaugeLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         BoxLayoutAlgorithm::PerformMeasureSelfWithChildList(layoutWrapper, list);
         return;
     }
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
     if (layoutPolicy.has_value() && (layoutPolicy->IsWrap() || layoutPolicy->IsFix())) {
@@ -85,7 +85,7 @@ std::optional<SizeF> GaugeLayoutAlgorithm::MeasureContent(
 {
     auto host = layoutWrapper->GetHostNode();
     CHECK_NULL_RETURN(host, std::nullopt);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_RETURN(layoutProperty, std::nullopt);
     auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
     if (layoutPolicy.has_value() && (layoutPolicy->IsWrap() || layoutPolicy->IsFix())) {
@@ -137,7 +137,7 @@ std::optional<SizeF> GaugeLayoutAlgorithm::MeasureContent(
 void GaugeLayoutAlgorithm::MeasureLimitValueTextWidth(LayoutWrapper* layoutWrapper)
 {
     CHECK_NULL_VOID(layoutWrapper);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto pattern = hostNode->GetPattern<GaugePattern>();
     CHECK_NULL_VOID(pattern);
@@ -185,7 +185,7 @@ void GaugeLayoutAlgorithm::MeasureLimitValueTextWidth(LayoutWrapper* layoutWrapp
 
 void GaugeLayoutAlgorithm::MeasureLimitValueText(LayoutWrapper* layoutWrapper, const SizeF& parentSize, bool isMin)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto pattern = hostNode->GetPattern<GaugePattern>();
     CHECK_NULL_VOID(pattern);
@@ -216,7 +216,7 @@ void GaugeLayoutAlgorithm::MeasureLimitValueText(LayoutWrapper* layoutWrapper, c
 
 void GaugeLayoutAlgorithm::MeasureDescription(LayoutWrapper* layoutWrapper, const SizeF& parentSize)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto pattern = hostNode->GetPattern<GaugePattern>();
     CHECK_NULL_VOID(pattern);
@@ -250,7 +250,7 @@ void GaugeLayoutAlgorithm::MeasureDescription(LayoutWrapper* layoutWrapper, cons
 
 void GaugeLayoutAlgorithm::MeasureTitleChild(LayoutWrapper* layoutWrapper, const SizeF& parentSize)
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto pattern = hostNode->GetPattern<GaugePattern>();
     CHECK_NULL_VOID(pattern);
@@ -356,7 +356,7 @@ void GaugeLayoutAlgorithm::MeasureFontSize(LayoutWrapper* layoutWrapper)
 bool GaugeLayoutAlgorithm::GetLimitFontSize(LayoutWrapper* layoutWrapper, bool isMin, Dimension& fontSize)
 {
     CHECK_NULL_RETURN(layoutWrapper, false);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_RETURN(hostNode, false);
     auto pattern = hostNode->GetPattern<GaugePattern>();
     CHECK_NULL_RETURN(pattern, false);
@@ -378,7 +378,7 @@ bool GaugeLayoutAlgorithm::GetLimitFontSize(LayoutWrapper* layoutWrapper, bool i
 void GaugeLayoutAlgorithm::SetLimitFontSize(LayoutWrapper* layoutWrapper, bool isMin, const Dimension& fontSize)
 {
     CHECK_NULL_VOID(layoutWrapper);
-    auto hostNode = AceType::DynamicCast<FrameNode>(layoutWrapper->GetHostNode());
+    auto hostNode = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(hostNode);
     auto pattern = hostNode->GetPattern<GaugePattern>();
     CHECK_NULL_VOID(pattern);

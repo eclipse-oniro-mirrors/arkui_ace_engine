@@ -269,13 +269,13 @@ HWTEST_F(TabsModifierTest, DISABLED_setScrollableTest, TestSize.Level1)
 HWTEST_F(TabsModifierTest, setBarOverlapTest, TestSize.Level1)
 {
     constexpr auto propName = "barOverlap";
-    ASSERT_NE(modifier_->setBarOverlap, nullptr);
+    ASSERT_NE(modifier_->setBarOverlap0, nullptr);
     auto checkVal = GetAttrValue<std::string>(GetJsonValue(node_), propName);
     EXPECT_THAT(checkVal, Eq("false"));
 
     for (const auto& [value, expectVal] : BOOL_STR_TEST_PLAN) {
         auto inputValue = Converter::ArkValue<Opt_Boolean>(value);
-        modifier_->setBarOverlap(node_, &inputValue);
+        modifier_->setBarOverlap0(node_, &inputValue);
         checkVal = GetAttrValue<std::string>(GetJsonValue(node_), propName);
         EXPECT_THAT(checkVal, Eq(expectVal));
     }

@@ -174,11 +174,7 @@ void ImageComponent::SetImageSourceSize(const std::pair<Dimension, Dimension>& s
 
 void ImageComponent::SetUseSkiaSvg(bool useSkiaSvg)
 {
-#ifndef USE_ROSEN_DRAWING
     useSkiaSvg_ = useSkiaSvg;
-#else
-    useSkiaSvg_ = false;
-#endif
 }
 
 void ImageComponent::SetAutoResize(bool autoResize)

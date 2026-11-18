@@ -26,7 +26,7 @@ ListContentModifier::ListContentModifier(const OffsetF& clipOffset, const SizeF&
     ListDividerMap dividerMap;
     RefPtr<ListDividerArithmetic> lda = AceType::MakeRefPtr<ListDividerArithmetic>(dividerMap, refDivider_);
     dividerList_ = AceType::MakeRefPtr<AnimatableArithmeticProperty>(
-        AceType::DynamicCast<CustomAnimatableArithmetic>(lda));
+        lda);
 
     AttachProperty(color_);
     AttachProperty(dividerList_);

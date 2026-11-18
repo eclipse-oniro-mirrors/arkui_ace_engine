@@ -73,10 +73,9 @@ namespace {
 constexpr double HALF_DIVISOR = 2.0;
 constexpr int32_t CENTER_HIT_TEST_TOUCH_ID = 0;
 
-// Smart-gesture clicks run before the focus chain, so an Agent Enter must be gated here
-// with the same live policy check the focus path applies to Enter events.
 bool RejectAgentSmartGestureClick(const RefPtr<FrameNode>& node, const KeyEvent& event)
 {
+    CHECK_NULL_RETURN(node, false);
     if (!event.isAgent || !InputManager::HasControlComponentPermission() ||
         node->GetAgentControlMode() != AgentControlMode::DENY) {
         return false;
@@ -259,7 +258,7 @@ void CollectPanGestureNodes(std::vector<RefPtr<FrameNode>>& centerHitPath, std::
     }
 
     for (const auto& childRecognizer : recognizerGroup->GetGroupRecognizer()) {
-        auto childGestureRecognizer = AceType::DynamicCast<NGGestureRecognizer>(childRecognizer);
+        auto childGestureRecognizer = childRecognizer;
         CollectPanGestureNodes(centerHitPath, visitedNodeIds, childGestureRecognizer);
     }
 }

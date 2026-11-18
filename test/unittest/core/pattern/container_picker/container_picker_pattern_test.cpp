@@ -4001,7 +4001,7 @@ HWTEST_F(ContainerPickerPatternTest,
 
     // Step 3: CalculateMiddleLineOffset() still non-zero — needs animated snap.
     //         Old code: !NearZero(0.0) → false → FireAnimationEndEvent (wrong — instant jump, item sticks)
-    //         New code: !NearZero(CalculateMiddleLineOffset()) → true → PlaySpringAnimation (correct — animated rebound)
+    //         New code: !NearZero(CalculateMiddleLineOffset()) → true → PlaySpringAnimation (correct)
     EXPECT_FALSE(NearZero(pattern->CalculateMiddleLineOffset()));
 }
 

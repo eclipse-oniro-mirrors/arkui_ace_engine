@@ -46,7 +46,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<ShapePaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propFill_ = CloneFill();
         value->propFillOpacity_ = CloneFillOpacity();
         value->propStroke_ = CloneStroke();

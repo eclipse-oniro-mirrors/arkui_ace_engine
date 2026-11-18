@@ -785,24 +785,35 @@ void addGestureToNodeWithRefCountDecrease(
 
 void removeGestureFromNode(ArkUINodeHandle node, ArkUIGesture* gesture)
 {
+    CHECK_NULL_VOID(node);
+    CHECK_NULL_VOID(gesture);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(gestureHub);
     auto gesturePtr = Referenced::Claim(reinterpret_cast<Gesture*>(gesture));
     gestureHub->RemoveGesture(gesturePtr);
 }
 
 void removeGestureFromNodeByTag(ArkUINodeHandle node, ArkUI_CharPtr gestureTag)
 {
+    CHECK_NULL_VOID(node);
+    CHECK_NULL_VOID(gestureTag);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(gestureHub);
     std::string tag(gestureTag);
     gestureHub->RemoveGesturesByTag(tag);
 }
 
 void clearGestures(ArkUINodeHandle node)
 {
+    CHECK_NULL_VOID(node);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
     auto gestureHub = frameNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(gestureHub);
     gestureHub->ClearModifierGesture();
 }
 

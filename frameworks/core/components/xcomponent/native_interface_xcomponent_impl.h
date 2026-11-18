@@ -73,6 +73,7 @@ class NativeXComponentImpl : public AceType {
     using SetExpectedRateRangeEvent_Callback = std::function<void()>;
     using SetOnFrameEvent_Callback = std::function<void()>;
     using SetUnregisterOnFrameEvent_Callback = std::function<void()>;
+    using VisibilityLifecycleEvent_Callback = std::function<void()>;
     using OnFrame_Callback = void (*)(OH_NativeXComponent*, uint64_t, uint64_t);
     using NativeNode_Callback = void (*)(void*, void*);
 
@@ -439,6 +440,24 @@ public:
         return needSoftKeyboard_;
     }
 
+    void SetVisibilityLifecycle(bool isVisibilityLifecycle)
+    {
+        isVisibilityLifecycle_ = isVisibilityLifecycle;
+        if (visibilityLifecycleCallback_) {
+            visibilityLifecycleCallback_();
+        }
+    }
+
+    bool IsVisibilityLifecycle() const
+    {
+        return isVisibilityLifecycle_;
+    }
+
+    void SetVisibilityLifecycleEventCallback(VisibilityLifecycleEvent_Callback callback)
+    {
+        visibilityLifecycleCallback_ = callback;
+    }
+
     void SetCurrentSourceType(std::pair<int32_t, OH_NativeXComponent_EventSourceType>&& curSourceType)
     {
         curSourceType_ = std::move(curSourceType);
@@ -492,6 +511,8 @@ private:
     OnTouchIntercept_Callback onTouchInterceptCallback_ = nullptr;
     void* container_ = nullptr;
     bool needSoftKeyboard_ = false;
+    bool isVisibilityLifecycle_ = false;
+    VisibilityLifecycleEvent_Callback visibilityLifecycleCallback_;
     std::pair<int32_t, OH_NativeXComponent_EventSourceType> curSourceType_ { -1,
         OH_NativeXComponent_EventSourceType::OH_NATIVEXCOMPONENT_SOURCE_TYPE_UNKNOWN };
     OH_NativeXComponent_ExtraMouseEventInfo extraMouseEventInfo_;
@@ -533,6 +554,7 @@ struct OH_NativeXComponent {
     int32_t RegisterUIAxisEventCallback(
         void (*callback)(OH_NativeXComponent* component, ArkUI_UIInputEvent* event, ArkUI_UIInputEvent_Type type));
     int32_t SetNeedSoftKeyboard(bool needSoftKeyboard);
+    int32_t EnableSurfaceVisibilityLifecycle(bool isVisibilityLifecycle);
     int32_t RegisterOnTouchInterceptCallback(
         HitTestMode (*callback)(OH_NativeXComponent* component, ArkUI_UIInputEvent* event));
     int32_t GetSourceType(int32_t pointId, OH_NativeXComponent_EventSourceType* sourceType);

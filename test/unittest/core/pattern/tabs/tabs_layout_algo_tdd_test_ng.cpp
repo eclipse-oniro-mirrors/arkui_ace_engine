@@ -553,10 +553,14 @@ HWTEST_F(TabsLayoutAlgoTddTestNg, MeasureSwiperHorizontalWithOverlap001, TestSiz
     LayoutAlgoTestCtx ctx;
     ctx.Build(720.0f, 400.0f);
     ctx.layoutProperty->UpdateBarOverlap(true);
+    auto tabsPattern = ctx.tabsNode->GetPattern<TabsPattern>();
+    ASSERT_NE(tabsPattern, nullptr);
+    tabsPattern->computedBarOverlapMode_ = BarOverlapMode::STACK;
     auto swiperGeo = AceType::MakeRefPtr<GeometryNode>();
     auto swiperLayoutProp = AceType::MakeRefPtr<LayoutProperty>();
     auto swiperNode = FrameNode::CreateFrameNode(
         V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ctx.tabsNode->AddChild(swiperNode);
     auto swiperWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(swiperNode, swiperGeo, swiperLayoutProp);
     swiperWrapper->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(nullptr));
     ctx.layoutWrapper->AppendChild(swiperWrapper);
@@ -608,10 +612,14 @@ HWTEST_F(TabsLayoutAlgoTddTestNg, MeasureSwiperVerticalWithOverlap001, TestSize.
     ctx.Build(720.0f, 400.0f);
     ctx.layoutProperty->UpdateAxis(Axis::VERTICAL);
     ctx.layoutProperty->UpdateBarOverlap(true);
+    auto tabsPattern = ctx.tabsNode->GetPattern<TabsPattern>();
+    ASSERT_NE(tabsPattern, nullptr);
+    tabsPattern->computedBarOverlapMode_ = BarOverlapMode::STACK;
     auto swiperGeo = AceType::MakeRefPtr<GeometryNode>();
     auto swiperLayoutProp = AceType::MakeRefPtr<LayoutProperty>();
     auto swiperNode = FrameNode::CreateFrameNode(
         V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ctx.tabsNode->AddChild(swiperNode);
     auto swiperWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(swiperNode, swiperGeo, swiperLayoutProp);
     swiperWrapper->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(nullptr));
     ctx.layoutWrapper->AppendChild(swiperWrapper);

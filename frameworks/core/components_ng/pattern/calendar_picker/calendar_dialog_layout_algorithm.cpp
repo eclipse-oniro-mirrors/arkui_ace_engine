@@ -42,7 +42,7 @@ void CalendarDialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(scrollNode);
     auto calendarNode = scrollNode->GetChildAtIndex(CALENDAR_NODE);
     CHECK_NULL_VOID(calendarNode);
-    auto columnFrameNode = AceType::DynamicCast<NG::FrameNode>(columnNode);
+    auto columnFrameNode = columnNode;
     CHECK_NULL_VOID(columnFrameNode);
     auto columnLayoutProperty = columnFrameNode->GetLayoutProperty();
     CHECK_NULL_VOID(columnLayoutProperty);

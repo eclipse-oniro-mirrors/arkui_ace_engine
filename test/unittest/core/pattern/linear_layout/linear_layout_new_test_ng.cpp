@@ -617,7 +617,7 @@ HWTEST_F(LinearLayoutNewTestNG, LinearIgnoreLayoutSafeArea001, TestSize.Level0)
     });
     IgnoreLayoutSafeAreaOpts opts = {.type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM, .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL};
     row1->GetLayoutProperty()->UpdateIgnoreLayoutSafeAreaOpts(opts);
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutProperty = AceType::DynamicCast<FlexLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(layoutProperty, nullptr);
@@ -657,7 +657,7 @@ HWTEST_F(LinearLayoutNewTestNG, LinearIgnoreLayoutSafeArea002, TestSize.Level0)
     });
     IgnoreLayoutSafeAreaOpts opts = {.type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM, .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL};
     row1->GetLayoutProperty()->UpdateIgnoreLayoutSafeAreaOpts(opts);
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutProperty = AceType::DynamicCast<FlexLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(layoutProperty, nullptr);
@@ -697,7 +697,7 @@ HWTEST_F(LinearLayoutNewTestNG, LinearIgnoreLayoutSafeArea003, TestSize.Level0)
     });
     IgnoreLayoutSafeAreaOpts opts = {.type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM, .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL};
     column1->GetLayoutProperty()->UpdateIgnoreLayoutSafeAreaOpts(opts);
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutProperty = AceType::DynamicCast<FlexLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(layoutProperty, nullptr);
@@ -736,7 +736,7 @@ HWTEST_F(LinearLayoutNewTestNG, LinearIgnoreLayoutSafeArea004, TestSize.Level0)
     });
     IgnoreLayoutSafeAreaOpts opts = {.type = NG::LAYOUT_SAFE_AREA_TYPE_SYSTEM, .edges = NG::LAYOUT_SAFE_AREA_EDGE_ALL};
     column1->GetLayoutProperty()->UpdateIgnoreLayoutSafeAreaOpts(opts);
-    auto layoutWrapper = AceType::DynamicCast<LayoutWrapper>(frameNode);
+    RefPtr<LayoutWrapper> layoutWrapper = frameNode;
     ASSERT_NE(layoutWrapper, nullptr);
     auto layoutProperty = AceType::DynamicCast<FlexLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(layoutProperty, nullptr);

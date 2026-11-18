@@ -1783,7 +1783,7 @@ HWTEST_F(DialogPatternAdditionalTestNg, DialogPatternAddForceSplitRatioListener0
      */
     auto pipeline = frameNode->GetContextRefPtr();
     ASSERT_NE(pipeline, nullptr);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     ASSERT_NE(forceSplitMgr, nullptr);
     EXPECT_EQ(forceSplitMgr->forceSplitRatioListeners_.size(), 1u);
 
@@ -1838,7 +1838,7 @@ HWTEST_F(DialogPatternAdditionalTestNg, DialogPatternRemoveForceSplitRatioListen
 
     auto pipeline = frameNode->GetContextRefPtr();
     ASSERT_NE(pipeline, nullptr);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     ASSERT_NE(forceSplitMgr, nullptr);
 
     pattern->AddForceSplitRatioListener();
@@ -1895,7 +1895,7 @@ HWTEST_F(DialogPatternAdditionalTestNg, DialogPatternRemoveForceSplitRatioListen
 
     auto pipeline = frameNode->GetContextRefPtr();
     ASSERT_NE(pipeline, nullptr);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     ASSERT_NE(forceSplitMgr, nullptr);
 
     /**
@@ -1926,7 +1926,7 @@ HWTEST_F(DialogPatternAdditionalTestNg, DialogPatternForceSplitRatioListenerCall
 
     auto pipeline = frameNode->GetContextRefPtr();
     ASSERT_NE(pipeline, nullptr);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     ASSERT_NE(forceSplitMgr, nullptr);
 
     pattern->AddForceSplitRatioListener();

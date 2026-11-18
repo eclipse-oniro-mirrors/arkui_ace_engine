@@ -352,6 +352,15 @@ void XComponentModelNG::EnableTransparentLayer(bool isTransparentLayer)
     xcPattern->EnableTransparentLayer(isTransparentLayer);
 }
 
+void XComponentModelNG::SetSurfaceVisibilityLifecycle(bool isVisibilityLifecycle)
+{
+    auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetSurfaceVisibilityLifecycle(isVisibilityLifecycle);
+}
+
 void XComponentModelNG::SetBufferQueueCount(int32_t bufferQueueCount)
 {
     auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
@@ -653,6 +662,14 @@ void XComponentModelNG::EnableTransparentLayer(FrameNode* frameNode, bool enable
     auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
     CHECK_NULL_VOID(xcPattern);
     xcPattern->EnableTransparentLayer(enable);
+}
+
+void XComponentModelNG::SetSurfaceVisibilityLifecycle(FrameNode* frameNode, bool isVisibilityLifecycle)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetSurfaceVisibilityLifecycle(isVisibilityLifecycle);
 }
 
 void XComponentModelNG::SetBufferQueueCount(FrameNode* frameNode, int32_t bufferQueueCount)

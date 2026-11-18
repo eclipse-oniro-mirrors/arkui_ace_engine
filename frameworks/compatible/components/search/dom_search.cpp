@@ -304,7 +304,7 @@ bool DOMSearch::AddSpecializedEvent(int32_t pageId, const std::string& event)
 
 void DOMSearch::CallSpecializedMethod(const std::string& method, const std::string& args)
 {
-    auto textField = AceType::DynamicCast<TextFieldComponent>(textFieldComponent_);
+    auto textField = textFieldComponent_;
     if (!textField) {
         return;
     }

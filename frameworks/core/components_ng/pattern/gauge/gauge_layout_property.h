@@ -29,7 +29,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<GaugeLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propIsShowLimitValue_ = CloneIsShowLimitValue();
         value->propIsShowDescription_ = CloneIsShowDescription();
         value->propStrokeWidth_ = CloneStrokeWidth();

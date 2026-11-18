@@ -790,31 +790,31 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetScrollLockOn(ArkUI_UIInputEvent* event, boo
  *
  * The values are bit flags and can be combined by using the bitwise OR operator.
  *
- * @since 26.2.0
+ * @since 26.1.0
  */
 typedef enum {
     /**
      * @brief No modifier key. This value can be used only with a function key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_NONE = 0,
     /**
      * @brief Ctrl key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_CTRL = 1,
     /**
      * @brief Shift key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_SHIFT = 2,
     /**
      * @brief Alt key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_ALT = 4,
 } OH_ArkUI_KeyboardShortcutModifierKey;
@@ -822,219 +822,207 @@ typedef enum {
 /**
  * @brief Enumerates the function keys supported by keyboard shortcuts.
  *
- * @since 26.2.0
+ * @since 26.1.0
  */
 typedef enum {
     /**
      * @brief Esc key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC = 0,
     /**
      * @brief F1 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F1 = 1,
     /**
      * @brief F2 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F2 = 2,
     /**
      * @brief F3 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F3 = 3,
     /**
      * @brief F4 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F4 = 4,
     /**
      * @brief F5 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F5 = 5,
     /**
      * @brief F6 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F6 = 6,
     /**
      * @brief F7 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F7 = 7,
     /**
      * @brief F8 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F8 = 8,
     /**
      * @brief F9 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F9 = 9,
     /**
      * @brief F10 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F10 = 10,
     /**
      * @brief F11 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F11 = 11,
     /**
      * @brief F12 key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_F12 = 12,
     /**
      * @brief Tab key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_TAB = 13,
     /**
      * @brief Up arrow key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_UP = 14,
     /**
      * @brief Down arrow key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_DOWN = 15,
     /**
      * @brief Left arrow key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_LEFT = 16,
     /**
      * @brief Right arrow key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DPAD_RIGHT = 17,
     /**
      * @brief CapsLock key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_CAPS_LOCK = 18,
     /**
-     * @brief PrintScreen key.
-     *
-     * @since 26.2.0
-     */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PRINT_SCREEN = 19,
-    /**
      * @brief ScrollLock key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SCROLL_LOCK = 20,
     /**
      * @brief Pause/Break key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAUSE_BREAK = 21,
     /**
      * @brief NumLock key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_NUM_LOCK = 22,
     /**
      * @brief Insert key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_INSERT = 23,
     /**
      * @brief Delete key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DELETE = 24,
     /**
      * @brief Home key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_HOME = 25,
     /**
      * @brief End key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_END = 26,
     /**
      * @brief Page Up key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAGE_UP = 27,
     /**
      * @brief Page Down key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAGE_DOWN = 28,
     /**
      * @brief Enter key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ENTER = 29,
     /**
      * @brief Backspace key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE = 30,
-    /**
-     * @brief Space key.
-     *
-     * @since 26.2.0
-     */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SPACE = 31,
 } OH_ArkUI_KeyboardShortcutFunctionKey;
 
 /**
  * @brief Enumerates the types of keys supported by keyboard shortcuts.
  *
- * @since 26.2.0
+ * @since 26.1.0
  */
 typedef enum {
     /**
      * @brief Character key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER = 0,
     /**
      * @brief Function key.
      *
-     * @since 26.2.0
+     * @since 26.1.0
      */
     OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_FUNCTION_KEY = 1,
 } OH_ArkUI_KeyboardShortcutKeyType;
@@ -1045,7 +1033,7 @@ typedef enum {
  * @see OH_ArkUI_KeyboardShortcutKey_Create
  * @see OH_ArkUI_KeyboardShortcutKey_Destroy
  *
- * @since 26.2.0
+ * @since 26.1.0
  */
 typedef struct OH_ArkUI_KeyboardShortcutKey OH_ArkUI_KeyboardShortcutKey;
 
@@ -1060,7 +1048,7 @@ typedef struct OH_ArkUI_KeyboardShortcutKey OH_ArkUI_KeyboardShortcutKey;
  *     <li>Returns <b>nullptr</b> if the operation fails, for example, due to a memory allocation failure.</li>
  *     </ul>
  * @release arkui/OH_ArkUI_KeyboardShortcutKey_Destroy {return}
- * @since 26.2.0
+ * @since 26.1.0
  */
 OH_ArkUI_KeyboardShortcutKey* OH_ArkUI_KeyboardShortcutKey_Create(void);
 
@@ -1068,7 +1056,7 @@ OH_ArkUI_KeyboardShortcutKey* OH_ArkUI_KeyboardShortcutKey_Create(void);
  * @brief Destroys a keyboard shortcut key object.
  *
  * @param key [in] Keyboard shortcut key object.
- * @since 26.2.0
+ * @since 26.1.0
  */
 void OH_ArkUI_KeyboardShortcutKey_Destroy(OH_ArkUI_KeyboardShortcutKey** key);
 
@@ -1077,7 +1065,7 @@ void OH_ArkUI_KeyboardShortcutKey_Destroy(OH_ArkUI_KeyboardShortcutKey** key);
  *
  * @param key [in] Pointer to the keyboard shortcut key object.
  * @param type [in] Key type.
- * @since 26.2.0
+ * @since 26.1.0
  */
 void OH_ArkUI_KeyboardShortcutKey_SetType(OH_ArkUI_KeyboardShortcutKey* key, OH_ArkUI_KeyboardShortcutKeyType type);
 
@@ -1090,7 +1078,7 @@ void OH_ArkUI_KeyboardShortcutKey_SetType(OH_ArkUI_KeyboardShortcutKey* key, OH_
  *     <li>Key type, if the operation is successful.</li>
  *     <li>{@link OH_ARKUI_KEYBOARD_SHORTCUT_KEY_TYPE_CHARACTER}, if <b>key</b> is <b>nullptr</b>.</li>
  *     </ul>
- * @since 26.2.0
+ * @since 26.1.0
  */
 OH_ArkUI_KeyboardShortcutKeyType OH_ArkUI_KeyboardShortcutKey_GetType(const OH_ArkUI_KeyboardShortcutKey* key);
 
@@ -1100,7 +1088,7 @@ OH_ArkUI_KeyboardShortcutKeyType OH_ArkUI_KeyboardShortcutKey_GetType(const OH_A
  *
  * @param key [in] Pointer to the keyboard shortcut key object.
  * @param character [in] Single character that can be entered through the keyboard.
- * @since 26.2.0
+ * @since 26.1.0
  */
 void OH_ArkUI_KeyboardShortcutKey_SetCharacter(OH_ArkUI_KeyboardShortcutKey* key, char character);
 
@@ -1113,7 +1101,7 @@ void OH_ArkUI_KeyboardShortcutKey_SetCharacter(OH_ArkUI_KeyboardShortcutKey* key
  *     <li>Character, if the operation is successful.</li>
  *     <li><b>'\\0'</b>, if <b>key</b> is <b>nullptr</b>.</li>
  *     </ul>
- * @since 26.2.0
+ * @since 26.1.0
  */
 char OH_ArkUI_KeyboardShortcutKey_GetCharacter(const OH_ArkUI_KeyboardShortcutKey* key);
 
@@ -1123,7 +1111,7 @@ char OH_ArkUI_KeyboardShortcutKey_GetCharacter(const OH_ArkUI_KeyboardShortcutKe
  *
  * @param key [in] Pointer to the keyboard shortcut key object.
  * @param functionKey [in] Function key.
- * @since 26.2.0
+ * @since 26.1.0
  */
 void OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(
     OH_ArkUI_KeyboardShortcutKey* key, OH_ArkUI_KeyboardShortcutFunctionKey functionKey);
@@ -1137,7 +1125,7 @@ void OH_ArkUI_KeyboardShortcutKey_SetFunctionKey(
  *     <li>Function key, if the operation is successful.</li>
  *     <li>{@link OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ESC}, if <b>key</b> is <b>nullptr</b>.</li>
  *     </ul>
- * @since 26.2.0
+ * @since 26.1.0
  */
 OH_ArkUI_KeyboardShortcutFunctionKey OH_ArkUI_KeyboardShortcutKey_GetFunctionKey(
     const OH_ArkUI_KeyboardShortcutKey* key);
@@ -1145,7 +1133,7 @@ OH_ArkUI_KeyboardShortcutFunctionKey OH_ArkUI_KeyboardShortcutKey_GetFunctionKey
 /**
  * @brief Defines the callback information for an application-level keyboard shortcut.
  *
- * @since 26.2.0
+ * @since 26.1.0
  */
 typedef struct OH_ArkUI_ApplicationShortcutCallbackInfo OH_ArkUI_ApplicationShortcutCallbackInfo;
 
@@ -1159,7 +1147,7 @@ typedef struct OH_ArkUI_ApplicationShortcutCallbackInfo OH_ArkUI_ApplicationShor
  *     during the callback and must not be retained.
  * @param userData [out] User-defined data passed when the shortcut is registered. The value is not copied and
  *     must remain valid until the shortcut is unregistered.
- * @since 26.2.0
+ * @since 26.1.0
  */
 typedef void (*OH_ArkUI_ApplicationShortcutCallback)(
     const OH_ArkUI_ApplicationShortcutCallbackInfo* info, void* userData);
@@ -1174,7 +1162,7 @@ typedef void (*OH_ArkUI_ApplicationShortcutCallback)(
  *     <li>The UI context of the UI instance where the shortcut is triggered, if the operation is successful.</li>
  *     <li><b>nullptr</b>, if <b>info</b> is invalid.</li>
  *     </ul>
- * @since 26.2.0
+ * @since 26.1.0
  */
 ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
     const OH_ArkUI_ApplicationShortcutCallbackInfo* info);
@@ -1209,7 +1197,7 @@ ArkUI_ContextHandle OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext(
  *     <li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *     <li>Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter is invalid.</li>
  *     </ul>
- * @since 26.2.0
+ * @since 26.1.0
  */
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys,
     void* userData, OH_ArkUI_ApplicationShortcutCallback callback, int32_t* registrationId);
@@ -1224,9 +1212,67 @@ ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Register(const OH_ArkUI_KeyboardSho
  * @param registrationId [in] Registration ID obtained when registering the shortcut.
  * @return Result code.
  *     <br>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation succeeds or the registration ID does not exist.
- * @since 26.2.0
+ * @since 26.1.0
  */
 ArkUI_ErrorCode OH_ArkUI_ApplicationShortcut_Unregister(int32_t registrationId);
+
+/**
+ * @brief Defines the callback invoked when a component-level keyboard shortcut is triggered.
+ *
+ * @param userData [out] User-defined data passed when the shortcut is registered. The value is not copied and
+ *     must remain valid until the shortcut is unregistered.
+ * @since 26.1.0
+ */
+typedef void (*OH_ArkUI_KeyboardShortcutCallback)(void* userData);
+
+/**
+ * @brief Registers a keyboard shortcut for a component. If the same shortcut is registered again for the same
+ * component, the latest registration takes effect. Component-level shortcuts take precedence over matching
+ * application-level shortcuts.
+ *
+ * @param node [in] Target component node.
+ * @param key [in] Pointer to a keyboard shortcut key object created by {@link OH_ArkUI_KeyboardShortcutKey_Create}.
+ *     The value must not be <b>nullptr</b>. For a character key, the character set through
+ *     {@link OH_ArkUI_KeyboardShortcutKey_SetCharacter} must be a single keyboard-input character.
+ * @param modifierKeys [in] Modifier key bitmask. Use a bitwise OR combination of values in
+ *     {@link OH_ArkUI_KeyboardShortcutModifierKey}. For a function key, use
+ *     {@link OH_ARKUI_KEYBOARD_SHORTCUT_MODIFIER_NONE} to register the shortcut without a modifier key. At least one
+ *     modifier key must be specified for a character key. Only the bits defined in
+ *     {@link OH_ArkUI_KeyboardShortcutModifierKey} are accepted; if any other bit is set,
+ *     {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
+ * @param userData [in] User-defined data passed to the callback. The value can be <b>nullptr</b>. The value is
+ *     not copied and must remain valid until the shortcut is unregistered.
+ * @param callback [in] Callback invoked when the shortcut is triggered. If <b>callback</b> is <b>nullptr</b>, the click
+ *     event of the component is triggered.
+ * @return Result code.
+ *     <ul>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter is invalid.</li>
+ *     </ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NodeKeyboardShortcut_Register(ArkUI_NodeHandle node, const OH_ArkUI_KeyboardShortcutKey* key,
+    uint32_t modifierKeys, void* userData, OH_ArkUI_KeyboardShortcutCallback callback);
+
+/**
+ * @brief Unregisters a keyboard shortcut from a component. If no matching shortcut is registered, the operation still
+ * succeeds.
+ *
+ * @param node [in] Target component node.
+ * @param key [in] Pointer to a keyboard shortcut key object used during registration. The value must not be
+ *     <b>nullptr</b>.
+ * @param modifierKeys [in] Modifier key bitmask used during registration. Only the bits defined in
+ *     {@link OH_ArkUI_KeyboardShortcutModifierKey} are accepted; if any other bit is set,
+ *     {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
+ * @return Result code.
+ *     <ul>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter is invalid.</li>
+ *     </ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NodeKeyboardShortcut_Unregister(
+    ArkUI_NodeHandle node, const OH_ArkUI_KeyboardShortcutKey* key, uint32_t modifierKeys);
 
 #ifdef __cplusplus
 };

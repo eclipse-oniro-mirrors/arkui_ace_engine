@@ -103,7 +103,8 @@ protected:
     // rect and derives startFixOffset_/endFixOffset_.
     void CalculateContentClipFixOffset(LayoutWrapper* layoutWrapper, float mainSize);
 
-    void UpdateGridDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount);
+    void UpdateGridDecodeCacheWindow(
+        LayoutWrapper* layoutWrapper, int32_t cacheCount, bool expandToFullMatrix = false);
 
     GridLayoutInfo info_;
     bool measureInNextFrame_ = false;
@@ -116,7 +117,7 @@ private:
     void PostClipContentSafeAreaBundle(LayoutWrapper* layoutWrapper) const;
     std::set<int32_t> CollectDecodeItems(int32_t decodeStartLine, int32_t decodeEndLine) const;
     void ApplyItemDecodeState(
-        LayoutWrapper* layoutWrapper, int32_t cacheStartLine, int32_t cacheEndLine,
+        const RefPtr<FrameNode>& host, int32_t cacheStartLine, int32_t cacheEndLine,
         const std::set<int32_t>& decodeItems);
 
     ACE_DISALLOW_COPY_AND_MOVE(GridLayoutBaseAlgorithm);

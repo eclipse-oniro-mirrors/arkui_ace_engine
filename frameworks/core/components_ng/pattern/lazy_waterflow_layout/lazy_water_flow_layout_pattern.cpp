@@ -130,7 +130,7 @@ bool LazyWaterFlowLayoutPattern::OnDirtyLayoutWrapperSwap(
         return false;
     }
     CHECK_NULL_RETURN(layoutInfo_, false);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<LazyWaterFlowLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);

@@ -16,14 +16,23 @@
 #include "grid_test_ng.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
+#include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 
 namespace OHOS::Ace::NG {
 namespace {
 constexpr float PRELOAD_TEST_OFFSET = -20.0f;
+
+RefPtr<FrameNode> CreateImageFrameNode()
+{
+    auto nodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto frameNode = FrameNode::CreateFrameNode("Image", nodeId, AceType::MakeRefPtr<ImagePattern>());
+    return frameNode;
+}
 } // namespace
 
 class GridCacheLayoutTestNg : public GridTestNg {
@@ -1883,5 +1892,362 @@ HWTEST_F(GridCacheLayoutTestNg, UpdateGridDecodeCacheWindow004, TestSize.Level1)
     auto wrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(wrapper, nullptr);
     layoutAlgorithm->UpdateGridDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: GridCalcDecodeWindowCount001
+ * @tc.desc: Test CalcDecodeWindowCount returns correct window size for various cacheCount values.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridCalcDecodeWindowCount001, TestSize.Level1)
+{
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(0), 0);   // 0 : cacheCount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(1), 1);   // 1 : cacheCount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(2), 1);   // 2 : cacheCount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(5), 1);   // 5 : cacheCount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(6), 2);   // 6 : cacheCount, 2 : decodeWindow
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(10), 2);  // 10 : cacheCount
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(11), 3);  // 11 : cacheCount, 3 : decodeWindow
+    EXPECT_EQ(ScrollableUtils::CalcDecodeWindowCount(25), 5);  // 25 : cacheCount, 5 : decodeWindow
+}
+
+/**
+ * @tc.name: GridIsLowMemoryDevice001
+ * @tc.desc: Test IsLowMemoryDevice threshold logic (<=8GiB is low memory).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridIsLowMemoryDevice001, TestSize.Level1)
+{
+    EXPECT_FALSE(ScrollableUtils::IsLowMemoryDevice(0));  // 0 : invalid
+    EXPECT_TRUE(ScrollableUtils::IsLowMemoryDevice(1));   // 1 : GiB, low memory
+    EXPECT_TRUE(ScrollableUtils::IsLowMemoryDevice(8));   // 8 : GiB, boundary
+    EXPECT_FALSE(ScrollableUtils::IsLowMemoryDevice(9));  // 9 : GiB, not low memory
+    EXPECT_FALSE(ScrollableUtils::IsLowMemoryDevice(12)); // 12 : GiB, not low memory
+}
+
+/**
+ * @tc.name: GridCollectDecodeItems001
+ * @tc.desc: Test CollectDecodeItems with empty gridMatrix returns empty set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridCollectDecodeItems001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.gridMatrix_.clear();
+    auto result = layoutAlgorithm->CollectDecodeItems(0, 5);
+    EXPECT_TRUE(result.empty());
+}
+
+/**
+ * @tc.name: GridCollectDecodeItems002
+ * @tc.desc: Test CollectDecodeItems collects items within range and excludes items outside.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridCollectDecodeItems002, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+        {1, {{0, 2}, {1, 3}}},
+        {2, {{0, 4}, {1, 5}}},
+    };
+    auto result = layoutAlgorithm->CollectDecodeItems(0, 1);
+    EXPECT_EQ(result.size(), 4u);
+    EXPECT_TRUE(result.count(0) > 0);
+    EXPECT_TRUE(result.count(1) > 0);
+    EXPECT_TRUE(result.count(2) > 0);
+    EXPECT_TRUE(result.count(3) > 0);
+    EXPECT_TRUE(result.count(4) == 0);
+    EXPECT_TRUE(result.count(5) == 0);
+}
+
+/**
+ * @tc.name: GridCollectDecodeItems003
+ * @tc.desc: Test CollectDecodeItems handles negative itemIdx (non-origin cells of multi-row items).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridCollectDecodeItems003, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    // Item 1 spans rows 0-1: origin at (0,1) idx=1, non-origin at (1,1) idx=-1
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+        {1, {{0, 2}, {1, -1}}},
+    };
+    auto result = layoutAlgorithm->CollectDecodeItems(0, 1);
+    EXPECT_EQ(result.size(), 3u);
+    EXPECT_TRUE(result.count(0) > 0);
+    EXPECT_TRUE(result.count(1) > 0);  // abs(-1) = 1
+    EXPECT_TRUE(result.count(2) > 0);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState001
+ * @tc.desc: Test ApplyItemDecodeState: item in decodeItems stays active, item not in decodeItems deactivated.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    auto item1 = GetItem(1, true);
+    ASSERT_NE(item0, nullptr);
+    ASSERT_NE(item1, nullptr);
+    auto image0 = CreateImageFrameNode();
+    auto image1 = CreateImageFrameNode();
+    ASSERT_NE(image0, nullptr);
+    ASSERT_NE(image1, nullptr);
+    item0->AddChild(image0);
+    item1->AddChild(image1);
+    auto pattern0 = image0->GetPattern<ImagePattern>();
+    auto pattern1 = image1->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern0, nullptr);
+    ASSERT_NE(pattern1, nullptr);
+
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+    };
+    std::set<int32_t> decodeItems = {0};
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 0, decodeItems);
+    EXPECT_TRUE(pattern0->decodeCacheActive_);   // in decodeItems, stays active
+    EXPECT_FALSE(pattern1->decodeCacheActive_);  // not in decodeItems, deactivated
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState002
+ * @tc.desc: Test ApplyItemDecodeState marks items NOT in decodeItems as inactive.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState002, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+    };
+    std::set<int32_t> decodeItems;  // empty: no items in decode window
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 0, decodeItems);
+    EXPECT_FALSE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState003
+ * @tc.desc: Test ApplyItemDecodeState deduplicates items by itemIdx (multi-row items processed once).
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState003, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item1 = GetItem(1, true);
+    ASSERT_NE(item1, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item1->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    // Overwrite gridMatrix_ to simulate item 1 spanning rows 0-1
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+        {1, {{0, 2}, {1, -1}}},
+    };
+    std::set<int32_t> decodeItems;
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 1, decodeItems);
+    EXPECT_FALSE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridSetDecodeCacheActive001
+ * @tc.desc: Test SetDecodeCacheActive(false) deactivates ImagePattern and clears state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridSetDecodeCacheActive001, TestSize.Level1)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+    pattern->SetDecodeCacheActive(false);
+    EXPECT_FALSE(pattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridSetDecodeCacheActive002
+ * @tc.desc: Test SetDecodeCacheActive(true) reactivates ImagePattern after deactivation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridSetDecodeCacheActive002, TestSize.Level1)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SetDecodeCacheActive(false);
+    EXPECT_FALSE(pattern->decodeCacheActive_);
+    pattern->SetDecodeCacheActive(true);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridUpdateCachedItemDecodeState001
+ * @tc.desc: Test UpdateCachedItemDecodeState recursively updates nested Image nodes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateCachedItemDecodeState001, TestSize.Level1)
+{
+    auto parent = CreateImageFrameNode();
+    ASSERT_NE(parent, nullptr);
+    auto child = CreateImageFrameNode();
+    ASSERT_NE(child, nullptr);
+    parent->AddChild(child);
+    auto parentPattern = parent->GetPattern<ImagePattern>();
+    ASSERT_NE(parentPattern, nullptr);
+    auto childPattern = child->GetPattern<ImagePattern>();
+    ASSERT_NE(childPattern, nullptr);
+    EXPECT_TRUE(parentPattern->decodeCacheActive_);
+    EXPECT_TRUE(childPattern->decodeCacheActive_);
+    ScrollableUtils::UpdateCachedItemDecodeState(parent, false);
+    EXPECT_FALSE(parentPattern->decodeCacheActive_);
+    EXPECT_FALSE(childPattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState_ExpandFullMatrix001
+ * @tc.desc: Test expanded range (expandToFullMatrix=true) covers items outside cache window.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_ExpandFullMatrix001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1);
+    CreateFixedItems(20);
+    CreateDone();
+
+    auto item0 = GetItem(0, true);
+    auto item10 = GetItem(10, true);
+    ASSERT_NE(item0, nullptr);
+    ASSERT_NE(item10, nullptr);
+    auto image0 = CreateImageFrameNode();
+    auto image10 = CreateImageFrameNode();
+    ASSERT_NE(image0, nullptr);
+    ASSERT_NE(image10, nullptr);
+    item0->AddChild(image0);
+    item10->AddChild(image10);
+    auto pattern0 = image0->GetPattern<ImagePattern>();
+    auto pattern10 = image10->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern0, nullptr);
+    ASSERT_NE(pattern10, nullptr);
+
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    // Overwrite gridMatrix_ to simulate preloaded items beyond cache window
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+        {1, {{0, 2}, {1, 3}}},
+        {2, {{0, 4}, {1, 5}}},
+        {3, {{0, 6}, {1, 7}}},
+        {4, {{0, 8}, {1, 9}}},
+        {5, {{0, 10}, {1, 11}}},
+    };
+    layoutAlgorithm->info_.startMainLineIndex_ = 2;
+    layoutAlgorithm->info_.endMainLineIndex_ = 3;
+    // Expanded range [0, 5] covers items at row 0 and row 5 → marked inactive
+    std::set<int32_t> emptyDecodeItems;
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 5, emptyDecodeItems);
+    EXPECT_FALSE(pattern0->decodeCacheActive_);
+    EXPECT_FALSE(pattern10->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState_ExpandFullMatrix002
+ * @tc.desc: Test original range (expandToFullMatrix=false) misses items outside cache window.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_ExpandFullMatrix002, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1);
+    CreateFixedItems(20);
+    CreateDone();
+
+    auto item0 = GetItem(0, true);
+    auto item10 = GetItem(10, true);
+    ASSERT_NE(item0, nullptr);
+    ASSERT_NE(item10, nullptr);
+    auto image0 = CreateImageFrameNode();
+    auto image10 = CreateImageFrameNode();
+    ASSERT_NE(image0, nullptr);
+    ASSERT_NE(image10, nullptr);
+    item0->AddChild(image0);
+    item10->AddChild(image10);
+    auto pattern0 = image0->GetPattern<ImagePattern>();
+    auto pattern10 = image10->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern0, nullptr);
+    ASSERT_NE(pattern10, nullptr);
+
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.gridMatrix_ = {
+        {0, {{0, 0}, {1, 1}}},
+        {1, {{0, 2}, {1, 3}}},
+        {2, {{0, 4}, {1, 5}}},
+        {3, {{0, 6}, {1, 7}}},
+        {4, {{0, 8}, {1, 9}}},
+        {5, {{0, 10}, {1, 11}}},
+    };
+    layoutAlgorithm->info_.startMainLineIndex_ = 2;
+    layoutAlgorithm->info_.endMainLineIndex_ = 3;
+    // Original range [1, 4] misses items at row 0 and row 5 → stay active
+    std::set<int32_t> emptyDecodeItems;
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 1, 4, emptyDecodeItems);
+    EXPECT_TRUE(pattern0->decodeCacheActive_);
+    EXPECT_TRUE(pattern10->decodeCacheActive_);
 }
 } // namespace OHOS::Ace::NG

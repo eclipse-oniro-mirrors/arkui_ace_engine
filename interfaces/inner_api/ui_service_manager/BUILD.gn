@@ -45,6 +45,9 @@ config("uiservice_manager_public_config") {
 }
 
 ohos_shared_library("ui_service_mgr") {
+  if (is_ohos) {
+    version_script = "$ace_root/build/libui_service_mgr.map"
+  }
   if (current_os == "ohos") {
     sanitize = {
       integer_overflow = true
@@ -105,6 +108,9 @@ ohos_shared_library("ui_service_mgr") {
 }
 
 ohos_shared_library("uiservice_manager_interface_set") {
+  if (is_ohos) {
+    version_script = "$ace_root/build/libuiservice_manager_interface_set.map"
+  }
   sanitize = {
     cfi = true
     cfi_cross_dso = true

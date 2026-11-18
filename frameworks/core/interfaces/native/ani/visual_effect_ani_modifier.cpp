@@ -70,6 +70,9 @@ void ConvertToImmersiveOptionsEC(std::shared_ptr<ImmersiveOptions>& newOptions)
     newOptions->interactive = false;
     newOptions->lightEffectOptions = std::nullopt;
     newOptions->colorResObj = nullptr;
+    // colorBlendMode is preserved here for future EC parameter extension.
+    // It currently has no effect on pure EC style, but may become useful when more params are added.
+    // For EC_SUB style it takes effect via the sub-shader path.
 }
 
 void ConvertToImmersiveOptionsECSub(std::shared_ptr<ImmersiveOptions>& newOptions)

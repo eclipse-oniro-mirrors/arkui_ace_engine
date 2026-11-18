@@ -40,7 +40,7 @@ public:
     {
         auto value = MakeRefPtr<TimePickerLayoutProperty>();
         Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propLoop_ = CloneLoop();
         return value;
     }

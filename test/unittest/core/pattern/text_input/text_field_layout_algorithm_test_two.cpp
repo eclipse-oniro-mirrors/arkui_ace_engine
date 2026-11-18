@@ -193,7 +193,7 @@ private:
     {
         if (layoutWrapper_) {
             auto layoutAlgorithmWrapper =
-                AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper_->GetLayoutAlgorithm());
+                layoutWrapper_->GetLayoutAlgorithm();
             if (layoutAlgorithmWrapper) {
                 layoutAlgorithm_ =
                     AceType::DynamicCast<TextFieldLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

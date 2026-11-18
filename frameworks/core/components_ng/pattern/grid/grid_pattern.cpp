@@ -57,6 +57,7 @@
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
+#include "core/gestures/drag_constants.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 namespace OHOS::Ace::NG {
@@ -1009,7 +1010,7 @@ void GridPattern::ClearMultiSelect()
             continue;
         }
 
-        auto itemFrameNode = AceType::DynamicCast<FrameNode>(item);
+        auto itemFrameNode = item;
         auto itemPattern = itemFrameNode->GetPattern<GridItemPattern>();
         CHECK_NULL_VOID(itemPattern);
         auto selectedStatus = itemToBeSelected_.find(itemFrameNode->GetId());
@@ -1456,7 +1457,7 @@ bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto gridLayoutAlgorithm = DynamicCast<GridLayoutBaseAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(gridLayoutAlgorithm, false);
@@ -1800,6 +1801,38 @@ void GridPattern::OnAnimateStop()
         scrollStop_ = true;
         MarkDirtyNodeSelf();
     }
+}
+
+void GridPattern::HandleOnDragStatusCallback(
+    const DragEventType& dragEventType, const RefPtr<NotifyDragEvent>& notifyDragEvent)
+{
+    if (dragEventType == DragEventType::START) {
+        dragAutoScrollStartOffset_.reset();
+    }
+    const bool mayStartAutoScroll = (dragEventType == DragEventType::ENTER || dragEventType == DragEventType::MOVE) &&
+        !dragAutoScrollStartOffset_ && !AnimateRunning() && GetSnapType() == SnapType::LIST_SNAP;
+    const double previousOffset = mayStartAutoScroll ? GetTotalOffset() : 0.0;
+    ScrollablePattern::HandleOnDragStatusCallback(dragEventType, notifyDragEvent);
+    if (mayStartAutoScroll && AnimateRunning()) {
+        dragAutoScrollStartOffset_ = previousOffset;
+    }
+    if (dragEventType != DragEventType::DROP || !dragAutoScrollStartOffset_) {
+        return;
+    }
+    const double startOffset = std::exchange(dragAutoScrollStartOffset_, std::nullopt).value();
+    auto context = GetContext();
+    CHECK_NULL_VOID(context);
+    // Drop callbacks can change the item layout. Resolve the snap from the next laid-out position.
+    context->AddAfterLayoutTask([weak = WeakClaim(this), startOffset]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern && !pattern->AnimateRunning() && pattern->ScrollableIdle());
+        if (NearEqual(startOffset, pattern->GetTotalOffset()) || pattern->GetSnapType() != SnapType::LIST_SNAP) {
+            return;
+        }
+        NestableScrollContainer& scrollContainer = *pattern;
+        scrollContainer.HandleScrollVelocity(0.0f);
+    });
+    context->RequestFrame();
 }
 
 void GridPattern::AnimateTo(

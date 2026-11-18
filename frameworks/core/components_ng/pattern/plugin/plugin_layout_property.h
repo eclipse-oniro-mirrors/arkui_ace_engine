@@ -34,7 +34,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<PluginLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<PluginLayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propRequestPluginInfo_ = CloneRequestPluginInfo();
         value->propData_ = CloneData();
         return value;

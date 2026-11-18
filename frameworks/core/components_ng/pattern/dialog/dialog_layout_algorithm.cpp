@@ -30,6 +30,9 @@
 #include "core/components_ng/pattern/navigation/navdestination_pattern_base.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
 #include "core/components_ng/pattern/overlay/dialog_manager.h"
+#if defined(ENABLE_SPLIT_MODE)
+#include "core/components_ng/pattern/stage/force_split/parallel_stage_manager.h"
+#endif
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/text/text_layout_algorithm.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
@@ -64,6 +67,11 @@ constexpr int32_t WIDTH_BREAKPOINT_MD = 2;
 constexpr int32_t WIDTH_BREAKPOINT_LG = 3;
 constexpr double EXPAND_DISPLAY_WINDOW_HEIGHT_RATIO = 0.67;
 constexpr double EXPAND_DISPLAY_DIALOG_HEIGHT_RATIO = 0.9;
+// Mirrors ParallelStageLayoutAlgorithm::SizeCalculationForForceSplit: the real split subtracts the
+// divider width from the stage width before applying the ratio, so both columns are slightly narrower
+// than the naive rootWidth * ratio / (1 - ratio). Dialog constraints must use the same geometry,
+// otherwise a left-column dialog is laid out with the wrong width limit.
+constexpr float SPLIT_DIVIDER_WIDTH = 1.0f;
 constexpr double HALF = 2.0;
 constexpr double LANDSCAPE_DIALOG_WIDTH_RATIO = 0.75;
 constexpr Dimension SCROLL_MIN_HEIGHT_SUITOLD = 100.0_vp;
@@ -74,6 +82,59 @@ constexpr double ONE_PX = 1.0;
 constexpr char LIST_ETS_TAG[] = "List";
 constexpr char SCROLL_ETS_TAG[] = "Scroll";
 constexpr char NAVDESTINATION_VIEW_ETS_TAG[] = "NavDestination";
+
+RefPtr<DialogPattern> GetDialogPattern(const RefPtr<DialogLayoutProperty>& prop)
+{
+    auto host = prop->GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    return host->GetPattern<DialogPattern>();
+}
+
+// Resolve the split column where the dialog should be displayed: prefer the cached decision (decided once
+// per dialog lifecycle), then the last touched column (tracked on ForceSplitManager, always available),
+// then the real focused page's column (needs ParallelStageManager, only present in ENABLE_SPLIT_MODE
+// builds). Any other case (no dialog pattern, no touch record, no real focus) returns NONE and callers
+// keep the legacy right-column placement.
+ForceSplitPageColumnType ResolveSplitColumnType(
+    PipelineContext* pipeline, const RefPtr<DialogPattern>& dialogPattern)
+{
+    CHECK_NULL_RETURN(pipeline, ForceSplitPageColumnType::NONE);
+    CHECK_NULL_RETURN(dialogPattern, ForceSplitPageColumnType::NONE);
+    auto cachedColumn = dialogPattern->GetCachedSplitColumnType();
+    if (cachedColumn.has_value()) {
+        TAG_LOGD(AceLogTag::ACE_DIALOG, "dialog split column resolved from cache: %{public}d",
+            static_cast<int32_t>(cachedColumn.value()));
+        return cachedColumn.value();
+    }
+    ForceSplitPageColumnType column = ForceSplitPageColumnType::NONE;
+    const char* source = "none";
+    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    if (forceSplitMgr) {
+        column = forceSplitMgr->GetLastTouchedColumnType();
+        if (column != ForceSplitPageColumnType::NONE) {
+            source = "lastTouchedColumn";
+        }
+    }
+#if defined(ENABLE_SPLIT_MODE)
+    if (column == ForceSplitPageColumnType::NONE) {
+        auto stageManager = AceType::DynamicCast<ParallelStageManager>(pipeline->GetStageManager());
+        if (stageManager) {
+            auto focusPage = stageManager->GetFocusPage();
+            // Only trust a page that currently holds real focus: GetFocusPage falls back to the structural
+            // top primary/home page when nothing is focused, which would flip dialogs to the left column
+            // in no-interaction scenarios where the legacy behavior places them on the right.
+            if (focusPage && focusPage->GetFocusHub() && focusPage->GetFocusHub()->IsCurrentFocus()) {
+                column = stageManager->GetPageColumnType(focusPage);
+                source = "focusedPage";
+            }
+        }
+    }
+#endif
+    TAG_LOGI(AceLogTag::ACE_DIALOG, "dialog split column resolved: %{public}d, source: %{public}s",
+        static_cast<int32_t>(column), source);
+    dialogPattern->SetCachedSplitColumnType(column);
+    return column;
+}
 } // namespace
 
 void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
@@ -92,7 +153,7 @@ void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(dialogTheme_);
     auto navigationManager = pipeline->GetNavigationManager();
     CHECK_NULL_VOID(navigationManager);
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     NG::RectF floatButtons;
     dialogPattern->GetWindowButtonRect(floatButtons);
@@ -148,8 +209,23 @@ void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     ResizeDialogSubwindow(dialogPattern->IsShowInFreeMultiWindow(), isShowInSubWindow_, isShowInFloatingWindow_);
     auto layoutConstraint = dialogProp->GetLayoutConstraint();
     if (needAdaptForceSplitMode_) {
-        layoutConstraint->percentReference.SetWidth(layoutConstraint->percentReference.Width() * forceSplitRatio_);
-        layoutConstraint->maxSize.SetWidth(layoutConstraint->maxSize.Width() * forceSplitRatio_);
+        // Constrain the dialog to the real width of its target column (resolved once per dialog), not a
+        // fixed ratio: the left column uses (1 - ratio) of the root width, the right column uses ratio,
+        // both after subtracting the divider — mirroring the stage split geometry.
+        // 'pipeline' is a raw PipelineContext* here, matching the raw-pointer parameter.
+        auto splitColumn = ResolveSplitColumnType(pipeline, dialogPattern);
+        // Floor the secondary width and derive the primary width by subtraction, exactly like
+        // ParallelStageLayoutAlgorithm::SizeCalculationForForceSplit, so dialog constraints land on the
+        // same pixel geometry as the real split columns.
+        float splittableWidth = pipeline->GetRootWidth() - SPLIT_DIVIDER_WIDTH;
+        float secondaryWidth = std::max(std::floor(splittableWidth * forceSplitRatio_), 0.0f);
+        float primaryWidth = std::max(splittableWidth - secondaryWidth, 0.0f);
+        float columnWidth = splitColumn == ForceSplitPageColumnType::PRIMARY ? primaryWidth : secondaryWidth;
+        TAG_LOGD(AceLogTag::ACE_DIALOG,
+            "dialog force split measure, splitColumn: %{public}d, columnWidth: %{public}f",
+            static_cast<int32_t>(splitColumn), columnWidth);
+        layoutConstraint->percentReference.SetWidth(columnWidth);
+        layoutConstraint->maxSize.SetWidth(columnWidth);
     }
     const auto& parentIdealSize = layoutConstraint->parentIdealSize;
     OptionalSizeF realSize;
@@ -163,9 +239,9 @@ void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     // update child layout constraint
     auto childLayoutConstraint = layoutWrapper->GetLayoutProperty()->CreateChildConstraint();
     if (needAdaptForceSplitMode_) {
-        childLayoutConstraint.percentReference.SetWidth(
-            childLayoutConstraint.percentReference.Width() * forceSplitRatio_);
-        childLayoutConstraint.maxSize.SetWidth(childLayoutConstraint.maxSize.Width() * forceSplitRatio_);
+        // Same target-column width as above (layoutConstraint->maxSize was already narrowed to it).
+        childLayoutConstraint.percentReference.SetWidth(layoutConstraint->maxSize.Width());
+        childLayoutConstraint.maxSize.SetWidth(layoutConstraint->maxSize.Width());
         childLayoutConstraint.minSize.SetWidth(ONE_PX);
         childLayoutConstraint.minSize.SetHeight(ONE_PX);
     }
@@ -194,7 +270,7 @@ void DialogLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 
     if (NeedAdaptToAgingWidth(hostNode)) {
         float widthRatio = needAdaptForceSplitMode_ ?
-            (LANDSCAPE_DIALOG_WIDTH_RATIO * pipeline->GetRootWidth() * forceSplitRatio_) :
+            (LANDSCAPE_DIALOG_WIDTH_RATIO * layoutConstraint->maxSize.Width()) :
             (LANDSCAPE_DIALOG_WIDTH_RATIO * pipeline->GetRootWidth());
         childLayoutConstraint.maxSize.SetWidth(widthRatio);
         if (needAdaptForceSplitMode_) {
@@ -570,7 +646,7 @@ void DialogLayoutAlgorithm::AnalysisLayoutOfTitle(const RefPtr<LayoutWrapper>& t
     }
     auto textNode = AceType::DynamicCast<FrameNode>(title->GetChildByIndex(ROW_CHILD_INDEX));
     CHECK_NULL_VOID(textNode);
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(textNode->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = textNode->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(textLayoutAlgorithm);
@@ -595,7 +671,7 @@ void DialogLayoutAlgorithm::AnalysisLayoutOfContent(LayoutWrapper* layoutWrapper
     if (!Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
         textLayoutProperty->UpdateWordBreak(dialogPattern->GetDialogProperties().wordBreak);
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(text->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = text->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(textLayoutAlgorithm);
@@ -703,7 +779,7 @@ bool DialogLayoutAlgorithm::ComputeInnerLayoutSizeParam(LayoutConstraintF& inner
     if (NeedAdaptToAgingWidth(dialogProp->GetHost())) {
         innerLayout.minSize = SizeF(width, 0.0);
         float widthRatio = needAdaptForceSplitMode_ ?
-            (LANDSCAPE_DIALOG_WIDTH_RATIO * pipeline->GetRootWidth() / HALF) :
+            (LANDSCAPE_DIALOG_WIDTH_RATIO * maxSize.Width()) :
             (LANDSCAPE_DIALOG_WIDTH_RATIO * pipeline->GetRootWidth());
         innerLayout.maxSize.SetWidth(widthRatio);
     }
@@ -1153,55 +1229,98 @@ void DialogLayoutAlgorithm::MultipleDialog(const RefPtr<DialogLayoutProperty>& d
     }
 }
 
-OffsetF DialogLayoutAlgorithm::ComputeChildPosition(
-    const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& selfSize,
-    const RefPtr<DialogPattern>& dialogPattern)
+void DialogLayoutAlgorithm::NarrowConstraintToSplitColumn(const RefPtr<PipelineContext>& pipelineContext,
+    const RefPtr<DialogLayoutProperty>& prop, std::optional<LayoutConstraintF>& layoutConstraint)
 {
-    OffsetF topLeftPoint;
-    auto pipelineContext = GetPipelineContext();
-    CHECK_NULL_RETURN(pipelineContext, OffsetF());
-    auto layoutConstraint = prop->GetLayoutConstraint();
-    if (needAdaptForceSplitMode_) {
-        layoutConstraint->percentReference.SetWidth(layoutConstraint->percentReference.Width() * forceSplitRatio_);
-        layoutConstraint->maxSize.SetWidth(layoutConstraint->maxSize.Width() * forceSplitRatio_);
+    if (!needAdaptForceSplitMode_) {
+        return;
     }
-    CHECK_NULL_RETURN(dialogTheme_, OffsetF());
-    auto dialogOffsetX =
-        ConvertToPx(CalcLength(dialogOffset_.GetX()), layoutConstraint->scaleProperty, selfSize.Width());
-    auto dialogOffsetY =
-        ConvertToPx(CalcLength(dialogOffset_.GetY()), layoutConstraint->scaleProperty, selfSize.Height());
-    OffsetF dialogOffset = OffsetF(dialogOffsetX.value_or(0.0), dialogOffsetY.value_or(0.0));
-    auto isHostWindowAlign = isUIExtensionSubWindow_ && expandDisplay_ && hostWindowRect_.GetSize().IsPositive();
-    auto maxSize = isHostWindowAlign ? hostWindowRect_.GetSize() : layoutConstraint->maxSize;
-    maxSize = isWindowBased_ ? parentWindowRect_.GetSize() : maxSize;
-    wrapperSize_ = layoutConstraint->maxSize;
+    // Idempotent absolute set (Measure already narrowed the same property constraint): keep the width
+    // at the real target-column width instead of multiplying by the ratio again.
+    auto splitColumn = ResolveSplitColumnType(RawPtr(pipelineContext), GetDialogPattern(prop));
+    float splittableWidth = pipelineContext->GetRootWidth() - SPLIT_DIVIDER_WIDTH;
+    float secondaryWidth = std::max(std::floor(splittableWidth * forceSplitRatio_), 0.0f);
+    float primaryWidth = std::max(splittableWidth - secondaryWidth, 0.0f);
+    float columnWidth = splitColumn == ForceSplitPageColumnType::PRIMARY ? primaryWidth : secondaryWidth;
+    layoutConstraint->percentReference.SetWidth(columnWidth);
+    layoutConstraint->maxSize.SetWidth(columnWidth);
+}
+
+void DialogLayoutAlgorithm::ComputeTopLeftPoint(OffsetF& topLeftPoint, const SizeF& childSize, SizeF maxSize,
+    const RefPtr<DialogLayoutProperty>& prop, const RefPtr<DialogPattern>& dialogPattern)
+{
+    bool handednessApplied = false;
     if (IsHandednessActive(prop)) {
         auto handednessOffset = ComputeHandednessOffset(childSize, maxSize, prop, dialogPattern);
         if (handednessOffset.first) {
             topLeftPoint = handednessOffset.second;
+            handednessApplied = true;
             if (dialogPattern && !dialogPattern->IsHandednessLayoutCaptured()) {
                 dialogPattern->MarkHandednessLayoutCaptured();
             }
-        } else {
-            if (!SetAlignmentSwitch(maxSize, childSize, topLeftPoint)) {
-                topLeftPoint =
-                    OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
-            }
         }
-    } else if (!SetAlignmentSwitch(maxSize, childSize, topLeftPoint)) {
-        topLeftPoint = OffsetF(maxSize.Width() - childSize.Width(), maxSize.Height() - childSize.Height()) / HALF;
     }
+    if (!handednessApplied && !SetAlignmentSwitch(maxSize, childSize, topLeftPoint)) {
+        topLeftPoint = OffsetF(maxSize.Width() - childSize.Width(),
+            maxSize.Height() - childSize.Height()) / HALF;
+    }
+}
+
+void DialogLayoutAlgorithm::ShiftTopLeftToSplitColumn(OffsetF& topLeftPoint,
+    const RefPtr<PipelineContext>& pipelineContext, const RefPtr<DialogLayoutProperty>& prop)
+{
+    if (!needAdaptForceSplitMode_) {
+        return;
+    }
+    // Shift to the target column using the real split geometry: the secondary column starts right
+    // after primaryWidth + divider, matching ParallelStageLayoutAlgorithm's layout offsets.
+    auto splitColumn = ResolveSplitColumnType(RawPtr(pipelineContext), GetDialogPattern(prop));
+    float splittableWidth = pipelineContext->GetRootWidth() - SPLIT_DIVIDER_WIDTH;
+    float secondaryWidth = std::max(std::floor(splittableWidth * forceSplitRatio_), 0.0f);
+    float primaryWidth = std::max(splittableWidth - secondaryWidth, 0.0f);
+    if (splitColumn == ForceSplitPageColumnType::PRIMARY) {
+        TAG_LOGI(AceLogTag::ACE_DIALOG,
+            "dialog adapt force split: splitColumn: %{public}d, placeOnPrimary, dialogId: %{public}d",
+            static_cast<int32_t>(splitColumn), prop->GetHost() ? prop->GetHost()->GetId() : -1);
+        return;
+    }
+    float secondaryStartX = primaryWidth + SPLIT_DIVIDER_WIDTH;
+    topLeftPoint.SetX(topLeftPoint.GetX() + secondaryStartX);
+    TAG_LOGI(AceLogTag::ACE_DIALOG,
+        "dialog adapt force split: splitColumn: %{public}d, forceSplitRatio: %{public}f, "
+        "secondaryStartX: %{public}f, dialogId: %{public}d",
+        static_cast<int32_t>(splitColumn), forceSplitRatio_, secondaryStartX,
+        prop->GetHost() ? prop->GetHost()->GetId() : -1);
+}
+
+OffsetF DialogLayoutAlgorithm::ComputeChildPosition(
+    const SizeF& childSize, const RefPtr<DialogLayoutProperty>& prop, const SizeF& selfSize,
+    const RefPtr<DialogPattern>& dialogPattern)
+{
+    auto pipelineContext = GetPipelineContext();
+    CHECK_NULL_RETURN(pipelineContext, OffsetF());
+    CHECK_NULL_RETURN(dialogTheme_, OffsetF());
+    auto layoutConstraint = prop->GetLayoutConstraint();
+    NarrowConstraintToSplitColumn(pipelineContext, prop, layoutConstraint);
+    auto dialogOffsetX = ConvertToPx(CalcLength(dialogOffset_.GetX()),
+        layoutConstraint->scaleProperty, selfSize.Width());
+    auto dialogOffsetY = ConvertToPx(CalcLength(dialogOffset_.GetY()),
+        layoutConstraint->scaleProperty, selfSize.Height());
+    OffsetF dialogOffset(dialogOffsetX.value_or(0.0), dialogOffsetY.value_or(0.0));
+    bool isHostWindowAlign = isUIExtensionSubWindow_ && expandDisplay_ && hostWindowRect_.GetSize().IsPositive();
+    auto maxSize = isHostWindowAlign ? hostWindowRect_.GetSize() : layoutConstraint->maxSize;
+    maxSize = isWindowBased_ ? parentWindowRect_.GetSize() : maxSize;
+    wrapperSize_ = layoutConstraint->maxSize;
+    OffsetF topLeftPoint;
+    ComputeTopLeftPoint(topLeftPoint, childSize, maxSize, prop, dialogPattern);
     if (isHostWindowAlign && !isModal_) {
         topLeftPoint += hostWindowRect_.GetOffset();
     }
+    ShiftTopLeftToSplitColumn(topLeftPoint, pipelineContext, prop);
+    bool needAvoidKeyboard = keyboardAvoidMode_ != KeyboardAvoidMode::NONE;
     const auto& expandSafeAreaOpts = prop->GetSafeAreaExpandOpts();
-    bool needAvoidKeyboard = true;
-    if ((expandSafeAreaOpts && (expandSafeAreaOpts->type & SAFE_AREA_TYPE_KEYBOARD)) ||
-        keyboardAvoidMode_ == KeyboardAvoidMode::NONE) {
+    if (expandSafeAreaOpts && (expandSafeAreaOpts->type & SAFE_AREA_TYPE_KEYBOARD)) {
         needAvoidKeyboard = false;
-    }
-    if (needAdaptForceSplitMode_) {
-        topLeftPoint.SetX(topLeftPoint.GetX() + pipelineContext->GetRootWidth() * (1 - forceSplitRatio_));
     }
     auto childOffset = AdjustChildPosition(topLeftPoint, dialogOffset, childSize, needAvoidKeyboard);
     AvoidScreen(childOffset, prop, dialogChildSize_);

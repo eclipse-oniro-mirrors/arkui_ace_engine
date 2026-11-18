@@ -1153,18 +1153,6 @@ if (use_mac || use_mingw_win) {
       subsystem_name = "distributeddatamgr"
       part_name = "kv_store"
     },
-    {
-      label = "//foundation/filemanagement/file_api/utils/filemgmt_libhilog:filemgmt_libhilog"
-      subsystem_name = "filemanagement"
-      part_name = "file_api"
-      lib_names = [ "filemgmt_libhilog" ]
-    },
-    {
-      label = "//foundation/filemanagement/file_api/utils/filemgmt_libn:filemgmt_libn"
-      subsystem_name = "filemanagement"
-      part_name = "file_api"
-      lib_names = [ "filemgmt_libn" ]
-    },
   ]
 
   napi_modules += [
@@ -1204,16 +1192,6 @@ if (use_mac || use_mingw_win) {
         },
       ]
     },
-    {
-      prefix = "file"
-      shard_libs = [
-        {
-          label = "//foundation/filemanagement/file_api/interfaces/kits/js:fs"
-          subsystem_name = "filemanagement"
-          part_name = "file_api"
-        },
-      ]
-    },
   ]
 }
 
@@ -1233,19 +1211,3 @@ if (use_linux) {
   ]
 }
 
-if (use_linux) {
-  common_bin += [
-    {
-      label = "//foundation/filemanagement/file_api/utils/filemgmt_libhilog:filemgmt_libhilog"
-      subsystem_name = "filemanagement"
-      part_name = "file_api"
-      lib_names = [ "filemgmt_libhilog" ]
-    },
-    {
-      label = "//foundation/filemanagement/file_api/utils/filemgmt_libn:filemgmt_libn"
-      subsystem_name = "filemanagement"
-      part_name = "file_api"
-      lib_names = [ "filemgmt_libn" ]
-    },
-  ]
-}

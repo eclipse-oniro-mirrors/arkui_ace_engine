@@ -33,7 +33,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<QRCodeThemeWrapper>();
-            auto theme = AceType::DynamicCast<QrcodeTheme>(themeWrapper);
+            RefPtr<QrcodeTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

@@ -1883,6 +1883,7 @@ declare class ArkXComponentComponent implements CommonMethod<XComponentAttribute
     enableSecure(value: boolean): this;
     hdrBrightness(value: number, hdrType?: HdrType): this;
     enableTransparentLayer(value: boolean): this;
+    enableSurfaceVisibilityLifecycle(value: boolean): this;
     bufferQueueCount(count: number): this;
 }
 declare class ArkBadgeComponent extends ArkComponent implements BadgeAttribute {
@@ -2040,7 +2041,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     onContentDidScroll(handler: OnTabsContentDidScrollCallback | undefined): TabsAttribute;
     fadingEdge(value: boolean): TabsAttribute;
     divider(value: DividerStyle | null): TabsAttribute;
-    barOverlap(value: boolean): TabsAttribute;
+    barOverlap(value: BarOverlapMode | boolean): TabsAttribute;
     barBackgroundColor(value: ResourceColor): TabsAttribute;
     sidebarSelectedIconColor(value: ResourceColor): TabsAttribute;
     sidebarSelectedTextColor(value: ResourceColor): TabsAttribute;

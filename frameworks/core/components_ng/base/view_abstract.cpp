@@ -7494,7 +7494,7 @@ void ViewAbstract::SetOverlayBuilder(FrameNode* frameNode, const RefPtr<NG::UINo
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -7532,7 +7532,7 @@ void ViewAbstract::AddOverlayToFrameNode(const RefPtr<NG::FrameNode>& overlayNod
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -8690,7 +8690,7 @@ void ViewAbstract::SetOverlayNode(FrameNode* frameNode, FrameNode* node, const N
     overlayNode->SetParent(AceType::WeakClaim(frameNode));
     overlayNode->SetActive(true);
     overlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto layoutProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->SetIsOverlayNode(true);
     layoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -10440,6 +10440,20 @@ void ViewAbstract::SetKeyboardShortcut(FrameNode* frameNode, const std::string& 
     }
     eventHub->SetKeyboardShortcut(value, key, onKeyboardShortcutAction);
     eventManager->AddKeyboardShortcutNode(WeakPtr<NG::FrameNode>(frameNodeRef));
+}
+
+void ViewAbstract::RemoveKeyboardShortcut(FrameNode* frameNode, const std::string& value,
+    const std::vector<ModifierKey>& keys)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pipeline = frameNode->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto eventManager = pipeline->GetEventManager();
+    CHECK_NULL_VOID(eventManager);
+    auto eventHub = frameNode->GetEventHub<EventHub>();
+    CHECK_NULL_VOID(eventHub);
+    auto key = eventManager->GetKeyboardShortcutKeys(keys);
+    eventHub->RemoveKeyboardShortcut(value, key);
 }
 
 void ViewAbstract::SetOnAppear(FrameNode* frameNode, std::function<void()> &&onAppear)

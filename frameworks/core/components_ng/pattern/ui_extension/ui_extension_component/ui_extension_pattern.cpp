@@ -288,7 +288,7 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     }
     AddWindowStateChangedCallback();
     RegisterAvoidInfoChangeListener(instanceId_);
-
+    RegisterBrandColorChangeListener();
     /* only for 1.2 begin */
     if (context->GetFrontendType() == FrontendType::ARK_TS) {
         auto wantWrap = GetWantWrap();
@@ -318,6 +318,33 @@ void UIExtensionPattern::RegisterEvent(int32_t instanceId)
     RegisterUIExtensionManagerEvent(instanceId);
     RegisterPipelineEvent(instanceId);
     hasDetachContext_ = false;
+}
+
+void UIExtensionPattern::RegisterBrandColorChangeListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    NG::BrandColorChangeCallback internalCallback =
+        [weak = WeakClaim(this), instanceId = instanceId_](
+            int32_t, const std::optional<Color>&,
+            const std::optional<NG::BrandColorStrategy>&) {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            ContainerScope scope(instanceId);
+            pattern->NotifyBrandColorChange(instanceId);
+        };
+    storage->RegisterBrandColorChangeListener(instanceId_, host->GetId(), internalCallback);
+}
+
+void UIExtensionPattern::UnRegisterBrandColorChangeListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->UnregisterBrandColorChangeListener(instanceId_, host->GetId());
 }
 
 void UIExtensionPattern::RegisterPipelineEvent(int32_t instanceId)
@@ -374,6 +401,7 @@ void UIExtensionPattern::UnRegisterEvent(int32_t instanceId)
 {
     UnRegisterUIExtensionManagerEvent(instanceId);
     UnRegisterPipelineEvent(instanceId);
+    UnRegisterBrandColorChangeListener();
     UnRegisterAvoidInfoChangeListener();
     hasDetachContext_ = true;
 }
@@ -2642,36 +2670,22 @@ void UIExtensionPattern::NotifyBrandColorChange(int32_t instanceId)
 
 std::string UIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) const
 {
-    auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
-    if (tokenTheme) {
-        auto themeColors = tokenTheme->Colors();
-        if (!themeColors) {
-            UIEXT_LOGW("ResolveBrandColor: tokenTheme exists but themeColors is null, "
+    auto brandColor = TokenThemeStorage::GetInstance()->ResolveBrandColor(themeScopeId);
+    if (!brandColor.has_value()) {
+        UIEXT_LOGW("ResolveBrandColor: themeColors is null, "
                 "themeScopeId=%{public}d, instanceId=%{public}d",
-                themeScopeId, instanceId_);
-            return DEFAULT_BRAND_COLOR_STR;
-        }
-        Color brandColor = themeColors->Brand();
-        if (brandColor.GetAlpha() != 0) {
-            UIEXT_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
-                instanceId_, brandColor.ToString().c_str());
-            return brandColor.ToString();
-        }
-        UIEXT_LOGW("ResolveBrandColor: brandColor is invalid, brandColorStr=%{public}s, "
-            "themeScopeId=%{public}d, instanceId=%{public}d",
-            brandColor.ToString().c_str(), themeScopeId, instanceId_);
+            themeScopeId, instanceId_);
         return DEFAULT_BRAND_COLOR_STR;
     }
-    auto container = Platform::AceContainer::GetContainer(instanceId_);
-    if (container && container->IsUIExtensionWindow()) {
-        auto brandColorInfo = TokenThemeStorage::GetInstance()->GetInstanceBrandColor(instanceId_);
-        if (brandColorInfo.brandColor.has_value()) {
-            UIEXT_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=0",
-                instanceId_, brandColorInfo.brandColor.value().ToString().c_str());
-            return brandColorInfo.brandColor.value().ToString();
-        }
+    if (brandColor.value().GetAlpha() == 0) {
+        UIEXT_LOGW("ResolveBrandColor: brandColor is transparent, "
+            "instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+            instanceId_, brandColor.value().ToString().c_str());
+        return DEFAULT_BRAND_COLOR_STR;
     }
-    return DEFAULT_BRAND_COLOR_STR;
+    UIEXT_LOGI("ResolveBrandColor: instanceId=%{public}d, brandColorStr=%{public}s, fromTheme=1",
+        instanceId_, brandColor.value().ToString().c_str());
+    return brandColor.value().ToString();
 }
 
 std::string UIExtensionPattern::GetBrandColorStr() const

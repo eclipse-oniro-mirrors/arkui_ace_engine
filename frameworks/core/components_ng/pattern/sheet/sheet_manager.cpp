@@ -293,13 +293,13 @@ RefPtr<OverlayManager> SheetManager::GetOverlayFromPage(int32_t rootNodeId, Root
     auto frameNode = FrameNode::GetFrameNode(tag, rootNodeId);
     CHECK_NULL_RETURN(frameNode, nullptr);
     if (tag == V2::PAGE_ETS_TAG) {
-        auto node = AceType::DynamicCast<FrameNode>(frameNode);
+        auto node = frameNode;
         CHECK_NULL_RETURN(node, nullptr);
         auto pattern = node->GetPattern<PagePattern>();
         return pattern->GetOverlayManager();
     }
     if (tag == NAVDESTINATION_VIEW_TAG) {
-        auto node = AceType::DynamicCast<FrameNode>(frameNode);
+        auto node = frameNode;
         CHECK_NULL_RETURN(node, nullptr);
         auto pattern = node->GetPattern<NavDestinationPattern>();
         CHECK_NULL_RETURN(pattern, nullptr);
@@ -307,7 +307,7 @@ RefPtr<OverlayManager> SheetManager::GetOverlayFromPage(int32_t rootNodeId, Root
     }
 #ifdef WINDOW_SCENE_SUPPORTED
     if (tag == V2::WINDOW_SCENE_ETS_TAG) {
-        auto node = AceType::DynamicCast<FrameNode>(frameNode);
+        auto node = frameNode;
         CHECK_NULL_RETURN(node, nullptr);
         auto pattern = node->GetPattern<SystemWindowScene>();
         CHECK_NULL_RETURN(pattern, nullptr);

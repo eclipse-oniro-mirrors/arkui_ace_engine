@@ -420,7 +420,7 @@ HWTEST_F(MenuDividerTestNG, MenuDividerTest007, TestSize.Level1)
      */
     auto property = menuNode->GetLayoutProperty<MenuLayoutProperty>();
     property->UpdateItemDividerMode(DividerMode::EMBEDDED_IN_MENU);
-    auto uiNode = AceType::DynamicCast<UINode>(menuNode);
+    RefPtr<UINode> uiNode = menuNode;
     RefPtr<UINode> previousNode = nullptr;
     menuPattern->UpdateMenuItemChildren(uiNode, previousNode);
     EXPECT_NE(bottomDivider->GetParent(), nullptr);
@@ -468,7 +468,7 @@ HWTEST_F(MenuDividerTestNG, MenuDividerTest008, TestSize.Level1)
      */
     auto property = menuNode->GetLayoutProperty<MenuLayoutProperty>();
     property->UpdateItemGroupDividerMode(DividerMode::EMBEDDED_IN_MENU);
-    auto uiNode = AceType::DynamicCast<UINode>(menuNode);
+    RefPtr<UINode> uiNode = menuNode;
     RefPtr<UINode> previousNode = nullptr;
     menuPattern->UpdateMenuItemChildren(uiNode, previousNode);
     EXPECT_EQ(bottomDivider->GetParent(), nullptr);

@@ -1322,7 +1322,7 @@ HWTEST_F(CalendarPickerTestNg, CalendarPickerLayoutAlgorithmTest002, TestSize.Le
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(LayoutConstraintVaildSize);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto calendarPickerLayoutAlgorithm =
         AceType::DynamicCast<CalendarPickerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

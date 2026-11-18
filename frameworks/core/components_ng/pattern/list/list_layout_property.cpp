@@ -197,7 +197,7 @@ void ListLayoutProperty::Clone(RefPtr<LayoutProperty> layoutProperty) const
 {
     auto value = DynamicCast<ListLayoutProperty>(layoutProperty);
     ScrollableLayoutProperty::Clone(value);
-    value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+    value->LayoutProperty::UpdateLayoutProperty(this);
     value->propSpace_ = CloneSpace();
     value->propSpaceWidth_ = CloneSpaceWidth();
     value->propInitialIndex_ = CloneInitialIndex();

@@ -160,6 +160,15 @@ static Matrix4_Obj* GetMatrixObj(ani_env* env, ani_object obj)
     return reinterpret_cast<Matrix4_Obj*>(matrix4x4);
 }
 
+static void NativeDestroyMatrix4([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object aniClass,
+    ani_long ptr)
+{
+    auto* matrix4Obj = reinterpret_cast<Matrix4_Obj*>(ptr);
+    if (matrix4Obj != nullptr) {
+        delete matrix4Obj;
+    }
+}
+
 static ani_object Matrix4_Identity([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object object)
 {
     ani_class cls = GetOrCreateMatrix4Class(env, MatrixClassName::TRANSIT_INNER);
@@ -651,7 +660,8 @@ ani_status BindMatrixTransit(ani_env* env)
     };
 
     std::array staticMethod = {
-        ani_native_function { "nativeTransferStatic", nullptr, reinterpret_cast<void*>(MatrixTransferStatic) }
+        ani_native_function { "nativeTransferStatic", nullptr, reinterpret_cast<void*>(MatrixTransferStatic) },
+        ani_native_function { "nativeDestroy", nullptr, reinterpret_cast<void*>(NativeDestroyMatrix4) }
     };
     if (ANI_OK != env->Class_BindStaticNativeMethods(cls, staticMethod.data(), staticMethod.size())) {
         return ANI_ERROR;

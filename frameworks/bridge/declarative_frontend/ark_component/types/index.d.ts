@@ -536,7 +536,9 @@ declare enum ObscuredReasons {
 }
 declare enum FunctionKey {
   ESC, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, TAB,
-  DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT
+  DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT,
+  CAPS_LOCK = 18, SCROLL_LOCK = 20, PAUSE_BREAK = 21, NUM_LOCK = 22, INSERT = 23, DELETE = 24,
+  HOME = 25, END = 26, PAGE_UP = 27, PAGE_DOWN = 28, ENTER = 29, BACKSPACE = 30
 }
 declare enum ModifierKey {
   CTRL,

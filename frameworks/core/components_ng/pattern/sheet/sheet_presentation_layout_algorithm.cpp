@@ -173,7 +173,7 @@ float SheetPresentationLayoutAlgorithm::CalculateSheetHeightInOtherScenes(
     if (isWaterfallWindowMode_) {
         auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
         CHECK_NULL_RETURN(sheetWrapper, height);
-        auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+        auto sheetWrapperNode = sheetWrapper;
         CHECK_NULL_RETURN(sheetWrapperNode, height);
         maxUpSheetHeight = foldCreaseRect.Top() - sheetWrapperNode->GetPositionToScreen().GetY() -
                            DOUBLE_SIZE * (SHEET_BLANK_MINI_HEIGHT.ConvertToPx());
@@ -209,7 +209,7 @@ void SheetPresentationLayoutAlgorithm::CalculateSheetOffsetInOtherScenes(LayoutW
     if (isWaterfallWindowMode_) {
         auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
         CHECK_NULL_VOID(sheetWrapper);
-        auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+        auto sheetWrapperNode = sheetWrapper;
         CHECK_NULL_VOID(sheetWrapperNode);
         upScreenHeight = foldCreaseRect.Top() - sheetWrapperNode->GetPositionToScreen().GetY();
         topStartOffsetY = 0.0f;
@@ -343,7 +343,7 @@ void SheetPresentationLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         if ((sheetType_ == SheetType::SHEET_CENTER || sheetType_ == SheetType::SHEET_POPUP ||
             (sheetType_ == SheetType::SHEET_BOTTOM_OFFSET))
             && (sheetStyle_.sheetHeight.sheetMode.value_or(SheetMode::LARGE) == SheetMode::AUTO)) {
-            auto secondChild = AceType::DynamicCast<LayoutWrapper>(scrollNode);
+            RefPtr<LayoutWrapper> secondChild = scrollNode;
             CHECK_NULL_VOID(secondChild);
             auto&& scrollChild = secondChild->GetAllChildrenWithBuild();
             auto builder = scrollChild.front();
@@ -662,42 +662,9 @@ void SheetPresentationLayoutAlgorithm::LayoutScrollNode(const NG::OffsetF& trans
     auto geometryNode = scrollWrapper->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
     geometryNode->SetMarginFrameOffset(offset);
+    sheetPattern->UpdateSafeAreaPaddingClip(
+        scrollNode->GetPaintProperty<ScrollablePaintProperty>(), titleBarHoverMode, offset.GetY() - translate.GetY());
     scrollWrapper->Layout();
-    UpdateSafeAreaPaddingClip(host, scrollNode->GetPaintProperty<ScrollablePaintProperty>(), titleBarHoverMode,
-        offset.GetY() - translate.GetY());
-}
-
-void SheetPresentationLayoutAlgorithm::UpdateSafeAreaPaddingClip(const RefPtr<FrameNode>& host,
-    const RefPtr<ScrollablePaintProperty>& scrollPaintProps, SheetTitleBarHoverMode hoverMode, float top)
-{
-    CHECK_NULL_VOID(host);
-    CHECK_NULL_VOID(scrollPaintProps);
-    auto hostLayoutProperty = host->GetLayoutProperty();
-    CHECK_NULL_VOID(hostLayoutProperty);
-    if (hoverMode == SheetTitleBarHoverMode::SAFE_AREA_PADDING) {
-        const auto& existing = hostLayoutProperty->GetSafeAreaPaddingProperty();
-        bool needUpdate =
-            !existing || !existing->top.has_value() || !NearEqual(existing->top->GetDimension().Value(), top);
-        if (needUpdate) {
-            PaddingProperty safeAreaPadding;
-            safeAreaPadding.left = CalcLength(0.0);
-            safeAreaPadding.right = CalcLength(0.0);
-            safeAreaPadding.top = CalcLength(top);
-            safeAreaPadding.bottom = std::nullopt;
-            hostLayoutProperty->UpdateSafeAreaPadding(safeAreaPadding);
-            host->ResetSafeAreaPadding();
-        }
-        const auto& clip = scrollPaintProps->GetContentClip();
-        if (!clip.has_value() || clip->first != ContentClipMode::SAFE_AREA) {
-            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::SAFE_AREA, nullptr));
-        }
-    } else if (hostLayoutProperty->GetSafeAreaPaddingProperty()) {
-        hostLayoutProperty->ResetSafeAreaPadding();
-        host->ResetSafeAreaPadding();
-        if (scrollPaintProps->GetContentClip().has_value()) {
-            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::BOUNDARY, nullptr));
-        }
-    }
 }
 
 void SheetPresentationLayoutAlgorithm::LayoutDragBar(const NG::OffsetF& translate, LayoutWrapper* layoutWrapper)

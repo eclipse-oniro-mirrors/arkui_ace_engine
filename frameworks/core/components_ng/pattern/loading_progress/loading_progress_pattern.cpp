@@ -28,7 +28,7 @@ bool LoadingProgressPattern::OnDirtyLayoutWrapperSwap(
     if (skipMeasure || dirty->SkipMeasureContent()) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
 
     auto lodingprogressLayoutAlgorithm =

@@ -239,7 +239,7 @@ HWTEST_F(DragEventTestNg, DragEventActuatorUpdatePreviewAttrTest037, TestSize.Le
     ASSERT_NE(parentNode, nullptr);
     frameNode->SetParent(parentNode);
     dragEventActuator->itemParentNode_ = parentNode;
-    manager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(frameNode));
+    manager->pixmapColumnNodeWeak_ = WeakPtr<FrameNode>(frameNode);
     dragEventActuator->isSelectedItemNode_ = true;
     auto pattern = AceType::MakeRefPtr<GridPattern>();
     auto itemPattern = AceType::MakeRefPtr<GridItemPattern>(nullptr, GridItemStyle::NONE);

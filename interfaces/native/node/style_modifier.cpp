@@ -21074,6 +21074,8 @@ bool IsNodeAttributeSupported(int32_t nodeType, int32_t attribute, int32_t attri
         case NODE_TEXT_MAX_LINES:
         case NODE_TEXT_OPTIMIZE_TRAILING_SPACE:
         case NODE_SCROLL_BY:
+        case NODE_SCROLL_PAGE:
+        case NODE_SCROLL_FLING:
         case NODE_SCROLL_EDGE_EFFECT:
         case NODE_SCROLL_ENABLE_SCROLL_INTERACTION:
         case NODE_SCROLL_FRICTION:

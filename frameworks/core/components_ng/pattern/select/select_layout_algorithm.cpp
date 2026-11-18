@@ -181,7 +181,7 @@ void SelectLayoutAlgorithm::NeedAgingUpdateParams(LayoutWrapper* layoutWrapper)
     const auto* menuItemModifier = NG::NodeModifier::GetMenuItemInnerModifier();
     CHECK_NULL_VOID(menuItemModifier);
     for (const auto& option : options) {
-        auto textNode = AceType::DynamicCast<FrameNode>(menuItemModifier->getTextNode(option));
+        auto textNode = menuItemModifier->getTextNode(option);
         CHECK_NULL_VOID(textNode);
         auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
         CHECK_NULL_VOID(textLayoutProperty);

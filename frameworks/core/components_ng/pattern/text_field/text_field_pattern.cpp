@@ -150,46 +150,6 @@ constexpr int MAX_SELECTED_AI_ENTITY = 1;
 constexpr double DEFAULT_OPACITY = 0.2;
 const int32_t DEFAULT_ALPHA = 255;
 
-static std::unordered_map<AceAutoFillType, TextInputType> keyBoardMap_ = {
-    { AceAutoFillType::ACE_PASSWORD, TextInputType::VISIBLE_PASSWORD},
-    { AceAutoFillType::ACE_USER_NAME, TextInputType::USER_NAME },
-    { AceAutoFillType::ACE_NEW_PASSWORD, TextInputType::NEW_PASSWORD },
-    { AceAutoFillType::ACE_FULL_STREET_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_HOUSE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_DISTRICT_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_CITY_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PROVINCE_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_COUNTRY_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PERSON_FULL_NAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PERSON_LAST_NAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PERSON_FIRST_NAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PHONE_NUMBER, TextInputType::PHONE },
-    { AceAutoFillType::ACE_PHONE_COUNTRY_CODE, TextInputType::PHONE },
-    { AceAutoFillType::ACE_FULL_PHONE_NUMBER, TextInputType::PHONE },
-    { AceAutoFillType::ACE_EMAIL_ADDRESS, TextInputType::EMAIL_ADDRESS },
-    { AceAutoFillType::ACE_BANK_CARD_NUMBER, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_ID_CARD_NUMBER, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_PRECISE_TIME, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_HOUR_AND_MINUTE, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_DATE, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_MONTH, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_YEAR, TextInputType::NUMBER },
-    { AceAutoFillType::ACE_NICKNAME, TextInputType::TEXT },
-    { AceAutoFillType::ACE_DETAIL_INFO_WITHOUT_STREET, TextInputType::TEXT },
-    { AceAutoFillType::ACE_FORMAT_ADDRESS, TextInputType::TEXT },
-    { AceAutoFillType::ACE_PASSPORT_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_VALIDITY, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ISSUE_AT, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ORGANIZATION, TextInputType::TEXT },
-    { AceAutoFillType::ACE_TAX_ID, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ADDRESS_CITY_AND_STATE, TextInputType::TEXT },
-    { AceAutoFillType::ACE_FLIGHT_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_FILE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_PLATE, TextInputType::TEXT },
-    { AceAutoFillType::ACE_ENGINE_NUMBER, TextInputType::TEXT },
-    { AceAutoFillType::ACE_LICENSE_CHASSIS_NUMBER, TextInputType::TEXT }};
-
 void SwapIfLarger(int32_t& a, int32_t& b)
 {
     if (a > b) {
@@ -865,7 +825,7 @@ bool TextFieldPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     auto oldContentRect = contentRect_;
     contentRect_ = dirty->GetGeometryNode()->GetContentRect();
     frameRect_ = dirty->GetGeometryNode()->GetFrameRect();
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto textFieldLayoutAlgorithm = DynamicCast<TextFieldLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(textFieldLayoutAlgorithm, false);
@@ -4092,9 +4052,10 @@ bool TextFieldPattern::IsKeyboardTypeChanged()
     auto currentType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
     CHECK_NULL_RETURN(keyboard_ != currentType, false);
     auto autoFillType = GetAutoFillType(false);
+    const auto& keyBoardMap = TextInputClient::GetAutoFillKeyboardMap();
     return currentType != TextInputType::UNSPECIFIED ||
-        keyBoardMap_.find(autoFillType) == keyBoardMap_.end() ||
-        keyboard_ != keyBoardMap_[autoFillType];
+        keyBoardMap.find(autoFillType) == keyBoardMap.end() ||
+        keyboard_ != keyBoardMap.at(autoFillType);
 }
 
 void TextFieldPattern::ProcessScroll()
@@ -5746,10 +5707,11 @@ void TextFieldPattern::KeyboardContentTypeToInputType()
         return;
     }
     auto autoFillType = GetAutoFillType(false);
-    if (keyBoardMap_.find(autoFillType) != keyBoardMap_.end()) {
+    const auto& keyBoardMap = TextInputClient::GetAutoFillKeyboardMap();
+    if (keyBoardMap.find(autoFillType) != keyBoardMap.end()) {
         TAG_LOGI(AceLogTag::ACE_TEXT_FIELD,
-            "Set InputType to %{public}d because of contentType", keyBoardMap_[autoFillType]);
-        keyboard_ = keyBoardMap_[autoFillType];
+            "Set InputType to %{public}d because of contentType", keyBoardMap.at(autoFillType));
+        keyboard_ = keyBoardMap.at(autoFillType);
     }
 }
 
@@ -13290,59 +13252,37 @@ void TextFieldPattern::OnReportSubmitEvent(const RefPtr<FrameNode>& frameNode)
 }
 
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-void TextFieldPattern::BeforeAutoFillAnimation(const std::u16string& content, const AceAutoFillType& type)
+// BeforeAutoFillAnimation is now provided by AutoFillHostBase (delegates to ExecuteBeforeAutoFillAnimation).
+// Only the component-specific hooks are implemented here.
+std::u16string TextFieldPattern::PrepareAutoFillText(const std::u16string& content)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    auto enableAutoFillAnimation = layoutProperty->GetEnableAutoFillAnimationValue(true);
     auto textValue = content;
     contentController_->FilterValue(textValue);
-    CHECK_NULL_VOID(GetOrCreateAutoFillController());
-    autoFillController_->SetAutoFillTextUtf16Value(textValue);
-    auto onFinishCallback = [weak = AceType::WeakClaim(this), textValue, unFilteredValue = content]() {
-        auto textFieldPattern = weak.Upgrade();
-        CHECK_NULL_VOID(textFieldPattern);
-        auto autoFillController = textFieldPattern->GetOrCreateAutoFillController();
-        CHECK_NULL_VOID(autoFillController);
-        autoFillController->ResetAutoFillAnimationStatus();
-        auto hostNode = textFieldPattern->GetHost();
-        CHECK_NULL_VOID(hostNode);
-        if (!textFieldPattern->OnWillChangePreSetValue(unFilteredValue)) {
-            hostNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-            return;
-        }
-        auto contentController = textFieldPattern->GetTextContentController();
-        CHECK_NULL_VOID(contentController);
-        contentController->SetTextValue(unFilteredValue);
-        auto textLength = static_cast<int32_t>(contentController->GetTextUtf16Value().length());
-        auto selectController = textFieldPattern->GetTextSelectController();
-        CHECK_NULL_VOID(selectController);
-        selectController->UpdateCaretIndex(textLength);
-        hostNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-    };
-    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
-    auto needsAnimation = pipeline && enableAutoFillAnimation &&
-                          (type == AceAutoFillType::ACE_NEW_PASSWORD || type == AceAutoFillType::ACE_PASSWORD) &&
-                          textValue.length() > 0;
-    if (needsAnimation) {
-        autoFillController_->SetAutoFillAnimationStatus(AutoFillAnimationStatus::SHOW_ICON);
-        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-        pipeline->AddAfterLayoutTask(
-            [weak = AceType::WeakClaim(this), onFinish = std::move(onFinishCallback), textValue]() {
-                auto textFieldPattern = weak.Upgrade();
-                CHECK_NULL_VOID(textFieldPattern);
-                auto autoFillController = textFieldPattern->GetOrCreateAutoFillController();
-                CHECK_NULL_VOID(autoFillController);
-                autoFillController->StartAutoFillAnimation(onFinish, textValue);
-            });
-    } else {
-        onFinishCallback();
+    return textValue;
+}
+ 
+bool TextFieldPattern::IsAutoFillAnimationEnabled() const
+{
+    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, true);
+    return layoutProperty->GetEnableAutoFillAnimationValue(true);
+}
+ 
+void TextFieldPattern::ExecuteAutoFillInsert(const std::u16string& content)
+{
+    if (!OnWillChangePreSetValue(content)) {
+        return;
     }
+    auto contentController = GetTextContentController();
+    CHECK_NULL_VOID(contentController);
+    contentController->SetTextValue(content);
+    auto textLength = static_cast<int32_t>(contentController->GetTextUtf16Value().length());
+    auto selectController = GetTextSelectController();
+    CHECK_NULL_VOID(selectController);
+    selectController->UpdateCaretIndex(textLength);
 }
 #else
-void TextFieldPattern::BeforeAutoFillAnimation(const std::u16string& content, const AceAutoFillType& type) {}
+// hooks are no-ops when ENABLE_AUTO_FILL_CONTROLLER is off (default impls from IAutoFillHost)
 #endif
 
 void TextFieldPattern::RemoveFillContentMap()

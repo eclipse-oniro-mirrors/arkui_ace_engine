@@ -351,6 +351,20 @@ void TokenThemeStorage::StoreInstanceBrandColor(int32_t instanceId, const BrandC
     }
 }
 
+void TokenThemeStorage::UpdateInstanceDefaultTheme(int32_t instanceId)
+{
+    std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
+    ContainerScope scope(instanceId);
+    auto theme = CreateSystemTokenTheme(CheckLocalAndSystemColorMode());
+    if (theme) {
+        instanceDefaultThemerMap_[instanceId] = theme;
+    } else {
+        instanceDefaultThemerMap_.erase(instanceId);
+    }
+    TAG_LOGI(AceLogTag::ACE_THEME, "UpdateInstanceDefaultTheme instanceId: %{public}d, rebuilt: %{public}d",
+        instanceId, theme != nullptr);
+}
+
 BrandColorInfo TokenThemeStorage::GetInstanceBrandColor(int32_t instanceId)
 {
     std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
@@ -372,6 +386,31 @@ std::optional<Color> TokenThemeStorage::GetThemeScopeBrandColor(int32_t themeSco
     return std::nullopt;
 }
 
+std::optional<Color> TokenThemeStorage::ResolveBrandColor(TokenThemeScopeId themeScopeId)
+{
+    RefPtr<TokenTheme> tokenTheme = GetTheme(themeScopeId);
+    if (!tokenTheme) {
+        TAG_LOGI(AceLogTag::ACE_THEME, "ResolveBrandColor: tokenTheme not found, use system theme, "
+            "themeScopeId: %{public}d", themeScopeId);
+        tokenTheme = ObtainSystemTheme();
+    }
+    CHECK_NULL_RETURN(tokenTheme, std::nullopt);
+    auto themeColors = tokenTheme->Colors();
+    if (!themeColors) {
+        TAG_LOGW(AceLogTag::ACE_THEME, "ResolveBrandColor: themeColors is null, "
+            "themeScopeId: %{public}d", themeScopeId);
+        return std::nullopt;
+    }
+    Color brandColor = themeColors->Brand();
+    if (brandColor.GetAlpha() == 0) {
+        TAG_LOGW(AceLogTag::ACE_THEME, "ResolveBrandColor: brandColor is invalid, "
+            "brandColorStr: %{public}s, themeScopeId: %{public}d",
+            brandColor.ToString().c_str(), themeScopeId);
+        return std::nullopt;
+    }
+    return brandColor;
+}
+
 void TokenThemeStorage::RemoveInstanceBrandColor(int32_t instanceId)
 {
     std::lock_guard<std::mutex> lock(instanceBrandColorMutex_);
@@ -387,23 +426,31 @@ void TokenThemeStorage::ClearAllInstanceBrandColors()
     instanceDefaultThemerMap_.clear();
 }
 
-void TokenThemeStorage::RegisterBrandColorChangeListener(int32_t instanceId, const BrandColorChangeCallback& callback)
+void TokenThemeStorage::RegisterBrandColorChangeListener(int32_t instanceId, int32_t nodeId,
+    const BrandColorChangeCallback& callback)
 {
     std::lock_guard<std::mutex> lock(brandColorListenerMutex_);
-    brandColorChangeListeners_[instanceId].push_back(callback);
+    brandColorChangeListeners_[instanceId][nodeId] = callback;
 }
 
-void TokenThemeStorage::UnregisterBrandColorChangeListener(int32_t instanceId)
+void TokenThemeStorage::UnregisterBrandColorChangeListener(int32_t instanceId, int32_t nodeId)
 {
     std::lock_guard<std::mutex> lock(brandColorListenerMutex_);
-    brandColorChangeListeners_.erase(instanceId);
+    auto it = brandColorChangeListeners_.find(instanceId);
+    if (it == brandColorChangeListeners_.end()) {
+        return;
+    }
+    it->second.erase(nodeId);
+    if (it->second.empty()) {
+        brandColorChangeListeners_.erase(it);
+    }
 }
 
 void TokenThemeStorage::NotifyBrandColorChange(
     int32_t instanceId, const std::optional<Color>& brandColor,
     const std::optional<BrandColorStrategy>& colorStrategy)
 {
-    std::vector<BrandColorChangeCallback> callbacks;
+    std::unordered_map<int32_t, BrandColorChangeCallback> callbacks;
     {
         std::lock_guard<std::mutex> lock(brandColorListenerMutex_);
         auto it = brandColorChangeListeners_.find(instanceId);
@@ -419,7 +466,7 @@ void TokenThemeStorage::NotifyBrandColorChange(
         "NotifyBrandColorChange instanceId: %{public}d, hasBrandColor: %{public}d, hasStrategy: %{public}d, "
         "callbackCount: %{public}zu",
         instanceId, brandColor.has_value(), colorStrategy.has_value(), callbacks.size());
-    for (const auto& callback : callbacks) {
+    for (const auto& [nodeId, callback] : callbacks) {
         if (callback) {
             callback(instanceId, brandColor, colorStrategy);
         }

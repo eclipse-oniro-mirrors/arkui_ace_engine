@@ -91,7 +91,7 @@ public:
     {
         auto value = MakeRefPtr<TextLayoutProperty>();
         Clone(value);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         return value;
     }
 
@@ -351,7 +351,7 @@ protected:
     void Clone(RefPtr<LayoutProperty> property) const override
     {
         auto value = DynamicCast<TextLayoutProperty>(property);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFontStyle_ = CloneFontStyle();
         value->propTextLineStyle_ = CloneTextLineStyle();
         value->propSymbolStyle_ = CloneSymbolStyle();

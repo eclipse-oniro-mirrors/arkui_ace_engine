@@ -139,6 +139,10 @@ void TabsPattern::OnAttachToFrameNode()
     // bottom-only defaults when it resolves back to BOTTOMTABBAR.
     host->GetLayoutProperty()->UpdateSafeAreaExpandOpts(
         { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_BOTTOM });
+    auto pipeline = host->GetContext();
+    if (pipeline && pipeline->IsImmersiveStrategySet(ImmersiveStrategy::TABS_EXPAND_SAFE_AREA)) {
+        strategyEnabled_ = true;
+    }
 }
 
 void TabsPattern::PerformanceCheckTabChange(
@@ -585,6 +589,7 @@ void TabsPattern::OnModifyDone()
     InitFocusEvent();
     InitAccessibilityZIndex();
 
+    ApplyStrategyBarOverlapBlurStyle();
     InitFloatingBar();
     OnUpdateShowDivider();
 
@@ -1470,11 +1475,45 @@ RefPtr<LayoutAlgorithm> TabsPattern::CreateLayoutAlgorithm()
     return algo;
 }
 
+void TabsPattern::ApplyStrategyBarOverlapBlurStyle()
+{
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    auto effectiveMode = property->GetEffectiveBarOverlapMode();
+    if (effectiveMode == BarOverlapMode::STANDARD &&
+        !property->HasBarOverlapMode() && !property->HasBarOverlap() && strategyEnabled_) {
+        effectiveMode = BarOverlapMode::SAFE_AREA_PADDING;
+    }
+    computedBarOverlapMode_ = effectiveMode;
+    // Only inject blur when: mode is SAFE_AREA_PADDING AND developer has NOT explicitly set
+    // barOverlap (neither mode nor boolean). Developer's explicit SAFE_AREA_PADDING goes
+    // through SetBarOverlapMode which already sets blur. Strategy-injected SAFE_AREA_PADDING
+    // bypasses Model layer, so blur must be set here.
+    if (effectiveMode != BarOverlapMode::SAFE_AREA_PADDING ||
+        property->HasBarOverlapMode() || property->HasBarOverlap()) {
+        return;
+    }
+    auto host = GetHost();
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBarNode);
+    auto renderContext = tabBarNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (renderContext->GetBackBlurStyle().has_value() || renderContext->GetBackgroundEffect().has_value()) {
+        return;
+    }
+    BlurStyleOption option;
+    option.blurStyle = BlurStyle::COMPONENT_THICK;
+    renderContext->UpdateBackBlurStyle(option);
+}
+
 void TabsPattern::InitFloatingBar()
 {
     auto property = GetLayoutProperty<TabsLayoutProperty>();
     CHECK_NULL_VOID(property);
-    bool isBarOverlap = property->GetBarOverlap().value_or(false);
+    bool isBarOverlap = computedBarOverlapMode_ == BarOverlapMode::STACK ||
+        computedBarOverlapMode_ == BarOverlapMode::SAFE_AREA_PADDING;
     bool isHorizontal = property->GetAxis().value_or(Axis::HORIZONTAL) == Axis::HORIZONTAL;
     bool isBarPositionEnd = property->GetTabBarPosition().value_or(BarPosition::START) == BarPosition::END;
     bool isFloatingStyle = property->HasBarFloatingStyle();

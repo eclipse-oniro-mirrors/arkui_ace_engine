@@ -74,6 +74,15 @@ public:
         }
     }
 
+    // Whether a developer-visible touch callback is bound to this node. Framework-internal
+    // listeners (pressed state, focus, menu and other component-internal touch tasks) also
+    // live in touchEvents_, so they must not be mistaken for a developer callback: the
+    // PageScene RESPONSE scene only recognizes operations whose developer callback is bound.
+    bool HasDeveloperTouchCallback() const
+    {
+        return userCallback_ != nullptr || onTouchEventCallback_ != nullptr || commonTouchEventCallback_ != nullptr;
+    }
+
     void OnFlushTouchEventsBegin() override;
     void OnFlushTouchEventsEnd() override;
 

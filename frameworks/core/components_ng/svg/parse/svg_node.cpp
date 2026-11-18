@@ -182,6 +182,10 @@ uint8_t OpacityDoubleToUint8(double opacity)
 
 void SvgNode::SetAttr(const std::string& name, const std::string& value)
 {
+    auto svgContext = svgContext_.Upgrade();
+    if (svgContext) {
+        svgContext->IncrementRenderCacheVersion();
+    }
     if (ParseAndSetSpecializedAttr(name, value)) {
         return;
     }
@@ -730,10 +734,18 @@ void SvgNode::OnTransform(RSCanvas& canvas, const Size& viewPort)
 
 void SvgNode::OnTransform(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule)
 {
-    Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
-    auto matrix = (animateTransform_.empty()) ?
-        NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule)
-        : SvgTransform::CreateMatrixFromMap(animateTransform_);
+    Matrix4 matrix;
+    if (!animateTransform_.empty()) {
+        matrix = SvgTransform::CreateMatrixFromMap(animateTransform_);
+    } else {
+        if (!transformVecCacheKey_.has_value() || !transformVecCacheKey_.value().IsSameForCache(lengthRule)) {
+            Offset globalPivot = CalcGlobalPivot(attributes_.transformOrigin, lengthRule);
+            transformVecMatrixCache_ =
+                NGSvgTransform::CreateMatrix4(attributes_.transformVec, globalPivot, lengthRule);
+            transformVecCacheKey_ = lengthRule;
+        }
+        matrix = transformVecMatrixCache_.value();
+    }
     canvas.ConcatMatrix(RosenSvgPainter::ToDrawingMatrix(matrix));
 }
 

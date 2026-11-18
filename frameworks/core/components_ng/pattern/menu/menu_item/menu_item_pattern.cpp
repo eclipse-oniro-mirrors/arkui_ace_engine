@@ -696,7 +696,7 @@ void MenuItemPattern::CleanParentMenuItemBgColor()
     props->UpdatePress(false);
     auto parentNode = host->GetParent();
     CHECK_NULL_VOID(parentNode);
-    auto parent = AceType::DynamicCast<UINode>(parentNode);
+    auto parent = parentNode;
     CHECK_NULL_VOID(parent);
     menuPattern->OnItemPressed(parent, index_, false, false);
     PlayBgColorAnimation();
@@ -1538,7 +1538,7 @@ void MenuItemPattern::NotifyPressStatus(bool isPress)
     ACE_UINODE_TRACE(menu);
     auto menuPattern = menu->GetPattern<MenuPattern>();
     CHECK_NULL_VOID(menuPattern);
-    auto parent = AceType::DynamicCast<UINode>(host->GetParent());
+    auto parent = host->GetParent();
     auto menuWrapper = GetMenuWrapper();
     auto menuWrapperPattern = menuWrapper ? menuWrapper->GetPattern<MenuWrapperPattern>() : nullptr;
 
@@ -1667,7 +1667,7 @@ void MenuItemPattern::OnHover(bool isHover)
         CHECK_NULL_VOID(menuPattern);
         auto props = GetPaintProperty<MenuItemPaintProperty>();
         CHECK_NULL_VOID(props);
-        auto parent = AceType::DynamicCast<UINode>(host->GetParent());
+        auto parent = host->GetParent();
         SetBgBlendColor(isHover || isSubMenuShowed_ ? theme->GetHoverColor() : Color::TRANSPARENT);
         props->UpdateHover(isHover || isSubMenuShowed_);
         UpdateDividerHoverStatus(isHover || isSubMenuShowed_);

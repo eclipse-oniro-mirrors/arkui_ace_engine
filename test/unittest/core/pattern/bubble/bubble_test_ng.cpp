@@ -384,7 +384,7 @@ HWTEST_F(BubbleTestNg, BubblePatternTest002, TestSize.Level0)
     RefPtr<LayoutWrapperNode> layoutWrapper =
         AceType::MakeRefPtr<LayoutWrapperNode>(frameNode, geometryNode, frameNode->GetLayoutProperty());
     layoutWrapper->SetLayoutAlgorithm(AccessibilityManager::MakeRefPtr<LayoutAlgorithmWrapper>(layoutAlgorithm));
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto bubbleLayoutAlgorithm =
         AceType::DynamicCast<BubbleLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -547,7 +547,7 @@ HWTEST_F(BubbleTestNg, BubblePatternTest005, TestSize.Level0)
     DirtySwapConfig config;
     config.skipLayout = false;
     config.skipMeasure = false;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_NE(layoutAlgorithmWrapper, nullptr);
     auto bubbleLayoutAlgorithm =
         AceType::DynamicCast<BubbleLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

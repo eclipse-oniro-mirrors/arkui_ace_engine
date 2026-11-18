@@ -36,7 +36,7 @@ public:
 
         auto* stack = NG::ViewStackProcessor::GetInstance();
         CHECK_NULL_VOID(stack);
-        auto frameNode = AceType::DynamicCast<NG::FrameNode>(stack->GetMainFrameNode());
+        auto frameNode = stack->GetMainFrameNode();
         CHECK_NULL_VOID(frameNode);
         auto paintProperty = frameNode->GetPaintProperty<NG::DataPanelPaintProperty>();
         bool trackBackgroundSetByUser = paintProperty && paintProperty->GetTrackBackgroundSetByUser().value_or(false);

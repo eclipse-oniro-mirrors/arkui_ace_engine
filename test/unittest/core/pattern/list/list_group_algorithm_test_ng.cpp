@@ -114,7 +114,7 @@ HWTEST_F(ListGroupAlgTestNg, CheckReMeasureTest001, TestSize.Level1)
     ASSERT_TRUE(listProps);
     auto groupNode = AceType::DynamicCast<FrameNode>(frameNode_->GetChildAtIndex(0));
     ASSERT_TRUE(groupNode);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(groupNode->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = groupNode->GetLayoutAlgorithm();
     ASSERT_TRUE(layoutAlgorithmWrapper);
     auto layoutAlgorithm =
         AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -1914,7 +1914,7 @@ HWTEST_F(ListGroupAlgTestNg, SupportLazyEmptryBranch001, TestSize.Level1)
     // list layout property
     auto layoutProperty = frameNode_->GetLayoutProperty<ListLayoutProperty>();
     EXPECT_NE(layoutProperty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(listItemGroupNode->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = listItemGroupNode->GetLayoutAlgorithm();
     ASSERT_TRUE(layoutAlgorithmWrapper);
     auto layoutAlgorithm =
         AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

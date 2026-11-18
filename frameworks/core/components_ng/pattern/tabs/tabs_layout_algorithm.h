@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/render/animation_utils.h"
+#include "ui/properties/ng/measure_property.h"
 
 namespace OHOS::Ace::NG {
 
@@ -120,6 +121,9 @@ private:
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& idealSize);
     SizeF MeasureSwiper(const RefPtr<TabsLayoutProperty>& layoutProperty, RefPtr<LayoutWrapper>& swiperWrapper,
         const SizeF& idealSize, const SizeF& tabBarSize, const float dividerWidth);
+    void ApplySafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& swiperWrapper, const SizeF& tabBarSize,
+        float dividerWidth, Axis axis, BarPosition barPosition, float extraPadding);
+    void ResetSafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& swiperWrapper, Axis axis, BarPosition barPosition);
     std::vector<OffsetF> LayoutOffsetList(LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& tabBarWrapper,
         const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& frameSize) const;
 

@@ -1497,7 +1497,7 @@ HWTEST_F(TextFieldControllerTest, MoveHandleToContentRect001, TestSize.Level1)
     ASSERT_NE(controller, nullptr);
     RectF handleRect = RectF(OffsetF(5.0f, 5.0f), SizeF(5.0f, 5.0f));
     float boundaryAdjustment = 1.0f;
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     textFiled->textRect_.SetRect(0.0f, 0.0f, 0.0f, 10.0f);
     controller->contentRect_.SetRect(0.0f, 6.0f, 0.0f, 6.0f);
@@ -1520,7 +1520,7 @@ HWTEST_F(TextFieldControllerTest, MoveHandleToContentRect002, TestSize.Level1)
     ASSERT_NE(controller, nullptr);
     RectF handleRect = RectF(OffsetF(5.0f, 5.0f), SizeF(5.0f, 5.0f));
     float boundaryAdjustment = 1.0f;
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     textFiled->textRect_.SetRect(0.0f, 0.0f, 0.0f, 10.0f);
     controller->contentRect_.SetRect(0.0f, 6.0f, 0.0f, 4.0f);
@@ -1543,7 +1543,7 @@ HWTEST_F(TextFieldControllerTest, MoveHandleToContentRect003, TestSize.Level1)
     ASSERT_NE(controller, nullptr);
     RectF handleRect = RectF(OffsetF(5.0f, 5.0f), SizeF(5.0f, 5.0f));
     float boundaryAdjustment = 1.0f;
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     textFiled->textRect_.SetRect(0.0f, 0.0f, 4.0f, 10.0f);
     controller->contentRect_.SetRect(6.0f, 6.0f, 0.0f, 4.0f);
@@ -1566,7 +1566,7 @@ HWTEST_F(TextFieldControllerTest, MoveHandleToContentRect004, TestSize.Level1)
     ASSERT_NE(controller, nullptr);
     RectF handleRect = RectF(OffsetF(5.0f, 5.0f), SizeF(5.0f, 5.0f));
     float boundaryAdjustment = 1.0f;
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     textFiled->textRect_.SetRect(0.0f, 0.0f, 4.0f, 10.0f);
     controller->contentRect_.SetRect(4.0f, 6.0f, 0.0f, 4.0f);
@@ -1589,7 +1589,7 @@ HWTEST_F(TextFieldControllerTest, MoveHandleToContentRect005, TestSize.Level1)
     ASSERT_NE(controller, nullptr);
     RectF handleRect = RectF(OffsetF(-5.0f, 5.0f), SizeF(5.0f, 5.0f));
     float boundaryAdjustment = -10.0f;
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     textFiled->textRect_.SetRect(0.0f, 0.0f, 4.0f, 10.0f);
     controller->contentRect_.SetRect(-6.0f, 6.0f, 0.0f, 4.0f);
@@ -1610,7 +1610,7 @@ HWTEST_F(TextFieldControllerTest, MoveCaretToContentRect001, TestSize.Level1)
 
     auto controller = pattern_->GetTextSelectController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     int32_t index = 0;
     SystemProperties::debugEnabled_ = true;
@@ -1633,7 +1633,7 @@ HWTEST_F(TextFieldControllerTest, MoveCaretToContentRect002, TestSize.Level1)
 
     auto controller = pattern_->GetTextSelectController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     int32_t index = 30;
     SystemProperties::debugEnabled_ = false;
@@ -1656,7 +1656,7 @@ HWTEST_F(TextFieldControllerTest, MoveCaretToContentRect003, TestSize.Level1)
 
     auto controller = pattern_->GetTextSelectController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     int32_t index = 30;
     SystemProperties::debugEnabled_ = false;
@@ -1679,7 +1679,7 @@ HWTEST_F(TextFieldControllerTest, MoveCaretToContentRect004, TestSize.Level1)
 
     auto controller = pattern_->GetTextSelectController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     int32_t index = 0;
     SystemProperties::debugEnabled_ = false;
@@ -1702,7 +1702,7 @@ HWTEST_F(TextFieldControllerTest, GetSelectParagraphByOffset001, TestSize.Level1
 
     auto controller = pattern_->GetTextSelectController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     textFiled->selectOverlay_->isUsingMouse_ = true;
     SystemProperties::debugEnabled_ = false;
@@ -1723,7 +1723,7 @@ HWTEST_F(TextFieldControllerTest, GetSelectParagraphByOffset002, TestSize.Level1
 
     auto controller = pattern_->GetTextSelectController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     auto paragraph = MockParagraph::GetOrCreateMockParagraph();
     EXPECT_CALL(*paragraph, GetGlyphIndexByCoordinate(testing::_, testing::_)).WillRepeatedly(Return(-5));
@@ -1834,7 +1834,7 @@ HWTEST_F(TextFieldControllerTest, TextFiledControllerScrollToVisible, TestSize.L
      */
     auto controller = pattern_->GetTextFieldController();
     ASSERT_NE(controller, nullptr);
-    auto textFiled = AceType::DynamicCast<TextFieldPattern>(pattern_);
+    auto textFiled = pattern_;
     ASSERT_NE(textFiled, nullptr);
     layoutProperty_->CleanDirty();
     textFiled->contentRect_ = RectF(0, 0, 10, 10);

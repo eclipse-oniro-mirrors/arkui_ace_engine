@@ -33,6 +33,7 @@ struct SymbolGradient;
 struct SelectParam;
 struct SelectResObjParam;
 struct ArkUIMaterialKeyParams;
+struct ExtraGlassParam;
 }
 
 namespace OHOS::Ace::NG {
@@ -171,14 +172,17 @@ struct ArkUIMaterialFuncRegistry {
 };
 typedef const ArkUIMaterialFuncRegistry* ArkUIMaterialFuncHandle;
 
-typedef void* (*ArkUICreateMaterialFilterFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
+typedef void* (*ArkUICreateMaterialFilterFunc)(
+    const OHOS::Ace::ArkUIMaterialKeyParams*, const OHOS::Ace::ExtraGlassParam*);
 typedef void (*ArkUIReleaseMaterialFilterFunc)(void*);
-typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*, bool);
+typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(
+    const OHOS::Ace::ArkUIMaterialKeyParams*, bool, const OHOS::Ace::ExtraGlassParam*);
+typedef void* (*ArkUICreateMaterialFilterECFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
 typedef int32_t (*ArkUIGetEnableColorInvertFunc)(int32_t, int32_t);
 struct ArkUIMaterialFilterFuncRegistry {
     ArkUICreateMaterialFilterFunc createUiMaterialFilter;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilter;
-    ArkUICreateMaterialFilterFunc createUiMaterialFilterEC;
+    ArkUICreateMaterialFilterECFunc createUiMaterialFilterEC;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilterEC;
     ArkUICreateMaterialFilterWithSplitFunc createUiMaterialShaderECSub;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialShaderECSub;
@@ -3963,6 +3967,9 @@ struct ArkUICommonModifier {
     ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
         std::function<void(ArkUI_Int32)>&& callback);
     void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
+    void (*registerNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys,
+        std::function<void()>&& callback);
+    void (*unregisterNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys);
 };
 
 struct ArkUICommonShapeModifier {
@@ -5775,6 +5782,7 @@ struct ArkUITabsModifier {
     void (*setBarBackgroundBlurStyle)(ArkUINodeHandle node, ArkUITabBarBackgroundBlurStyle* styleOption);
     void (*setBarBackgroundBlurStyleWithStyleOption)(ArkUINodeHandle node, void* styleOption);
     void (*setBarOverlap)(ArkUINodeHandle node, ArkUI_Bool overlap);
+    void (*setBarOverlapMode)(ArkUINodeHandle node, ArkUI_Int32 mode);
     void (*setIsVertical)(ArkUINodeHandle node, ArkUI_Bool isVertical);
     void (*setTabBarPosition)(ArkUINodeHandle node, ArkUI_Int32 barVal);
     void (*setTabsOptionsIndex)(ArkUINodeHandle node, ArkUI_Int32 indexVal);
@@ -5797,6 +5805,7 @@ struct ArkUITabsModifier {
     void (*resetBarBackgroundColor)(ArkUINodeHandle node);
     void (*resetBarBackgroundBlurStyle)(ArkUINodeHandle node);
     void (*resetBarOverlap)(ArkUINodeHandle node);
+    void (*resetBarOverlapMode)(ArkUINodeHandle node);
     void (*resetIsVertical)(ArkUINodeHandle node);
     void (*resetTabBarPosition)(ArkUINodeHandle node);
     void (*resetTabsOptionsIndex)(ArkUINodeHandle node);
@@ -9911,6 +9920,8 @@ struct ArkUIXComponentModifier {
     void (*setXComponentExtraFlag)(ArkUINodeHandle node, ArkUI_Uint32 flag);
     void (*setXComponentEnableTransparentLayer)(ArkUINodeHandle node, ArkUI_Bool enable);
     void (*resetXComponentEnableTransparentLayer)(ArkUINodeHandle node);
+    void (*setXComponentSurfaceVisibilityLifecycle)(ArkUINodeHandle node, ArkUI_Bool isVisibilityLifecycle);
+    void (*resetXComponentSurfaceVisibilityLifecycle)(ArkUINodeHandle node);
     void (*setXComponentBufferQueueCount)(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount);
     void (*resetXComponentBufferQueueCount)(ArkUINodeHandle node);
     ArkUI_Int32 (*getXComponentBufferQueueCount)(ArkUINodeHandle node);

@@ -4424,6 +4424,10 @@
         "name": "OH_ArkUI_SurfaceHolder_SetSurfaceConfig"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_XComponent_EnableSurfaceVisibilityLifecycle"
+    },
+    {
         "first_introduced": "22",
         "name": "OH_ArkUI_ShowCounterConfig_Create"
     },
@@ -7713,51 +7717,59 @@
         "name": "OH_ArkUI_PickerComponentTextStyle_SetOverflow"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_ApplicationShortcut_Register"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_ApplicationShortcut_Unregister"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_Create"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_Destroy"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_SetType"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_GetType"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_SetCharacter"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_GetCharacter"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_SetFunctionKey"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_KeyboardShortcutKey_GetFunctionKey"
     },
     {
-        "first_introduced": "26.2.0",
+        "first_introduced": "26.1.0",
         "name": "OH_ArkUI_ApplicationShortcutCallbackInfo_GetUIContext"
     },
     {
         "first_introduced": "26.1.0",
         "name": "OH_ArkUI_EnableTouchPadEvent"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NodeKeyboardShortcut_Register"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NodeKeyboardShortcut_Unregister"
     }
 ]

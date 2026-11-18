@@ -137,7 +137,7 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
-  barOverlap(value: boolean): this {
+  barOverlap(value: BarOverlapMode | boolean): this {
     this.lazyComponent.barOverlap(value);
     return this;
   }

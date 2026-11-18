@@ -62,6 +62,7 @@ ArcListPattern::ArcListPattern()
 
 void ArcListPattern::OnModifyDone()
 {
+    Pattern::OnModifyDone();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     if (!GetScrollableEvent()) {
@@ -106,7 +107,7 @@ bool ArcListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto listLayoutAlgorithm = DynamicCast<ArcListLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(listLayoutAlgorithm, false);

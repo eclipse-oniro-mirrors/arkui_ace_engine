@@ -1023,7 +1023,7 @@ void ClickRecognizer::ResetTouchDownNotifiedToClickFlag()
     CHECK_NULL_VOID(node);
     auto context = node->GetContext();
     CHECK_NULL_VOID(context);
-    auto ngContext = DynamicCast<PipelineContext>(context);
+    auto ngContext = context;
     CHECK_NULL_VOID(ngContext);
     const auto& touchOptimizer = ngContext->GetTouchOptimizer();
     CHECK_NULL_VOID(touchOptimizer);

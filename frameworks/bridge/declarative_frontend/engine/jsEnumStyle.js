@@ -383,6 +383,7 @@ let ImmersiveStrategy;
   ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
   ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
   ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.TABS_EXPAND_SAFE_AREA = 9] = 'TABS_EXPAND_SAFE_AREA';
 })(ImmersiveStrategy || (ImmersiveStrategy = {}));
 
 let VerticalAlign;
@@ -1275,6 +1276,12 @@ let BarStyle;
   BarStyle[BarStyle.STACK = 1] = 'STACK';
   BarStyle[BarStyle.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
 })(BarStyle || (BarStyle = {}));
+let BarOverlapMode;
+(function (BarOverlapMode) {
+  BarOverlapMode[BarOverlapMode.STANDARD = 0] = 'STANDARD';
+  BarOverlapMode[BarOverlapMode.STACK = 1] = 'STACK';
+  BarOverlapMode[BarOverlapMode.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
+})(BarOverlapMode || (BarOverlapMode = {}));
 let NavigationMode;
 (function (NavigationMode) {
   NavigationMode[NavigationMode.Stack = 0] = 'Stack';
@@ -2217,6 +2224,18 @@ let FunctionKey;
   FunctionKey[FunctionKey.DPAD_DOWN = 15] = 'DPAD_DOWN';
   FunctionKey[FunctionKey.DPAD_LEFT = 16] = 'DPAD_LEFT';
   FunctionKey[FunctionKey.DPAD_RIGHT = 17] = 'DPAD_RIGHT';
+  FunctionKey[FunctionKey.CAPS_LOCK = 18] = 'CAPS_LOCK';
+  FunctionKey[FunctionKey.SCROLL_LOCK = 20] = 'SCROLL_LOCK';
+  FunctionKey[FunctionKey.PAUSE_BREAK = 21] = 'PAUSE_BREAK';
+  FunctionKey[FunctionKey.NUM_LOCK = 22] = 'NUM_LOCK';
+  FunctionKey[FunctionKey.INSERT = 23] = 'INSERT';
+  FunctionKey[FunctionKey.DELETE = 24] = 'DELETE';
+  FunctionKey[FunctionKey.HOME = 25] = 'HOME';
+  FunctionKey[FunctionKey.END = 26] = 'END';
+  FunctionKey[FunctionKey.PAGE_UP = 27] = 'PAGE_UP';
+  FunctionKey[FunctionKey.PAGE_DOWN = 28] = 'PAGE_DOWN';
+  FunctionKey[FunctionKey.ENTER = 29] = 'ENTER';
+  FunctionKey[FunctionKey.BACKSPACE = 30] = 'BACKSPACE';
 })(FunctionKey || (FunctionKey = {}));
 
 let ContentType;
