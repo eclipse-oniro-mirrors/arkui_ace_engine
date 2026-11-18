@@ -75,6 +75,12 @@ global:
     # init guard of static inline BrokerDelegator delegator_ — see DelegateProxy above
     _ZGVN4OHOS3Ace27FormRendererDispatcherProxy10delegator_E;
 
+    # Preserve init/fini and cross-DSO CFI entry points per repo map template.
+    _init;
+    _fini;
+    # Preserve cross-DSO CFI entry points when enabled by the toolchain.
+    __cfi_check*;
+
 local:
     *;
 };
