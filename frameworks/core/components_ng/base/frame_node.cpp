@@ -9910,7 +9910,7 @@ template<typename T>
 ACE_FORCE_EXPORT RefPtr<T> FrameNode::GetAccessibilityProperty() const
 {
     const auto& accessibilityProperty = const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty();
-    if constexpr (std::is_convertible_v<AccessibilityProperty*, T*>) {
+    if constexpr (std::is_same_v<AccessibilityProperty*, T*>) {
         return accessibilityProperty;
     } else {
         return DynamicCast<T>(accessibilityProperty);

@@ -555,7 +555,7 @@ public:
     template<typename T>
     T* GetPatternPtr() const
     {
-        if constexpr (std::is_convertible_v<Pattern*, T*>) {
+        if constexpr (std::is_same_v<Pattern*, T*>) {
             return static_cast<T*>(RawPtr(pattern_));
         } else {
             if (ACE_UNLIKELY(pattern_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(pattern_))) {
@@ -569,7 +569,7 @@ public:
     template<typename T>
     T* GetRawPattern() const
     {
-        if constexpr (std::is_convertible_v<Pattern*, T*>) {
+        if constexpr (std::is_same_v<Pattern*, T*>) {
             return static_cast<T*>(RawPtr(pattern_));
         } else {
             return DynamicCast<T>(pattern_.GetRawPtr());
@@ -579,7 +579,7 @@ public:
     template<typename T>
     RefPtr<T> GetPattern() const
     {
-        if constexpr (std::is_convertible_v<Pattern*, T*>) {
+        if constexpr (std::is_same_v<Pattern*, T*>) {
             return pattern_;
         } else {
             return DynamicCast<T>(pattern_);
@@ -597,7 +597,7 @@ public:
     template<typename T>
     T* GetLayoutPropertyPtr() const
     {
-        if constexpr (std::is_convertible_v<LayoutProperty*, T*>) {
+        if constexpr (std::is_same_v<LayoutProperty*, T*>) {
             return static_cast<T*>(RawPtr(layoutProperty_));
         } else {
             if (ACE_UNLIKELY(layoutProperty_ && ShouldDetectAceObjTypeConvertion() &&
@@ -612,7 +612,7 @@ public:
     template<typename T>
     RefPtr<T> GetLayoutProperty() const
     {
-        if constexpr (std::is_convertible_v<LayoutProperty*, T*>) {
+        if constexpr (std::is_same_v<LayoutProperty*, T*>) {
             return layoutProperty_;
         } else {
             return DynamicCast<T>(layoutProperty_);
@@ -622,7 +622,7 @@ public:
     template<typename T>
     T* GetPaintPropertyPtr() const
     {
-        if constexpr (std::is_convertible_v<PaintProperty*, T*>) {
+        if constexpr (std::is_same_v<PaintProperty*, T*>) {
             return static_cast<T*>(RawPtr(paintProperty_));
         } else {
             if (ACE_UNLIKELY(paintProperty_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(paintProperty_))) {
@@ -636,7 +636,7 @@ public:
     template<typename T>
     RefPtr<T> GetPaintProperty() const
     {
-        if constexpr (std::is_convertible_v<PaintProperty*, T*>) {
+        if constexpr (std::is_same_v<PaintProperty*, T*>) {
             return paintProperty_;
         } else {
             return DynamicCast<T>(paintProperty_);
@@ -648,7 +648,7 @@ public:
     {
         CreateEventHubInner();
         CHECK_NULL_RETURN(eventHub_, nullptr);
-        if constexpr (std::is_convertible_v<EventHub*, T*>) {
+        if constexpr (std::is_same_v<EventHub*, T*>) {
             return eventHub_;
         } else {
             return DynamicCast<T>(eventHub_);
@@ -658,7 +658,7 @@ public:
     template<typename T>
     RefPtr<T> GetEventHubOnly()
     {
-        if constexpr (std::is_convertible_v<EventHub*, T*>) {
+        if constexpr (std::is_same_v<EventHub*, T*>) {
             return eventHub_;
         } else {
             return DynamicCast<T>(eventHub_);
