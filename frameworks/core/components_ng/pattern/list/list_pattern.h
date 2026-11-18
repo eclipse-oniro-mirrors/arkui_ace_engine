@@ -269,6 +269,11 @@ public:
         return currentOffset_;
     }
 
+    double GetScrollPositionForState() const override
+    {
+        return GetTotalOffset() + currentDelta_;
+    }
+
     float GetContentStartOffset() const override
     {
         return contentStartOffset_;

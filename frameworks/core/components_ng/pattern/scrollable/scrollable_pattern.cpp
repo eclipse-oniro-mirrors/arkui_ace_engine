@@ -3710,7 +3710,12 @@ ScrollResult ScrollablePattern::HandleScroll(float offset, int32_t source, Neste
     ScrollResult result = { 0, false };
     auto host = GetHost();
     CHECK_NULL_RETURN(host, result);
-    int32_t savedQuerySource = scrollSourceForQuery_;
+    const double initialScrollPosition = GetScrollPositionForState();
+    auto resetQueryStateIfNotMoved = [this, state, initialScrollPosition]() {
+        if (state != NestedState::GESTURE && NearEqual(initialScrollPosition, GetScrollPositionForState())) {
+            scrollSourceForQuery_ = SCROLL_FROM_NONE;
+        }
+    };
     auto nestedScroll = GetNestedScroll();
     auto parent = GetNestedScrollParent();
     auto initOffset = offset;
@@ -3732,6 +3737,7 @@ ScrollResult ScrollablePattern::HandleScroll(float offset, int32_t source, Neste
             result = HandleScrollSelfOnly(offset, source, state);
         }
     } else if (state == NestedState::CHILD_CHECK_OVER_SCROLL) {
+        resetQueryStateIfNotMoved();
         return result;
     }
     ACE_SCOPED_TRACE("HandleScroll, initOffset:%f, processedOffset:%f, "
@@ -3745,10 +3751,7 @@ ScrollResult ScrollablePattern::HandleScroll(float offset, int32_t source, Neste
     }
     bool moved = HandleScrollImpl(offset, source);
     NotifyMoved(moved);
-    if (NearZero(offset) && (source == SCROLL_FROM_UPDATE || source == SCROLL_FROM_AXIS ||
-        source == SCROLL_FROM_CROWN)) {
-        scrollSourceForQuery_ = savedQuerySource;
-    }
+    resetQueryStateIfNotMoved();
     return result;
 }
 

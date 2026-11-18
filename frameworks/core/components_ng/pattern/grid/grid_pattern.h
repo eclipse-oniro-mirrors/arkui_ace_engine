@@ -341,6 +341,11 @@ public:
         return EstimateHeight();
     }
 
+    double GetScrollPositionForState() const override
+    {
+        return info_.currentOffset_;
+    }
+
     float GetTotalHeight() const override;
 
     void OnAnimateStop() override;

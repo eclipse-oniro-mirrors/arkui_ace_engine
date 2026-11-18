@@ -484,6 +484,10 @@ public:
     {
         return 0.0f;
     }
+    virtual double GetScrollPositionForState() const
+    {
+        return GetTotalOffset();
+    }
 
     /* ============================= Free Scroll Enhancements ============================= */
     virtual Offset GetFreeScrollOffset() const
