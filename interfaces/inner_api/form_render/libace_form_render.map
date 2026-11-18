@@ -1,0 +1,86 @@
+# Copyright (c) 2026 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Export map of libace_form_render.z.so
+# Public ABI = classes declared under interfaces/inner_api/form_render/include
+# (published as platformsdk_indirect inner API). Three-rule pattern per class:
+# _ZN (members/ctors/dtors), _ZNK (const members), _ZT*N (vtable/typeinfo/VTT/thunks).
+# Product consumers kept working:
+#   - form_fwk libformrender: FormRendererGroup::Create/AddForm/RecoverRenderer/
+#     SetVisibleChange + dtor (form_render_record.cpp)
+#   - ace form component (merged into libace): FormRendererDelegateImpl ctor/dtor/
+#     Set*EventHandler + vtable (form_manager_delegate.cpp)
+# Everything else (private helpers, STL weak templates) is hidden by local:*.
+# FormRequest is header-inline only and produces no out-of-line symbols.
+{
+global:
+    # Render entry classes
+    _ZN4OHOS3Ace12FormRenderer*;
+    _ZNK4OHOS3Ace12FormRenderer*;
+    _ZT*N4OHOS3Ace12FormRenderer*;
+
+    _ZN4OHOS3Ace17FormRendererGroup*;
+    _ZNK4OHOS3Ace17FormRendererGroup*;
+
+    _ZN4OHOS3Ace27FormRenderDelegateRecipient*;
+    _ZNK4OHOS3Ace27FormRenderDelegateRecipient*;
+    _ZT*N4OHOS3Ace27FormRenderDelegateRecipient*;
+
+    # IPC interfaces
+    _ZN4OHOS3Ace21IFormRendererDelegate*;
+    _ZNK4OHOS3Ace21IFormRendererDelegate*;
+    _ZT*N4OHOS3Ace21IFormRendererDelegate*;
+
+    _ZN4OHOS3Ace23IFormRendererDispatcher*;
+    _ZNK4OHOS3Ace23IFormRendererDispatcher*;
+    _ZT*N4OHOS3Ace23IFormRendererDispatcher*;
+
+    # IPC stub/proxy/impl classes
+    _ZN4OHOS3Ace24FormRendererDelegateImpl*;
+    _ZNK4OHOS3Ace24FormRendererDelegateImpl*;
+    _ZT*N4OHOS3Ace24FormRendererDelegateImpl*;
+
+    _ZN4OHOS3Ace24FormRendererDelegateStub*;
+    _ZNK4OHOS3Ace24FormRendererDelegateStub*;
+    _ZT*N4OHOS3Ace24FormRendererDelegateStub*;
+
+    _ZN4OHOS3Ace25FormRendererDelegateProxy*;
+    _ZNK4OHOS3Ace25FormRendererDelegateProxy*;
+    _ZT*N4OHOS3Ace25FormRendererDelegateProxy*;
+    # init guard of static inline BrokerDelegator delegator_ — the variable
+    # itself matches _ZN above; guard must follow to keep interposition whole
+    _ZGVN4OHOS3Ace25FormRendererDelegateProxy10delegator_E;
+
+    _ZN4OHOS3Ace26FormRendererDispatcherImpl*;
+    _ZNK4OHOS3Ace26FormRendererDispatcherImpl*;
+    _ZT*N4OHOS3Ace26FormRendererDispatcherImpl*;
+
+    _ZN4OHOS3Ace26FormRendererDispatcherStub*;
+    _ZNK4OHOS3Ace26FormRendererDispatcherStub*;
+    _ZT*N4OHOS3Ace26FormRendererDispatcherStub*;
+
+    _ZN4OHOS3Ace27FormRendererDispatcherProxy*;
+    _ZNK4OHOS3Ace27FormRendererDispatcherProxy*;
+    _ZT*N4OHOS3Ace27FormRendererDispatcherProxy*;
+    # init guard of static inline BrokerDelegator delegator_ — see DelegateProxy above
+    _ZGVN4OHOS3Ace27FormRendererDispatcherProxy10delegator_E;
+
+    # Preserve init/fini and cross-DSO CFI entry points per repo map template.
+    _init;
+    _fini;
+    # Preserve cross-DSO CFI entry points when enabled by the toolchain.
+    __cfi_check*;
+
+local:
+    *;
+};
