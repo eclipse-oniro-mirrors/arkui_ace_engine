@@ -1932,11 +1932,13 @@ public:
         auto viewDataWrap = ViewDataWrap::CreateViewDataWrap(viewData);
         CHECK_NULL_VOID(viewDataWrap);
         if (!isNative_) {
+            auto node = node_.Upgrade();
+            CHECK_NULL_VOID(node);
             taskExecutor->PostTask(
-                [viewDataWrap, weakNode = node_, autoFillType = autoFillType_, triggerType = triggerType_]() {
-                    auto node = weakNode.Upgrade();
-                    CHECK_NULL_VOID(node);
-                    node->NotifyFillRequestSuccess(viewDataWrap, nullptr, autoFillType, triggerType);
+                [viewDataWrap, node, autoFillType = autoFillType_, triggerType = triggerType_]() {
+                    if (node) {
+                        node->NotifyFillRequestSuccess(viewDataWrap, nullptr, autoFillType, triggerType);
+                    }
                 },
                 TaskExecutor::TaskType::UI, "ArkUINotifyWebFillRequestSuccess");
             return;
