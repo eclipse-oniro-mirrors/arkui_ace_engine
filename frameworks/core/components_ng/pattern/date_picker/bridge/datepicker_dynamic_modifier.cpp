@@ -784,7 +784,9 @@ void SetJSDisappearTextStyle(void* theme, void* textStyle)
 {
     CHECK_NULL_VOID(theme);
     CHECK_NULL_VOID(textStyle);
-    DatePickerModelNG::GetInstance()->SetDisappearTextStyle(
+    auto* model = DatePickerModelNG::GetInstance();
+    CHECK_NULL_VOID(model);
+    model->SetDisappearTextStyle(
         AceType::Claim((reinterpret_cast<Ace::PickerTheme*>(theme))),
         (*reinterpret_cast<NG::PickerTextStyle*>(textStyle)));
 }
