@@ -33,6 +33,7 @@ export class ConsumeDecoratedVariable<T> extends DecoratedV1VariableBase<T> impl
         this.sourceProvide_ = owningView.__findProvide__Internal<T>(provideAliasName) as ProvideDecoratedVariable<T> | undefined;
         if (!this.sourceProvide_) {
             if (consumeOptions) {
+                this.checkValueIsNotFunction(consumeOptions!.defaultValue);
                 this.checkFake = true;
                 // use fake Provide source
                 this.sourceProvide_ = new ProvideDecoratedVariable<T>(varName, uiUtils.makeV1Observed(consumeOptions!.defaultValue) as T);
@@ -110,6 +111,7 @@ export class ConsumeDecoratedVariable<T> extends DecoratedV1VariableBase<T> impl
         
         if (!this.sourceProvide_) {
             if (consumeOptions) {
+                this.checkValueIsNotFunction(consumeOptions!.defaultValue);
                 this.checkFake = true;
                 this.sourceProvide_ = new ProvideDecoratedVariable<T>(this.varName, uiUtils.makeV1Observed(consumeOptions!.defaultValue) as T);
                 this.registerWatchForObservedObjectChanges(this.sourceProvide_!.get(false));
