@@ -233,7 +233,7 @@ void ImageSpanView::SetOnError(FrameNode* frameNode, std::function<void(const Lo
 void ImageSpanView::SetBorderRadius(FrameNode* frameNode, NG::BorderRadiusProperty borderRadius)
 {
     ViewAbstract::SetBorderRadius(frameNode, borderRadius);
-    ImageModelNG::SetBackBorder(frameNode);
+    ImageModelNG::SetBorderRadius(frameNode, borderRadius);
 }
 
 void ImageSpanView::ResetBorderRadius(FrameNode* frameNode)
