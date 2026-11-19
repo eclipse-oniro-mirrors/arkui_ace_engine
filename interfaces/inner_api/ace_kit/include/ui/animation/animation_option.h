@@ -207,19 +207,19 @@ public:
     std::string ToSimpleString() const
     {
         std::stringstream ss;
-        ss << "dur:" << duration_ << ", curve:"
+        ss << "dur:" << duration_ << ",curve:"
            << (curve_ ? curve_->ToSimpleString() : "");
         if (iteration_ != 1) {
-            ss << ", iter:"  << iteration_;
+            ss << ",iter:" << iteration_;
         }
         if (delay_) {
-            ss << ", delay:"  << delay_;
+            ss << ",delay:" << delay_;
         }
         if (!NearEqual(tempo_, 1.0f)) {
-            ss << ", tempo:"  << tempo_;
+            ss << ",tempo:" << tempo_;
         }
         if (direction_ != AnimationDirection::NORMAL) {
-            ss << ", mode:"  << static_cast<int32_t>(direction_);
+            ss << ",mode:" << static_cast<int32_t>(direction_);
         }
         return ss.str();
     }
