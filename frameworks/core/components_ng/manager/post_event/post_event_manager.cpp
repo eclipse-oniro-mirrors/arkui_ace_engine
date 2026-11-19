@@ -120,6 +120,11 @@ bool PostEventManager::PostTouchEventWithStrategy(const RefPtr<NG::UINode>& uiNo
     if (!CheckTouchEvent(uiNode, touchEvent, eventManager->GetInstanceId())) {
         return false;
     }
+
+    auto responseCtrl = eventManager->GetResponseCtrl();
+    if (responseCtrl && !responseCtrl->ShouldResponse(frameNode)) {
+        return false;
+    }
     if (touchEvent.type != TouchType::MOVE) {
         postInputEventAction_.push_back({ uiNode, touchEvent });
     }
@@ -212,6 +217,11 @@ bool PostEventManager::PostMouseEventWithStrategy(const RefPtr<NG::UINode>& uiNo
     if (!CheckMouseEvent(uiNode, mouseEvent, eventManager->GetInstanceId())) {
         return false;
     }
+    auto responseCtrl = eventManager->GetResponseCtrl();
+    if (responseCtrl && !responseCtrl->ShouldResponse(frameNode)) {
+        return false;
+    }
+
     if (mouseEvent.action == MouseAction::PRESS || mouseEvent.action == MouseAction::RELEASE ||
         mouseEvent.action == MouseAction::CANCEL) {
         postMouseEventAction_.push_back({ uiNode, mouseEvent });
@@ -289,6 +299,10 @@ bool PostEventManager::PostAxisEventWithStrategy(const RefPtr<NG::UINode>& uiNod
     auto eventManager = pipelineContext->GetEventManager();
     CHECK_NULL_RETURN(eventManager, false);
     if (!CheckAxisEvent(uiNode, axisEvent, eventManager->GetInstanceId())) {
+        return false;
+    }
+    auto responseCtrl = eventManager->GetResponseCtrl();
+    if (responseCtrl && !responseCtrl->ShouldResponse(frameNode)) {
         return false;
     }
     if (axisEvent.action != AxisAction::UPDATE) {
