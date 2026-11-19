@@ -20,6 +20,7 @@
 
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/image/image_model_ng.h"
+#include "core/components_ng/pattern/image/image_render_property.h"
 #include "core/components_ng/pattern/text/span/image_span_view.h"
 #include "core/components_ng/pattern/text/span_model_ng.h"
 #include "core/components_ng/pattern/text/span/symbol_span_model_ng.h"
@@ -616,6 +617,40 @@ HWTEST_F(SpanTestNg, Create001, TestSize.Level1)
     ASSERT_NE(layoutProperty, nullptr);
     EXPECT_EQ(layoutProperty->GetImageFitValue(ImageFit::COVER), ImageFit::FILL);
     EXPECT_EQ(layoutProperty->GetVerticalAlignValue(VerticalAlign::BOTTOM), VerticalAlign::TOP);
+}
+
+/**
+ * @tc.name: ImageSpanSetBorderRadiusTest001
+ * @tc.desc: Test ImageSpanView::SetBorderRadius updates render context and image render property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SpanTestNg, ImageSpanSetBorderRadiusTest001, TestSize.Level1)
+{
+    ImageModelNG imageSpan;
+    ImageInfoConfig imageInfoConfig;
+    RefPtr<PixelMap> pixMap = nullptr;
+    imageInfoConfig.pixelMap = pixMap;
+    imageSpan.Create(imageInfoConfig);
+    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(frameNode, nullptr);
+
+    BorderRadiusProperty borderRadius;
+    borderRadius.SetRadius(Dimension(10.0, DimensionUnit::VP));
+    ImageSpanView::SetBorderRadius(AceType::RawPtr(frameNode), borderRadius);
+
+    // ViewAbstract chain: border radius is written to the render context.
+    auto renderContext = frameNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto renderRadius = renderContext->GetBorderRadiusValue(BorderRadiusProperty {});
+    ASSERT_TRUE(renderRadius.radiusTopLeft.has_value());
+    EXPECT_EQ(renderRadius.radiusTopLeft.value(), Dimension(10.0, DimensionUnit::VP));
+
+    // ImageModelNG chain: border radius is written to the image render property.
+    auto imageRenderProperty = frameNode->GetPaintProperty<ImageRenderProperty>();
+    ASSERT_NE(imageRenderProperty, nullptr);
+    EXPECT_TRUE(imageRenderProperty->HasBorderRadius());
+    EXPECT_EQ(imageRenderProperty->GetBorderRadiusValue().radiusTopLeft.value(), Dimension(10.0, DimensionUnit::VP));
+    EXPECT_TRUE(imageRenderProperty->GetNeedBorderRadiusValue());
 }
 
 /**
