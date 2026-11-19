@@ -1269,14 +1269,16 @@ void ImagePattern::LoadImage(const ImageSourceInfo& src, bool needLayout)
         loadingCtx_->SetOnProgressCallback(std::move(onProgressCallback_));
     }
     
-    CHECK_NULL_VOID(host);
-    auto pipeline = host->GetContext();
     if (!needLayout) {
         loadingCtx_->FinishMeasure();
-    }else if(pipeline && host->GetId() != INVALID_ID && src.IsValid() && src.GetSrcType() != SrcType::UNSUPPORTED) {
-        bool isVisible = IsVisibleOnRenderTree(host);
-        ImagePerf::GetPerfMonitor()->AddLoadComponent(
-            host->GetId(), static_cast<int32_t>(src.GetSrcType()), isVisible);
+    }else {
+        CHECK_NULL_VOID(host);
+        auto pipeline = host->GetContext();
+        if(pipeline && host->GetId() != INVALID_ID && src.IsValid() && src.GetSrcType() != SrcType::UNSUPPORTED) {
+            bool isVisible = IsVisibleOnRenderTree(host);
+            ImagePerf::GetPerfMonitor()->AddLoadComponent(
+                host->GetId(), static_cast<int32_t>(src.GetSrcType()), isVisible);
+        }
     }
     ClearReloadFlagsAfterLoad();
     ImagePerf::GetPerfMonitor()->StartRecordImageLoadStat(imageDfxConfig_.GetAccessibilityId());
