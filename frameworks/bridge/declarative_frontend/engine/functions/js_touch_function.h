@@ -38,6 +38,7 @@ public:
     }
     void Execute(EcmaVM* vm, TouchEventInfo& info);
     static JSRef<JSObject> CreateTouchInfo(const TouchLocationInfo& touchInfo);
+    // Creates a JS-owned snapshot. Callers must copy propagation flags back after invoking JS.
     static JSRef<JSObject> CreateJSEventInfo(TouchEventInfo& info);
 };
 

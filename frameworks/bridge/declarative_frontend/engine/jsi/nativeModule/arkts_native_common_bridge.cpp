@@ -34,6 +34,7 @@
 #include "bridge/declarative_frontend/engine/functions/js_should_built_in_recognizer_parallel_with_function.h"
 #include "bridge/declarative_frontend/engine/js_ref_ptr.h"
 #include "bridge/declarative_frontend/engine/jsi/js_ui_index.h"
+#include "bridge/declarative_frontend/engine/jsi/jsi_native_event.h"
 #include "bridge/declarative_frontend/engine/jsi/jsi_types.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_frame_node_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_raw_input_event_wrapper.h"
@@ -8236,8 +8237,7 @@ Local<panda::ObjectRef> CommonBridge::CreateGestureEventInfo(
     obj->Set(vm, panda::StringRef::NewFromUtf8(vm, "fingerList"), fingerArr);
     obj->Set(vm, panda::StringRef::NewFromUtf8(vm, "target"), CreateEventTargetObject(vm, info));
     CreateFingerInfosInfo(vm, info, obj);
-    obj->SetNativePointerFieldCount(vm, 1);
-    obj->SetNativePointerField(vm, 0, static_cast<void*>(info.get()));
+    JsiNativeEvent::Bind(vm, obj, info);
     return obj;
 }
 
@@ -8328,8 +8328,7 @@ Local<panda::ObjectRef> CommonBridge::CreateGestureEventInfo(EcmaVM* vm, const s
     obj->Set(vm, panda::StringRef::NewFromUtf8(vm, "fingerList"), fingerArr);
     obj->Set(vm, panda::StringRef::NewFromUtf8(vm, "target"), CreateEventTargetObject(vm, info));
     CreateFingerInfosInfo(vm, info, obj);
-    obj->SetNativePointerFieldCount(vm, 1);
-    obj->SetNativePointerField(vm, 0, static_cast<void*>(info.get()));
+    JsiNativeEvent::Bind(vm, obj, info);
     return obj;
 }
 
@@ -10267,8 +10266,7 @@ Local<panda::ObjectRef> CommonBridge::CreateTapGestureLocationInfo(
         panda::FunctionRef::New(vm, Framework::JsGetCurrentLocalPosition),
     };
     auto tapLocationObj = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
-    tapLocationObj->SetNativePointerFieldCount(vm, 1);
-    tapLocationObj->SetNativePointerField(vm, 0, static_cast<void*>(info.get()));
+    JsiNativeEvent::Bind(vm, tapLocationObj, info);
     return tapLocationObj;
 }
 

@@ -19,6 +19,7 @@
 #include "base/utils/utils.h"
 #include "bridge/declarative_frontend/engine/functions/js_should_built_in_recognizer_parallel_with_function.h"
 #include "bridge/declarative_frontend/engine/functions/js_gesture_judge_function.h"
+#include "bridge/declarative_frontend/engine/jsi/jsi_native_event.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/gestures/base_gesture_event.h"
 #include "frameworks/bridge/declarative_frontend/engine/functions/js_common_utils.h"
@@ -75,7 +76,7 @@ JSRef<JSObject> JsTouchTestDoneFunction::CreateGestureEventObject(const std::sha
     obj->SetPropertyObject("fingerList", fingerArr);
     auto target = CommonUtils::CreateEventTargetObject(info);
     obj->SetPropertyObject("target", target);
-    obj->Wrap<BaseGestureEvent>(info.get());
+    JsiNativeEvent::Bind(obj->GetEcmaVM(), obj->GetLocalHandle(), info);
     return obj;
 }
 } // namespace OHOS::Ace::Framework

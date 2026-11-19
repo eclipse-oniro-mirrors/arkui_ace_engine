@@ -33,8 +33,12 @@ AccessibilityActionInterceptResult JsAccessibilityActionInterceptFunction::Execu
 
 void JsAccessibilityHoverTransparentFunction::Execute(TouchEventInfo& info)
 {
-    JSRef<JSVal> param = JsTouchFunction::CreateJSEventInfo(info);
+    auto eventObj = JsTouchFunction::CreateJSEventInfo(info);
+    JSRef<JSVal> param = eventObj;
     JsFunction::ExecuteJS(1, &param);
+    auto* eventInfo = eventObj->Unwrap<TouchEventInfo>();
+    info.SetStopPropagation(eventInfo->IsStopPropagation());
+    info.SetPreventDefault(eventInfo->IsPreventDefault());
 }
 
 } // namespace OHOS::Ace::Framework
