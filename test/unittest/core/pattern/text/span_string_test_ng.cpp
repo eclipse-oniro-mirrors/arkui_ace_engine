@@ -3101,4 +3101,39 @@ HWTEST_F(SpanStringTestNg, MutableSpanString022, TestSize.Level1)
     EXPECT_EQ(firstFontSpan->GetFont().GetFontColor(), OHOS::Ace::Color::RED.ColorToString());
 }
 
+/**
+ * @tc.name: DecodeTlvEmptyBuffer
+ * @tc.desc: Empty unmarshalling input produces an empty string without spans.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SpanStringTestNg, DecodeTlvEmptyBuffer, TestSize.Level1)
+{
+    std::vector<uint8_t> buffer;
+    auto decoded = SpanString::DecodeTlv(buffer);
+    ASSERT_NE(decoded, nullptr);
+    EXPECT_TRUE(decoded->GetString().empty());
+    EXPECT_EQ(decoded->GetLength(), 0);
+    EXPECT_TRUE(decoded->GetSpanItems().empty());
+    EXPECT_TRUE(buffer.empty());
+}
+
+/**
+ * @tc.name: EmptySpanStringTlvRoundTrip
+ * @tc.desc: An empty string survives serialization and deserialization.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SpanStringTestNg, EmptySpanStringTlvRoundTrip, TestSize.Level1)
+{
+    auto original = AceType::MakeRefPtr<SpanString>(u"");
+    std::vector<uint8_t> buffer;
+    original->EncodeTlv(buffer);
+    ASSERT_FALSE(buffer.empty());
+
+    auto decoded = SpanString::DecodeTlv(buffer);
+    ASSERT_NE(decoded, nullptr);
+    EXPECT_EQ(decoded->GetString(), original->GetString());
+    EXPECT_EQ(decoded->GetLength(), 0);
+    EXPECT_TRUE(decoded->GetSpanItems().empty());
+}
+
 } // namespace OHOS::Ace::NG
