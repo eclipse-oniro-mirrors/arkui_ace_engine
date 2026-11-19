@@ -530,7 +530,7 @@ void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
 bool ImagePattern::IsVisibleOnRenderTree(const RefPtr<FrameNode>& host)
 {
     auto renderContext = host->GetRenderContext();
-    return renderContext && renderContext->IsOnRenderTree()
+    return renderContext && renderContext->IsOnRenderTree();
 }
 
  void ImagePattern::ReportImageSuccessInfo(const RefPtr<FrameNode>& host)
