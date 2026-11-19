@@ -129,12 +129,16 @@ HWTEST_F(DialogLayoutFourTestNg, IsGlobalAvoidEnabled001, TestSize.Level1)
  */
 HWTEST_F(DialogLayoutFourTestNg, GetMaskRect001, TestSize.Level1)
 {
+    // step: create DialogLayoutAlgorithm and set isUIExtensionSubWindow_ to false
     DialogLayoutAlgorithm algo;
     algo.isUIExtensionSubWindow_ = false;
+    // step: create a dialog FrameNode bound with DialogPattern (no maskRect set in DialogProperties)
     auto dialogTheme = AceType::MakeRefPtr<DialogTheme>();
     auto dialog = FrameNode::CreateFrameNode(
         V2::DIALOG_ETS_TAG, 1, AceType::MakeRefPtr<DialogPattern>(dialogTheme, nullptr));
     ASSERT_NE(dialog, nullptr);
+    // step: non-UIExtension subwindow returns the maskRect from DialogProperties as-is,
+    // which is empty when the property is not set
     auto maskRect = algo.GetMaskRect(dialog);
     EXPECT_FALSE(maskRect.has_value());
 }
@@ -146,14 +150,18 @@ HWTEST_F(DialogLayoutFourTestNg, GetMaskRect001, TestSize.Level1)
  */
 HWTEST_F(DialogLayoutFourTestNg, GetMaskRect002, TestSize.Level1)
 {
+    // step: create DialogLayoutAlgorithm and set UIExtension subwindow with expandDisplay enabled
     DialogLayoutAlgorithm algo;
     algo.isUIExtensionSubWindow_ = true;
     algo.expandDisplay_ = true;
+    // step: set a positive hostWindowRect (offset 10,20, size 300x400)
     algo.hostWindowRect_ = RectF(10.0f, 20.0f, 300.0f, 400.0f);
+    // step: create a dialog FrameNode bound with DialogPattern
     auto dialogTheme = AceType::MakeRefPtr<DialogTheme>();
     auto dialog = FrameNode::CreateFrameNode(
         V2::DIALOG_ETS_TAG, 1, AceType::MakeRefPtr<DialogPattern>(dialogTheme, nullptr));
     ASSERT_NE(dialog, nullptr);
+    // step: maskRect is rebuilt from hostWindowRect, size equals 300x400
     auto maskRect = algo.GetMaskRect(dialog);
     ASSERT_TRUE(maskRect.has_value());
     EXPECT_EQ(maskRect->GetWidth().Value(), 300.0f);
