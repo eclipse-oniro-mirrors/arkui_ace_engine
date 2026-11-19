@@ -18,6 +18,7 @@
 
 #include <functional>
 #include <list>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -46,7 +47,7 @@ namespace OHOS::Ace {
 namespace NG {
 enum class ExecutionState;
 enum class ProcessResult;
-struct CommandResult;
+struct RelaxedCommandResult;
 struct AgentGestureState;
 class FrameNode;
 class GestureDebugBoundaryManager;
@@ -506,9 +507,26 @@ public:
         const std::function<void(NG::ExecutionState)>& completion);
     void ProcessCommand(const std::string& command, std::function<void()> requestFrameCallback);
     void ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
-        const std::function<void(const NG::CommandResult&)>& finishCallback);
+        const std::function<void(const NG::RelaxedCommandResult&)>& finishCallback);
     void FlushRelaxedInteraction(std::function<void()> requestFrameCallback);
     void ClearRelaxedInteraction(NG::ExecutionState reason);
+    void HandleRelaxedInteractionTouch(const TouchEvent& event);
+    void HandleRelaxedInteractionMouse(const MouseEvent& event);
+    void HandleRelaxedInteractionAxis(const AxisEvent& event);
+    void HandleRelaxedInteractionKey(const NonPointerEvent& event);
+
+#ifdef RELAXED_INTERACTION_SUPPORT
+    // P1 drag suppression seam: while a press_and_move injection runs, system drag start is rejected.
+    void SetRelaxedInteractionDragSuppressed(bool suppressed)
+    {
+        relaxedInteractionDragSuppressed_ = suppressed;
+    }
+
+    bool IsRelaxedInteractionDragSuppressed() const
+    {
+        return relaxedInteractionDragSuppressed_;
+    }
+#endif
 
 private:
     RefPtr<NG::ActiveRecognizerManager> activeRecognizerManager_;
@@ -677,6 +695,11 @@ private:
     std::function<void(uint64_t sensorTime, uint64_t receiveTime, uint64_t dispatchTime, int32_t eventType)>
         touchTimingCallback_;
     RefPtr<NG::RelaxedInteractionManager> relaxedInteractionManager_;
+    bool relaxedInteractionDragSuppressed_ = false;
+    std::set<std::pair<int64_t, int32_t>> relaxedRealTouches_;
+    std::set<std::pair<int64_t, int32_t>> relaxedRealKeys_;
+    std::set<std::pair<int64_t, int32_t>> relaxedRealAxes_;
+    std::unordered_map<int64_t, int32_t> relaxedRealMouseButtons_;
 };
 
 } // namespace OHOS::Ace

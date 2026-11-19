@@ -30,7 +30,57 @@ namespace {
 bool IsSupportedCommandType(const std::string& type)
 {
     return type == BACKPRESS || type == CLICK || type == CONTENT_SWITCH || type == SCROLL ||
-        type == TAP || type == SLIDE;
+        type == TAP || type == SLIDE || type == PRESS_KEY || type == WHEEL_SCROLL ||
+        type == PRESS_AND_MOVE;
+}
+
+ProcessResult ValidateCommandType(const std::unique_ptr<JsonValue>& json, bool preserveLegacySemantics,
+    bool interruptibleByUser)
+{
+    if (preserveLegacySemantics || json->Contains(FALLBACK_CMD_KEY)) {
+        return ProcessResult::SUCCESS;
+    }
+    auto cmd = json->GetValue(CMD_KEY);
+    if (!cmd || !cmd->IsObject()) {
+        return ProcessResult::VALIDATION_ERROR;
+    }
+    auto type = cmd->GetValue(TYPE_KEY);
+    if (!type || !type->IsString()) {
+        return ProcessResult::VALIDATION_ERROR;
+    }
+    auto name = type->GetString();
+    if (!IsSupportedCommandType(name) && !(interruptibleByUser && name == KEY)) {
+        return ProcessResult::NO_VALID_CMD;
+    }
+    return ProcessResult::SUCCESS;
+}
+
+// P2: identity carried next to cmd in the command JSON.
+RelaxedCommandIdentity ParseCommandIdentity(const std::unique_ptr<JsonValue>& json)
+{
+    RelaxedCommandIdentity identity;
+    auto identityJson = json->GetValue("identity");
+    if (identityJson && identityJson->IsObject()) {
+        if (identityJson->Contains("source")) {
+            identity.source = identityJson->GetString("source");
+        }
+        if (identityJson->Contains("token")) {
+            identity.token = identityJson->GetString("token");
+        }
+        if (identityJson->Contains("label")) {
+            identity.label = identityJson->GetString("label");
+        }
+    }
+    if (identity.source.empty() && json->Contains("source")) {
+        identity.source = json->GetString("source");
+    }
+    if (identity.token.empty() && json->Contains("token")) {
+        identity.token = json->GetString("token");
+    }
+    if (identity.label.empty() && json->Contains("label")) {
+        identity.label = json->GetString("label");
+    }
+    return identity;
 }
 }
 
@@ -52,9 +102,10 @@ ProcessResult RelaxedInteractionManager::ProcessCommand(
 }
 
 ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::string& jsonStr,
-    const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics, bool interruptibleByUser)
+    const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics, bool interruptibleByUser,
+    bool isPcCommand)
 {
-    WorkflowDumper::GetInstance().AddLog("Processing command: " + jsonStr);
+    WorkflowDumper::GetInstance().AddLog("Processing relaxed interaction command");
     auto json = JsonUtil::ParseJsonString(jsonStr);
     if (!json || !json->IsValid() || !json->IsObject()) {
         WorkflowDumper::GetInstance().AddLog("Failed to parse command because of invalid JSON format");
@@ -62,20 +113,20 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
         return ProcessResult::PARSE_ERROR;
     }
 
-    if (!preserveLegacySemantics && !json->Contains(FALLBACK_CMD_KEY)) {
-        auto cmd = json->GetValue(CMD_KEY);
-        if (!cmd || !cmd->IsObject()) {
-            return ProcessResult::VALIDATION_ERROR;
-        }
-        auto type = cmd->GetValue(TYPE_KEY);
-        if (!type || !type->IsString()) {
-            return ProcessResult::VALIDATION_ERROR;
-        }
-        auto name = type->GetString();
-        if (!IsSupportedCommandType(name) && !(interruptibleByUser && name == KEY)) {
-            return ProcessResult::NO_VALID_CMD;
-        }
+    auto validation = ValidateCommandType(json, preserveLegacySemantics, interruptibleByUser);
+    if (validation != ProcessResult::SUCCESS) {
+        return validation;
     }
+
+    return ParseAndEnqueueCommand(json, finishCallback, preserveLegacySemantics, interruptibleByUser, isPcCommand);
+}
+
+ProcessResult RelaxedInteractionManager::ParseAndEnqueueCommand(const std::unique_ptr<JsonValue>& json,
+    const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics, bool interruptibleByUser,
+    bool isPcCommand)
+{
+    // P2: stamp the security identity carried by this command before parsing.
+    executorGenerator_->SetIdentity(ParseCommandIdentity(json));
 
     auto executors = interruptibleByUser ? executorGenerator_->ParseInjectionCommand(json)
                                        : executorGenerator_->ParseCommand(json);
@@ -93,17 +144,26 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
     WorkflowDumper::GetInstance().AddLog("Parsed executors: " + ExecutorsToString(executors));
     size_t executorCount = executors.size();
     auto securityContext = UiCommandSecurityGate::GetContext();
+    std::string commandType;
+    if (!preserveLegacySemantics && !json->Contains(FALLBACK_CMD_KEY)) {
+        auto cmd = json->GetValue(CMD_KEY);
+        if (cmd && cmd->IsObject() && cmd->Contains(TYPE_KEY)) {
+            commandType = cmd->GetString(TYPE_KEY);
+        }
+    }
     choreographer_->Enqueue(std::move(executors));
+    // startTime stays zero: a workflow's timeout window opens when it becomes the running one.
     workflowStates_.push_back({ executorCount, finishCallback, preserveLegacySemantics,
         interruptibleByUser ? InterruptionPolicy::INTERRUPTIBLE : InterruptionPolicy::IGNORE_USER_INPUT,
-        securityContext.needSecurityAuth, securityContext.agentTokenId });
+        securityContext.needSecurityAuth, securityContext.agentTokenId,
+        commandType, std::chrono::steady_clock::time_point {}, isPcCommand });
     return ProcessResult::SUCCESS;
 }
 
 ProcessResult RelaxedInteractionManager::ProcessCommand(const std::string& jsonStr,
-    const std::function<void(ExecutionState)>& finishCallback, bool interruptibleByUser)
+    const std::function<void(ExecutionState)>& finishCallback, bool interruptibleByUser, bool isPcCommand)
 {
-    return ProcessCommandInternal(jsonStr, finishCallback, false, interruptibleByUser);
+    return ProcessCommandInternal(jsonStr, finishCallback, false, interruptibleByUser, isPcCommand);
 }
 
 ExecutionState RelaxedInteractionManager::ExecuteNextStep()
@@ -124,6 +184,27 @@ ExecutionState RelaxedInteractionManager::ExecuteNextStep()
             CommandSecurityContext { workflow.needSecurityAuth, workflow.agentTokenId });
     }
 
+    if (!workflowStates_.empty() && workflowStates_.front().isPcCommand) {
+        auto context = context_.Upgrade();
+        if (!context || context->IsDestroyed()) {
+            std::function<void(ExecutionState)> finishCallback;
+            CompleteCurrentWorkflow(finishCallback, false);
+            if (finishCallback) {
+                finishCallback(ExecutionState::CONTEXT_UNAVAILABLE);
+            }
+            return ExecutionState::CONTEXT_UNAVAILABLE;
+        }
+    }
+
+    // P1 per-command timeout: close out the running workflow when it exceeds the limit.
+    std::function<void(ExecutionState)> timeoutCallback;
+    if (HandleWorkflowTimeout(timeoutCallback)) {
+        if (timeoutCallback) {
+            timeoutCallback(ExecutionState::TIMEOUT);
+        }
+        return ExecutionState::TIMEOUT;
+    }
+
     std::function<void(ExecutionState)> finishCallback;
     ExecutionState state = DoExecuteNextStep(finishCallback);
     WorkflowDumper::GetInstance().AddLog("Current workflow state changed to: " + ExecutionStateToString(state));
@@ -136,10 +217,80 @@ ExecutionState RelaxedInteractionManager::ExecuteNextStep()
     return state;
 }
 
+bool RelaxedInteractionManager::HandleWorkflowTimeout(std::function<void(ExecutionState)>& timeoutCallback)
+{
+    if (executionPhase_ != ExecutionPhase::IDLE) {
+        return false;
+    }
+    if (workflowStates_.empty()) {
+        return false;
+    }
+    auto now = std::chrono::steady_clock::now();
+    auto& workflow = workflowStates_.front();
+    // The timeout window opens when the workflow becomes the running one.
+    if (workflow.startTime == std::chrono::steady_clock::time_point {}) {
+        workflow.startTime = now;
+        return false;
+    }
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - workflow.startTime).count();
+    if (elapsed < static_cast<int64_t>(commandTimeoutMs_)) {
+        return false;
+    }
+    TAG_LOGW(AceLogTag::ACE_UIEVENT, "Workflow exceeded command timeout %{public}d ms", commandTimeoutMs_);
+    WorkflowDumper::GetInstance().AddLog("Workflow exceeded command timeout, completing with TIMEOUT");
+    auto cancelledExecutors = choreographer_->ExtractExecutors(std::vector<bool>(workflow.remainingExecutors, true));
+    timeoutCallback = std::move(workflow.finishCallback);
+    workflowStates_.pop_front();
+    // Detach the workflow before compensation can reenter the manager.
+    for (auto& executor : cancelledExecutors) {
+        executor->Cancel();
+    }
+    return true;
+}
+
+void RelaxedInteractionManager::SetDenyCallback(RelaxedDenyCallback callback)
+{
+    if (executorGenerator_) {
+        executorGenerator_->SetDenyCallback(std::move(callback));
+    }
+}
+
+bool RelaxedInteractionManager::IsPointerClassInjectionRunning() const
+{
+    return !workflowStates_.empty() && IsPointerClassCommand(workflowStates_.front().commandType);
+}
+
+bool RelaxedInteractionManager::IsKeyClassInjectionRunning() const
+{
+    return !workflowStates_.empty() && IsKeyClassCommand(workflowStates_.front().commandType);
+}
+
+bool RelaxedInteractionManager::IsContextAvailable() const
+{
+    auto context = context_.Upgrade();
+    return context && !context->IsDestroyed();
+}
+
 bool RelaxedInteractionManager::HasPendingWorkflow() const
 {
     return !pendingUserCompletions_.empty() ||
         (choreographer_ && (choreographer_->HasCurrent() || choreographer_->HasNext()));
+}
+
+// Completes a step that finished while no workflow is queued (legacy late completion).
+ExecutionState RelaxedInteractionManager::ExecuteStepWithoutWorkflow(ExecutorResult result)
+{
+    switch (result) {
+        case ExecutorResult::PENDING:
+            return ExecutionState::RUNNING;
+        case ExecutorResult::SUCCESS:
+            choreographer_->Clear();
+            return ExecutionState::SUCCESS;
+        case ExecutorResult::FAILED:
+            return choreographer_->HasNext() ? ExecutionState::RUNNING : ExecutionState::FAILED;
+        default:
+            return ExecutionState::FAILED;
+    }
 }
 
 ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
@@ -154,16 +305,7 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
     executionPhase_ = ExecutionPhase::IDLE;
 
     if (workflowStates_.empty()) {
-        switch (result) {
-            case ExecutorResult::PENDING:
-                return ExecutionState::RUNNING;
-            case ExecutorResult::SUCCESS:
-                choreographer_->Clear();
-                return ExecutionState::SUCCESS;
-            case ExecutorResult::FAILED:
-                return choreographer_->HasNext() ? ExecutionState::RUNNING : ExecutionState::FAILED;
-        }
-        return ExecutionState::FAILED;
+        return ExecuteStepWithoutWorkflow(result);
     }
 
     auto& workflow = workflowStates_.front();
@@ -185,6 +327,12 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
             return ExecutionState::SUCCESS;
 
         case ExecutorResult::FAILED:
+            if (choreographer_->GetFailureState() == ExecutionState::CONTROL_DENIED ||
+                (workflow.isPcCommand && choreographer_->GetFailureState() == ExecutionState::CONTEXT_UNAVAILABLE)) {
+                auto failure = choreographer_->GetFailureState();
+                CompleteCurrentWorkflow(finishCallback, true);
+                return failure;
+            }
             if (workflow.remainingExecutors > 0) {
                 --workflow.remainingExecutors;
             }
@@ -198,6 +346,50 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
     }
 
     return ExecutionState::FAILED;
+}
+
+void RelaxedInteractionManager::CompleteCurrentWorkflow(
+    std::function<void(ExecutionState)>& finishCallback, bool stepFinished)
+{
+    auto count = workflowStates_.front().remainingExecutors;
+    if (stepFinished && count > 0) {
+        --count;
+    }
+    finishCallback = std::move(workflowStates_.front().finishCallback);
+    workflowStates_.pop_front();
+    auto cancelledExecutors = choreographer_->ExtractExecutors(std::vector<bool>(count, true));
+    for (auto& executor : cancelledExecutors) {
+        executor->Cancel();
+    }
+}
+
+void RelaxedInteractionManager::InterruptForUserInput(UserInput input, bool interruptLegacy)
+{
+    bool interrupted = false;
+    for (auto& workflow : workflowStates_) {
+        if (workflow.interruptionPolicy == InterruptionPolicy::IGNORE_USER_INPUT) {
+            continue;
+        }
+        const bool conflicts = workflow.isPcCommand
+            ? ((input == UserInput::KEY && IsKeyClassCommand(workflow.commandType)) ||
+                (input == UserInput::POINTER && IsPointerClassCommand(workflow.commandType)))
+            : interruptLegacy;
+        if (conflicts) {
+            workflow.interruptionPolicy = InterruptionPolicy::INTERRUPTED;
+            interrupted = true;
+        }
+    }
+    if (!interrupted) {
+        return;
+    }
+    if (executionPhase_ != ExecutionPhase::IDLE) {
+        if (executionPhase_ == ExecutionPhase::EXECUTING) {
+            clearReason_ = ExecutionState::INTERRUPTED_BY_USER;
+        }
+        executionPhase_ = ExecutionPhase::CLEAR_PENDING;
+        return;
+    }
+    ClearInterruptedWorkflows();
 }
 
 bool RelaxedInteractionManager::HandleDeferredClear(ExecutorResult result, ExecutionState& state)
@@ -296,7 +488,13 @@ void RelaxedInteractionManager::Clear(ExecutionState reason)
     }
     for (auto& workflow : cancelledWorkflows) {
         if (workflow.finishCallback && workflow.interruptionPolicy != InterruptionPolicy::IGNORE_USER_INPUT) {
-            workflow.finishCallback(reason);
+            auto state = reason;
+            auto context = context_.Upgrade();
+            if (workflow.isPcCommand && state == ExecutionState::TARGET_NOT_FOUND &&
+                (!context || context->IsDestroyed())) {
+                state = ExecutionState::CONTEXT_UNAVAILABLE;
+            }
+            workflow.finishCallback(state);
         }
     }
 }
@@ -305,6 +503,7 @@ void RelaxedInteractionManager::ClearInterruptedWorkflows(bool currentStepFinish
 {
     std::vector<bool> removeExecutors;
     std::deque<WorkflowState> retainedWorkflows;
+    std::deque<std::function<void(ExecutionState)>> synchronousCompletions;
     for (auto& workflow : workflowStates_) {
         size_t count = workflow.remainingExecutors;
         if (currentStepFinished && count > 0) {
@@ -316,7 +515,8 @@ void RelaxedInteractionManager::ClearInterruptedWorkflows(bool currentStepFinish
         if (!interrupted) {
             retainedWorkflows.push_back(std::move(workflow));
         } else if (workflow.finishCallback) {
-            pendingUserCompletions_.push_back(std::move(workflow.finishCallback));
+            auto& completions = workflow.isPcCommand ? synchronousCompletions : pendingUserCompletions_;
+            completions.push_back(std::move(workflow.finishCallback));
         }
     }
     workflowStates_.swap(retainedWorkflows);
@@ -326,6 +526,9 @@ void RelaxedInteractionManager::ClearInterruptedWorkflows(bool currentStepFinish
     }
     if (workflowStates_.empty()) {
         UiCommandSecurityGate::ClearContext();
+    }
+    for (auto& completion : synchronousCompletions) {
+        completion(ExecutionState::INTERRUPTED_BY_USER);
     }
     auto context = context_.Upgrade();
     if (!pendingUserCompletions_.empty() && context && !context->IsDestroyed()) {
@@ -361,6 +564,12 @@ std::string RelaxedInteractionManager::ExecutionStateToString(ExecutionState sta
             return "TARGET_NOT_FOUND";
         case ExecutionState::INTERRUPTED_BY_USER:
             return "INTERRUPTED_BY_USER";
+        case ExecutionState::TIMEOUT:
+            return "TIMEOUT";
+        case ExecutionState::CONTROL_DENIED:
+            return "CONTROL_DENIED";
+        case ExecutionState::CONTEXT_UNAVAILABLE:
+            return "CONTEXT_UNAVAILABLE";
         default:
             return "UNKNOWN";
     }

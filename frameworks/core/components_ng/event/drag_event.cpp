@@ -1909,6 +1909,16 @@ bool DragEventActuator::IsAllowedDrag()
     CHECK_NULL_RETURN(gestureHub, false);
     auto frameNode = gestureHub->GetFrameNode();
     CHECK_NULL_RETURN(frameNode, false);
+#ifdef RELAXED_INTERACTION_SUPPORT
+    // While a press_and_move injection runs, system drag start is suppressed.
+    auto pipeline = frameNode->GetContextRefPtr();
+    CHECK_NULL_RETURN(pipeline, false);
+    auto eventManager = pipeline->GetEventManager();
+    CHECK_NULL_RETURN(eventManager, false);
+    if (eventManager->IsRelaxedInteractionDragSuppressed()) {
+        return false;
+    }
+#endif
     auto eventHub = frameNode->GetEventHub<EventHub>();
     CHECK_NULL_RETURN(eventHub, false);
     bool isAllowedDrag = gestureHub->IsAllowedDrag(eventHub);

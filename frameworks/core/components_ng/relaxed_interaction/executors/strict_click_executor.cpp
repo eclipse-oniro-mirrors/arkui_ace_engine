@@ -34,6 +34,9 @@ ExecutorResult StrictClickExecutor::ExecuteStep()
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
         return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
+    if (IsDenied(coordinates_)) {
+        return SetFailureState(ExecutionState::CONTROL_DENIED);
+    }
 
     // Use FrameNodeFinder to query FrameNode at coordinates
     auto result = FindFrameNode(coordinates_.GetX(), coordinates_.GetY(), ClickRecognizerPred());

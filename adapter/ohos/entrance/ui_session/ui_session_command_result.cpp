@@ -18,6 +18,7 @@
 #include "adapter/ohos/entrance/ui_session/ui_session_batch_command.h"
 #include "base/utils/string_utils.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 
 namespace OHOS::Ace {
 namespace {
@@ -36,6 +37,31 @@ std::string SerializeCommandResult(const NG::CommandResult& result)
         case NG::CommandErrorType::INVALID_PARAM: type = "INVALID_PARAM"; break;
         case NG::CommandErrorType::NOT_SUPPORTED: type = "NOT_SUPPORTED"; break;
         case NG::CommandErrorType::SECURITY_DENIED: type = "SECURITY_DENIED"; break;
+        default: break;
+    }
+    auto message = result.errorMessage;
+    if (message.size() > MAX_COMMAND_MESSAGE_BYTES) {
+        message.clear();
+    }
+    return std::string(R"({"result":"FAILED","errorType":")") + type +
+        "\",\"errorMessage\":" + StringUtils::EscapeJsonString(message) + "}";
+}
+
+std::string SerializeCommandResult(const NG::RelaxedCommandResult& result)
+{
+    if (result.success) {
+        return R"({"result":"SUCCESS"})";
+    }
+    const char* type = "EXECUTE_FAIL";
+    switch (result.errorType) {
+        case NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE: type = "TARGET_UNAVAILABLE"; break;
+        case NG::RelaxedCommandErrorType::CONTEXT_UNAVAILABLE: type = "CONTEXT_UNAVAILABLE"; break;
+        case NG::RelaxedCommandErrorType::NODE_NOT_FOUND: type = "NODE_NOT_FOUND"; break;
+        case NG::RelaxedCommandErrorType::INVALID_COMMAND: type = "INVALID_COMMAND"; break;
+        case NG::RelaxedCommandErrorType::INVALID_PARAM: type = "INVALID_PARAM"; break;
+        case NG::RelaxedCommandErrorType::TIMEOUT: type = "TIMEOUT"; break;
+        case NG::RelaxedCommandErrorType::CONTROL_DENIED: type = "CONTROL_DENIED"; break;
+        case NG::RelaxedCommandErrorType::USER_ACTION_PRIORITY: type = "USER_ACTION_PRIORITY"; break;
         default: break;
     }
     auto message = result.errorMessage;

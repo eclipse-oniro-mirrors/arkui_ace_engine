@@ -201,9 +201,8 @@ constexpr Dimension CARET_AVOID_OFFSET = 24.0_vp;
 
 bool InterruptRelaxedInteractionByMouse(const MouseEvent& event, const RefPtr<EventManager>& eventManager)
 {
-    if (!event.isInjected && (event.action == MouseAction::PRESS || event.action == MouseAction::PULL_DOWN) &&
-        eventManager) {
-        eventManager->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+    if (!event.isInjected && !event.isFalsifyCancel && eventManager) {
+        eventManager->HandleRelaxedInteractionMouse(event);
         return true;
     }
     return false;
@@ -3979,7 +3978,7 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNo
 {
     CHECK_RUN_ON(UI);
     if (!point.isInjected && !point.isGenerate && eventManager_) {
-        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        eventManager_->HandleRelaxedInteractionTouch(point);
         if (IsDestroyed()) {
             return;
         }
@@ -5660,7 +5659,7 @@ void PipelineContext::ReDispatch(KeyEvent& keyEvent)
 bool PipelineContext::OnNonPointerEvent(const NonPointerEvent& event)
 {
     if (!event.isInjected && eventManager_) {
-        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        eventManager_->HandleRelaxedInteractionKey(event);
         if (IsDestroyed()) {
             return false;
         }
@@ -5752,7 +5751,7 @@ MouseEvent ConvertAxisToMouse(const AxisEvent& event)
 void PipelineContext::OnAxisEvent(const AxisEvent& event, const RefPtr<FrameNode>& node)
 {
     if (!event.isInjected && eventManager_) {
-        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        eventManager_->HandleRelaxedInteractionAxis(event);
         if (IsDestroyed()) {
             return;
         }
@@ -9166,16 +9165,23 @@ ProcessResult PipelineContext::ProcessCommand(const std::string& command,
 }
 
 void PipelineContext::ProcessCommandWithResult(
-    const std::string& command, const std::function<void(const CommandResult&)>& finish)
+    const std::string& command, const std::function<void(const RelaxedCommandResult&)>& finish)
 {
 #ifdef RELAXED_INTERACTION_SUPPORT
     if (!eventManager_) {
-        finish(CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto json = JsonUtil::ParseJsonString(command);
+        auto cmd = json && json->IsObject() ? json->GetValue(CMD_KEY) : nullptr;
+        const auto type = cmd && cmd->IsObject() ? cmd->GetString(TYPE_KEY) : "";
+        const bool pcCommand = json && !json->Contains(FALLBACK_CMD_KEY) &&
+            (type == CLICK || type == PRESS_KEY || type == WHEEL_SCROLL || type == PRESS_AND_MOVE);
+        finish(pcCommand
+            ? RelaxedCommandResult::Error(RelaxedCommandErrorType::CONTEXT_UNAVAILABLE, "UI context is unavailable")
+            : RelaxedCommandResult::Error(RelaxedCommandErrorType::EXECUTE_FAIL));
         return;
     }
     eventManager_->ProcessCommandWithResult(command, [this]() { RequestFrame(); }, finish);
 #else
-    finish(CommandResult::Error(CommandErrorType::INVALID_COMMAND));
+    finish(RelaxedCommandResult::Error(RelaxedCommandErrorType::INVALID_COMMAND));
 #endif
 }
 

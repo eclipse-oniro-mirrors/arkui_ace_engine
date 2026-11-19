@@ -23,6 +23,7 @@
 
 #include "base/json/json_util.h"
 #include "base/memory/referenced.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 
 namespace OHOS::Ace::NG {
 
@@ -39,6 +40,22 @@ public:
     std::vector<std::unique_ptr<BaseExecutor>> ParseInjectionCommand(const std::unique_ptr<JsonValue>& json);
     static bool ValidateCommand(const std::unique_ptr<JsonValue>& json);
 
+    // P2 security seam: deny check and identity carried by injected commands.
+    void SetDenyCallback(RelaxedDenyCallback callback)
+    {
+        denyCallback_ = std::move(callback);
+    }
+
+    void SetIdentity(const RelaxedCommandIdentity& identity)
+    {
+        identity_ = identity;
+    }
+
+    const RelaxedCommandIdentity& GetIdentity() const
+    {
+        return identity_;
+    }
+
 private:
     void RegisterDefaultParsers();
 
@@ -46,8 +63,12 @@ private:
 
     std::vector<std::unique_ptr<BaseExecutor>> ParseRegularCmd(const std::unique_ptr<JsonValue>& json);
 
+    std::vector<std::unique_ptr<BaseExecutor>> StampDenyContext(std::vector<std::unique_ptr<BaseExecutor>> executors);
+
     WeakPtr<PipelineContext> context_;
     std::unordered_map<std::string, std::unique_ptr<BaseCommandParser>> parserRegistry_;
+    RelaxedDenyCallback denyCallback_;
+    RelaxedCommandIdentity identity_;
 };
 
 } // namespace OHOS::Ace::NG

@@ -4211,35 +4211,234 @@ void EventManager::ClearRelaxedInteraction(NG::ExecutionState reason)
 #endif
 }
 
+namespace {
+#ifdef RELAXED_INTERACTION_SUPPORT
+bool IsPcCommand(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsObject() || json->Contains(NG::FALLBACK_CMD_KEY)) {
+        return false;
+    }
+    auto cmd = json->GetValue(NG::CMD_KEY);
+    if (!cmd || !cmd->IsObject()) {
+        return false;
+    }
+    auto type = cmd->GetString(NG::TYPE_KEY);
+    return type == NG::CLICK || type == NG::PRESS_KEY || type == NG::WHEEL_SCROLL || type == NG::PRESS_AND_MOVE;
+}
+
+NG::RelaxedCommandResult PcCommandError(NG::RelaxedCommandErrorType type)
+{
+    const char* message = "";
+    switch (type) {
+        case NG::RelaxedCommandErrorType::INVALID_PARAM: message = "invalid command argument"; break;
+        case NG::RelaxedCommandErrorType::TIMEOUT: message = "command execution timed out"; break;
+        case NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE: message = "target is unavailable"; break;
+        case NG::RelaxedCommandErrorType::CONTEXT_UNAVAILABLE: message = "UI context is unavailable"; break;
+        case NG::RelaxedCommandErrorType::CONTROL_DENIED: message = "control denied by policy"; break;
+        case NG::RelaxedCommandErrorType::USER_ACTION_PRIORITY: message = "interrupted by user action"; break;
+        default: break;
+    }
+    return NG::RelaxedCommandResult::Error(type, message);
+}
+NG::RelaxedCommandResult CommandExecutionResult(NG::ExecutionState state, bool pcCommand)
+{
+    if (state == NG::ExecutionState::SUCCESS) {
+        return NG::RelaxedCommandResult::Success();
+    }
+    auto type = NG::RelaxedCommandErrorType::EXECUTE_FAIL;
+    switch (state) {
+        case NG::ExecutionState::TARGET_NOT_FOUND:
+            type = pcCommand ? NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE
+                             : NG::RelaxedCommandErrorType::NODE_NOT_FOUND;
+            break;
+        case NG::ExecutionState::CONTEXT_UNAVAILABLE:
+            type = NG::RelaxedCommandErrorType::CONTEXT_UNAVAILABLE;
+            break;
+        case NG::ExecutionState::INTERRUPTED_BY_USER:
+            type = NG::RelaxedCommandErrorType::USER_ACTION_PRIORITY;
+            break;
+        case NG::ExecutionState::TIMEOUT: type = NG::RelaxedCommandErrorType::TIMEOUT; break;
+        case NG::ExecutionState::CONTROL_DENIED: type = NG::RelaxedCommandErrorType::CONTROL_DENIED; break;
+        case NG::ExecutionState::SECURITY_DENIED:
+            // Upstream security gate refusal; PC commands surface it as CONTROL_DENIED.
+            type = NG::RelaxedCommandErrorType::CONTROL_DENIED;
+            break;
+        default: break;
+    }
+    return pcCommand ? PcCommandError(type) : NG::RelaxedCommandResult::Error(type);
+}
+
+#endif
+} // namespace
+
 void EventManager::ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
-    const std::function<void(const NG::CommandResult&)>& finishCallback)
+    const std::function<void(const NG::RelaxedCommandResult&)>& finishCallback)
 {
     ContainerScope scope(instanceId_);
 #ifdef RELAXED_INTERACTION_SUPPORT
+    const bool pcCommand = IsPcCommand(command);
+    auto errorResult = [pcCommand](NG::RelaxedCommandErrorType type) {
+        return pcCommand ? PcCommandError(type) : NG::RelaxedCommandResult::Error(type);
+    };
+    // Record real input before callbacks can reenter this admission check.
+    if (pcCommand && (!relaxedRealTouches_.empty() || !relaxedRealKeys_.empty() ||
+        !relaxedRealAxes_.empty() || !relaxedRealMouseButtons_.empty())) {
+        finishCallback(errorResult(NG::RelaxedCommandErrorType::USER_ACTION_PRIORITY));
+        return;
+    }
     auto relaxedInteractionManager = GetOrCreateRelaxedInteractionManager();
-    if (!relaxedInteractionManager) {
-        finishCallback(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL));
+    if (!relaxedInteractionManager || (pcCommand && !relaxedInteractionManager->IsContextAvailable())) {
+        finishCallback(errorResult(pcCommand ? NG::RelaxedCommandErrorType::CONTEXT_UNAVAILABLE
+                                            : NG::RelaxedCommandErrorType::EXECUTE_FAIL));
         return;
     }
     auto result = relaxedInteractionManager->ProcessCommand(command,
-        [finishCallback](NG::ExecutionState state) {
-            if (state == NG::ExecutionState::SUCCESS) {
-                finishCallback(NG::CommandResult::Success());
-            } else if (state == NG::ExecutionState::SECURITY_DENIED) {
-                finishCallback(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED));
-            } else {
-                finishCallback(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL));
+        [finishCallback, pcCommand](NG::ExecutionState state) {
+            if (state == NG::ExecutionState::SECURITY_DENIED && !pcCommand) {
+                // Upstream security gate refusal stays on the legacy result shape.
+                finishCallback(NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::EXECUTE_FAIL));
+                return;
             }
-        });
+            finishCallback(CommandExecutionResult(state, pcCommand));
+        }, pcCommand, pcCommand);
     if (result == NG::ProcessResult::SUCCESS) {
         requestFrameCallback();
         return;
     }
-    finishCallback(NG::CommandResult::Error(result == NG::ProcessResult::NO_VALID_CMD
-        ? NG::CommandErrorType::INVALID_COMMAND
-        : NG::CommandErrorType::INVALID_PARAM));
+    finishCallback(errorResult(result == NG::ProcessResult::NO_VALID_CMD
+        ? NG::RelaxedCommandErrorType::INVALID_COMMAND : NG::RelaxedCommandErrorType::INVALID_PARAM));
 #else
-    finishCallback(NG::CommandResult::Error(NG::CommandErrorType::INVALID_COMMAND));
+    finishCallback(NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::INVALID_COMMAND));
+#endif
+}
+
+void EventManager::HandleRelaxedInteractionTouch(const TouchEvent& event)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    // Agent controller input must not claim real-user priority over PC commands.
+    if (event.isInjected || event.isGenerate || event.isFalsified || event.isAgent ||
+        event.sourceType == SourceType::MOUSE) {
+        return;
+    }
+    using UserInput = NG::RelaxedInteractionManager::UserInput;
+    auto input = UserInput::POINTER;
+    const auto pointer = std::make_pair(static_cast<int64_t>(event.deviceId), event.id);
+    switch (event.type) {
+        case TouchType::DOWN:
+        case TouchType::PULL_DOWN:
+        case TouchType::PULL_MOVE:
+        case TouchType::PULL_IN_WINDOW: relaxedRealTouches_.insert(pointer); break;
+        case TouchType::UP:
+        case TouchType::PULL_UP:
+        case TouchType::PULL_OUT_WINDOW:
+        case TouchType::CANCEL: relaxedRealTouches_.erase(pointer); break;
+        case TouchType::MOVE: break;
+        default: input = UserInput::OTHER; break;
+    }
+    auto manager = relaxedInteractionManager_;
+    if (manager) {
+        manager->InterruptForUserInput(input);
+    }
+#endif
+}
+
+void EventManager::HandleRelaxedInteractionMouse(const MouseEvent& event)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    // Agent controller input must not claim real-user priority over PC commands.
+    if (event.isInjected || event.isFalsifyCancel || event.isAgent) {
+        return;
+    }
+    const auto button = static_cast<int32_t>(event.button);
+    switch (event.action) {
+        case MouseAction::PRESS:
+        case MouseAction::PULL_DOWN:
+            relaxedRealMouseButtons_[event.deviceId] |= button | event.pressedButtons;
+            break;
+        case MouseAction::RELEASE:
+        case MouseAction::PULL_UP: {
+            auto iter = relaxedRealMouseButtons_.find(event.deviceId);
+            if (iter != relaxedRealMouseButtons_.end()) {
+                iter->second &= ~button;
+                if (button == 0 || iter->second == 0) {
+                    relaxedRealMouseButtons_.erase(iter);
+                }
+            }
+            break;
+        }
+        case MouseAction::CANCEL: relaxedRealMouseButtons_.erase(event.deviceId); break;
+        case MouseAction::PULL_MOVE:
+            relaxedRealMouseButtons_[event.deviceId] |= event.pressedButtons;
+            break;
+        case MouseAction::MOVE:
+            if (event.pressedButtons == 0 && relaxedRealMouseButtons_.count(event.deviceId) == 0) {
+                return;
+            }
+            if (event.pressedButtons != 0) {
+                relaxedRealMouseButtons_[event.deviceId] |= event.pressedButtons;
+            }
+            break;
+        default: return;
+    }
+    auto manager = relaxedInteractionManager_;
+    if (manager) {
+        manager->InterruptForUserInput(NG::RelaxedInteractionManager::UserInput::POINTER,
+            event.action == MouseAction::PRESS || event.action == MouseAction::PULL_DOWN);
+    }
+#endif
+}
+
+void EventManager::HandleRelaxedInteractionAxis(const AxisEvent& event)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    if (event.isInjected || event.isFalsifyCancel) {
+        return;
+    }
+    const auto pointer = std::make_pair(event.deviceId, event.id);
+    switch (event.action) {
+        case AxisAction::BEGIN:
+        case AxisAction::UPDATE: relaxedRealAxes_.insert(pointer); break;
+        case AxisAction::END:
+        case AxisAction::CANCEL: relaxedRealAxes_.erase(pointer); break;
+        default: return;
+    }
+    auto manager = relaxedInteractionManager_;
+    if (manager) {
+        manager->InterruptForUserInput(NG::RelaxedInteractionManager::UserInput::POINTER);
+    }
+#endif
+}
+
+void EventManager::HandleRelaxedInteractionKey(const NonPointerEvent& event)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    if (event.isInjected) {
+        return;
+    }
+    if (event.eventType != UIInputEventType::KEY) {
+        if (relaxedInteractionManager_) {
+            relaxedInteractionManager_->InterruptForUserInput(NG::RelaxedInteractionManager::UserInput::OTHER);
+        }
+        return;
+    }
+    const auto& key = static_cast<const KeyEvent&>(event);
+    if (key.isFalsifyCancel) {
+        return;
+    }
+    const auto code = std::make_pair(key.deviceId, static_cast<int32_t>(key.code));
+    switch (key.action) {
+        case KeyAction::DOWN:
+        case KeyAction::LONG_PRESS: relaxedRealKeys_.insert(code); break;
+        case KeyAction::UP:
+        case KeyAction::CANCEL: relaxedRealKeys_.erase(code); break;
+        case KeyAction::CLICK: break;
+        default: return;
+    }
+    auto manager = relaxedInteractionManager_;
+    if (manager) {
+        manager->InterruptForUserInput(NG::RelaxedInteractionManager::UserInput::KEY);
+    }
 #endif
 }
 
@@ -4261,13 +4460,14 @@ RefPtr<NG::RelaxedInteractionManager> EventManager::GetOrCreateRelaxedInteractio
         return relaxedInteractionManager_;
     }
 
-    auto container = Container::Current();
+    auto container = Container::CurrentSafely();
     CHECK_NULL_RETURN(container, nullptr);
     auto pipelineContext = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
     CHECK_NULL_RETURN(pipelineContext, nullptr);
     relaxedInteractionManager_ = AceType::MakeRefPtr<NG::RelaxedInteractionManager>(pipelineContext);
     return relaxedInteractionManager_;
 }
+
 #endif
 
 void EventManager::FlushCursorStyleRequests()

@@ -42,6 +42,7 @@ private:
     static bool ParseParameters(const std::unique_ptr<JsonValue>& json, ExecuteMode& mode, PointF& coordinates);
     static bool ParseMode(const JsonValue* cmdJson, ExecuteMode& mode);
     static bool ParseCoordinates(const JsonValue* cmdJson, PointF& coordinates);
+    static bool ParsePcOptions(const JsonValue* cmdJson, ClickInput& input);
     std::vector<std::unique_ptr<BaseExecutor>> CreateExecutor(ExecuteMode mode, const PointF& coordinates);
 };
 

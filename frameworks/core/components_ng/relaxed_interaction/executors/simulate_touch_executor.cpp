@@ -37,6 +37,9 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
         return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
+    if (IsDenied(coordinates_)) {
+        return SetFailureState(ExecutionState::CONTROL_DENIED);
+    }
 
     if (IsTargetDeniedAt(coordinates_.GetX(), coordinates_.GetY())) {
         return SetFailureState(ExecutionState::SECURITY_DENIED);

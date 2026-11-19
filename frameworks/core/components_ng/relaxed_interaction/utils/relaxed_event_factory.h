@@ -17,12 +17,17 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_UTILS_RELAXED_EVENT_FACTORY_H
 
 #include "base/geometry/ng/point_t.h"
+#include "base/geometry/offset.h"
+#include "core/event/axis_event.h"
+#include "core/event/key_event.h"
+#include "core/event/mouse_event.h"
 #include "ui/event/touch_event.h"
 #include "ui/gestures/gesture_event.h"
 
 namespace OHOS::Ace::NG {
 
 class FrameNode;
+enum class WheelScrollDirection;
 
 class RelaxedEventFactory {
 public:
@@ -30,6 +35,19 @@ public:
     ~RelaxedEventFactory() = delete;
 
     static TouchEvent CreateTouchEvent(const PointF& coordinates, TouchType touchType);
+
+    static MouseEvent CreateMouseEvent(const PointF& coordinates, MouseAction action, MouseButton button,
+        int32_t pressedButtons, const std::vector<KeyCode>& pressedKeyCodes);
+
+    static AxisEvent CreateAxisEvent(const PointF& coordinates, double delta,
+        const std::vector<KeyCode>& pressedCodes);
+
+    static AxisEvent CreateAxisEvent(const PointF& coordinates, const Offset& windowOffset, double delta,
+        const std::vector<KeyCode>& pressedCodes, WheelScrollDirection direction,
+        AxisAction action = AxisAction::UPDATE);
+
+    static KeyEvent CreateKeyEvent(KeyCode code, KeyAction action, const std::vector<KeyCode>& pressedCodes,
+        int32_t repeatTime = 0);
 
     static GestureEvent CreateClickGestureEvent(const RefPtr<FrameNode>& frameNode);
 };
