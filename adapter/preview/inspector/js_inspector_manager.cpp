@@ -432,13 +432,10 @@ void JsInspectorManager::GetAttrsAndStylesV2(
     std::string viewId = composedElement->GetViewId();
     jsonNode->Put(INSPECTOR_DEBUGLINE, debugLine.c_str());
     jsonNode->Put(INSPECTOR_VIEW_ID, viewId.c_str());
-    auto inspectorElement = AceType::DynamicCast<V2::InspectorComposedElement>(composedElement);
-    if (inspectorElement) {
-        auto jsonObject = inspectorElement->ToJsonObject();
-        jsonObject->Put("viewId", viewId.c_str());
-        jsonNode->Put(INSPECTOR_ATTRS, jsonObject);
-    }
-    auto shapeComposedElement = AceType::DynamicCast<V2::ShapeComposedElement>(inspectorElement);
+    auto jsonObject = composedElement->ToJsonObject();
+    jsonObject->Put("viewId", viewId.c_str());
+    jsonNode->Put(INSPECTOR_ATTRS, jsonObject);
+    auto shapeComposedElement = AceType::DynamicCast<V2::ShapeComposedElement>(composedElement);
     if (shapeComposedElement) {
         jsonNode->Replace(INSPECTOR_TYPE, shapeComposedElement->GetShapeType().c_str());
     }
