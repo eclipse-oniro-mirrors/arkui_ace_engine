@@ -2022,6 +2022,9 @@ HWTEST_F(SheetPresentationTestFiveNg, ClearSheetCloseIconMaterial002_StateEffect
     auto isUiMaterialLevel = g_uiMaterialLevel;
     g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
 
+    /**
+     * @tc.steps: step1. create sheet node.
+     */
     auto rootNode = FrameNode::CreateFrameNode("Root", 501, AceType::MakeRefPtr<RootPattern>());
     ASSERT_NE(rootNode, nullptr);
     auto callback = [](const std::string&) {};
@@ -2040,6 +2043,10 @@ HWTEST_F(SheetPresentationTestFiveNg, ClearSheetCloseIconMaterial002_StateEffect
     symbolNode->MountToParent(buttonNode);
     buttonNode->MountToParent(sheetNode);
 
+    /**
+     * @tc.steps: step2. SetSheetCloseIconMaterial.
+     * @tc.expected: GetStateEffect is false.
+     */
     auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
     ASSERT_NE(sheetPattern, nullptr);
     sheetPattern->SetCloseButtonNode(WeakPtr<FrameNode>(buttonNode));
@@ -2052,6 +2059,10 @@ HWTEST_F(SheetPresentationTestFiveNg, ClearSheetCloseIconMaterial002_StateEffect
     ASSERT_NE(buttonEventHub, nullptr);
     EXPECT_FALSE(buttonEventHub->GetStateEffect());
 
+    /**
+     * @tc.steps: step3. ClearSheetCloseIconMaterial.
+     * @tc.expected: GetStateEffect is true.
+     */
     sheetPattern->ClearSheetCloseIconMaterial();
     EXPECT_TRUE(buttonEventHub->GetStateEffect());
 
