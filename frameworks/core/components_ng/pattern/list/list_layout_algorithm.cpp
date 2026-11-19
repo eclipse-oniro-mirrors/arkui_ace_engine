@@ -94,6 +94,7 @@ static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
     LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache,
     bool allowPlaceholderSubstitution = false)
 {
+    CHECK_NULL_RETURN(layoutWrapper,false);
     const auto& layoutProperty = AceType::DynamicCast<ListLayoutProperty>(layoutWrapper->GetLayoutProperty());
     // Scroll placeholder load observation at the List child build call point: predict before
     // the real builder runs on an unbuilt index and sample its duration afterwards. Observation
@@ -1379,6 +1380,7 @@ bool ListLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutWrappe
 std::optional<ListPositionMap::EstimateRange> ListLayoutAlgorithm::GetPhysicalLanesRow(int32_t index) const
 {
     auto row = GetFastScrollLanesRow(isStackFromEnd_ ? totalItemCount_ - index - 1 : index);
+    CHECK_NULL_RETURN(row, false);
     if (row && isStackFromEnd_) {
         return ListPositionMap::EstimateRange {
             totalItemCount_ - row->endIndex - 1, totalItemCount_ - row->startIndex - 1 };
