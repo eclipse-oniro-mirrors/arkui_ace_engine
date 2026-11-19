@@ -32,6 +32,11 @@
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components/scroll/scroll_controller_base.h"
 
+namespace OHOS::Ace {
+struct ScrollSnapStrategy;
+struct SnapCandidate;
+}
+
 namespace OHOS::Ace::NG {
 class ScrollPlaceholderManager;
 class InspectorFilter;
@@ -386,13 +391,26 @@ public:
 
     void StartListSnapAnimation(float scrollSnapDelta, float scrollSnapVelocity);
 
-    SnapType GetSnapType() override
+    SnapType GetSnapType() override;
+    // Tracked item snap: List is a 1D layout (no cross-row geometry), so tracked candidates
+    // are always available while the strategy is enabled.
+    bool SupportsTrackedItemSnap() const override
     {
-        auto snapAlign = GetScrollSnapAlign();
-        return snapAlign != ScrollSnapAlign::NONE ? SnapType::LIST_SNAP : SnapType::NONE_SNAP;
+        return true;
     }
+    std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align) override;
 
     ScrollSnapAlign GetScrollSnapAlign() const;
+
+    // Item scroll snap (scrollSnapStrategy) integration.
+    ScrollSnapStrategy GetScrollSnapStrategy() const override;
+    std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align) override;
+    std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller) override;
+    float GetItemSnapMinOffset() const override;
+    float GetItemSnapMaxOffset() const override;
+    float GetItemSnapCalibrationMargin() const override;
+    static float GetSnapAnchorOffset(ScrollSnapAlign align, float itemStartContent, float itemMainSize,
+        float viewportMainSize);
 
     void SetLastSnapTargetIndex(int32_t lastSnapTargetIndex) override
     {

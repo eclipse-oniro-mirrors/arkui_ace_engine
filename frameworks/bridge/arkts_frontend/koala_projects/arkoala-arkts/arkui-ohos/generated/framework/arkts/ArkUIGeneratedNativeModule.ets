@@ -1248,6 +1248,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _ListAttribute_setScrollSnapAlign(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _ListAttribute_setScrollSnapStrategy(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _ListAttribute_setMaintainVisibleContentPosition(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ListAttribute_setSupportEmptyBranchInLazyLoading(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void

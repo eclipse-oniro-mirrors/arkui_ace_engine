@@ -559,7 +559,7 @@ private:
     // axis-snap steering state; called from gesture takeover and programmatic stop paths.
     void CancelItemSnapChain();
 
-    void OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source, float startVelocity,
+    void OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source,
         std::function<void(float, float)>&& onHandoff);
     void PostItemSnapHandoff(uint32_t generation, float providerVelocity, float motionVelocity,
         std::function<void(float, float)>&& onHandoff);

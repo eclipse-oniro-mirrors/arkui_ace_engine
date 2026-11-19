@@ -73,6 +73,8 @@ public:
     static void SetNestedScroll(const JSCallbackInfo& args);
     static void SetScrollEnabled(const JSCallbackInfo& args);
     static void SetScrollSnapAlign(int32_t scrollSnapAlign);
+    // Two-stage item scroll snap strategy (built-in align or custom offset provider).
+    static void SetScrollSnapStrategy(const JSCallbackInfo& args);
     static void SetFriction(const JSCallbackInfo& info);
     static void SetFocusWrapMode(const JSCallbackInfo& args);
     static void MaintainVisibleContentPosition(const JSCallbackInfo& args);

@@ -19,6 +19,8 @@
 import { ArkThemeScopeManager } from '#arktheme'
 import { SerializerBase, DeserializerBase, nullptr, KPointer, KInt, KBoolean, KStringPtr, RuntimeType, MaterializedBase, toPeerPtr, NativeBuffer, CallbackResource, InteropNativeModule, Tags, KSerializerBuffer, KUint8ArrayPtr, resourceFinalizerRegister, Finalizable, MaterializedBaseTag } from '@koalaui/interop'
 import { global_resource_Resource_serializer } from './../framework/resource'
+import { ScrollSnapOffsetProviderProxy, ScrollSnapOffsetProviderProxy_serializer } from './scrollCommon'
+import { extractors, ScrollSnapOffsetProvider, ChildrenMainSize, AttributeModifier, hookListChildrenMainSizeImpl, hookListAttributeModifier, AttributeUpdater } from '#handwritten'
 import { EditModeOptions_serializer, Bindable_Boolean_serializer, ArkScrollableCommonMethodPeer, ScrollableCommonMethod, EditModeOptions, Bindable, Callback as arkui_component_common_Callback, OnItemDragStartCallback, ItemDragInfo, OnWillScrollCallback, OnScrollCallback, CommonMethod, ExtendableCommonMethod, ArkScrollableCommonMethodComponent, ArkCommonMethodComponent, RectResult_serializer, RectResult, UIScrollableCommonEvent, UIScrollableCommonEventInternal } from './common'
 import { LengthConstrain_serializer, ItemFillPolicy_serializer, CacheCountInfo_serializer, Resource as arkui_component_units_Resource, LengthConstrain, ItemFillPolicy, Dimension, CacheCountInfo, Length, ResponsiveFillType, ResourceColor } from './units'
 import { int32, int64, float32, unsafeCast } from '@koalaui/common'
@@ -27,7 +29,6 @@ import { PeerNode } from './../PeerNode'
 import { ArkUIGeneratedNativeModule } from '#components'
 import { Axis, FocusWrapMode, ScrollSource, PresetFillType, Color as arkui_component_enums_Color } from './enums'
 import { Resource as global_resource_Resource } from 'global.resource'
-import { ChildrenMainSize, AttributeModifier, hookListChildrenMainSizeImpl, hookListAttributeModifier, AttributeUpdater } from '#handwritten'
 import { OnScrollFrameBeginCallback, Scroller, Scroller_serializer, ScrollerInternal, ScrollAlign } from './scroll'
 import { PlaceholderProvider } from '@ohos.arkui.placeholderRegister'
 import { CustomBuilder, ConstructorT, CustomBuilderT } from './builder'
@@ -209,6 +210,27 @@ export class ArkListPeer extends ArkScrollableCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._ListAttribute_setScrollSnapAlign(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setScrollSnapStrategyAttribute(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof ScrollSnapAlign) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as ScrollSnapAlign
+                thisSerializer.writeInt32(valueTmpValueForIdx0.valueOf())
+            } else if (valueTmpValue instanceof ScrollSnapOffsetProvider) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as ScrollSnapOffsetProvider
+                const valueTmpValueForIdx1Transformed: ScrollSnapOffsetProviderProxy = extractors.transform_Ark_ScrollSnapOffsetProvider_to_Ark_ScrollSnapOffsetProviderProxy(valueTmpValueForIdx1)
+                ScrollSnapOffsetProviderProxy_serializer.write(thisSerializer, valueTmpValueForIdx1Transformed)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._ListAttribute_setScrollSnapStrategy(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setMaintainVisibleContentPositionAttribute(value: boolean | undefined): void {
@@ -741,6 +763,18 @@ export interface ListAttribute extends ScrollableCommonMethod {
         }
         throw new Error('Unimplemented method scrollSnapAlign')
     }
+    scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as ListAttribute).scrollSnapStrategy(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('List attribute scrollSnapStrategy can only be set when creating an extendable component.')
+            }
+        }
+        throw new Error('Unimplemented method scrollSnapStrategy')
+    }
     childrenMainSize(value: ChildrenMainSize | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -1166,6 +1200,11 @@ export class ArkListComponent extends ArkScrollableCommonMethodComponent impleme
     public scrollSnapAlign(value: ScrollSnapAlign | undefined): this {
         const value_casted = value as (ScrollSnapAlign | undefined)
         this.getPeer()?.setScrollSnapAlignAttribute(value_casted)
+        return this
+    }
+    public scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        const value_casted = value as (ScrollSnapAlign | ScrollSnapOffsetProvider | undefined)
+        this.getPeer()?.setScrollSnapStrategyAttribute(value_casted)
         return this
     }
     public childrenMainSize(value: ChildrenMainSize | undefined): this {

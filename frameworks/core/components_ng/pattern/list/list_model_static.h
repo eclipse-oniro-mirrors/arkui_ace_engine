@@ -22,6 +22,10 @@
 #include "core/components_ng/pattern/list/list_properties.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 
+namespace OHOS::Ace {
+struct ScrollSnapStrategy;
+}
+
 namespace OHOS::Ace::NG {
 
 class ACE_EXPORT ListModelStatic {
@@ -38,6 +42,10 @@ public:
         FrameNode* frameNode, const std::optional<V2::ItemDivider>& divider, bool needGetThemeColor = false);
     static void SetSticky(FrameNode* frameNode, const std::optional<int32_t>& stickyStyle);
     static void SetScrollSnapAlign(FrameNode* frameNode, const std::optional<ScrollSnapAlign>& scrollSnapAlign);
+    // Two-stage item scroll snap strategy (nullopt clears); exclusive with
+    // scrollSnapAlign — the last setter wins (see the ListModelNG setters for the same contract).
+    static void SetScrollSnapStrategy(
+        FrameNode* frameNode, const std::optional<ScrollSnapStrategy>& scrollSnapStrategy);
     static void SetListFriction(FrameNode* frameNode, const std::optional<double>& friction);
     static RefPtr<ScrollProxy> GetOrCreateScrollBarProxy(FrameNode* frameNode);
     static void SetScrollBarProxy(FrameNode* frameNode, const RefPtr<ScrollProxy> proxy);

@@ -18,6 +18,7 @@
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/list/list_model_static.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
 #include "core/interfaces/native/utility/callback_helper.h"
@@ -390,6 +391,62 @@ void SetScrollSnapAlignImpl(Ark_NativePointer node,
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
     ListModelStatic::SetScrollSnapAlign(frameNode, Converter::OptConvertPtr<ScrollSnapAlign>(value));
+}
+template<typename Callback, typename... Args>
+double InvokeSnapProvider(const CallbackHelper<Callback>& callback, const WeakPtr<FrameNode>& weakNode,
+    int32_t instanceId, Args... args)
+{
+    auto node = weakNode.Upgrade();
+    CHECK_NULL_RETURN(node, std::numeric_limits<double>::quiet_NaN());
+    ContainerScope scope(instanceId);
+    PipelineContext::SetCallBackNode(weakNode);
+    // The public provider uses vp and vp/s; the scroll runtime uses px and px/s.
+    auto result = callback.template InvokeWithOptConvertResult<double, Ark_Float64, synthetic_Callback_F64_Void>(
+        Converter::ArkValue<Ark_Float64>(Dimension(args).ConvertToVp())...);
+    return result ? Dimension(result.value(), DimensionUnit::VP).ConvertToPx()
+                  : std::numeric_limits<double>::quiet_NaN();
+}
+
+void SetScrollSnapStrategyImpl(Ark_NativePointer node,
+                               const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    Converter::VisitUnionPtr(value,
+        [frameNode](const Ark_ScrollSnapAlign& align) {
+            ScrollSnapStrategy strategy;
+            switch (align) {
+                case ARK_SCROLL_SNAP_ALIGN_NONE: strategy.align = ScrollSnapAlign::NONE; break;
+                case ARK_SCROLL_SNAP_ALIGN_START: strategy.align = ScrollSnapAlign::START; break;
+                case ARK_SCROLL_SNAP_ALIGN_CENTER: strategy.align = ScrollSnapAlign::CENTER; break;
+                case ARK_SCROLL_SNAP_ALIGN_END: strategy.align = ScrollSnapAlign::END; break;
+                default:
+                    ListModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                    return;
+            }
+            ListModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode](const Ark_ScrollSnapOffsetProviderProxy& provider) {
+            if (!provider.calculateApproachOffset.callSync || !provider.calculateSnapOffset.callSync) {
+                ListModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                return;
+            }
+            const auto weakNode = AceType::WeakClaim(frameNode);
+            const auto instanceId = frameNode->GetInstanceId();
+            ScrollSnapStrategy strategy;
+            strategy.hasProvider = true;
+            strategy.calculateApproachOffset =
+                [callback = CallbackHelper(provider.calculateApproachOffset), weakNode, instanceId](
+                    double velocity, double decayOffset) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity, decayOffset);
+                };
+            strategy.calculateSnapOffset =
+                [callback = CallbackHelper(provider.calculateSnapOffset), weakNode, instanceId](double velocity) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity);
+                };
+            ListModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode]() { ListModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt); });
 }
 void SetMaintainVisibleContentPositionImpl(Ark_NativePointer node,
                                            const Opt_Boolean* value)
@@ -861,6 +918,7 @@ const GENERATED_ArkUIListModifier* GetListModifier()
         ListAttributeModifier::SetChainAnimationOptionsImpl,
         ListAttributeModifier::SetStickyImpl,
         ListAttributeModifier::SetScrollSnapAlignImpl,
+        ListAttributeModifier::SetScrollSnapStrategyImpl,
         ListAttributeModifier::SetMaintainVisibleContentPositionImpl,
         ListAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl,
         ListAttributeModifier::SetStackFromEndImpl,
