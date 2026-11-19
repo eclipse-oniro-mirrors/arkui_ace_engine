@@ -932,7 +932,13 @@ void JSSpanString::MarshallingExtSpan(const JSCallbackInfo& info, std::vector<ui
         if (ret->IsArrayBuffer()) {
             JsiRef<JsiArrayBuffer> retJSBuf = JsiRef<JsiArrayBuffer>::Cast(ret);
             int32_t bufferSize = retJSBuf->ByteLength();
+            if (bufferSize <= 0) {
+                return arrBuff;
+            }
             auto* retBuf = static_cast<uint8_t*>(retJSBuf->GetBuffer());
+            if (retBuf == nullptr) {
+                return arrBuff;
+            }
             std::vector<uint8_t> resBuf(retBuf, retBuf + bufferSize);
             return resBuf;
         }
@@ -1019,9 +1025,21 @@ void JSSpanString::Unmarshalling(const JSCallbackInfo& info)
     auto instanceId = Container::CurrentIdSafely();
     ContainerScope scope(instanceId);
     JSRef<JSArrayBuffer> arrayBuffer = JSRef<JSArrayBuffer>::Cast(arg);
-    size_t bufferSize = static_cast<size_t>(arrayBuffer->ByteLength());
-    void* buffer = arrayBuffer->GetBuffer();
-    std::vector<uint8_t> buff(static_cast<uint8_t*>(buffer), static_cast<uint8_t*>(buffer) + bufferSize);
+    int32_t byteLength = arrayBuffer->ByteLength();
+    if (byteLength < 0) {
+        ReturnPromise(info, ERROR_CODE_PARAM_INVALID);
+        return;
+    }
+    std::vector<uint8_t> buff;
+    if (byteLength > 0) {
+        auto* buffer = static_cast<uint8_t*>(arrayBuffer->GetBuffer());
+        if (buffer == nullptr) {
+            ReturnPromise(info, ERROR_CODE_PARAM_INVALID);
+            return;
+        }
+        size_t bufferSize = static_cast<size_t>(byteLength);
+        buff.assign(buffer, buffer + bufferSize);
+    }
     auto asyncContext = new AsyncContext();
     asyncContext->buffer = buff;
     asyncContext->instanceId = instanceId;
