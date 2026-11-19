@@ -371,6 +371,8 @@ public:
     static void SetHueRotate(float value);
     static void SetColorBlend(const Color &value);
     static void CreateWithColorBlendResourceObj(const RefPtr<ResourceObject>& resobj);
+    static void SetColorFilterEffect(const std::vector<float>& matrix);
+    static void ResetColorFilterEffect();
     static void SetSystemBarEffect(bool systemBarEffect);
     static void SetSystemBarEffect(FrameNode *frameNode, bool enable);
 
@@ -811,6 +813,8 @@ public:
     static void SetColorBlend(FrameNode* frameNode, const Color& colorBlend);
     static void SetColorBlend(FrameNode* frameNode, const Color& colorBlend, const RefPtr<ResourceObject>& resObj);
     static void SetGrayScale(FrameNode* frameNode, const Dimension& grayScale);
+    static void SetColorFilterEffect(FrameNode* frameNode, const std::vector<float>& matrix);
+    static void ResetColorFilterEffect(FrameNode* frameNode);
     static void SetContrast(FrameNode* frameNode, const Dimension& contrast);
     static void SetBrightness(FrameNode* frameNode, const Dimension& brightness);
     static void SetFrontBlur(FrameNode* frameNode, const Dimension& radius, const BlurOption& blurOption,

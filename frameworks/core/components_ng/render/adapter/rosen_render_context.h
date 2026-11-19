@@ -752,6 +752,7 @@ protected:
     void OnSystemBarEffectUpdate(bool systemBarEffect) override;
     void OnFrontHueRotateUpdate(float hueRotate) override;
     void OnFrontColorBlendUpdate(const Color& colorBlend) override;
+    void OnFrontColorFilterEffectUpdate(const std::vector<float>& matrix) override;
     void OnLinearGradientBlurUpdate(const NG::LinearGradientBlurPara& blurPara) override;
     void OnMagnifierUpdate(const MagnifierParams& magnifierParams) override;
     void OnDynamicLightUpRateUpdate(const float rate) override;

@@ -3014,6 +3014,10 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetGrayscale));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetGrayscale"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetGrayscale));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setColorFilterEffect"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetColorFilterEffect));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetColorFilterEffect"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetColorFilterEffect));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setContrast"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetContrast));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContrast"),

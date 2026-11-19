@@ -22,6 +22,7 @@
 
 #include "ui/focus/focus_constants.h"
 
+#include "base/image/image_color_filter.h"
 #include "base/json/json_util.h"
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
@@ -3110,6 +3111,38 @@ ArkUINativeModuleValue CommonBridge::ResetGrayscale(ArkUIRuntimeCallInfo *runtim
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getCommonModifier()->resetGrayscale(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::SetColorFilterEffect(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(NUM_1);
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    if (!secondArg->IsObject(vm)) {
+        GetArkUINodeModifiers()->getCommonModifier()->resetColorFilterEffect(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto* colorFilter = static_cast<Ace::ImageColorFilter*>(secondArg->ToObject(vm)->GetNativePointerField(vm, 0));
+    if (colorFilter && colorFilter->GetColorFilterMatrix().size() == Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        auto matrix = colorFilter->GetColorFilterMatrix();
+        GetArkUINodeModifiers()->getCommonModifier()->setColorFilterEffect(
+            nativeNode, matrix.data(), static_cast<ArkUI_Int32>(matrix.size()));
+    } else {
+        GetArkUINodeModifiers()->getCommonModifier()->resetColorFilterEffect(nativeNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::ResetColorFilterEffect(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getCommonModifier()->resetColorFilterEffect(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

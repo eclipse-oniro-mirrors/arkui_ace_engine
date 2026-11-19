@@ -337,6 +337,8 @@ public:
     virtual void SetWindowBlur(float progress, WindowBlurStyle blurStyle) = 0;
     virtual void SetBrightness(const Dimension& value) = 0;
     virtual void SetGrayScale(const Dimension& value) = 0;
+    virtual void SetColorFilterEffect(const std::vector<float>& matrix) {}
+    virtual void ResetColorFilterEffect() {}
     virtual void SetContrast(const Dimension& value) = 0;
     virtual void SetSaturate(const Dimension& value) = 0;
     virtual void SetSepia(const Dimension& value) = 0;
