@@ -62,7 +62,7 @@ void ViewContextIntegrationTest::SetUpTestCase()
 {
     MockPipelineContext::SetUp();
     MockContainer::SetUp();
-    pipelineContext_ = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrentContext());
+    pipelineContext_ = MockPipelineContext::GetCurrentContext();
 }
 
 void ViewContextIntegrationTest::TearDownTestCase()
