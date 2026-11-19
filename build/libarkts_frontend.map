@@ -23,6 +23,12 @@
     OHOS_ACE_CreateArktsFrontend;
     OHOS_ACE_CreateArktsPluginFrontend;
     OHOS_ACE_DeleteAniReference;
+    # String-based dlsym entries (invisible to link-time UND closure scan):
+    # arkts_module_preloader.cpp / arkts_dynamic_renderer_loader.cpp.
+    OHOS_ACE_PreloadAceArkTSModule;
+    OHOS_ACE_GetArkTSRuntime;
+    OHOS_ACE_CreatEaWorkerTaskWrapper;
+    OHOS_ACE_GetCurrentThreadAniEnv;
     _ZN4OHOS3Ace13ArktsFrontend29RegisterDrawInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEEi;
     _ZN4OHOS3Ace13ArktsFrontend31RegisterLayoutInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEEi;
     _ZN4OHOS3Ace13ArktsFrontend31UnregisterDrawInspectorCallbackEi;
