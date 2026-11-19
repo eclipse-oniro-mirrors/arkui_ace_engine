@@ -6399,9 +6399,9 @@ void SetBlendModeImpl(Ark_NativePointer node,
     ViewAbstractModelStatic::SetBlendMode(frameNode, blendMode);
     ViewAbstractModelStatic::SetBlendApplyType(frameNode, blendApplyType);
 }
-void SetAdvancedBlendModeImpl(Ark_NativePointer node,
-                              const Opt_Union_BlendMode_Blender* effect,
-                              const Opt_BlendApplyType* type)
+void SetAdvancedBlendMode0Impl(Ark_NativePointer node,
+    const Opt_Union_BlendMode_Blender* effect,
+    const Opt_BlendApplyType* type)
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
@@ -6424,7 +6424,12 @@ void SetAdvancedBlendModeImpl(Ark_NativePointer node,
                     ViewAbstractModelStatic::SetBlender(frameNode, ptrOpt.value());
                 },
                 [frameNode](const Ark_uiEffect_HdrBrightnessBlender& blender) {
-                    LOGE("SetAdvancedBlendModeImpl is not implemented for Ark_uiEffect_HdrBrightnessBlender");
+                    auto ptrOpt = Converter::OptConvert<OHOS::Rosen::Blender*>(blender);
+                    if (!ptrOpt || !(ptrOpt.value())) {
+                        ViewAbstractModelStatic::SetBlender(frameNode, nullptr);
+                        return;
+                    }
+                    ViewAbstractModelStatic::SetBlender(frameNode, ptrOpt.value());
                 },
                 [frameNode]() {
                     ViewAbstractModelStatic::SetBlendMode(frameNode, BlendMode::NONE);
@@ -6435,6 +6440,23 @@ void SetAdvancedBlendModeImpl(Ark_NativePointer node,
             ViewAbstractModelStatic::SetBlendMode(frameNode, blendMode);
             ViewAbstractModelStatic::SetBlender(frameNode, nullptr);
         });
+    std::optional<BlendApplyType> blendApplyTypeOpt = Converter::OptConvertPtr<BlendApplyType>(type);
+    blendApplyType = blendApplyTypeOpt.value_or(blendApplyType);
+    ViewAbstractModelStatic::SetBlendApplyType(frameNode, blendApplyType);
+}
+void SetAdvancedBlendMode1Impl(Ark_NativePointer node,
+    const Opt_uiEffect_BlenderBase* effect,
+    const Opt_BlendApplyType* type)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto ptrOpt = Converter::OptConvertPtr<OHOS::Rosen::Blender*>(effect);
+    if (!ptrOpt || !(ptrOpt.value())) {
+        ViewAbstractModelStatic::SetBlender(frameNode, nullptr);
+    } else {
+        ViewAbstractModelStatic::SetBlender(frameNode, ptrOpt.value());
+    }
+    BlendApplyType blendApplyType = BlendApplyType::FAST;
     std::optional<BlendApplyType> blendApplyTypeOpt = Converter::OptConvertPtr<BlendApplyType>(type);
     blendApplyType = blendApplyTypeOpt.value_or(blendApplyType);
     ViewAbstractModelStatic::SetBlendApplyType(frameNode, blendApplyType);
@@ -7689,7 +7711,8 @@ const GENERATED_ArkUICommonMethodModifier* GetCommonMethodModifier()
         CommonMethodModifier::SetDragPreviewImpl,
         CommonMethodModifier::SetOverlayImpl,
         CommonMethodModifier::SetBlendModeImpl,
-        CommonMethodModifier::SetAdvancedBlendModeImpl,
+        CommonMethodModifier::SetAdvancedBlendMode0Impl,
+        CommonMethodModifier::SetAdvancedBlendMode1Impl,
         CommonMethodModifier::SetGeometryTransitionImpl,
         CommonMethodModifier::SetBindTipsImpl,
         CommonMethodModifier::SetBindPopupImpl,

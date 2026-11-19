@@ -607,7 +607,9 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CommonMethod_setBlendMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
-    native static _CommonMethod_setAdvancedBlendMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _CommonMethod_setAdvancedBlendMode0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _CommonMethod_setAdvancedBlendMode1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setGeometryTransition(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
