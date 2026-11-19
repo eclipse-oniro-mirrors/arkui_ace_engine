@@ -3317,4 +3317,200 @@ HWTEST_F(DragDropManagerTestNgCoverage, CalcContentTrationOffset002, TestSize.Le
 
     AceApplicationInfo::GetInstance().isRightToLeft_ = backupValue;
 }
+
+/**
+ * @tc.name: DragDropManagerTestNgCoverage090
+ * @tc.desc: Test developer drag window hide survives the first framework-synthesized move.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage090, TestSize.Level1)
+{
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    EXPECT_CALL(*mock, SetDragWindowVisible(_, _)).Times(AnyNumber()).WillRepeatedly(Return(0));
+
+    /**
+     * @tc.steps: step1. record a hide at drag start, then move outside the hide node bounds.
+     * @tc.expected: step1. the first move keeps hidden, the second move restores visibility.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    Point farPoint(1000.0f, 1000.0f);
+    dragDropManager->UpdateDragWindowVisibleByDeveloper(farPoint);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    EXPECT_CALL(*mock, SetDragWindowVisible(true, _)).Times(1).WillOnce(Return(0)).RetiresOnSaturation();
+    dragDropManager->UpdateDragWindowVisibleByDeveloper(farPoint);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step2. reset clears the first-move suppression together with the hide state.
+     * @tc.expected: step2. a later hide without suppression restores on the first move already.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    dragDropManager->ResetDragWindowHiddenByDeveloper();
+    dragDropManager->isDragWindowHiddenByDeveloper_ = true;
+    EXPECT_CALL(*mock, SetDragWindowVisible(true, _)).Times(1).WillOnce(Return(0)).RetiresOnSaturation();
+    dragDropManager->UpdateDragWindowVisibleByDeveloper(farPoint);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerTestNgCoverage091
+ * @tc.desc: Test developer hide skips the drag start animation and the transfer showing.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage091, TestSize.Level1)
+{
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+
+    /**
+     * @tc.steps: step1. record a hide at drag start and run the drag start animation.
+     * @tc.expected: step1. no animation runs, the window is transferred hidden: no
+     *               SetDragWindowVisible call is issued at all, isDragFwkShow_ becomes true.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    GestureEvent event;
+    event.SetDeviceId(0);
+    PreparedInfoForDrag drag;
+    EXPECT_CALL(*mock, SetDragWindowVisible(_, _)).Times(0);
+    dragDropManager->DoDragStartAnimation(nullptr, event, nullptr, drag);
+    EXPECT_TRUE(dragDropManager->isDragFwkShow_);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerTestNgCoverage092
+ * @tc.desc: Test drop inside the hide node keeps the window hidden and clears the hide state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage092, TestSize.Level1)
+{
+    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(dragEvent, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+
+    /**
+     * @tc.steps: step1. hide the window, then stop the drag without a custom animation.
+     * @tc.expected: step1. the developer hide forces the custom animation branch, the window
+     *               stays invisible on stop, and the hide state is cleared afterwards.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    DragDropRet dragDropRet;
+    EXPECT_CALL(*mock, StopDrag(_, _))
+        .WillOnce(DoAll(SaveArg<0>(&dragDropRet), Return(0)))
+        .RetiresOnSaturation();
+    DragPointerEvent pointerEvent;
+    dragDropManager->ExecuteStopDrag(
+        dragEvent, DragRet::DRAG_SUCCESS, false, WINDOW_ID, DragBehavior::MOVE, pointerEvent);
+    pipeline->FlushMessages();
+    EXPECT_TRUE(dragDropRet.hasCustomAnimation);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerTestNgCoverage093
+ * @tc.desc: Test drag-enter-window clears the previous session residue unless dragging as source.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage093, TestSize.Level1)
+{
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    EXPECT_CALL(*mock, SetDragWindowVisible(_, _)).Times(AnyNumber()).WillRepeatedly(Return(0));
+    EXPECT_CALL(*mock, UpdateDragStyle(_, _)).Times(AnyNumber()).WillRepeatedly(Return(0));
+    EXPECT_CALL(*mock, GetDragSummary(_)).Times(AnyNumber()).WillRepeatedly(Return(0));
+    EXPECT_CALL(*mock, GetDragBundleInfo(_)).Times(AnyNumber()).WillRepeatedly(Return(0));
+
+    /**
+     * @tc.steps: step1. a pure drag target window (not the drag source) receives a new drag.
+     * @tc.expected: step1. the hide state left by the previous drag session is cleared.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    DragPointerEvent pointerEvent;
+    dragDropManager->OnDragStartForDragEvent(pointerEvent, frameNode);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step2. the drag source process receives drag events while already dragging.
+     * @tc.expected: step2. the entry cleanup is skipped so a fresh hide is preserved.
+     */
+    dragDropManager->OnDragStart({ GLOBAL_X, GLOBAL_Y }, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragging());
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    dragDropManager->OnDragStartForDragEvent(pointerEvent, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerTestNgCoverage094
+ * @tc.desc: Test the second drag session issues the hide IPC again after a stopped session.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage094, TestSize.Level1)
+{
+    auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    EXPECT_CALL(*mock, SetDragWindowVisible(_, _)).Times(AnyNumber()).WillRepeatedly(Return(0));
+    EXPECT_CALL(*mock, StopDrag(_, _)).Times(AnyNumber()).WillRepeatedly(Return(0));
+
+    /**
+     * @tc.steps: step1. first session: hide at drag start, then stop the drag.
+     * @tc.expected: step1. the hide state is cleared when the session ends.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(dragEvent, nullptr);
+    DragPointerEvent pointerEvent;
+    dragDropManager->ExecuteStopDrag(
+        dragEvent, DragRet::DRAG_SUCCESS, false, WINDOW_ID, DragBehavior::MOVE, pointerEvent);
+    pipeline->FlushMessages();
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step2. second session: request hiding again from an enter/move callback.
+     * @tc.expected: step2. the hide IPC is issued again; a residue would have swallowed it.
+     */
+    auto secondDragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(secondDragEvent, nullptr);
+    secondDragEvent->SetDragWindowVisible(false);
+    EXPECT_CALL(*mock, SetDragWindowVisible(false, _)).Times(1).WillOnce(Return(0)).RetiresOnSaturation();
+    dragDropManager->HandleDragWindowVisibleByDeveloper(secondDragEvent, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
 } // namespace OHOS::Ace::NG

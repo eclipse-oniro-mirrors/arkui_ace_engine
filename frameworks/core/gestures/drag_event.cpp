@@ -456,6 +456,22 @@ bool DragEvent::IsUseDataLoadParams() const
     return useDataLoadParams_;
 }
 
+void DragEvent::SetDragWindowVisible(bool dragWindowVisible)
+{
+    dragWindowVisible_ = dragWindowVisible;
+    isDragWindowVisibleChanged_ = true;
+}
+
+bool DragEvent::GetDragWindowVisible() const
+{
+    return dragWindowVisible_;
+}
+
+bool DragEvent::IsDragWindowVisibleChanged() const
+{
+    return isDragWindowVisibleChanged_;
+}
+
 RefPtr<PixelMap> DragEvent::GetDragDropInfoPixelMap() const
 {
     return dragDropInfoPixelMap_;

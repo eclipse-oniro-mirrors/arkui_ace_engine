@@ -30467,6 +30467,8 @@ typedef struct GENERATED_ArkUIDragEventAccessor {
     Ark_Boolean (*isRemote)(Ark_DragEvent peer);
     Ark_Float64 (*getGlobalDisplayX)(Ark_DragEvent peer);
     Ark_Float64 (*getGlobalDisplayY)(Ark_DragEvent peer);
+    void (*setDragWindowVisible)(Ark_DragEvent peer,
+                                 Ark_Boolean visible);
     Ark_DragBehavior (*getDragBehavior)(Ark_DragEvent peer);
     void (*setDragBehavior)(Ark_DragEvent peer,
                             Ark_DragBehavior dragBehavior);

@@ -363,6 +363,7 @@ declare interface DragEvent {
   getDataLoadParams(): unifiedData.DataLoadParams | undefined;
   setDataLoadParams(params: unifiedData.DataLoadParams): void;
   enableInternalDropAnimation(configuration: string): void;
+  setDragWindowVisible(visible: boolean): void;
 }
 type CustomBuilder = () => void;
 declare interface DragItemInfo {

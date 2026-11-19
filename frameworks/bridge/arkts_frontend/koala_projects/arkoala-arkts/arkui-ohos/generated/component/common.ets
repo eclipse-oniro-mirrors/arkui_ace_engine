@@ -773,6 +773,7 @@ export interface DragEvent {
     enableInternalDropAnimation(configuration: string): void
     getGlobalDisplayX(): double
     getGlobalDisplayY(): double
+    setDragWindowVisible(visible: boolean): void
 }
 export class DragEventInternal implements MaterializedBase,DragEvent {
     public peer?: Finalizable | undefined = undefined
@@ -902,6 +903,9 @@ export class DragEventInternal implements MaterializedBase,DragEvent {
     }
     public getGlobalDisplayY(): double {
         return this.getGlobalDisplayY_serialize()
+    }
+    public setDragWindowVisible(visible: boolean): void {
+        this.setDragWindowVisible_serialize(visible)
     }
     private getDragBehavior(): DragBehavior {
         return this.getDragBehavior_serialize()
@@ -1041,6 +1045,9 @@ export class DragEventInternal implements MaterializedBase,DragEvent {
     private getGlobalDisplayY_serialize(): double {
         const retval = ArkUIGeneratedNativeModule._DragEvent_getGlobalDisplayY(this.peer!.ptr)
         return retval
+    }
+    private setDragWindowVisible_serialize(visible: boolean): void {
+        ArkUIGeneratedNativeModule._DragEvent_setDragWindowVisible(this.peer!.ptr, visible ? true : false)
     }
     private getDragBehavior_serialize(): DragBehavior {
         const retval = ArkUIGeneratedNativeModule._DragEvent_getDragBehavior(this.peer!.ptr)

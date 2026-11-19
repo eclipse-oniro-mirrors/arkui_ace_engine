@@ -141,11 +141,13 @@ DragDropManager::DragDropManager() {}
 
 DragDropManager::~DragDropManager()
 {
-    if (isDragFwkShow_ == false) {
+    if (isDragFwkShow_ == false || isDragWindowHiddenByDeveloper_) {
         ACE_SCOPED_TRACE("drag: set drag window visible when destroy");
         TAG_LOGI(AceLogTag::ACE_DRAG, "destroy, transDragWindowToDragFwk is %{public}d", isDragFwkShow_);
         InteractionInterface::GetInstance()->SetDragWindowVisible(true);
         isDragFwkShow_ = true;
+        isDragWindowHiddenByDeveloper_ = false;
+        dragWindowHideNode_ = nullptr;
     }
 }
 
@@ -862,7 +864,15 @@ void DragDropManager::TransDragWindowToDragFwk(int32_t windowContainerId)
         CHECK_NULL_VOID(dragEventActuator);
         dragEventActuator->NotifyTransDragWindowToFwk();
     }
-    InteractionInterface::GetInstance()->SetDragWindowVisible(true);
+    if (!IsDragWindowHiddenByDeveloper()) {
+        InteractionInterface::GetInstance()->SetDragWindowVisible(true);
+    }
+    // isDragFwkShow_ tracks which side owns the drag visual (the drag framework or the ArkUI
+    // overlay), not the window visibility: after the transfer the framework owns the window even
+    // when the developer keeps it hidden, and the visibility is restored by
+    // RestoreDragWindowVisibleFromDeveloper once the pointer leaves the range of the hide node.
+    // isDragFwkShow_ readers are compatible with the hidden case: OnDragMove only skips menu
+    // offset updates, and ExecuteStopDrag skips overlay cleanup whose nodes are removed here.
     DragDropGlobalController::GetInstance().ResetDragDropInitiatingStatus();
     isDragFwkShow_ = true;
     HideSubwindowDragNode();
@@ -918,6 +928,15 @@ void DragDropManager::OnDragMoveOut(const DragPointerEvent& pointerEvent)
             preTargetFrameNode_->GetDepth());
         FireOnDragEvent(preTargetFrameNode_, pointerEvent, DragEventType::LEAVE, extraInfo_);
         preTargetFrameNode_ = nullptr;
+    }
+    // Pointer has left the current window, restore the drag window hidden by developer.
+    if (isDragFwkShow_) {
+        // The transfer-to-framework below early-returns when the framework already owns the
+        // window, restore the visibility here so no redundant SetDragWindowVisible call happens.
+        RestoreDragWindowVisibleFromDeveloper();
+    } else {
+        // The transfer path below calls SetDragWindowVisible(true) itself, only clear the state.
+        ResetDragWindowHiddenByDeveloper();
     }
     if (IsNeedDisplayInSubwindow() || isDragWithContextMenu_) {
         TransDragWindowToDragFwk(Container::CurrentId());
@@ -998,6 +1017,12 @@ void DragDropManager::OnDragStartForDragEvent(const DragPointerEvent& pointerEve
 {
     auto container = Container::Current();
     CHECK_NULL_VOID(container);
+    if (!IsDragging()) {
+        // A drag from another window enters this window. This window may be a pure drag target
+        // (for example a UIExtension child process) that never runs the drag start gesture path,
+        // so clear the hide state left by a previous drag session before the new session begins.
+        ResetDragWindowHiddenByDeveloper();
+    }
     ResetPreTargetFrameNode(container->GetInstanceId());
     RequireSummaryAndDragBundleInfoIfNecessary(pointerEvent);
     SetDragCursorStyleCore(DragCursorStyleCore::DEFAULT);
@@ -1148,32 +1173,46 @@ void DragDropManager::OnDragMove(const DragPointerEvent& pointerEvent, const std
     auto dragFrameNode = FindDragFrameNodeByPosition(
         static_cast<float>(point.GetX()), static_cast<float>(point.GetY()), node);
     if (!dragFrameNode) {
-        if (preTargetFrameNode_) {
-            TAG_LOGI(AceLogTag::ACE_DRAG,
-                "Not find drag target node, current windowId is %{public}d, pointerEventId is %{public}d, "
-                "PreTargetFrameNode is %{public}s, depth is %{public}d.",
-                container->GetWindowId(), pointerEvent.pointerEventId, preTargetFrameNode_->GetTag().c_str(),
-                preTargetFrameNode_->GetDepth());
-            FireOnDragEvent(preTargetFrameNode_, pointerEvent, DragEventType::LEAVE, extraInfo);
-            preTargetFrameNode_ = nullptr;
-        }
-        UpdateDragStyle(DragCursorStyleCore::MOVE, pointerEvent.pointerEventId);
-        return;
+        HandleOnDragMoveNoTarget(pointerEvent, extraInfo, container->GetWindowId());
+    } else {
+        HandleOnDragMove(pointerEvent, extraInfo, dragFrameNode);
     }
-    HandleOnDragMove(pointerEvent, extraInfo, dragFrameNode);
+    UpdateDragWindowVisibleByDeveloper(point);
+}
+
+void DragDropManager::HandleOnDragMoveNoTarget(
+    const DragPointerEvent& pointerEvent, const std::string& extraInfo, int32_t windowId)
+{
+    if (preTargetFrameNode_) {
+        TAG_LOGI(AceLogTag::ACE_DRAG,
+            "Not find drag target node, current windowId is %{public}d, pointerEventId is %{public}d, "
+            "PreTargetFrameNode is %{public}s, depth is %{public}d.",
+            windowId, pointerEvent.pointerEventId, preTargetFrameNode_->GetTag().c_str(),
+            preTargetFrameNode_->GetDepth());
+        FireOnDragEvent(preTargetFrameNode_, pointerEvent, DragEventType::LEAVE, extraInfo);
+        preTargetFrameNode_ = nullptr;
+    }
+    UpdateDragStyle(DragCursorStyleCore::MOVE, pointerEvent.pointerEventId);
 }
 
 void DragDropManager::ResetDragDropStatus(const Point& point, const DragDropRet& dragDropRet, int32_t windowId)
 {
     ACE_SCOPED_TRACE("drag: reset drag %d, %d", dragDropRet.result, dragDropRet.hasCustomAnimation);
     if (dragDropRet.result != DragRet::DRAG_FAIL || !isMouseDragged_) {
-        InteractionInterface::GetInstance()->SetDragWindowVisible(!dragDropRet.hasCustomAnimation);
+        bool dragWindowVisible = !dragDropRet.hasCustomAnimation;
+        if (dragWindowVisible && IsDragWindowHiddenByDeveloper()) {
+            // Developer requested hiding inside the current target range, keep the drag window
+            // invisible; the hide state is cleared below when the drag session is cleaned up.
+            dragWindowVisible = false;
+        }
+        InteractionInterface::GetInstance()->SetDragWindowVisible(dragWindowVisible);
     }
     InteractionInterface::GetInstance()->StopDrag(dragDropRet);
     NotifyDragFrameNode(point, DragEventType::DROP, dragDropRet.result);
     ResetPullId();
     dragCursorStyleCore_ = DragCursorStyleCore::DEFAULT;
     isReDragStart_ = false;
+    ResetDragWindowHiddenByDeveloper();
 }
 
 void DragDropManager::ResetPreTargetFrameNode(int32_t instanceId)
@@ -1721,6 +1760,8 @@ void DragDropManager::ExecuteFollowHandMorphStopDrag(const RefPtr<OHOS::Ace::Dra
         static_cast<void>(
             DragDropGlobalController::GetInstance().ConsumeAndExecutePendingFollowHandMorphDropAnimation());
     }
+    // The drag session ends; clear the developer hide state for the next drag session.
+    ResetDragWindowHiddenByDeveloper();
 }
 
 void DragDropManager::ExecuteStopDrag(const RefPtr<OHOS::Ace::DragEvent>& event, DragRet dragResult,
@@ -1750,6 +1791,10 @@ void DragDropManager::ExecuteStopDrag(const RefPtr<OHOS::Ace::DragEvent>& event,
         if (manager) {
             manager->HideDragPreviewOverlay();
             useCustomAnimation = manager->IsDisableDefaultDropAnimation() ? true : useCustomAnimation;
+            if (!useCustomAnimation && manager->IsDragWindowHiddenByDeveloper()) {
+                // Developer hide has higher priority, keep the drag window invisible on stop.
+                useCustomAnimation = true;
+            }
         }
         TAG_LOGI(AceLogTag::ACE_DRAG,
             "Stop drag, start do drop animation. useCustomAnimation is %{public}d,"
@@ -1758,6 +1803,12 @@ void DragDropManager::ExecuteStopDrag(const RefPtr<OHOS::Ace::DragEvent>& event,
         InteractionInterface::GetInstance()->SetDragWindowVisible(!useCustomAnimation);
         DragDropRet dragDropRet { dragResult, useCustomAnimation, windowId, dragBehavior };
         InteractionInterface::GetInstance()->StopDrag(dragDropRet);
+        if (manager) {
+            // The drag session ends; clear the developer hide state so the next drag session in
+            // this window (which may never run the drag start gesture path, e.g. a pure drag
+            // target window) starts from the default visible state.
+            manager->ResetDragWindowHiddenByDeveloper();
+        }
     });
 }
 
@@ -1781,6 +1832,18 @@ void DragDropManager::SetRSSyncTransaction(OHOS::Rosen::RSSyncTransactionControl
 #endif
 }
 
+void DragDropManager::RunDropAnimationAndCleanupOverlay(
+    const RefPtr<OHOS::Ace::DragEvent>& event, const RefPtr<PipelineContext>& pipeline)
+{
+    event->ExecuteDropAnimation();
+    auto overlayManager = GetDragAnimationOverlayManager(pipeline->GetInstanceId());
+    if (overlayManager) {
+        overlayManager->RemoveDragPixelMap();
+        overlayManager->RemoveFilter();
+    }
+    HideSubwindowDragNode();
+}
+
 void DragDropManager::ExecuteCustomDropAnimation(const RefPtr<OHOS::Ace::DragEvent>& event, DragDropRet dragDropRet)
 {
     CHECK_NULL_VOID(event);
@@ -1798,13 +1861,7 @@ void DragDropManager::ExecuteCustomDropAnimation(const RefPtr<OHOS::Ace::DragEve
         TAG_LOGE(AceLogTag::ACE_DRAG, "transactionController and handler invalid");
         return;
     }
-    event->ExecuteDropAnimation();
-    auto overlayManager = GetDragAnimationOverlayManager(pipeline->GetInstanceId());
-    if (overlayManager) {
-        overlayManager->RemoveDragPixelMap();
-        overlayManager->RemoveFilter();
-    }
-    HideSubwindowDragNode();
+    RunDropAnimationAndCleanupOverlay(event, pipeline);
     if (transactionController) {
         auto transaction = transactionController->GetRSTransaction();
         InteractionInterface::GetInstance()->SetDragWindowVisible(false, transaction);
@@ -1820,17 +1877,12 @@ void DragDropManager::ExecuteCustomDropAnimation(const RefPtr<OHOS::Ace::DragEve
         pipeline->FlushMessages();
     }
 #else
-    event->ExecuteDropAnimation();
-    auto overlayManager = GetDragAnimationOverlayManager(pipeline->GetInstanceId());
-    if (overlayManager) {
-        overlayManager->RemoveDragPixelMap();
-        overlayManager->RemoveFilter();
-    }
-    HideSubwindowDragNode();
+    RunDropAnimationAndCleanupOverlay(event, pipeline);
     InteractionInterface::GetInstance()->SetDragWindowVisible(false);
     pipeline->FlushMessages();
 #endif
     InteractionInterface::GetInstance()->StopDrag(dragDropRet);
+    ResetDragWindowHiddenByDeveloper();
 }
 
 void DragDropManager::ExecuteFollowHandMorphDropAnimation(const RefPtr<OHOS::Ace::DragEvent>& event)
@@ -1967,6 +2019,7 @@ void DragDropManager::onDragCancel()
 {
     preTargetFrameNode_ = nullptr;
     draggedFrameNode_ = nullptr;
+    ResetDragWindowHiddenByDeveloper();
 }
 
 void DragDropManager::FireOnDragEventWithDragType(const RefPtr<EventHub>& eventHub, DragEventType type,
@@ -2045,6 +2098,10 @@ void DragDropManager::FireOnDragEvent(
     FireOnDragSpringLoadingEventWithDragType(frameNode, eventHub, type, extraParams);
     FireOnDragEventWithDragType(eventHub, type, event, extraParams);
 
+    if (type == DragEventType::ENTER || type == DragEventType::MOVE) {
+        HandleDragWindowVisibleByDeveloper(event, frameNode);
+    }
+
     UpdateDragCursorStyle(frameNode, event, pointerEvent.pointerEventId);
 }
 
@@ -2065,6 +2122,94 @@ void DragDropManager::UpdateDragCursorStyle(const RefPtr<FrameNode>& frameNode,
     } else {
         UpdateDragAllowDrop(frameNode, event->GetDragBehavior(), eventId, event->IsCapi());
     }
+}
+
+void DragDropManager::NotifyDragWindowVisibleByDeveloper(const RefPtr<FrameNode>& frameNode, bool visible)
+{
+    if (!visible) {
+        isDragWindowHiddenByDeveloper_ = true;
+        dragWindowHideNode_ = frameNode;
+        skipInitialDragMoveVisibleCheck_ = true;
+        TAG_LOGI(AceLogTag::ACE_DRAG,
+            "Developer hides drag window on drag start, node is %{public}s, id is %{public}d",
+            frameNode ? frameNode->GetTag().c_str() : "null", frameNode ? frameNode->GetId() : -1);
+        return;
+    }
+    isDragWindowHiddenByDeveloper_ = false;
+    dragWindowHideNode_ = nullptr;
+    skipInitialDragMoveVisibleCheck_ = false;
+}
+
+void DragDropManager::ResetDragWindowHiddenByDeveloper()
+{
+    isDragWindowHiddenByDeveloper_ = false;
+    dragWindowHideNode_ = nullptr;
+    skipInitialDragMoveVisibleCheck_ = false;
+}
+
+void DragDropManager::HandleDragWindowVisibleByDeveloper(
+    const RefPtr<OHOS::Ace::DragEvent>& event, const RefPtr<FrameNode>& frameNode)
+{
+    CHECK_NULL_VOID(event);
+    if (!event->IsDragWindowVisibleChanged()) {
+        return;
+    }
+    if (!event->GetDragWindowVisible()) {
+        if (!frameNode) {
+            // No target node to own the hide state, ignore the request.
+            return;
+        }
+        bool alreadyHidden = isDragWindowHiddenByDeveloper_;
+        isDragWindowHiddenByDeveloper_ = true;
+        dragWindowHideNode_ = frameNode;
+        if (!alreadyHidden) {
+            ACE_SCOPED_TRACE("drag: hide drag window by developer");
+            TAG_LOGI(AceLogTag::ACE_DRAG, "Developer hides drag window, node is %{public}s",
+                frameNode->GetTag().c_str());
+            InteractionInterface::GetInstance()->SetDragWindowVisible(false);
+        }
+        return;
+    }
+    RestoreDragWindowVisibleFromDeveloper();
+}
+
+void DragDropManager::UpdateDragWindowVisibleByDeveloper(const Point& point)
+{
+    if (skipInitialDragMoveVisibleCheck_) {
+        // The first move after drag start is framework-synthesized at the drag start position and
+        // may already be outside the hide node bounds; a hide requested in onDragStart survives
+        // until a real pointer move drives the bounds check.
+        skipInitialDragMoveVisibleCheck_ = false;
+        return;
+    }
+    if (!isDragWindowHiddenByDeveloper_) {
+        return;
+    }
+    auto hideNode = dragWindowHideNode_.Upgrade();
+    if (hideNode) {
+        auto hideRect = hideNode->GetTransformRectRelativeToWindow();
+        PointF currentPoint(static_cast<float>(point.GetX()), static_cast<float>(point.GetY()));
+        if (hideRect.IsInnerRegion(currentPoint)) {
+            // Pointer is still within the range of the node that requested hiding, keep hidden.
+            return;
+        }
+    }
+    // Pointer left the range of the hide node, or the node has been destroyed, restore visible.
+    TAG_LOGI(AceLogTag::ACE_DRAG, "Leave the range of hide node, restore drag window visible");
+    RestoreDragWindowVisibleFromDeveloper();
+}
+
+void DragDropManager::RestoreDragWindowVisibleFromDeveloper()
+{
+    if (!isDragWindowHiddenByDeveloper_) {
+        return;
+    }
+    isDragWindowHiddenByDeveloper_ = false;
+    dragWindowHideNode_ = nullptr;
+    skipInitialDragMoveVisibleCheck_ = false;
+    ACE_SCOPED_TRACE("drag: restore drag window visible by developer");
+    TAG_LOGI(AceLogTag::ACE_DRAG, "Restore drag window visible by developer");
+    InteractionInterface::GetInstance()->SetDragWindowVisible(true);
 }
 
 void DragDropManager::OnItemDragStart(float globalX, float globalY, const RefPtr<FrameNode>& frameNode)
@@ -2877,9 +3022,12 @@ void DragDropManager::DoDragStartAnimation(const RefPtr<OverlayManager>& overlay
 {
     auto containerId = Container::CurrentId();
     auto deviceId = static_cast<int32_t>(event.GetDeviceId());
-    if (deviceId == RESERVED_DEVICEID_1 || deviceId == RESERVED_DEVICEID_2) {
+    // Reserved device ids and a developer hide request both skip the drag start animation:
+    // transfer to the drag framework directly without showing the drag window.
+    if (deviceId == RESERVED_DEVICEID_1 || deviceId == RESERVED_DEVICEID_2 || isDragWindowHiddenByDeveloper_) {
+        TAG_LOGI(AceLogTag::ACE_DRAG, "Skip drag start animation, deviceId is %{public}d, hidden is %{public}d",
+            deviceId, isDragWindowHiddenByDeveloper_);
         isDragFwkShow_ = false;
-        TAG_LOGI(AceLogTag::ACE_DRAG, "Do not need animation.");
         TransDragWindowToDragFwk(containerId);
         return;
     }

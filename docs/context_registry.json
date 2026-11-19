@@ -7285,6 +7285,9 @@
         "InteractionInterface",
         "预拖拽",
         "SpringLoading",
+        "setDragWindowVisible",
+        "拖拽窗显隐",
+        "IsDragWindowHiddenByDeveloper",
         "GetDragCallback"
       ],
       "aliases": [
@@ -7296,6 +7299,7 @@
       "spec_domain": "specs/03-engine-framework/04-event-framework/02-drag-framework",
       "func_id": "03-04-02",
       "spec_status": "active",
+      "last_verified": "2026-11-13",
       "source_paths": {
         "pipeline": "frameworks/core/pipeline_ng/pipeline_context.cpp",
         "manager": "frameworks/core/components_ng/manager/drag_drop/drag_drop_manager.cpp",
@@ -7307,8 +7311,7 @@
         "test/unittest/core/manager/drag_drop/",
         "test/unittest/core/event/drag_event/"
       ],
-      "status": "active",
-      "last_verified": "2026-08-01"
+      "status": "active"
     },
     {
       "id": "DragCapability",
