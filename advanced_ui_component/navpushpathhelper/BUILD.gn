@@ -42,6 +42,7 @@ gen_obj("navpushpathhelper_abc_preview") {
 additional_include_dirs = [ "${ace_root}" ]
 
 ohos_shared_library("navpushpathhelper") {
+  branch_protector_ret = "pac_ret"
   sources = [
     "src/hsp_silentinstall.cpp",
     "src/hsp_silentinstall_napi.cpp",

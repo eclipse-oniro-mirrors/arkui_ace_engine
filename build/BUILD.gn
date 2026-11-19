@@ -140,6 +140,7 @@ config("lto_link_config") {
 }
 
 ohos_shared_library("libace_compatible") {
+  branch_protector_ret = "pac_ret"
   public_configs = [
     ":ace_engine_public_config",
     "$ace_root/interfaces/inner_api/ace_kit:ace_kit_config",
@@ -184,6 +185,7 @@ ohos_shared_library("libace_compatible") {
 }
 
 ohos_shared_library("libace_compatible_components") {
+  branch_protector_ret = "pac_ret"
   deps = [ ":libace_compatible" ]
   if (is_ohos) {
     version_script = "libace_compatible_components.map"
@@ -201,6 +203,7 @@ ohos_shared_library("libace_compatible_components") {
 
 if (!is_asan && ace_engine_feature_enable_libace) {
   ohos_shared_library("libace") {
+    branch_protector_ret = "pac_ret"
     external_deps = []
     if (use_hilog) {
       external_deps += [ "hilog:libhilog" ]

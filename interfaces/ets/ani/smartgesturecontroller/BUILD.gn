@@ -18,6 +18,7 @@ import("//foundation/arkui/ace_engine/adapter/ohos/build/common.gni")
 
 if (defined(smart_gesture_support) && smart_gesture_support) {
   ohos_shared_library("smartGestureController_ani") {
+    branch_protector_ret = "pac_ret"
     shlib_type = "ani"
     deps = [ "$ace_root/build:libace_compatible" ]
     include_dirs = [ "./include" ]

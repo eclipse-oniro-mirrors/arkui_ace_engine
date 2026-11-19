@@ -51,6 +51,7 @@ template("napi_dialog_static") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     defines += invoker.defines
     cflags_cc += invoker.cflags_cc
 
@@ -114,6 +115,7 @@ foreach(item, ace_platforms) {
 }
 
 ohos_shared_library("dialog_napi") {
+  branch_protector_ret = "pac_ret"
   output_name = "dialog_napi"
   sanitize = {
     integer_overflow = true

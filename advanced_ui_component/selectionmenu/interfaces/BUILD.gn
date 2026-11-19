@@ -40,6 +40,7 @@ gen_obj("selectionmenu_abc_preview") {
 }
 
 ohos_shared_library("selectionmenu") {
+  branch_protector_ret = "pac_ret"
   sources = [ "selectionmenu.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

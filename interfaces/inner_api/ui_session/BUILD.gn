@@ -32,6 +32,7 @@ config("uisession_manager_public_config") {
 }
 
 ohos_shared_library("ui_session") {
+  branch_protector_ret = "pac_ret"
   if (current_os == "ohos") {
     sanitize = {
       integer_overflow = true

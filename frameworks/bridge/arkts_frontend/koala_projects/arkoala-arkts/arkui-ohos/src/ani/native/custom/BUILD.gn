@@ -21,6 +21,7 @@ group("arkuicustomnode_group") {
 }
 
 ohos_shared_library("arkuicustomnode_ani") {
+  branch_protector_ret = "pac_ret"
   deps = [ "$ace_root/build:libace_compatible" ]
   if (is_ohos) {
     version_script = "$ace_root/build/libarkuicustomnode_ani.map"

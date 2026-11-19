@@ -61,6 +61,7 @@ template("build_component_plugin") {
     }
 
     ohos_source_set("components_plugins_${component_name}_${platform}") {
+      branch_protector_ret = "pac_ret"
       defines += invoker.defines
 
       sources = []

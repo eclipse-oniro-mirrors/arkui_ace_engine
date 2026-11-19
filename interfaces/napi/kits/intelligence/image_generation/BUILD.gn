@@ -18,6 +18,7 @@ template("napi_imagegeneration_static") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     defines += invoker.defines
     cflags_cc += invoker.cflags_cc
     configs = [ "$ace_root/interfaces/napi/kits:ace_napi_config" ]
@@ -74,6 +75,7 @@ foreach(item, ace_platforms) {
 }
 
 ohos_shared_library("imagegeneration") {
+  branch_protector_ret = "pac_ret"
   if (current_os == "ohos") {
     sanitize = {
       integer_overflow = true
