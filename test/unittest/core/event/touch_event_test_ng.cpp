@@ -983,9 +983,9 @@ HWTEST_F(TouchEventTestNg, TouchEventReportGateMaskNotSubscribedTest006, TestSiz
  */
 HWTEST_F(TouchEventTestNg, TouchEventReportGatePassThroughTest007, TestSize.Level1)
 {
-    constexpr int32_t NODE_ID = 1104;
+    constexpr int32_t nodeId = 1104;
     auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
-    auto frameNode = FrameNode::CreateFrameNode("test", NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto frameNode = FrameNode::CreateFrameNode("test", nodeId, AceType::MakeRefPtr<Pattern>());
     touchEventActuator->AttachFrameNode(frameNode);
 
     auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
@@ -997,9 +997,9 @@ HWTEST_F(TouchEventTestNg, TouchEventReportGatePassThroughTest007, TestSize.Leve
     auto mockReporter = reinterpret_cast<MockReporter*>(&Reporter::GetInstance());
     EXPECT_CALL(*mockReporter, HandleUISessionReporting(_))
         .Times(3)
-        .WillRepeatedly(Invoke([&reportedCount, NODE_ID](const JsonReport& report) {
+        .WillRepeatedly(Invoke([&reportedCount, nodeId](const JsonReport& report) {
             EXPECT_EQ(report.GetGestureType(), GestureTypeName::TOUCH_EVENT);
-            EXPECT_EQ(report.GetId(), NODE_ID);
+            EXPECT_EQ(report.GetId(), nodeId);
             ++reportedCount;
         }));
 
