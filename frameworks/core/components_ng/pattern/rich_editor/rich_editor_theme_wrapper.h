@@ -34,7 +34,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<RichEditorThemeWrapper>();
-            auto theme = AceType::DynamicCast<RichEditorTheme>(wrapper);
+            RefPtr<RichEditorTheme> theme = wrapper;
             CHECK_NULL_RETURN(themeConstants, wrapper);
             InitThemeDefaults(themeConstants, theme);
             ParsePattern(themeConstants, theme);

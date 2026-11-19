@@ -51,7 +51,7 @@ void RichEditorDragOverlayModifier::onDraw(DrawingContext& context)
     auto hostPattern = hostPattern_.Upgrade();
     CHECK_NULL_VOID(hostPattern);
     auto richEditor = DynamicCast<RichEditorPattern>(hostPattern);
-    auto textPattern = DynamicCast<TextPattern>(hostPattern);
+    auto textPattern = hostPattern;
     std::shared_ptr<RSPath> path;
     path = isAnimating_ ? textDragPattern->GenerateBackgroundPath(backgroundOffset_->Get(),
         1 - selectedBackgroundOpacity_->Get()) : textDragPattern->GetBackgroundPath();

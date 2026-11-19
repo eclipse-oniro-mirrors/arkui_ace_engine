@@ -67,7 +67,7 @@ RefPtr<FrameNode> RichEditorDragPattern::CreateDragNode(const RefPtr<FrameNode>&
 OffsetF RichEditorDragPattern::ConvertToGlobalOffset(const OffsetF& localOffset, const OffsetF& parentGlobalOffset)
 {
     auto globalOffset = localOffset + parentGlobalOffset;
-    auto textPattern = DynamicCast<TextPattern>(hostPattern_.Upgrade());
+    auto textPattern = hostPattern_.Upgrade();
     CHECK_NULL_RETURN(textPattern, globalOffset);
     return textPattern->ConvertToGlobalOffsetWithTransform(localOffset);
 }

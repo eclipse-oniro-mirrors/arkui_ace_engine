@@ -625,7 +625,7 @@ ArkUI_StyledString_Descriptor* CreateArkUIStyledStringDescriptorWithCustomSpan(A
 {
     RefPtr<NapiCustomSpan> customSpan = AceType::DynamicCast<NapiCustomSpan>(ParseCustomSpan(value, 0, 1));
     CHECK_NULL_RETURN(customSpan, nullptr);
-    auto span = AceType::DynamicCast<CustomSpan>(customSpan);
+    RefPtr<CustomSpan> span = customSpan;
     CHECK_NULL_RETURN(span, nullptr);
     MutableSpanString* spanString = new MutableSpanString(span);
     ArkUI_StyledString_Descriptor* descriptor = new ArkUI_StyledString_Descriptor();
