@@ -56,24 +56,20 @@ bool IsTouchExplorationEnabled(const RefPtr<NG::PipelineContext>& context)
 bool AccessibilityHoverManagerForThirdNG::GetElementInfoForThird(
     int64_t elementId,
     AccessibilityElementInfo& info,
-    int64_t hostElementId, ThirdAccessibilityTraversal* traversal)
+    int64_t hostElementId)
 {
-    ThirdAccessibilityTraversal queryTraversal("hover-query");
-    if (!traversal) {
-        traversal = &queryTraversal;
-    }
-    // this function only for third party hover process
+    // this function only for third party hover process; the provider answer is
+    // passed through unvalidated: hover serves the provider's own registered tree.
     auto jsThirdProviderOperator =
         GetJsThirdProviderInteractionOperation(hostElementId).lock();
     if (!jsThirdProviderOperator) {
-        traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, elementId);
         return false;
     }
     std::list<Accessibility::AccessibilityElementInfo> infos;
     // Hover coordinates exclude the host offset.
-    bool ret = traversal->FindNodeInfos(*jsThirdProviderOperator, elementId, infos, true);
+    bool ret = jsThirdProviderOperator->FindAccessibilityNodeInfosByIdFromProvider(
+        elementId, 0, 0, infos, true);
     if (!ret || infos.empty()) {
-        traversal->Record(ThirdAccessibilityTraversal::QUERY_FAILED, elementId);
         return false;
     }
     info = infos.front();
@@ -169,14 +165,8 @@ bool AccessibilityHoverManagerForThirdNG::HoverChildrenForThird(
 {
     const auto childrenIds = nodeInfo.GetChildIds();
     for (auto childId = childrenIds.rbegin(); childId != childrenIds.rend(); ++childId) {
-        if (context.traversal.Exhausted()) {
-            break;
-        }
-        if (!context.traversal.Visit(*childId, depth + 1)) {
-            continue;
-        }
         AccessibilityElementInfo childInfo;
-        if (!GetElementInfoForThird(*childId, childInfo, context.hostElementId, &context.traversal)) {
+        if (!GetElementInfoForThird(*childId, childInfo, context.hostElementId)) {
             continue;
         }
         if (HoverPathForThirdRecursive(childInfo, context, depth + 1)) {
@@ -232,18 +222,8 @@ AccessibilityHoverTestPathForThird AccessibilityHoverManagerForThirdNG::HoverPat
         rootInfo.GetChildIds().size(), rootInfo.GetAccessibilityLevel().c_str(),
         rootInfo.GetHitTestBehavior().c_str(), mountBindIds.size());
     AccessibilityHoverTestPathForThird path;
-    ThirdAccessibilityTraversal traversal("hover");
-    int64_t rootId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
-    int32_t treeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
-    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
-        rootInfo.GetAccessibilityId(), rootId, treeId);
-    if (traversal.Visit(rootId, 0)) {
-        ThirdHoverContext context { hostElementId, point, mountBindIds, path, traversal };
-        HoverPathForThirdRecursive(rootInfo, context, 0);
-    }
-    if (traversal.Exhausted()) {
-        path.clear();
-    }
+    ThirdHoverContext context { hostElementId, point, mountBindIds, path };
+    HoverPathForThirdRecursive(rootInfo, context, 0);
     TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
         "third hover hit-test result: pathSize=%{public}zu, hitId=%{public}" PRId64,
         path.size(), path.empty() ? INVALID_NODE_ID : path.back());

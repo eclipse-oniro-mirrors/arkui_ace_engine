@@ -44,7 +44,6 @@ namespace Framework {
 class JsAccessibilityManager;
 struct ActionParam;
 class JsThirdProviderInteractionOperation;
-class ThirdAccessibilityTraversal;
 
 using namespace OHOS::Accessibility;
 
@@ -85,7 +84,7 @@ public:
     bool GetElementInfoForThird(
         int64_t elementId,
         AccessibilityElementInfo& info,
-        int64_t hostElementId, ThirdAccessibilityTraversal* traversal = nullptr);
+        int64_t hostElementId);
 
     bool ActThirdAccessibilityFocus(
         int64_t elementId,
@@ -150,7 +149,6 @@ private:
         const NG::PointF& point;
         const std::vector<int64_t>& mountBindIds;
         AccessibilityHoverTestPathForThird& path;
-        ThirdAccessibilityTraversal& traversal;
     };
     bool HoverPathForThirdRecursive(
         const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth);
