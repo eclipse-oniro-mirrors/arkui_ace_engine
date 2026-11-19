@@ -67,6 +67,10 @@ public:
     {
         return x_ == other.x_ && y_ == other.y_ && z_ == other.z_;
     }
+    bool operator!=(const Vector3& other) const
+    {
+        return !(*this == other);
+    }
 };
 using Vector3f = Vector3<float>;
 template<typename T>
