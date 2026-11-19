@@ -207,8 +207,7 @@ public:
     std::string ToSimpleString() const
     {
         std::stringstream ss;
-        ss << "dur:" << duration_ << ",curve:"
-           << (curve_ ? curve_->ToSimpleString() : "");
+        ss << "dur:" << duration_ << "," << (curve_ ? curve_->ToSimpleString() : "");
         if (iteration_ != 1) {
             ss << ",iter:" << iteration_;
         }
