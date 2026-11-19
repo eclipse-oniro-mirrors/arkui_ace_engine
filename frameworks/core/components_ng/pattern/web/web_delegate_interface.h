@@ -59,7 +59,6 @@ public:
     virtual void UpdateMixedContentMode(const MixedModeContent& mixedMode) = 0;
     virtual void UpdateSupportZoom(const bool& isZoomAccessEnabled) = 0;
     virtual void UpdateDomStorageEnabled(const bool& isDomStorageAccessEnabled) = 0;
-    virtual void UpdateVisitedLinkPersistEnabled(const bool& isVisitedLinkPersistEnabled) = 0;
     virtual void UpdateGeolocationEnabled(const bool& isGeolocationAccessEnabled) = 0;
     virtual void UpdateCacheMode(const WebCacheMode& mode) = 0;
     virtual void UpdateDarkMode(const WebDarkMode& mode) = 0;

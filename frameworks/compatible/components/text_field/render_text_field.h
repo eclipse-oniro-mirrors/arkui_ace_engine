@@ -101,8 +101,7 @@ public:
     // Override TextInputClient
     void UpdateEditingValue(const std::shared_ptr<TextEditingValue>& value, bool needFireChangeEvent = true) override;
     void PerformDefaultAction();
-    void PerformAction(TextInputAction action, bool forceCloseKeyboard = false,
-        bool platformWillInsertNewline = false) override;
+    void PerformAction(TextInputAction action, bool forceCloseKeyboard = false) override;
     void OnStatusChanged(RenderStatus renderStatus) override;
     void OnValueChanged(bool needFireChangeEvent = true, bool needFireSelectChangeEvent = true) override;
     void OnPaintFinish() override;

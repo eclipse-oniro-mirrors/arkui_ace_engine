@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_RICH_EDITOR_RICH_EDITOR_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_RICH_EDITOR_RICH_EDITOR_PATTERN_H
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -460,8 +461,7 @@ public:
     void UpdateRichTextRect(const std::optional<RectF>& richTextRectOpt);
     void UpdateEditingValue(const std::shared_ptr<TextEditingValue>& value, bool needFireChangeEvent = true) override;
     void HandleEditingDeleteEvent(const std::shared_ptr<TextEditingValue>& value);
-    void PerformAction(TextInputAction action, bool forceCloseKeyboard = true,
-        bool platformWillInsertNewline = false) override;
+    void PerformAction(TextInputAction action, bool forceCloseKeyboard = true) override;
 #if defined(IOS_PLATFORM)
     void UpdateFloatingCursor(FloatingCursorState state, double x, double y) override;
     Rect GetCaretWindowRect() override;
@@ -1697,7 +1697,7 @@ private:
     int32_t insertValueLength_ = 0;
     int32_t lastCaretPosition_ = 0;
     int32_t caretPosition_ = 0;
-    bool caretInfoPushPending_ = false;
+    std::atomic<bool> caretInfoPushPending_ { false };
     int32_t caretSpanIndex_ = -1;
     long long timestamp_ = 0;
     CaretAffinityPolicy caretAffinityPolicy_ = CaretAffinityPolicy::DEFAULT;

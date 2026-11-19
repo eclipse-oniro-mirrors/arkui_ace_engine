@@ -1716,7 +1716,7 @@ void RenderTextField::PerformDefaultAction()
     PerformAction(action_);
 }
 
-void RenderTextField::PerformAction(TextInputAction action, bool forceCloseKeyboard, bool platformWillInsertNewline)
+void RenderTextField::PerformAction(TextInputAction action, bool forceCloseKeyboard)
 {
     LOGI("PerformAction  %{public}d", static_cast<int32_t>(action));
     ContainerScope scope(instanceId_);

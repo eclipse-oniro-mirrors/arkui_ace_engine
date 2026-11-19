@@ -7203,7 +7203,7 @@ int32_t TextFieldPattern::GetCaretIndexAtPoint(double x, double y)
 }
 #endif
 
-void TextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard, bool platformWillInsertNewline)
+void TextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard)
 {
     if (!HasFocus()) {
         TAG_LOGW(AceLogTag::ACE_TEXT_FIELD, "Not Trigger OnSubmit because field blur");
@@ -7226,6 +7226,8 @@ void TextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyb
             // event path (physical keyboard while the soft keyboard is closed), the
             // event never goes through shouldChangeTextInRange/insertText, so
             // nobody else inserts and PerformAction must do it.
+            bool platformWillInsertNewline = platformWillInsertNewline_;
+            platformWillInsertNewline_ = false;
             if (!platformWillInsertNewline && GetInputFilter() != "\n") {
                 InsertValue(u"\n", true);
             }
@@ -7432,7 +7434,7 @@ bool TextFieldPattern::HandleEditingEventCrossPlatform(const std::shared_ptr<Tex
 #if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
     if (value->appendText.empty()) {
         // Selection-only event (no appended text, no delete). Apply it as a real
-        // caret move: on Android it is the IME caret echo, on iOS a native caret
+        // caret move: it is either the IME caret echo or a native caret
         // update from setSelectedTextRange: (e.g. hardware keyboard navigation
         // while the soft keyboard is closed). Dropping it would clear the event
         // selection and push the stale engine caret back to the adapter, so
