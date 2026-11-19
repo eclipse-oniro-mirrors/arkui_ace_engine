@@ -1,7 +1,7 @@
 # State Management — V2 装饰器 Context
 
-> 文档版本：v1.0
-> 更新时间：2026-07-13
+> 文档版本：v1.1
+> 更新时间：2026-10-31
 > 来源：`docs/context_registry.json` 主题 `StateMgmtV2Decorators`
 
 ## 定位
@@ -91,6 +91,38 @@ V2 装饰器是 API 12+ 的下一代状态管理 API，全部定义在 `v2/v2_de
 |--------|---------|------|
 | `07-02-04` | `specs/07-frontend/02-state-management/04-v2-component-state` | Baselined（V2 组件装饰器部分） |
 | `07-02-05` | `specs/07-frontend/02-state-management/05-v2-data-object-state` | Baselined（@ObservedV2/@Trace/@Computed/@Monitor） |
+
+## @Computed 属性重定义与序列化
+
+`@Computed` 在实例构造阶段将原原型 getter 重定义为**实例自身的可枚举访问器**，从而注入依赖追踪代理能力，并使该属性可被 `Object.keys` 枚举——这是其区别于普通原型 getter（不参与 PersistenceV2 序列化）的关键。
+
+### 重定义机制
+
+装饰阶段（`v2_decorators.ts:366` `Computed`）仅捕获原 `descriptor.get` 存入原型上的 `Symbol.for('___comp_<ctor>')` 注册表，不修改属性。实例构造阶段（`v2_change_observation.ts:1588` `constructComputed` → `new ComputedV2(owningObject,...)` → `InitRun`）通过 `Reflect.defineProperty(this.target_, propertyKey, descriptor)` 在**实例自身**上重定义属性：
+
+| 描述符字段 | 实现 | 源码 |
+|------------|------|------|
+| `get` | `ObserveV2.getObserve().addRef(this, propertyKey)` 注册依赖 → `ObserveV2.autoProxyObject(this, cachedProp)` 返回 `___comp_cached_<prop>` 缓存值 | `v2_computed.ts:64-65` |
+| `set` | 固定抛 `@Computed <prop> is readonly, cannot set value for it` | `v2_computed.ts:67-71` |
+| `enumerable` | `true`（显式置位） | `v2_computed.ts:72` |
+
+> 重定义发生在实例上（`this.target_` = owning instance），非子类化。原原型 getter 被实例级访问器覆盖，getter 注入 `addRef`+`autoProxyObject` 实现状态变量代理，setter 抛错保证只读。
+
+### 序列化影响
+
+因 `enumerable: true`，`@Computed` 属性出现在 `Object.keys(instance)` 中，PersistenceV2 序列化时经 `ObservedReplacer`/`JSON2.toAliasedObject` 读取 `value[<prop>]`（触发 getter）并将**缓存计算结果**写入磁盘。与普通原型 getter（非自有属性、不在 `Object.keys`、不序列化）形成对比——详见 [storage](storage.md)「属性枚举范围（getter 不参与序列化）」。
+
+### 反序列化约束
+
+`@Computed` 的 setter 抛错，`DataCoder.restoreTo` 还原时按缓存值类型分两种结果：
+
+| 缓存值类型 | 还原路径 | 结果 |
+|------------|----------|------|
+| 原始类型（string/number/boolean/bigint） | `restorePropValue` 执行 `target[prop] = srcVal` | **触发 setter 抛 `@Computed <prop> is readonly`** |
+| 对象 / Array / Map / Set | `restoreObject(tgtVal, srcVal, opts)` 原地改写缓存对象 | 不触发 setter，正常还原 |
+
+> 源码：`data_coder.ts:257`（原始类型分支 `target[targetProp] = srcVal`）、`data_coder.ts:278`（集合分支 `restoreObject`）。持久化含原始类型 `@Computed` 的 `@ObservedV2` 对象时，反序列化会失败——建议用 `@Type({ disabled: true })` 排除 `@Computed` 属性或避免持久化此类对象。
+
 ## 常见问题定位
 
 | 问题 | 优先查看 |
@@ -99,6 +131,7 @@ V2 装饰器是 API 12+ 的下一代状态管理 API，全部定义在 `v2/v2_de
 | `@Trace` 不在 `@ObservedV2` 中 | 缺 GC 清理、`@Computed`/`@Monitor` 构造、ID_REFS 优化 |
 | `@Trace` 赋相同值不触发 | setter 严格 `!==` 比较 |
 | `@Computed` 不支持 setter | `InitRun` setter 抛错，计算属性只读 |
+| `@Computed` 是否被 PersistenceV2 序列化 | 是——`InitRun` 经 `Reflect.defineProperty` 置 `enumerable: true`，属性进入 `Object.keys`；序列化写缓存值，原始类型反序列化因 setter 抛错失败（详见「@Computed 属性重定义与序列化」） |
 | `@Computed` 在 getter 中有副作用 | 应为纯函数；`startDirty_` 防递归但不防状态不一致 |
 | `@Monitor` vs V1 `@Watch` | 前者深层路径 + IMonitor（before/now/path），后者仅变量名 |
 | `@SyncMonitor` vs `@Monitor` | 前者同步立即执行（数据校验），后者异步 VSync |
