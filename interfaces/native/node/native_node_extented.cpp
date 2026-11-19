@@ -2104,15 +2104,19 @@ ArkUI_ErrorCode OH_ArkUI_TextLayoutManager_GetGlyphRangeForCharacterRange(ArkUI_
             node->uiNodeHandle, start, end, encoding, &range);
     }
     ArkUI_Boundary* glyphRange = new (std::nothrow) ArkUI_Boundary(range.glyphStart, range.glyphEnd);
+    if (glyphRange == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "glyphRange is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
     ArkUI_Boundary* actualCharRange = nullptr;
     if (outActualCharRange != nullptr) {
         actualCharRange = new (std::nothrow) ArkUI_Boundary(range.charStart, range.charEnd);
-    }
-    if (glyphRange == nullptr || (outActualCharRange != nullptr && actualCharRange == nullptr)) {
-        delete glyphRange;
-        delete actualCharRange;
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "glyphRange or actualCharRange is null");
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        // Validate actualCharRange immediately after creation, before any use.
+        if (actualCharRange == nullptr) {
+            delete glyphRange;
+            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "actualCharRange is null");
+            return ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
     }
     *outGlyphRange = reinterpret_cast<OH_Drawing_Range*>(glyphRange);
     if (outActualCharRange != nullptr) {
@@ -2145,15 +2149,19 @@ ArkUI_ErrorCode OH_ArkUI_TextLayoutManager_GetCharacterRangeForGlyphRange(ArkUI_
             node->uiNodeHandle, start, end, encoding, &range);
     }
     ArkUI_Boundary* charRange = new (std::nothrow) ArkUI_Boundary(range.charStart, range.charEnd);
+    if (charRange == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "charRange is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
     ArkUI_Boundary* actualGlyphRange = nullptr;
     if (outActualGlyphRange != nullptr) {
         actualGlyphRange = new (std::nothrow) ArkUI_Boundary(range.glyphStart, range.glyphEnd);
-    }
-    if (charRange == nullptr || (outActualGlyphRange != nullptr && actualGlyphRange == nullptr)) {
-        delete charRange;
-        delete actualGlyphRange;
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "charRange or actualGlyphRange is null");
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        // Validate actualGlyphRange immediately after creation, before any use.
+        if (actualGlyphRange == nullptr) {
+            delete charRange;
+            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "actualGlyphRange is null");
+            return ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
     }
     *outCharRange = reinterpret_cast<OH_Drawing_Range*>(charRange);
     if (outActualGlyphRange != nullptr) {
@@ -2212,15 +2220,19 @@ ArkUI_ErrorCode OH_ArkUI_TextLayoutManager_GetGlyphRangeForCharacterRangeWithEnc
             node->uiNodeHandle, start, end, arkEncoding, &range);
     }
     ArkUI_Boundary* glyphRange = new (std::nothrow) ArkUI_Boundary(range.glyphStart, range.glyphEnd);
+    if (glyphRange == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "glyphRange is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
     ArkUI_Boundary* actualCharRange = nullptr;
     if (outActualCharRange != nullptr) {
         actualCharRange = new (std::nothrow) ArkUI_Boundary(range.charStart, range.charEnd);
-    }
-    if (glyphRange == nullptr || (outActualCharRange != nullptr && actualCharRange == nullptr)) {
-        delete glyphRange;
-        delete actualCharRange;
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "glyphRange or actualCharRange is null");
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        // Validate actualCharRange immediately after creation, before any use.
+        if (actualCharRange == nullptr) {
+            delete glyphRange;
+            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "actualCharRange is null");
+            return ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
     }
     *outGlyphRange = reinterpret_cast<OH_Drawing_Range*>(glyphRange);
     if (outActualCharRange != nullptr) {
@@ -2255,15 +2267,19 @@ ArkUI_ErrorCode OH_ArkUI_TextLayoutManager_GetCharacterRangeForGlyphRangeWithEnc
             node->uiNodeHandle, start, end, arkEncoding, &range);
     }
     ArkUI_Boundary* charRange = new (std::nothrow) ArkUI_Boundary(range.charStart, range.charEnd);
+    if (charRange == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "charRange is null");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
     ArkUI_Boundary* actualGlyphRange = nullptr;
     if (outActualGlyphRange != nullptr) {
         actualGlyphRange = new (std::nothrow) ArkUI_Boundary(range.glyphStart, range.glyphEnd);
-    }
-    if (charRange == nullptr || (outActualGlyphRange != nullptr && actualGlyphRange == nullptr)) {
-        delete charRange;
-        delete actualGlyphRange;
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "charRange or actualGlyphRange is null");
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        // Validate actualGlyphRange immediately after creation, before any use.
+        if (actualGlyphRange == nullptr) {
+            delete charRange;
+            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "actualGlyphRange is null");
+            return ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
     }
     *outCharRange = reinterpret_cast<OH_Drawing_Range*>(charRange);
     if (outActualGlyphRange != nullptr) {

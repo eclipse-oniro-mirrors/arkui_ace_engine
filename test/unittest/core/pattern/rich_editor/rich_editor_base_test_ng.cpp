@@ -483,7 +483,7 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel010, TestSize.Level0)
     // add symbol
     SymbolSpanOptions symbolSpanOptions;
     symbolSpanOptions.symbolId = SYMBOL_ID;
-    auto richEditorController =  richEditorPattern->GetRichEditorController();
+    auto richEditorController = richEditorPattern->GetRichEditorController();
     ASSERT_NE(richEditorController, nullptr);
     richEditorController->AddSymbolSpan(symbolSpanOptions);
     richEditorPattern->HandleOnSelectAll();
@@ -670,7 +670,7 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel014, TestSize.Level0)
     richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
     info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
     EXPECT_EQ(static_cast<WordBreak>(info[0].wordBreak), WordBreak::BREAK_ALL);
-    
+
     // test paragraph style wordBreak value of WordBreak.BREAK_WORD
     style.wordBreak = WordBreak::BREAK_WORD;
     richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
@@ -790,25 +790,25 @@ HWTEST_F(RichEditorBaseTestNg, RichEditorModel017, TestSize.Level0)
     ASSERT_NE(richEditorController, nullptr);
     TextSpanOptions options;
     options.value = INIT_VALUE_1;
- 
+
     // test paragraph  style linebreakstrategy default value
     richEditorController->AddTextSpan(options);
     auto info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
     EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::GREEDY);
- 
+
     // test paragraph style linebreakstrategy value of LineBreakStrategy.GREEDY
     struct UpdateParagraphStyle style;
     style.lineBreakStrategy = LineBreakStrategy::GREEDY;
     richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
     info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
     EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::GREEDY);
- 
+
     // test paragraph style linebreakstrategy value of LineBreakStrategy.HIGH_QUALITY
     style.lineBreakStrategy = LineBreakStrategy::HIGH_QUALITY;
     richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
     info = richEditorController->GetParagraphsInfo(1, sizeof(INIT_VALUE_1));
     EXPECT_EQ(static_cast<LineBreakStrategy>(info[0].lineBreakStrategy), LineBreakStrategy::HIGH_QUALITY);
- 
+
     // test paragraph style linebreakstrategy value of LineBreakStrategy.BALANCED
     style.lineBreakStrategy = LineBreakStrategy::BALANCED;
     richEditorController->UpdateParagraphStyle(1, sizeof(INIT_VALUE_1), style);
