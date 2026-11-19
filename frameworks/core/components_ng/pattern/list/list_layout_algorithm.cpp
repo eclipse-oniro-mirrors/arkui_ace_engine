@@ -1380,7 +1380,6 @@ bool ListLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutWrappe
 std::optional<ListPositionMap::EstimateRange> ListLayoutAlgorithm::GetPhysicalLanesRow(int32_t index) const
 {
     auto row = GetFastScrollLanesRow(isStackFromEnd_ ? totalItemCount_ - index - 1 : index);
-    CHECK_NULL_RETURN(row, false);
     if (row && isStackFromEnd_) {
         return ListPositionMap::EstimateRange {
             totalItemCount_ - row->endIndex - 1, totalItemCount_ - row->startIndex - 1 };
