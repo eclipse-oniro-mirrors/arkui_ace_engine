@@ -1620,6 +1620,15 @@ void PipelineContext::InitManagers()
     frameRateManager_ = MakeRefPtr<FrameRateManager>();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
 }
+
+int32_t PipelineContext::AddHostWindowInfoChangedCallback(HostWindowInfoChangedCallback&& callback)
+{
+    return -1;
+}
+
+void PipelineContext::RemoveHostWindowInfoChangedCallback(int32_t callbackId) {}
+
+void PipelineContext::AddWindowSizeChangeCallback(uint32_t hostWindowId) {}
 } // namespace OHOS::Ace::NG
 // pipeline_context ============================================================
 

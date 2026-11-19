@@ -269,6 +269,23 @@ void UIExtensionPattern::AddWindowStateChangedCallback()
     context->AddWindowStateChangedCallback(host->GetId());
 }
 
+void UIExtensionPattern::OnHostWindowInfoChanged(uint32_t hostWindowId)
+{
+    CHECK_NULL_VOID(sessionWrapper_);
+    if (!sessionWrapper_->IsSessionValid()) {
+        UIEXT_LOGW("OnHostWindowInfoChanged session is not valid");
+        return;
+    }
+    auto container = Container::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    if (!container->IsUIExtensionWindow()) {
+        return;
+    }
+    UIEXT_LOGI("OnHostWindowInfoChanged, hostWindowId=%{public}u", hostWindowId);
+    sessionWrapper_->UpdateExtensionParent(hostWindowId);
+    sessionWrapper_->ReDispatchWantParams();
+}
+
 void UIExtensionPattern::OnAttachContext(PipelineContext *context)
 {
     CHECK_NULL_VOID(context);
@@ -282,7 +299,8 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
         UnRegisterEvent(instanceId_);
         RegisterEvent(newInstanceId);
         instanceId_ = newInstanceId;
-        UpdateSessionInstanceId(newInstanceId);
+        auto newHostWindowId = static_cast<uint32_t>(context->GetFocusWindowId());
+        UpdateSessionInstanceId(newInstanceId, newHostWindowId);
     } else if (detachContextHappened) {
         RegisterEvent(instanceId_);
     }
@@ -301,7 +319,7 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     /* only for 1.2 end */
 }
 
-void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
+void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId)
 {
     auto sessionWrapperImpl = AceType::DynamicCast<SessionWrapperImpl>(sessionWrapper_);
     if (!sessionWrapperImpl) {
@@ -309,7 +327,7 @@ void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
         return;
     }
 
-    sessionWrapperImpl->UpdateInstanceId(instanceId);
+    sessionWrapperImpl->UpdateInstanceId(instanceId, newHostWindowId);
     NotifyBrandColorChange(instanceId);
 }
 
@@ -1046,44 +1064,46 @@ void UIExtensionPattern::RegisterPipelineEvent(
     CHECK_NULL_VOID(host);
     auto eventHub = host->GetEventHub<EventHub>();
     CHECK_NULL_VOID(eventHub);
-    OnAreaChangedFunc onAreaChangedFunc = [weak = WeakClaim(this)](
-        const RectF& oldRect,
-        const OffsetF& oldOrigin,
-        const RectF& rect,
-        const OffsetF& origin) {
+    eventHub->AddInnerOnAreaChangedCallback(host->GetId(),
+        [weak = WeakClaim(this)](const RectF&, const OffsetF&, const RectF&, const OffsetF&) {
             auto pattern = weak.Upgrade();
             CHECK_NULL_VOID(pattern);
             pattern->DispatchDisplayArea();
-    };
-    eventHub->AddInnerOnAreaChangedCallback(host->GetId(), std::move(onAreaChangedFunc));
+        });
     pipeline->AddOnAreaChangeNode(host->GetId());
     pipeline->AddWindowSizeChangeCallback(host->GetId());
-    surfacePositionCallBackId_ =
-        pipeline->RegisterSurfacePositionChangedCallback([weak = WeakClaim(this)](int32_t, int32_t) {
-        auto pattern = weak.Upgrade();
-        CHECK_NULL_VOID(pattern);
-        pattern->TransferAccessibilityRectInfo();
-        pattern->DispatchDisplayArea(true);
-    });
-    foldDisplayCallBackId_ =
-        pipeline->RegisterFoldDisplayModeChangedCallback([weak = WeakClaim(this)](FoldDisplayMode foldDisplayMode) {
-        auto pattern = weak.Upgrade();
-        CHECK_NULL_VOID(pattern);
-        pattern->SetFoldStatusChanged(true);
-    });
+    surfacePositionCallBackId_ = pipeline->RegisterSurfacePositionChangedCallback(
+        [weak = WeakClaim(this)](int32_t, int32_t) {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->TransferAccessibilityRectInfo();
+            pattern->DispatchDisplayArea(true);
+        });
+    foldDisplayCallBackId_ = pipeline->RegisterFoldDisplayModeChangedCallback(
+        [weak = WeakClaim(this)](FoldDisplayMode foldDisplayMode) {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->SetFoldStatusChanged(true);
+        });
     auto frontend = pipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
     auto accessibilityManager = frontend->GetAccessibilityManager();
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->AddFrameNodeToUecStatusVec(host);
     host->RegisterNodeChangeListener();
-    accessibilitySAObserverCallback_ = std::make_shared<UECAccessibilitySAObserverCallback>(
-        WeakClaim(this), host->GetAccessibilityId());
+    accessibilitySAObserverCallback_ =
+        std::make_shared<UECAccessibilitySAObserverCallback>(WeakClaim(this), host->GetAccessibilityId());
 #ifndef ACE_UNITTEST
     accessibilityManager->RegisterAccessibilitySAObserverCallback(host->GetAccessibilityId(),
         accessibilitySAObserverCallback_);
 #endif
     UIEXT_LOGI("RegisterPipelineEvent");
+    hostWindowInfoCallbackId_ = pipeline->AddHostWindowInfoChangedCallback(
+        [weak = WeakClaim(this)](uint32_t hostWindowId) {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->OnHostWindowInfoChanged(hostWindowId);
+        });
 }
 
 void UIExtensionPattern::OnDetachFromFrameNode(FrameNode* frameNode)
@@ -1108,6 +1128,8 @@ void UIExtensionPattern::UnRegisterPipelineEvent(
     pipeline->UnregisterSurfacePositionChangedCallback(surfacePositionCallBackId_);
     pipeline->UnRegisterFoldDisplayModeChangedCallback(foldDisplayCallBackId_);
     frameNode->UnregisterNodeChangeListener();
+    pipeline->RemoveHostWindowInfoChangedCallback(hostWindowInfoCallbackId_);
+    hostWindowInfoCallbackId_ = -1;
 #ifndef ACE_UNITTEST
     auto accessibilityManager = pipeline->GetAccessibilityManager();
     CHECK_NULL_VOID(accessibilityManager);

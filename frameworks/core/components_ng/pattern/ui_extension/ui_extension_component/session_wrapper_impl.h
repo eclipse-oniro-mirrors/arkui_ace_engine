@@ -43,7 +43,8 @@ public:
     bool IsSessionValid() override;
     int32_t GetSessionId() const override;
     const std::shared_ptr<AAFwk::Want> GetWant() override;
-    void UpdateInstanceId(int32_t instanceId) override;
+    void UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId) override;
+    void UpdateExtensionParent(uint32_t newHostWindowId) override;
 
     // Synchronous interface for event notify
     bool NotifyFocusEventSync(bool isFocus) override;

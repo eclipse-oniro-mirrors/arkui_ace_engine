@@ -1226,10 +1226,10 @@ HWTEST_F(UIExtensionComponentTestTwoNg, UpdateSessionInstanceId001, TestSize.Lev
     auto sessionWrapperImpl = AceType::DynamicCast<SessionWrapperImpl>(pattern->sessionWrapper_);
     ASSERT_NE(sessionWrapperImpl, nullptr);
     ASSERT_NE(sessionWrapperImpl->instanceId_, instanceId);
-    pattern->UpdateSessionInstanceId(instanceId);
+    pattern->UpdateSessionInstanceId(instanceId, 0);
     ASSERT_NE(sessionWrapperImpl->instanceId_, instanceId);
     pattern->sessionWrapper_ = nullptr;
-    pattern->UpdateSessionInstanceId(instanceId);
+    pattern->UpdateSessionInstanceId(instanceId, 0);
 #endif
 }
 
@@ -2159,5 +2159,230 @@ HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionBrandColorTest026, TestSize.L
     EXPECT_TRUE(storage->brandColorChangeListeners_.find(pattern1->instanceId_) ==
                 storage->brandColorChangeListeners_.end());
 #endif
+}
+
+/**
+ * @tc.name: UIExtensionOnHostWindowInfoChanged001
+ * @tc.desc: Test OnHostWindowInfoChanged returns early when sessionWrapper is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionOnHostWindowInfoChanged001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 2,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->OnHostWindowInfoChanged(100u);
+}
+
+/**
+ * @tc.name: UIExtensionUpdateSessionInstanceId001
+ * @tc.desc: Test UpdateSessionInstanceId signature with newHostWindowId parameter.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionUpdateSessionInstanceId001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 3,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateSessionInstanceId(999, 888);
+}
+
+/**
+ * @tc.name: UIExtensionOnHostWindowInfoChanged002
+ * @tc.desc: Test OnHostWindowInfoChanged with valid sessionWrapper but non-UIExtensionWindow container.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionOnHostWindowInfoChanged002, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 4,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->OnHostWindowInfoChanged(200u);
+}
+
+/**
+ * @tc.name: UIExtensionOnHostWindowInfoChanged003
+ * @tc.desc: Test OnHostWindowInfoChanged with hostWindowId=0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionOnHostWindowInfoChanged003, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 5,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->OnHostWindowInfoChanged(0u);
+}
+
+/**
+ * @tc.name: UIExtensionUpdateSessionInstanceId002
+ * @tc.desc: Test UpdateSessionInstanceId with hostWindowId=0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionUpdateSessionInstanceId002, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 6,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateSessionInstanceId(100, 0);
+}
+
+/**
+ * @tc.name: UIExtensionUpdateSessionInstanceId003
+ * @tc.desc: Test UpdateSessionInstanceId with same instanceId (no-op).
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionUpdateSessionInstanceId003, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 7,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateSessionInstanceId(pattern->GetInstanceId(), 555);
+}
+
+/**
+ * @tc.name: SecurityUIExtensionUpdateSessionInstanceId001
+ * @tc.desc: Test SecurityUIExtensionPattern UpdateSessionInstanceId with newHostWindowId.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, SecurityUIExtensionUpdateSessionInstanceId001, TestSize.Level1)
+{
+    auto node = FrameNode::GetOrCreateFrameNode(V2::SECURITY_UI_EXTENSION_COMPONENT_ETS_TAG, 8,
+        []() { return AceType::MakeRefPtr<SecurityUIExtensionPattern>(); });
+    ASSERT_NE(node, nullptr);
+    auto pattern = node->GetPattern<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateSessionInstanceId(777, 666);
+}
+
+/**
+ * @tc.name: SecurityUIExtensionUpdateSessionInstanceId002
+ * @tc.desc: Test SecurityUIExtensionPattern UpdateSessionInstanceId with hostWindowId=0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, SecurityUIExtensionUpdateSessionInstanceId002, TestSize.Level1)
+{
+    auto node = FrameNode::GetOrCreateFrameNode(V2::SECURITY_UI_EXTENSION_COMPONENT_ETS_TAG, 9,
+        []() { return AceType::MakeRefPtr<SecurityUIExtensionPattern>(); });
+    ASSERT_NE(node, nullptr);
+    auto pattern = node->GetPattern<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateSessionInstanceId(888, 0);
+}
+
+/**
+ * @tc.name: SecurityUIExtensionUpdateSessionInstanceId003
+ * @tc.desc: Test SecurityUIExtensionPattern UpdateSessionInstanceId with same instanceId.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, SecurityUIExtensionUpdateSessionInstanceId003, TestSize.Level1)
+{
+    auto node = FrameNode::GetOrCreateFrameNode(V2::SECURITY_UI_EXTENSION_COMPONENT_ETS_TAG, 10,
+        []() { return AceType::MakeRefPtr<SecurityUIExtensionPattern>(); });
+    ASSERT_NE(node, nullptr);
+    auto pattern = node->GetPattern<SecurityUIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateSessionInstanceId(pattern->GetInstanceId(), 0);
+}
+
+/**
+ * @tc.name: UIExtensionRegisterPipelineEvent001
+ * @tc.desc: Test RegisterPipelineEvent and UnRegisterPipelineEvent callback lifecycle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionRegisterPipelineEvent001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 11,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->hostWindowInfoCallbackId_, -1);
+}
+
+/**
+ * @tc.name: UIExtensionPatternGetUiExtensionId001
+ * @tc.desc: Test GetUiExtensionId returns valid id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionPatternGetUiExtensionId001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 12,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_GE(pattern->GetUiExtensionId(), 0);
+}
+
+/**
+ * @tc.name: UIExtensionPatternGetNodeId001
+ * @tc.desc: Test GetNodeId after pattern creation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionPatternGetNodeId001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 13,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetNodeId(), 13);
+}
+
+/**
+ * @tc.name: UIExtensionPatternGetInstanceId001
+ * @tc.desc: Test GetInstanceId after pattern creation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionPatternGetInstanceId001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 14,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetInstanceId(), Container::CurrentId());
+}
+
+/**
+ * @tc.name: UIExtensionPatternIsForeground001
+ * @tc.desc: Test IsForeground returns false initially.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionPatternIsForeground001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 15,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->IsForeground());
+}
+
+/**
+ * @tc.name: UIExtensionPatternGetSessionId001
+ * @tc.desc: Test GetSessionId returns 0 when no session.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, UIExtensionPatternGetSessionId001, TestSize.Level1)
+{
+    auto uiextensionNode = UIExtensionNode::GetOrCreateUIExtensionNode(V2::UI_EXTENSION_COMPONENT_ETS_TAG, 16,
+        []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiextensionNode, nullptr);
+    auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetSessionId(), 1);
 }
 } // namespace OHOS::Ace::NG

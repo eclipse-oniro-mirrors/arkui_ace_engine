@@ -211,7 +211,8 @@ void SecurityUIExtensionPattern::OnAttachContext(PipelineContext *context)
     auto newInstanceId = context->GetInstanceId();
     if (newInstanceId != instanceId_) {
         instanceId_ = newInstanceId;
-        UpdateSessionInstanceId(newInstanceId);
+        auto newHostWindowId = static_cast<uint32_t>(context->GetFocusWindowId());
+        UpdateSessionInstanceId(newInstanceId, newHostWindowId);
     }
     if (needReNotifyForeground_ && hasMountToParent_) {
         needReNotifyForeground_ = false;
@@ -236,14 +237,14 @@ void SecurityUIExtensionPattern::OnDetachContext(PipelineContext *context)
     UnRegisterBrandColorChangeListener();
 }
 
-void SecurityUIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
+void SecurityUIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId)
 {
     if (sessionWrapper_ == nullptr) {
         PLATFORM_LOGW("securitySessionWrapperImpl is nullptr");
         return;
     }
 
-    sessionWrapper_->UpdateInstanceId(instanceId);
+    sessionWrapper_->UpdateInstanceId(instanceId, newHostWindowId);
     NotifyBrandColorChange(instanceId);
 }
 

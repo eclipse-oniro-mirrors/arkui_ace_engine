@@ -110,6 +110,7 @@ public:
     void SetUIContentType(UIContentType uIContentType) override;
     void SetHostParams(const OHOS::AAFwk::WantParams& params) override;
     void SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy) override;
+    void UpdateHostWindowInfo(uint32_t hostWindowId) override;
     void UpdateFontScale(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     static int32_t GetUIContentWindowID(int32_t instanceId);
     static bool IsBrandColorValid(const std::string& brandColorStr);

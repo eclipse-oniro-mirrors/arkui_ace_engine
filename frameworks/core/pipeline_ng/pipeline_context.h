@@ -618,6 +618,11 @@ public:
 
     void RemoveWindowSizeChangeCallback(int32_t nodeId);
 
+    using HostWindowInfoChangedCallback = PipelineBase::HostWindowInfoChangedCallback;
+    int32_t AddHostWindowInfoChangedCallback(HostWindowInfoChangedCallback&& callback);
+    void RemoveHostWindowInfoChangedCallback(int32_t callbackId);
+    void FlushHostWindowInfoChangedCallback(uint32_t hostWindowId) override;
+
     void AddWindowSizeDragEndCallback(std::function<void()>&& callback);
 
     void AddNavigationNode(int32_t pageId, WeakPtr<UINode> navigationNode);
@@ -1598,6 +1603,9 @@ private:
     std::list<int32_t> onWindowSizeChangeCallbacks_;
     // window size drag end
     std::list<std::function<void()>> onWindowSizeDragEndCallbacks_;
+    // host window info changed callbacks for cross-window migration
+    std::unordered_map<int32_t, HostWindowInfoChangedCallback> hostWindowInfoChangedCallbacks_;
+    std::atomic<int32_t> nextHostWindowInfoCallbackId_ { 0 };
 
     std::list<int32_t> nodesToNotifyMemoryLevel_;
 

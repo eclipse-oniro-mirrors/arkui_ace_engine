@@ -6410,6 +6410,40 @@ void PipelineContext::FlushWindowStateChangedCallback(bool isShow)
     HandleSubwindow(isShow);
 }
 
+int32_t PipelineContext::AddHostWindowInfoChangedCallback(HostWindowInfoChangedCallback&& callback)
+{
+    if (!CheckThreadSafe()) {
+        LOGW("AddHostWindowInfoChangedCallback doesn't run on UI thread!");
+        return -1;
+    }
+    int32_t id = nextHostWindowInfoCallbackId_.fetch_add(1);
+    hostWindowInfoChangedCallbacks_[id] = std::move(callback);
+    return id;
+}
+
+void PipelineContext::RemoveHostWindowInfoChangedCallback(int32_t callbackId)
+{
+    if (!CheckThreadSafe()) {
+        LOGW("RemoveHostWindowInfoChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    hostWindowInfoChangedCallbacks_.erase(callbackId);
+}
+
+void PipelineContext::FlushHostWindowInfoChangedCallback(uint32_t hostWindowId)
+{
+    if (!CheckThreadSafe()) {
+        LOGW("FlushHostWindowInfoChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    auto callbacks = hostWindowInfoChangedCallbacks_;
+    for (const auto& [id, callback] : callbacks) {
+        if (hostWindowInfoChangedCallbacks_.find(id) != hostWindowInfoChangedCallbacks_.end()) {
+            callback(hostWindowId);
+        }
+    }
+}
+
 void PipelineContext::AddWindowFocusChangedCallback(int32_t nodeId)
 {
     onWindowFocusChangedCallbacks_.emplace(nodeId);
