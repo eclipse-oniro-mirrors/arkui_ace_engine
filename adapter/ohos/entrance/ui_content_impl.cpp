@@ -6621,7 +6621,7 @@ void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
                 AceAsyncTraceEnd(0, "SendCommand.Request.Legacy.Global");
                 CHECK_NULL_VOID(pipeline);
                 NG::UiCommandSecurityGate::SetContext(
-                    NG::CommandSecurityContext { securityAuth.needSecurityAuth, securityAuth.tokenId });
+                    NG::CommandSecurityContext { securityAuth.needSecurityAuth, securityAuth.agentTokenId });
                 if (IsFocusedTargetDenied(pipeline, "UiSessionSendCommandKeyCode")) {
                     return;
                 }
@@ -6666,7 +6666,7 @@ NG::CommandSecurityContext MakeSecurityContext(const SecurityAuthInfo& securityA
 {
     NG::CommandSecurityContext security;
     security.needSecurityAuth = securityAuth.needSecurityAuth;
-    security.tokenId = securityAuth.tokenId;
+    security.agentTokenId = securityAuth.agentTokenId;
     return security;
 }
 
@@ -6796,7 +6796,7 @@ void ExecuteGlobalCommandWithResult(const std::string& command,
     }
     if (IsKeyCodeNumber(json)) {
         NG::UiCommandSecurityGate::SetContext(
-            NG::CommandSecurityContext { securityAuth.needSecurityAuth, securityAuth.tokenId });
+            NG::CommandSecurityContext { securityAuth.needSecurityAuth, securityAuth.agentTokenId });
         if (IsFocusedTargetDenied(pipeline, "UiSessionSendCommandWithResultKeyCode")) {
             finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED)));
             return;

@@ -96,7 +96,7 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
     choreographer_->Enqueue(std::move(executors));
     workflowStates_.push_back({ executorCount, finishCallback, preserveLegacySemantics,
         interruptibleByUser ? InterruptionPolicy::INTERRUPTIBLE : InterruptionPolicy::IGNORE_USER_INPUT,
-        securityContext.needSecurityAuth, securityContext.tokenId });
+        securityContext.needSecurityAuth, securityContext.agentTokenId });
     return ProcessResult::SUCCESS;
 }
 
@@ -121,7 +121,7 @@ ExecutionState RelaxedInteractionManager::ExecuteNextStep()
     if (!workflowStates_.empty()) {
         const auto& workflow = workflowStates_.front();
         UiCommandSecurityGate::SetContext(
-            CommandSecurityContext { workflow.needSecurityAuth, workflow.tokenId });
+            CommandSecurityContext { workflow.needSecurityAuth, workflow.agentTokenId });
     }
 
     std::function<void(ExecutionState)> finishCallback;

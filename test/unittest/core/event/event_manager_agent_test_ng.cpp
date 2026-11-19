@@ -446,13 +446,13 @@ HWTEST_F(EventManagerTestNg, CommandSecurityGateMatrix001, TestSize.Level1)
     }
 
     // Auth flag true, target DENY and permission granted: refuse and report to the fence.
-    // The caller-relayed tokenId routes the notification when present.
+    // The caller-relayed agentTokenId routes the notification when present.
     {
         AgentInputProbe probe;
         EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(deniedNode, true));
         CommandSecurityContext security;
         security.needSecurityAuth = true;
-        security.tokenId = SESSION_ID;
+        security.agentTokenId = SESSION_ID;
         UiCommandSecurityGate::ReportDeniedCommand(deniedNode, security);
         ASSERT_EQ(probe.reports.size(), 1u);
         const auto& result = probe.reports.front();

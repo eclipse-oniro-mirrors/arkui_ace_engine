@@ -409,10 +409,10 @@ HWTEST_F(RelaxedInteractionManagerExecuteNextStepTest, ExecuteNextStep_RestoresW
     auto state = manager_->ExecuteNextStep();
     EXPECT_EQ(state, ExecutionState::SUCCESS);
     EXPECT_TRUE(observed.needSecurityAuth);
-    EXPECT_EQ(observed.tokenId, 100u);
+    EXPECT_EQ(observed.agentTokenId, 100u);
     // Context must not leak once the queue drains.
     EXPECT_FALSE(UiCommandSecurityGate::GetContext().needSecurityAuth);
-    EXPECT_EQ(UiCommandSecurityGate::GetContext().tokenId, UINT64_MAX);
+    EXPECT_EQ(UiCommandSecurityGate::GetContext().agentTokenId, UINT64_MAX);
     UiCommandSecurityGate::ClearContext();
 }
 
@@ -444,9 +444,9 @@ HWTEST_F(RelaxedInteractionManagerExecuteNextStepTest, ExecuteNextStep_QueuedWor
     EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
     EXPECT_EQ(manager_->ExecuteNextStep(), ExecutionState::SUCCESS);
     EXPECT_TRUE(observed[0].needSecurityAuth);
-    EXPECT_EQ(observed[0].tokenId, 100u);
+    EXPECT_EQ(observed[0].agentTokenId, 100u);
     EXPECT_FALSE(observed[1].needSecurityAuth);
-    EXPECT_EQ(observed[1].tokenId, 200u);
+    EXPECT_EQ(observed[1].agentTokenId, 200u);
     UiCommandSecurityGate::ClearContext();
 }
 

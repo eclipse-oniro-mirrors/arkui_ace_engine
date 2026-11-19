@@ -457,9 +457,9 @@ SecurityAuthInfo ReadSecurityAuthInfo(MessageParcel& data)
 {
     SecurityAuthInfo securityAuth;
     securityAuth.needSecurityAuth = data.ReadBool();
-    uint64_t tokenId = 0;
-    if (data.ReadUint64(tokenId)) {
-        securityAuth.tokenId = tokenId;
+    uint64_t agentTokenId = 0;
+    if (data.ReadUint64(agentTokenId)) {
+        securityAuth.agentTokenId = agentTokenId;
     }
     return securityAuth;
 }

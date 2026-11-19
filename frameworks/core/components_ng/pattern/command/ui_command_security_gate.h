@@ -26,7 +26,7 @@ namespace OHOS::Ace::NG {
 
 struct CommandSecurityContext {
     bool needSecurityAuth = false;
-    uint64_t tokenId = UINT64_MAX;
+    uint64_t agentTokenId = UINT64_MAX;
 };
 
 // Central security gate for AI injected commands (UISession SendCommand).

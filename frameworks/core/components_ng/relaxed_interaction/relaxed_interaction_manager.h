@@ -79,9 +79,10 @@ private:
         InterruptionPolicy interruptionPolicy = InterruptionPolicy::IGNORE_USER_INPUT;
         // Snapshot of the security context at enqueue time. The gate context is thread-local and a later
         // command may overwrite it before this workflow finishes, so each workflow restores its own
-        // snapshot before every execution step.
+        // snapshot before every execution step. agentTokenId is the access token id of the originating
+        // controller(agent) relayed by the UISession caller (see SecurityAuthInfo).
         bool needSecurityAuth = false;
-        uint64_t tokenId = UINT64_MAX;
+        uint64_t agentTokenId = UINT64_MAX;
     };
     enum class ExecutionPhase {
         IDLE,
