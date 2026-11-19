@@ -128,11 +128,7 @@ public:
         const std::shared_ptr<TextEditingValue>& value, bool needFireChangeEvent = true) = 0;
 
     // Requests that this client perform the given action.
-    // platformWillInsertNewline: the platform text input is about to insert the
-    // newline itself (e.g. iOS soft keyboard inserts '\n' through
-    // shouldChangeTextInRange/insertText), so PerformAction must not insert again.
-    virtual void PerformAction(TextInputAction action, bool forceCloseKeyboard = false,
-        bool platformWillInsertNewline = false) = 0;
+    virtual void PerformAction(TextInputAction action, bool forceCloseKeyboard = false) = 0;
 
 #if defined(IOS_PLATFORM)
     // iOS keyboard trackpad caret drag (UIKit floating cursor). The adapter has
@@ -161,6 +157,18 @@ public:
     // cursor's magnet/target planning operate on stale data and dulled the
     // trackpad drag compared with a real UITextView.
     virtual int32_t GetCaretIndexAtPoint(double x, double y) { return -1; }
+
+    // The iOS soft keyboard inserts '\n' itself through shouldChangeTextInRange/
+    // insertText; the adapter calls this before PerformAction so the pattern must
+    // not insert the newline again. The flag is consumed and cleared by each
+    // PerformAction call. Non-virtual on purpose: keeps the vtable layout stable
+    // for already-compiled components.
+    void SetPlatformWillInsertNewline(bool willInsert) { platformWillInsertNewline_ = willInsert; }
+
+protected:
+    bool platformWillInsertNewline_ = false;
+
+public:
 #endif
 
     virtual void InsertValue(const std::string& insertValue, bool isIME = false) {};

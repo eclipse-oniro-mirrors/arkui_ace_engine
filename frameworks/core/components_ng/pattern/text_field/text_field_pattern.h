@@ -582,8 +582,7 @@ public:
 
     FocusPattern GetFocusPattern() const override;
     FocusPattern GetFocusPatternMultiThread() const;
-    void PerformAction(TextInputAction action, bool forceCloseKeyboard = false,
-        bool platformWillInsertNewline = false) override;
+    void PerformAction(TextInputAction action, bool forceCloseKeyboard = false) override;
 #if defined(IOS_PLATFORM)
     void UpdateFloatingCursor(FloatingCursorState state, double x, double y) override;
     Rect GetCaretWindowRect() override;

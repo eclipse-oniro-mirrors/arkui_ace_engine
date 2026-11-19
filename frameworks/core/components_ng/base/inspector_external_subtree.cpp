@@ -395,12 +395,7 @@ void SpliceWebInspectorSubtree(const std::string& subtreeJson, const RefPtr<NG::
 
     jsonChildrenArray->PutRef(std::move(parsed));
 }
-#endif
 
-// Cross-platform builds resolve WebPattern to the appframework surface, which does
-// not provide the web accessibility subtree APIs yet; degrade to the no-op stub
-// there instead of failing to compile.
-#if defined(WEB_SUPPORTED) && !defined(ACE_UNITTEST) && !defined(CROSS_PLATFORM)
 void AppendWebSubtreeToChildren(
     const RefPtr<NG::UINode>& parent, std::unique_ptr<OHOS::Ace::JsonValue>& jsonChildrenArray)
 {

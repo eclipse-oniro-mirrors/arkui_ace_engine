@@ -6630,7 +6630,7 @@ void RichEditorPattern::UpdateEditingValue(const std::shared_ptr<TextEditingValu
 #if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
         if (value->appendText.empty()) {
             // Selection-only event (no appended text, no delete). Apply it as a
-            // real caret move: on Android it is the IME caret echo, on iOS a
+            // real caret move: it is either the IME caret echo or a
             // native caret update from setSelectedTextRange: (e.g. hardware
             // keyboard navigation while the soft keyboard is closed). Dropping it
             // would clear the event selection and push the stale engine caret
@@ -7241,6 +7241,9 @@ void RichEditorPattern::UpdateCaretInfoToController()
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     caretInfoPushPending_ = true;
+    // Guarantee the after-layout task runs even when nothing else dirtied the
+    // node: without a layout pass the deferred push would never execute.
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     auto weak = WeakClaim(this);
     pipeline->AddAfterLayoutTask([weak]() {
         auto pattern = weak.Upgrade();
@@ -7266,7 +7269,7 @@ void RichEditorPattern::PushCaretInfoToInputMethod()
     // not a real caret command: replaying it back into the engine caret drags the
     // caret to a stale position (older line ends), so later input lands on the wrong
     // line and the candidate bar shows the whole line. Only real text-appending
-    // events may snap the caret (same as the Android branch). Selection-only events
+    // events may snap the caret (same as the platform-specific branch). Selection-only events
     // never reach this guard as caret commands: they are applied in
     // UpdateEditingValue before the caret is pushed back, so a native caret move is
     // echoed to the adapter with its new position instead of being overwritten here.
@@ -13928,6 +13931,9 @@ void RichEditorPattern::UpdateFloatingCursor(FloatingCursorState state, double x
         clampedY = static_cast<float>(std::clamp(static_cast<double>(local.GetY()),
             textRect.GetY() + 1.0, textRect.Bottom() - 1.0));
     }
+    if (paragraphs_.GetParagraphs().empty()) {
+        return;
+    }
     Offset textOffset = { clampedX - textRect.GetX(), clampedY - textRect.GetY() };
     auto positionWithAffinity = paragraphs_.GetGlyphPositionAtCoordinate(textOffset);
     SetCaretPositionWithAffinity(positionWithAffinity);
@@ -13949,6 +13955,8 @@ void RichEditorPattern::UpdateFloatingCursor(FloatingCursorState state, double x
 
 Rect RichEditorPattern::GetCaretWindowRect()
 {
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, Rect());
     auto caretRect = GetCaretRect();
     auto globalOffset = GetParentGlobalOffset();
     return Rect(globalOffset.GetX() + caretRect.Left(), globalOffset.GetY() + caretRect.Top(),
@@ -13986,7 +13994,8 @@ int32_t RichEditorPattern::GetIndexAfterLineMove(int32_t fromIndex, bool isUp, i
     }
     Offset textOffset = { caretOffset.GetX() - textRect.GetX(), targetY - textRect.GetY() };
     auto positionWithAffinity = paragraphs_.GetGlyphPositionAtCoordinate(textOffset);
-    return static_cast<int32_t>(positionWithAffinity.position_);
+    auto result = static_cast<int32_t>(positionWithAffinity.position_);
+    return (result >= 0 && result <= GetTextContentLength()) ? result : -1;
 }
 
 int32_t RichEditorPattern::GetCaretIndexAtPoint(double x, double y)
@@ -14013,7 +14022,7 @@ int32_t RichEditorPattern::GetCaretIndexAtPoint(double x, double y)
 }
 #endif
 
-void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard, bool platformWillInsertNewline)
+void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard)
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "PerformAction, action=%{public}d", action);
     auto host = GetHost();
@@ -14036,7 +14045,11 @@ void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKey
         // (physical keyboard while the soft keyboard is closed), the event never
         // goes through shouldChangeTextInRange/insertText, so nobody else inserts
         // and PerformAction must do it.
-        IF_TRUE(!blurOnSubmit_ && !platformWillInsertNewline, InsertValue(u"\n", true));
+        bool platformWillInsertNewline = platformWillInsertNewline_;
+        platformWillInsertNewline_ = false;
+        if (!blurOnSubmit_ && !platformWillInsertNewline) {
+            InsertValue(u"\n", true);
+        }
 #else
         IF_TRUE(!blurOnSubmit_, InsertValue(u"\n", true));
 #endif
