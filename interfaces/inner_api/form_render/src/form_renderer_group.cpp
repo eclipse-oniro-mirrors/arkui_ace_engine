@@ -24,6 +24,17 @@ namespace Ace {
 namespace {
 constexpr char FORM_RENDERER_COMP_ID[] = "ohos.extra.param.key.form_comp_id";
 constexpr char FORM_RENDER_STATE[] = "ohos.extra.param.key.form_render_state";
+// Numeric-aware compare: longer decimal id is larger; mirrors FRS IsCompIdGreater so owner checks agree.
+bool IsCompIdGreater(const std::string& lhs, const std::string& rhs)
+{
+    auto isDecimal = [](const std::string& s) {
+        return !s.empty() && s.find_first_not_of("0123456789") == std::string::npos;
+    };
+    if (isDecimal(lhs) && isDecimal(rhs) && lhs.size() != rhs.size()) {
+        return lhs.size() > rhs.size();
+    }
+    return lhs > rhs;
+}
 }
 std::shared_ptr<FormRendererGroup> FormRendererGroup::Create(
     const std::shared_ptr<OHOS::AbilityRuntime::Context> context,
@@ -47,7 +58,6 @@ FormRendererGroup::~FormRendererGroup()
 void FormRendererGroup::AddForm(const OHOS::AAFwk::Want& want, const OHOS::AppExecFwk::FormJsInfo& formJsInfo)
 {
     auto compId = want.GetStringParam(FORM_RENDERER_COMP_ID);
-    currentCompId_ = compId;
     FormRequest formRequest;
     formRequest.compId = compId;
     formRequest.want = want;
@@ -57,7 +67,17 @@ void FormRendererGroup::AddForm(const OHOS::AAFwk::Want& want, const OHOS::AppEx
     if (info != formRequests_.end()) {
         *info = formRequest;
     } else {
-        formRequests_.emplace_back(formRequest);
+        // Keep requests sorted by numeric compId so the tail is always the owner.
+        auto pos = std::find_if(
+            formRequests_.begin(), formRequests_.end(),
+            [&compId](const FormRequest& request) {
+                return IsCompIdGreater(request.compId, compId);
+            });
+        formRequests_.insert(pos, formRequest);
+    }
+    // Only the latest-created request owns the surface; a smaller compId never preempts it.
+    if (formRequests_.back().compId == compId) {
+        currentCompId_ = compId;
     }
     bool isVerified = want.GetBoolParam(FORM_RENDER_STATE, false);
     if (isVerified) {
@@ -161,14 +181,8 @@ void FormRendererGroup::InnerAddForm(const FormRequest& formRequest)
         errCode = formRenderer_->RunFormPage(want, formJsInfo);
         initState_ = FormRendererInitState::INITIALIZED;
         errType = AppExecFwk::AddFormFailedErrorType::SURFACE_NODE_CREATE_FAILED;
-    } else { // initState_ == FormRendererInitState::INITIALIZED
-        HILOG_INFO("AttachForm compId: %{public}s, currentCompId_: %{public}s, formRequests size is %{public}s, "
-                   "formJsInfo.formData.size is %{public}zu",
-            compId.c_str(),
-            currentCompId_.c_str(),
-            std::to_string(formRequests_.size()).c_str(),
-            formJsInfo.formData.size());
-        errCode = formRenderer_->AttachForm(want, formJsInfo);
+    } else {
+        errCode = AttachOwnerRequest(compId, want, formJsInfo);
         errType = AppExecFwk::AddFormFailedErrorType::SURFACE_NODE_REUSE_FAILED;
     }
 
@@ -180,6 +194,24 @@ void FormRendererGroup::InnerAddForm(const FormRequest& formRequest)
             static_cast<int32_t>(errType),
             errCode);
     }
+}
+
+// Attach the shared surface; non-owner compIds are skipped so the owner stays deterministic.
+int32_t FormRendererGroup::AttachOwnerRequest(const std::string& compId, const OHOS::AAFwk::Want& want,
+    const AppExecFwk::FormJsInfo& formJsInfo)
+{
+    if (formRequests_.back().compId != compId) {
+        HILOG_INFO("compId %{public}s is not the owner %{public}s, skip AttachForm.",
+            compId.c_str(), formRequests_.back().compId.c_str());
+        return ERR_OK;
+    }
+    HILOG_INFO("AttachForm compId: %{public}s, currentCompId_: %{public}s, formRequests size is %{public}s, "
+               "formJsInfo.formData.size is %{public}zu",
+        compId.c_str(),
+        currentCompId_.c_str(),
+        std::to_string(formRequests_.size()).c_str(),
+        formJsInfo.formData.size());
+    return formRenderer_->AttachForm(want, formJsInfo);
 }
 
 void FormRendererGroup::ReloadForm(const AppExecFwk::FormJsInfo& formJsInfo)

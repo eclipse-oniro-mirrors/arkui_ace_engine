@@ -33,6 +33,8 @@ constexpr char FORM_RENDERER_PROCESS_ON_ADD_SURFACE[] = "ohos.extra.param.key.pr
 constexpr char CONNECT_TO_RENDER[] = "ohos.connect.to.render";
 constexpr char TRANSPARENT_COLOR[] = "#00FFFFFF";
 constexpr int32_t DOUBLE = 2;
+// Delay before moving the shared surface so the old host can mount its snapshot first.
+constexpr int64_t SURFACE_HANDOVER_DELAY_TIME = 50;
 } // namespace
 
 using EventHandler = OHOS::AppExecFwk::EventHandler;
@@ -645,7 +647,38 @@ int32_t FormRenderer::AttachForm(const OHOS::AAFwk::Want& want, const OHOS::AppE
     }
     ParseWant(want);
     OnSurfaceDetach();
+    // Invalidate any pending delayed hand-over before deciding the mode: both the
+    // immediate and the delayed path must supersede an earlier pending one.
+    ++surfaceHandoverGeneration_;
+    // Delay only when the incoming host opted in; otherwise hand over at once.
+    bool delayHandover = want.GetBoolParam(OHOS::AppExecFwk::Constants::FORM_ENABLE_SNAPSHOT_ON_DETACH, false);
+    auto handler = eventHandler_.lock();
+    if (!delayHandover || !handler) {
+        return CompleteSurfaceHandover(want, formJsInfo);
+    }
+    uint32_t generation = surfaceHandoverGeneration_;
+    auto self = shared_from_this();
+    OHOS::AAFwk::Want wantCopy = want;
+    OHOS::AppExecFwk::FormJsInfo formJsInfoCopy = formJsInfo;
+    handler->PostTask(
+        [self, generation, wantCopy, formJsInfoCopy]() {
+            if (self->surfaceHandoverGeneration_ != generation) {
+                return; // superseded by a newer attach request
+            }
+            self->CompleteSurfaceHandover(wantCopy, formJsInfoCopy);
+        }, SURFACE_HANDOVER_DELAY_TIME);
+    return ERR_OK;
+}
+
+int32_t FormRenderer::CompleteSurfaceHandover(
+    const OHOS::AAFwk::Want& want, const OHOS::AppExecFwk::FormJsInfo& formJsInfo)
+{
+    if (uiContent_ == nullptr) {
+        HILOG_ERROR("uiContent is null!");
+        return ERR_APPEXECFWK_FORM_FORM_NODE_RELEASED;
+    }
     AttachUIContent(want, formJsInfo);
+    // Rebind at completion so card events keep routing to the live owner during the delay.
     SetRenderDelegate(proxy_);
     return OnSurfaceReuse(formJsInfo);
 }

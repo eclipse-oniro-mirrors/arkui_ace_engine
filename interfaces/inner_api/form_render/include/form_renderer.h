@@ -62,6 +62,7 @@ public:
     void OnFormLinkInfoUpdate(const std::vector<std::string>& formLinkInfos);
     void UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     int32_t AttachForm(const OHOS::AAFwk::Want& want, const OHOS::AppExecFwk::FormJsInfo& formJsInfo);
+    int32_t CompleteSurfaceHandover(const OHOS::AAFwk::Want& want, const OHOS::AppExecFwk::FormJsInfo& formJsInfo);
     void RecycleForm(std::string& statusData);
     void RecoverForm(const std::string& statusData);
     void GetRectRelativeToWindow(AccessibilityParentRectInfo& parentRectInfo) const;
@@ -106,6 +107,8 @@ private:
     sptr<IRemoteObject::DeathRecipient> renderDelegateDeathRecipient_;
     sptr<IRemoteObject> proxy_;
     AppExecFwk::Constants::FormLocation formLocation_ = AppExecFwk::Constants::FormLocation::OTHER;
+    // Bumped on every AttachForm; discards hand-overs superseded by a newer attach.
+    uint32_t surfaceHandoverGeneration_ = 0;
 };
 
 /**
