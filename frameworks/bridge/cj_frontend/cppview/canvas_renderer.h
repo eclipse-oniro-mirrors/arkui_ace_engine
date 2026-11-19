@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <string>
+#include <mutex>
 
 #include "ffi_remote_data.h"
 #include "pixel_map_impl.h"
@@ -228,7 +229,13 @@ private:
     bool isOffscreenInitializeShadow_ = false;
     bool isInitializeShadow_ = false;
     static std::unordered_map<int32_t, std::shared_ptr<Pattern>> pattern_;
+    static std::mutex patternMutex_;
     std::shared_ptr<Pattern> GetPatternPtr(int32_t id);
+
+public:
+    void RemovePattern(int32_t id);
+
+private:
     static unsigned int patternCount_;
 };
 

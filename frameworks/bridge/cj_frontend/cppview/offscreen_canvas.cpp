@@ -132,7 +132,8 @@ int64_t NativeOffscreenCanvas::GetContext(int32_t contextType, bool option, doub
         offscreenCanvasContext_ = FFIData::Create<CJOffscreenRenderingContext>();
         offscreenCanvasContext_->SetInstanceId(Container::CurrentId());
         offscreenCanvasContext_->SetOffscreenPattern(offscreenCanvasPattern_);
-        offscreenCanvasContext_->AddOffscreenCanvasPattern(offscreenCanvasPattern_);
+        offscreenCanvasContext_->SetId(
+            offscreenCanvasContext_->AddOffscreenCanvasPattern(offscreenCanvasPattern_));
         offscreenCanvasContext_->SetWidth(width_);
         offscreenCanvasContext_->SetHeight(height_);
         offscreenCanvasContext_->SetUnit(GetUnit());
