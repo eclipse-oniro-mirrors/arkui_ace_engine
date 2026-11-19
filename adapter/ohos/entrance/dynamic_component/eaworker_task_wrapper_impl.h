@@ -17,7 +17,9 @@
 #define FOUNDATION_ACE_ADAPTER_OHOS_ENTRANCE_DYNAMIC_COMPONENT_EAWORKER_TASK_WRAPPER_H
 
 #include "base/thread/task_executor.h"
+#include <mutex>
 #include <set>
+#include <shared_mutex>
 
 namespace OHOS::Ace::NG {
 
@@ -44,6 +46,7 @@ private:
     int32_t hostInstanceId_ = -1;
     int32_t workerId_ = -1;
     std::set<pthread_t> attachCurrentThreads_;
+    std::shared_mutex attachMutex_;
 };
 
 class EaWorkerEvent {

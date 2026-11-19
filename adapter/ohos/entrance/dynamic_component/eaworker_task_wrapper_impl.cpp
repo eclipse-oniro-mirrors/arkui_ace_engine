@@ -134,6 +134,7 @@ void *EaWorkerTaskWrapperImpl::GetCurrentAniEnv()
 
 bool EaWorkerTaskWrapperImpl::HasAttachCurrentThread(pthread_t tid)
 {
+    std::shared_lock<std::shared_mutex> lock(attachMutex_);
     if (threadId_ == tid) {
         return true;
     }
@@ -194,7 +195,10 @@ void EaWorkerTaskWrapperImpl::Call(const TaskExecutor::Task& task,
             GetVM(hostInstanceId_, &vm);
             CHECK_NULL_VOID(vm);
             vm->DetachCurrentThread();
-            attachCurrentThreads_.erase(tid);
+            {
+                std::unique_lock<std::shared_mutex> lock(attachMutex_);
+                attachCurrentThreads_.erase(tid);
+            }
         }
     };
 
@@ -206,6 +210,7 @@ void EaWorkerTaskWrapperImpl::Call(const TaskExecutor::Task& task,
     }
 
     if (!attachCurrentThread) {
+        std::unique_lock<std::shared_mutex> lock(attachMutex_);
         attachCurrentThreads_.insert(tid);
     }
 

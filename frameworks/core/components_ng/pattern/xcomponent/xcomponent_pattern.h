@@ -16,7 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_XCOMPONENT_XCOMPONENT_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_XCOMPONENT_XCOMPONENT_PATTERN_H
 
+#include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 
@@ -358,6 +360,8 @@ public:
     float RoundValueToPixelGrid(float value, bool isRound, bool forceCeil, bool forceFloor);
     void OnSurfaceDestroyed(FrameNode* frameNode = nullptr);
     void SetRenderFit(RenderFit renderFit);
+    void SetSurfaceRenderFit(RenderFit renderFit, bool isRenderFitNewVersionEnabled);
+    bool GetSurfaceRenderFit(int32_t& renderFitNumber, bool& isRenderFitNewVersionEnabled);
     void SetScreenId(uint64_t screenId);
     void HandleSurfaceCreated();
     void HandleSurfaceDestroyed(FrameNode* frameNode = nullptr);
@@ -441,6 +445,7 @@ protected:
     bool isSurfaceLock_ = false;
     bool isOpaque_ = false;
     RenderFit renderFit_ = RenderFit::RESIZE_FILL;
+    std::shared_mutex surfaceRenderMutex_;
     int32_t bufferQueueCount_ = DEFAULT_BUFFER_QUEUE_COUNT;
     RefPtr<UIXComponentDisplaySync> displaySync_ = AceType::MakeRefPtr<UIXComponentDisplaySync>();
     bool needRecoverDisplaySync_ = false;
