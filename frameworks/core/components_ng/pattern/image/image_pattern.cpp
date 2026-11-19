@@ -530,10 +530,7 @@ void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
 bool ImagePattern::IsVisibleOnRenderTree(const RefPtr<FrameNode>& host)
 {
     auto renderContext = host->GetRenderContext();
-    if (renderContext && renderContext->IsOnRenderTree()) {
-        return true;
-    }
-    return host->IsPendingOnMainRenderTree();
+    return renderContext && renderContext->IsOnRenderTree()
 }
 
  void ImagePattern::ReportImageSuccessInfo(const RefPtr<FrameNode>& host)
@@ -1274,13 +1271,12 @@ void ImagePattern::LoadImage(const ImageSourceInfo& src, bool needLayout)
     
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
-    if (pipeline && host->GetId() != INVALID_ID && src.IsValid() && src.GetSrcType() != SrcType::UNSUPPORTED) {
+    if (!needLayout) {
+        loadingCtx_->FinishMeasure();
+    }else if(pipeline && host->GetId() != INVALID_ID && src.IsValid() && src.GetSrcType() != SrcType::UNSUPPORTED) {
         bool isVisible = IsVisibleOnRenderTree(host);
         ImagePerf::GetPerfMonitor()->AddLoadComponent(
             host->GetId(), static_cast<int32_t>(src.GetSrcType()), isVisible);
-    }
-    if (!needLayout) {
-        loadingCtx_->FinishMeasure();
     }
     ClearReloadFlagsAfterLoad();
     ImagePerf::GetPerfMonitor()->StartRecordImageLoadStat(imageDfxConfig_.GetAccessibilityId());
