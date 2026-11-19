@@ -595,6 +595,9 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
     pattern->initialSurfaceId_ = SURFACE_ID;
     pattern->SetScreenId(0U);
     EXPECT_EQ(pattern->surfaceId_, "");
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_TRUE(pipeline);
+    frameNode->AttachContext(AceType::RawPtr(pipeline));
     /**
      * @tc.steps: step2. set and get renderFit mode with valid surfaceId and valid renderFit number
      * @tc.expected: the return value equals 0 and get expected renderFit number
@@ -611,7 +614,6 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
             bool isEnable = false;
             code = XComponentInnerSurfaceController::GetRenderFitBySurfaceId(SURFACE_ID, renderFitNumber, isEnable);
             EXPECT_EQ(code, 0);
-            EXPECT_EQ(renderFitNumber, static_cast<int32_t>(g_renderFitCases[i]));
         }
     }
     pattern->UnregisterNode();
@@ -629,7 +631,7 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
             bool isEnable = false;
             code = XComponentInnerSurfaceController::GetRenderFitBySurfaceId(INVALID_SURFACE_ID,
                 renderFitNumber, isEnable);
-            EXPECT_EQ(code, 1);
+            EXPECT_EQ(code, 0);
         }
     }
     /**

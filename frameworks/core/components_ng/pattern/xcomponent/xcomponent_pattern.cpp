@@ -2637,8 +2637,8 @@ void XComponentPattern::SetRenderFit(RenderFit renderFit)
 }
 
 // Set renderFit and frameGravityNewVersion flag on renderContextForSurface_
-// under surfaceRenderMutex_. The caller (XComponentInnerSurfaceController::
-// SetRenderFitBySurfaceId) is responsible for posting this to the UI thread.
+// under surfaceRenderMutex_. The caller (XComponentInnerSurfaceController::SetRenderFitBySurfaceId)
+// is responsible for posting this to the UI thread.
 // Called by XComponentInnerSurfaceController::SetRenderFitBySurfaceId, which is
 // the inner API entry point for OHOS_ACE_SetRenderFitBySurfaceId.
 void XComponentPattern::SetSurfaceRenderFit(RenderFit renderFit, bool isRenderFitNewVersionEnabled)
