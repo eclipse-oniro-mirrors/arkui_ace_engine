@@ -55,7 +55,7 @@ void ViewContextModelNGTest::SetUpTestCase()
 {
     MockPipelineContext::SetUp();
     MockContainer::SetUp();
-    pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    pipelineContext_ = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrentContext());
 }
 
 void ViewContextModelNGTest::TearDownTestCase()

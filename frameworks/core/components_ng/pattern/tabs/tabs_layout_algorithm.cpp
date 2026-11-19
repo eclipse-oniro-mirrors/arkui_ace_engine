@@ -1602,7 +1602,7 @@ void TabsLayoutAlgorithm::ApplySafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& s
 {
     auto swiperNode = swiperWrapper->GetHostNode();
     CHECK_NULL_VOID(swiperNode);
-    auto swiperFrameNode = swiperNode;
+    auto swiperFrameNode = AceType::DynamicCast<FrameNode>(swiperNode);
     CHECK_NULL_VOID(swiperFrameNode);
     const auto& children = swiperFrameNode->GetChildren();
     for (const auto& child : children) {
@@ -1659,7 +1659,7 @@ void TabsLayoutAlgorithm::ResetSafeAreaPaddingForTabBar(RefPtr<LayoutWrapper>& s
 {
     auto swiperNode = swiperWrapper->GetHostNode();
     CHECK_NULL_VOID(swiperNode);
-    auto swiperFrameNode = swiperNode;
+    auto swiperFrameNode = AceType::DynamicCast<FrameNode>(swiperNode);
     CHECK_NULL_VOID(swiperFrameNode);
     const auto& children = swiperFrameNode->GetChildren();
     for (const auto& child : children) {

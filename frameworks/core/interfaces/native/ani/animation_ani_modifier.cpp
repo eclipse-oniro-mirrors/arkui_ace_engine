@@ -159,7 +159,7 @@ static void UpdateAnimatableArithmetic(
     CHECK_NULL_VOID(frameNode);
     std::string propertyNameStr(propertyName);
     auto arithmeticImpl = AceType::MakeRefPtr<AniAnimatableArithmetic>(object.property, object.env);
-    RefPtr<CustomAnimatableArithmetic> arithmetic = arithmeticImpl;
+    RefPtr<CustomAnimatableArithmetic> arithmetic = AceType::DynamicCast<CustomAnimatableArithmetic>(arithmeticImpl);
     frameNode->UpdateAnimatableArithmeticProperty(propertyNameStr, arithmetic);
 }
 
@@ -171,7 +171,7 @@ static void CreateAnimatableArithmetic(
     CHECK_NULL_VOID(callback);
     std::string propertyNameStr(propertyName);
     auto arithmeticImpl = AceType::MakeRefPtr<AniAnimatableArithmetic>(object.property, object.env);
-    RefPtr<CustomAnimatableArithmetic> arithmetic = arithmeticImpl;
+    RefPtr<CustomAnimatableArithmetic> arithmetic = AceType::DynamicCast<CustomAnimatableArithmetic>(arithmeticImpl);
     std::function<void(const RefPtr<CustomAnimatableArithmetic>&)> updateCallback =
         [callbackFunc = *(reinterpret_cast<ArithmeticUpdateFunction*>(callback)),
             id = Container::CurrentIdSafelyWithCheck(),

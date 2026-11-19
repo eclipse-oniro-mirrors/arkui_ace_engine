@@ -58,7 +58,7 @@ void SyncLastTouchedColumnType(const RefPtr<FrameNode>& host, ForceSplitPageColu
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
-    auto forceSplitMgr = context->GetForceSplitManager();
+    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(context->GetForceSplitManager());
     CHECK_NULL_VOID(forceSplitMgr);
     TAG_LOGD(AceLogTag::ACE_NAVIGATION,
         "navigation destination touched, sync last touched column type: %{public}d, nodeId: %{public}d",

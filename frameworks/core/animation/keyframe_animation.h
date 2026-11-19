@@ -116,7 +116,7 @@ public:
             }
 
             float fraction = keyframe->GetKeyTime();
-            auto curve = keyframe->GetCurve() ? keyframe->GetCurve() : RefPtr<Curve>(Curves::EASE);
+            auto curve = keyframe->GetCurve() ? keyframe->GetCurve() : AceType::DynamicCast<Curve>(Curves::EASE);
             scheduler->AddKeyFrame(
                 fraction, curve, [weak = AceType::WeakClaim(this), callback = prepareCallback, fraction]() {
                     auto animation = weak.Upgrade();
