@@ -1988,7 +1988,10 @@ public:
             return;
         }
         taskExecutor->PostTask(
-            [viewDataWrap, pipelineContext, autoFillType = autoFillType_, triggerType = triggerType_, node]() {
+            [viewDataWrap, pipelineContext, autoFillType = autoFillType_, triggerType = triggerType_,
+                weakNode = node_]() {
+                auto node = weakNode.Upgrade();
+                CHECK_NULL_VOID(node);
                 if (pipelineContext) {
                     pipelineContext->NotifyFillRequestSuccess(autoFillType, viewDataWrap, triggerType, node);
                 }
@@ -2007,7 +2010,9 @@ public:
         auto taskExecutor = pipelineContext->GetTaskExecutor();
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostTask(
-            [errCode, pipelineContext, node, fillContent, isPopup]() {
+            [errCode, pipelineContext, weakNode = node_, fillContent, isPopup]() {
+                auto node = weakNode.Upgrade();
+                CHECK_NULL_VOID(node);
                 if (pipelineContext) {
                     pipelineContext->NotifyFillRequestFailed(node, errCode, fillContent, isPopup);
                 }
