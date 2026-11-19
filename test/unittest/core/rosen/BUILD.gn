@@ -189,6 +189,8 @@ ohos_unittest("arkui_rosen_render_context_test") {
     "detached_rs_node_manager_test.cpp",
     "frame_node_adopted_compensation_test.cpp",
     "overlay_modifier_test_ng.cpp",
+    "rosen_render_context_test.cpp",
+    "rosen_render_context_test_new.cpp",
     "sheet_edge_light_test_ng.cpp",
     "ui_material_filter_creator_test_ng.cpp",
   ]
