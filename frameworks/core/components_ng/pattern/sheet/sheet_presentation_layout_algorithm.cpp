@@ -74,15 +74,23 @@ bool TryResolveSubwindowHandedness(const RefPtr<FrameNode>& host, bool showInSub
     return true;
 }
 
-std::optional<PopupSide> ResolveHandednessSide(HandednessFollowMode mode,
+std::optional<PopupSide> ResolveHandednessSide(const RefPtr<FrameNode>& host, HandednessFollowMode mode,
     const RefPtr<HandednessManager>& handednessMgr, const RefPtr<WindowManager>& windowManager,
     float windowWidth)
 {
+    auto sheetPattern = host->GetPattern<SheetPresentationPattern>();
+    CHECK_NULL_RETURN(sheetPattern, std::nullopt);
     if (mode == HandednessFollowMode::FOLLOW_ANCHOR) {
-        auto [nodeId, anchorCenter] = handednessMgr->QueryAnchorPosition();
+        // On first layout, query HandednessManager for the anchor node and cache the
+        // returned nodeId on the pattern. On subsequent re-layouts, re-query using the
+        // cached nodeId so the sheet keeps following the same anchor component captured
+        // when the sheet was opened, instead of whatever lastFocusNodeId_ points to now.
+        int32_t queryNodeId = sheetPattern->GetHandednessAnchorNodeId();
+        auto [nodeId, anchorCenter] = handednessMgr->QueryAnchorPosition(queryNodeId);
         if (nodeId < 0) {
             return std::nullopt;
         }
+        sheetPattern->SetHandednessAnchorNodeId(nodeId);
         auto widthBp = windowManager->GetWidthBreakpointCallback();
         if (widthBp == WidthBreakpoint::WIDTH_MD) {
             return anchorCenter.GetX() < windowWidth / DOUBLE_SIZE ? PopupSide::LEFT : PopupSide::RIGHT;
@@ -101,7 +109,16 @@ std::optional<PopupSide> ResolveHandednessSide(HandednessFollowMode mode,
         return PopupSide::RIGHT;
     }
     if (mode == HandednessFollowMode::FOLLOW_GRIP_HAND) {
-        return handednessMgr->QueryPopupSideByHoldingHand();
+        // On first layout, query HandednessManager for the popup side and cache it on
+        // the pattern. On subsequent re-layouts, reuse the cached side so the sheet
+        // position stays stable instead of re-querying the holding-hand posture.
+        if (sheetPattern->IsHandednessPopupSideCaptured()) {
+            return sheetPattern->GetHandednessPopupSide();
+        }
+        auto side = handednessMgr->QueryPopupSideByHoldingHand();
+        sheetPattern->SetHandednessPopupSide(side);
+        sheetPattern->MarkHandednessPopupSideCaptured();
+        return side;
     }
     return std::nullopt;
 }
@@ -423,7 +440,7 @@ float SheetPresentationLayoutAlgorithm::ComputeHandednessOffsetX(LayoutWrapper* 
         return defaultCenterX;
     }
 
-    auto side = ResolveHandednessSide(mode, handednessMgr, windowManager, windowWidth);
+    auto side = ResolveHandednessSide(host, mode, handednessMgr, windowManager, windowWidth);
     if (!side.has_value() || LessOrEqual(windowWidth, sheetWidth_)) {
         return defaultCenterX;
     }
