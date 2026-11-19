@@ -2636,45 +2636,28 @@ void XComponentPattern::SetRenderFit(RenderFit renderFit)
     handlingSurfaceRenderContext_->SetRenderFit(renderFit);
 }
 
-// Set renderFit and frameGravityNewVersion flag on renderContextForSurface_.
-// All property writes and MarkNeedRenderOnly are posted to the UI thread to
-// serialize with the ArkTS .renderFit() path. surfaceRenderMutex_ is acquired
-// inside the UI thread lambda as an extra guard against concurrent access.
+// Set renderFit and frameGravityNewVersion flag on renderContextForSurface_
+// under surfaceRenderMutex_. The caller (XComponentInnerSurfaceController::
+// SetRenderFitBySurfaceId) is responsible for posting this to the UI thread.
 // Called by XComponentInnerSurfaceController::SetRenderFitBySurfaceId, which is
 // the inner API entry point for OHOS_ACE_SetRenderFitBySurfaceId.
 void XComponentPattern::SetSurfaceRenderFit(RenderFit renderFit, bool isRenderFitNewVersionEnabled)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto context = host->GetContextRefPtr();
-    CHECK_NULL_VOID(context);
-    auto taskExecutor = context->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
-    taskExecutor->PostTask(
-        [weak = WeakClaim(this), renderFit, isRenderFitNewVersionEnabled]() {
-            auto pattern = weak.Upgrade();
-            CHECK_NULL_VOID(pattern);
-            auto host = pattern->GetHost();
-            CHECK_NULL_VOID(host);
-            std::unique_lock<std::shared_mutex> lock(pattern->surfaceRenderMutex_);
-            const auto& renderContext = pattern->renderContextForSurface_;
-            CHECK_NULL_VOID(renderContext);
-            renderContext->SetRenderFit(renderFit);
+    std::unique_lock<std::shared_mutex> lock(surfaceRenderMutex_);
+    CHECK_NULL_VOID(renderContextForSurface_);
+    renderContextForSurface_->SetRenderFit(renderFit);
 #ifdef ENABLE_ROSEN_BACKEND
-            auto rosenRenderContext = AceType::DynamicCast<NG::RosenRenderContext>(renderContext);
-            CHECK_NULL_VOID(rosenRenderContext);
-            auto rsNode = rosenRenderContext->GetRSNode();
-            CHECK_NULL_VOID(rsNode);
-            auto rsSurfaceNode = rsNode->ReinterpretCastTo<Rosen::RSSurfaceNode>();
-            CHECK_NULL_VOID(rsSurfaceNode);
-            rsSurfaceNode->SetFrameGravityNewVersionEnabled(isRenderFitNewVersionEnabled);
+    auto rosenRenderContext = AceType::DynamicCast<NG::RosenRenderContext>(renderContextForSurface_);
+    CHECK_NULL_VOID(rosenRenderContext);
+    auto rsNode = rosenRenderContext->GetRSNode();
+    CHECK_NULL_VOID(rsNode);
+    auto rsSurfaceNode = rsNode->ReinterpretCastTo<Rosen::RSSurfaceNode>();
+    CHECK_NULL_VOID(rsSurfaceNode);
+    rsSurfaceNode->SetFrameGravityNewVersionEnabled(isRenderFitNewVersionEnabled);
 #endif
-            TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
-                "SetSurfaceRenderFit renderFit: %{public}d, isRenderFitNewVersionEnabled: %{public}d",
-                static_cast<int32_t>(renderFit), isRenderFitNewVersionEnabled);
-            host->MarkNeedRenderOnly();
-        },
-        TaskExecutor::TaskType::UI, "ArkUIXComponentSetRenderFitMarkRender");
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "SetSurfaceRenderFit renderFit: %{public}d, isRenderFitNewVersionEnabled: %{public}d",
+        static_cast<int32_t>(renderFit), isRenderFitNewVersionEnabled);
 }
 
 // Read current renderFit and frameGravityNewVersion flag from

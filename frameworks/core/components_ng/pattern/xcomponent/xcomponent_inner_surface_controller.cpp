@@ -45,9 +45,20 @@ int32_t XComponentInnerSurfaceController::SetRenderFitBySurfaceId(
     }
     auto node = weakNode.Upgrade();
     CHECK_NULL_RETURN(node, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto xcPattern = AceType::DynamicCast<XComponentPattern>(node->GetPattern());
-    CHECK_NULL_RETURN(xcPattern, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    xcPattern->SetSurfaceRenderFit(renderFit, isRenderFitNewVersionEnabled);
+    auto context = node->GetContextRefPtr();
+    CHECK_NULL_RETURN(context, XCOMPONENT_CONTROLLER_NO_ERROR);
+    auto taskExecutor = context->GetTaskExecutor();
+    CHECK_NULL_RETURN(taskExecutor, XCOMPONENT_CONTROLLER_NO_ERROR);
+    taskExecutor->PostTask(
+        [weakNode, renderFit, isRenderFitNewVersionEnabled]() {
+            auto node = weakNode.Upgrade();
+            CHECK_NULL_VOID(node);
+            auto xcPattern = AceType::DynamicCast<XComponentPattern>(node->GetPattern());
+            CHECK_NULL_VOID(xcPattern);
+            xcPattern->SetSurfaceRenderFit(renderFit, isRenderFitNewVersionEnabled);
+            node->MarkNeedRenderOnly();
+        },
+        TaskExecutor::TaskType::UI, "ArkUIXComponentSetRenderFit");
     return XCOMPONENT_CONTROLLER_NO_ERROR;
 }
 
