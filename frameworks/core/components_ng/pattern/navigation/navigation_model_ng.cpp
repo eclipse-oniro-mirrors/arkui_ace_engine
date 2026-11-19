@@ -821,55 +821,8 @@ void CreateImageBackIcon(const RefPtr<FrameNode>& backButtonNode, NavigationGrou
 void NavigationModelNG::SetTitleMode(NG::NavigationTitleMode mode)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    auto navigationGroupNode = AceType::DynamicCast<NavigationGroupNode>(frameNode);
-    CHECK_NULL_VOID(navigationGroupNode);
-    auto navBarNode = AceType::DynamicCast<NavBarNode>(navigationGroupNode->GetNavBarNode());
-    CHECK_NULL_VOID(navBarNode);
-    ACE_UINODE_TRACE(navBarNode);
-    auto navBarLayoutProperty = navBarNode->GetLayoutProperty<NavBarLayoutProperty>();
-    CHECK_NULL_VOID(navBarLayoutProperty);
-    auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navBarNode->GetTitleBarNode());
-    CHECK_NULL_VOID(titleBarNode);
-    auto titleBarLayoutProperty = titleBarNode->GetLayoutProperty<TitleBarLayoutProperty>();
-    CHECK_NULL_VOID(titleBarLayoutProperty);
-    const auto& titleHeightProperty = titleBarLayoutProperty->GetTitleHeight();
-    if (titleHeightProperty.has_value()) {
-        mode = NavigationTitleMode::MINI;
-    }
-    if (!navBarLayoutProperty->HasTitleMode() || navBarLayoutProperty->GetTitleModeValue() != mode) {
-        SetNeedResetTitleProperty(titleBarNode);
-    }
-    navBarLayoutProperty->UpdateTitleMode(static_cast<NG::NavigationTitleMode>(mode));
-    auto backButtonNode = AceType::DynamicCast<FrameNode>(titleBarNode->GetBackButton());
-    if (mode != NavigationTitleMode::MINI) {
-        // remove back button if any.
-        titleBarNode->RemoveChild(backButtonNode);
-        titleBarNode->SetBackButton(nullptr);
-        return;
-    }
-
-    if (backButtonNode != nullptr) {
-        return;
-    }
-    // create back button
-    bool result = CreateBackButtonNode(backButtonNode);
-    CHECK_NULL_VOID(result);
-
-    if (Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TWELVE) &&
-        SystemProperties::IsNeedSymbol()) {
-        CreateSymbolBackIcon(backButtonNode, navigationGroupNode);
-    } else {
-        CreateImageBackIcon(backButtonNode, navigationGroupNode);
-    }
-
-    //read navigation back button
-    auto theme = NavigationGetTheme();
-    std::string message = theme ? theme->GetNavigationBack() : "";
-    NavigationTitleUtil::SetAccessibility(backButtonNode, message);
-
-    backButtonNode->MarkModifyDone();
-    titleBarNode->SetBackButton(backButtonNode);
-    titleBarNode->AddChild(backButtonNode, 0);
+    CHECK_NULL_VOID(frameNode);
+    SetTitleMode(frameNode, mode);
 }
 
 bool NavigationModelNG::CreateBackButtonNode(RefPtr<FrameNode>& backButtonNode)
