@@ -117,6 +117,7 @@ adapter/ohos/osal/accessibility/ @ArkUI_ability_group
 adapter/ohos/osal/ace_checker.cpp @arkui_framework_xnode
 adapter/ohos/osal/ace_engine_ext.cpp @ArkUI_Event
 adapter/ohos/osal/ace_trace.cpp @arkui_framework_xnode
+adapter/ohos/osal/agent_input_reporter.cpp @ArkUI_Event
 adapter/ohos/osal/anr_thread.cpp @arkui_framework_xnode
 adapter/ohos/osal/app_bar_helper_impl.cpp @ArkUI_ability_group
 adapter/ohos/osal/background_task_helper_ohos.cpp @arkui_framework_xnode
@@ -2466,6 +2467,8 @@ frameworks/core/components_ng/pattern/calendar_picker/ @arkui001
 frameworks/core/components_ng/pattern/canvas/ @arkuilayout1
 frameworks/core/components_ng/pattern/checkbox/ @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/checkboxgroup/ @arkuipopupwindow_all
+frameworks/core/components_ng/pattern/command/ui_command_security_gate.cpp @arkui_framework_xnode
+frameworks/core/components_ng/pattern/command/ui_command_security_gate.h @arkui_framework_xnode
 frameworks/core/components_ng/pattern/common_text/ @huawei_g_five
 frameworks/core/components_ng/pattern/common_view/ @ArkUI_Event
 frameworks/core/components_ng/pattern/container_modal/ @ArkUI_ability_group
@@ -2684,6 +2687,8 @@ frameworks/core/components_ng/property/templates_parser.cpp @arkuiscroll
 frameworks/core/components_ng/property/templates_parser.h @arkuiscroll
 frameworks/core/components_ng/property/transition_property.h @arkuicodepulse
 frameworks/core/components_ng/property/union_effect_container_options.h @arkuicodepulse
+frameworks/core/components_ng/relaxed_interaction/relaxed_interaction_manager.cpp @ArkUI_Event
+frameworks/core/components_ng/relaxed_interaction/relaxed_interaction_manager.h @ArkUI_Event
 frameworks/core/components_ng/render/adapter/animated_image.cpp @arkui001
 frameworks/core/components_ng/render/adapter/animated_image.h @arkui001
 frameworks/core/components_ng/render/adapter/background_modifier.h @ArkUI_Event
@@ -3774,6 +3779,7 @@ test/unittest/core/pattern/rating/ @arkuipopupwindow_all
 test/unittest/core/pattern/recycle_node/ @arkuieco3
 test/unittest/core/pattern/refresh/ @arkuiscroll
 test/unittest/core/pattern/relative_container/ @arkuilayout1
+test/unittest/core/pattern/relaxed_interaction/relaxed_interaction_manager_test_ng.cpp @ArkUI_Event
 test/unittest/core/pattern/render_node/ @arkuieco3
 test/unittest/core/pattern/rich_editor/ @arkui_rich_editor
 test/unittest/core/pattern/rich_editor_drag/ @arkui_rich_editor
