@@ -463,6 +463,7 @@ export class ArkUIAniModule {
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
     native static _Common_IsTransPageEnabled(instanceId: KInt): boolean
+    native static _Common_SetDynamicDimming(id: string, value: double, instanceId: KInt): void
 
     // for transfer
     native static _createTouchEventAccessorWithPointer(input: KPointer): KPointer

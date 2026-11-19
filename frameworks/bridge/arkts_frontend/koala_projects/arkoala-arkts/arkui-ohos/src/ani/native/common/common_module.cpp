@@ -138,6 +138,16 @@ ani_boolean IsTransPageEnabled([[maybe_unused]] ani_env* env, ani_object obj, an
     return modifier->getCommonAniModifier()->isTransPageEnabled(instanceId);
 }
 
+void SetDynamicDimming(ani_env* env, ani_object obj, ani_string id, ani_double dimming, ani_int instanceId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier || !modifier->getCommonAniModifier() || !env) {
+        return;
+    }
+    auto key = AniUtils::ANIStringToStdString(env, id);
+    modifier->getCommonAniModifier()->setDynamicDimming(key, dimming, instanceId);
+}
+
 ani_object GetHostContext([[maybe_unused]] ani_env* env, ani_object obj, ani_int key)
 {
     const auto* modifier = GetNodeAniModifier();

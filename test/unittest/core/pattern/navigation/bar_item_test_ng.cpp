@@ -70,18 +70,6 @@ void BarItemTestNg::InitBarItemTestNg()
 }
 
 /**
- * @tc.name: CreateLayoutProperty001
- * @tc.desc: Test CreateLayoutProperty interface.
- * @tc.type: FUNC
- */
-HWTEST_F(BarItemTestNg, CreateLayoutProperty001, TestSize.Level1)
-{
-    auto barItemPattern = AceType::MakeRefPtr<BarItemPattern>();
-    auto ret = barItemPattern->CreateLayoutProperty();
-    EXPECT_NE(ret, nullptr);
-}
-
-/**
  * @tc.name: CreateLayoutAlgorithm001
  * @tc.desc: Test CreateLayoutAlgorithm interface.
  * @tc.type: FUNC
@@ -90,6 +78,18 @@ HWTEST_F(BarItemTestNg, CreateLayoutAlgorithm001, TestSize.Level1)
 {
     auto barItemPattern = AceType::MakeRefPtr<BarItemPattern>();
     auto ret = barItemPattern->CreateLayoutAlgorithm();
+    EXPECT_NE(ret, nullptr);
+}
+
+/**
+ * @tc.name: CreateLayoutProperty001
+ * @tc.desc: Test CreateLayoutProperty interface.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarItemTestNg, CreateLayoutProperty001, TestSize.Level1)
+{
+    auto barItemPattern = AceType::MakeRefPtr<BarItemPattern>();
+    auto ret = barItemPattern->CreateLayoutProperty();
     EXPECT_NE(ret, nullptr);
 }
 
