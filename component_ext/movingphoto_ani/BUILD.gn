@@ -62,6 +62,7 @@ ohos_shared_library("movingphotoview_ani") {
     external_deps += [ "media_library:media_library_manager" ]
   }
 
+  version_script = "./movingphotoview_ani.map"
   ldflags = [ "-Wl,--gc-sections" ]
 
   cflags = [
