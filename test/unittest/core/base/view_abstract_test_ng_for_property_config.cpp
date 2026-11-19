@@ -19,7 +19,6 @@
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
-
 #include "core/common/resource/resource_manager.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/common/resource/resource_parse_utils.h"
@@ -774,45 +773,6 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnAttach001, TestSize.Level1)
 }
 
 /**
- * @tc.name: ViewAbstractOnDetach001
- * @tc.desc: Test setting onDetach function
- * @tc.type: FUNC
- */
-HWTEST_F(ViewAbstractTestNg, ViewAbstractOnDetach001, TestSize.Level1)
-{
-    /**
-     * @tc.steps: step1. create framenode and check callback;
-     * @tc.expected: callback is not null.
-     */
-    ViewStackProcessor::GetInstance()->Push(FRAME_NODE_ROOT);
-    ViewStackProcessor::GetInstance()->Push(FRAME_NODE_CHILD);
-
-    auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
-    EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
-    auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
-    ASSERT_NE(frameNode, nullptr);
-    auto node = frameNode;
-    ASSERT_NE(node, nullptr);
-    std::function<void()> onDetachCallback = []() {};
-    ViewAbstract::SetOnDetach(std::move(onDetachCallback));
-    auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach;
-    EXPECT_NE(callback, nullptr);
-
-    /**
-     * @tc.steps: step2. Disable callback.
-     * @tc.expected: callback is null.
-     */
-    ViewAbstract::DisableOnDetach(AceType::RawPtr(node));
-    EXPECT_EQ(callback, nullptr);
-
-    /**
-     * @tc.steps: step3. Finish view stack.
-     */
-    ViewStackProcessor::GetInstance()->Finish();
-}
-
-/**
  * @tc.name: ViewAbstractOnAttach002
  * @tc.desc: Test setting onAttach callback
  * @tc.type: FUNC
@@ -843,6 +803,44 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnAttach002, TestSize.Level1)
      * @tc.expected: callback is null.
      */
     ViewAbstract::DisableOnAttach(AceType::RawPtr(node));
+    EXPECT_EQ(callback, nullptr);
+
+    /**
+     * @tc.steps: step3. Finish view stack.
+     */
+    ViewStackProcessor::GetInstance()->Finish();
+}
+/**
+ * @tc.name: ViewAbstractOnDetach001
+ * @tc.desc: Test setting onDetach function
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ViewAbstractOnDetach001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create framenode and check callback;
+     * @tc.expected: callback is not null.
+     */
+    ViewStackProcessor::GetInstance()->Push(FRAME_NODE_ROOT);
+    ViewStackProcessor::GetInstance()->Push(FRAME_NODE_CHILD);
+
+    auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
+    EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
+    auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
+    ASSERT_NE(frameNode, nullptr);
+    auto node = frameNode;
+    ASSERT_NE(node, nullptr);
+    std::function<void()> onDetachCallback = []() {};
+    ViewAbstract::SetOnDetach(std::move(onDetachCallback));
+    auto eventHub = node->GetEventHub<EventHub>();
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach;
+    EXPECT_NE(callback, nullptr);
+
+    /**
+     * @tc.steps: step2. Disable callback.
+     * @tc.expected: callback is null.
+     */
+    ViewAbstract::DisableOnDetach(AceType::RawPtr(node));
     EXPECT_EQ(callback, nullptr);
 
     /**
@@ -887,41 +885,6 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractBgDynamicBrightness001, TestSize.Level1
 }
 
 /**
- * @tc.name: ViewAbstractFgDynamicBrightness001
- * @tc.desc: Test setting foreground dynamic brightness option
- * @tc.type: FUNC
- */
-HWTEST_F(ViewAbstractTestNg, ViewAbstractFgDynamicBrightness001, TestSize.Level1)
-{
-    /**
-     * @tc.steps: Build a object viewAbstract and set visual state.
-     */
-    ViewStackProcessor viewStackProcessor;
-    int32_t index = 1;
-    auto state = static_cast<VisualState>(index);
-    viewStackProcessor.GetInstance()->SetVisualState(state);
-    auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
-    auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
-    ASSERT_NE(frameNode, nullptr);
-
-    /**
-     * @tc.steps: Build a object viewAbstract and set visual state.
-     * @tc.expected: The foreground effect is not changed.
-     */
-    BrightnessOption brightnessOption;
-    ViewAbstract::SetFgDynamicBrightness(brightnessOption);
-    ASSERT_FALSE(frameNode->GetRenderContext()->GetFgDynamicBrightnessOption().has_value());
-
-    /**
-     * @tc.steps: Set visual state to null and check the current visual state process
-     * @tc.expected: The foreground effect is changed as expected.
-     */
-    ViewStackProcessor::GetInstance()->visualState_ = std::nullopt;
-    ViewAbstract::SetFgDynamicBrightness(brightnessOption);
-    ASSERT_TRUE(frameNode->GetRenderContext()->GetFgDynamicBrightnessOption().has_value());
-}
-
-/**
  * @tc.name: ViewAbstractBgDynamicBrightness002
  * @tc.desc: Test setting background dynamic brightness option
  * @tc.type: FUNC
@@ -954,6 +917,40 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractBgDynamicBrightness002, TestSize.Level1
     ViewStackProcessor::GetInstance()->visualState_ = std::nullopt;
     ViewAbstract::SetBgDynamicBrightness(AceType::RawPtr(node), brightnessOption);
     ASSERT_TRUE(frameNode->GetRenderContext()->GetBgDynamicBrightnessOption().has_value());
+}
+/**
+ * @tc.name: ViewAbstractFgDynamicBrightness001
+ * @tc.desc: Test setting foreground dynamic brightness option
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ViewAbstractFgDynamicBrightness001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: Build a object viewAbstract and set visual state.
+     */
+    ViewStackProcessor viewStackProcessor;
+    int32_t index = 1;
+    auto state = static_cast<VisualState>(index);
+    viewStackProcessor.GetInstance()->SetVisualState(state);
+    auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
+    auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
+    ASSERT_NE(frameNode, nullptr);
+
+    /**
+     * @tc.steps: Build a object viewAbstract and set visual state.
+     * @tc.expected: The foreground effect is not changed.
+     */
+    BrightnessOption brightnessOption;
+    ViewAbstract::SetFgDynamicBrightness(brightnessOption);
+    ASSERT_FALSE(frameNode->GetRenderContext()->GetFgDynamicBrightnessOption().has_value());
+
+    /**
+     * @tc.steps: Set visual state to null and check the current visual state process
+     * @tc.expected: The foreground effect is changed as expected.
+     */
+    ViewStackProcessor::GetInstance()->visualState_ = std::nullopt;
+    ViewAbstract::SetFgDynamicBrightness(brightnessOption);
+    ASSERT_TRUE(frameNode->GetRenderContext()->GetFgDynamicBrightnessOption().has_value());
 }
 
 /**
@@ -1268,7 +1265,6 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractRequestFocus001, TestSize.Level1)
     childFocusHub->focusable_ = true;
     retCode = ViewAbstract::RequestFocus(AceType::RawPtr(child));
     ASSERT_EQ(retCode, ERROR_CODE_NON_FOCUSABLE_ANCESTOR);
-
 
     /**
     * @tc.steps: Set both frameNode and child focusable true

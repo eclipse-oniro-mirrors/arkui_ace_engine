@@ -777,6 +777,27 @@ HWTEST_F(ViewAbstractTestNg, SetOverlayBuilder001, TestSize.Level1)
     ViewAbstract::SetOverlayBuilder(nullptr, align, offsetX, offsetY);
     EXPECT_FALSE(result);
 }
+/**
+ * @tc.name: SetOverlayBuilder002
+ * @tc.desc: Test SetNeedFocus of View_Abstract
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetOverlayBuilder002, TestSize.Level1)
+{
+    std::function<void()> buildFunc = []() {};
+    std::optional<Alignment> align;
+    std::optional<Dimension> offsetX;
+    std::optional<Dimension> offsetY;
+    auto state = static_cast<VisualState>(INDEX);
+    ViewStackProcessor::GetInstance()->SetVisualState(state);
+    ViewStackProcessor::GetInstance()->ClearStack();
+    bool result = ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess();
+
+    ViewAbstract::SetOverlayBuilder(std::move(buildFunc), align, offsetX, offsetY);
+    ViewStackProcessor::GetInstance()->visualState_ = std::nullopt;
+    ViewAbstract::SetOverlayBuilder(std::move(buildFunc), align, offsetX, offsetY);
+    EXPECT_FALSE(result);
+}
 
 /**
  * @tc.name: SetClipEdge001
@@ -946,28 +967,6 @@ HWTEST_F(ViewAbstractTestNg, CleanTransit001, TestSize.Level1)
     frameNode->renderContext_ = AceType::MakeRefPtr<MockRenderContext>();
     ViewAbstract::CleanTransition(frameNode);
     EXPECT_NE(frameNode->renderContext_, nullptr);
-}
-
-/**
- * @tc.name: SetOverlayBuilder002
- * @tc.desc: Test SetNeedFocus of View_Abstract
- * @tc.type: FUNC
- */
-HWTEST_F(ViewAbstractTestNg, SetOverlayBuilder002, TestSize.Level1)
-{
-    std::function<void()> buildFunc = []() {};
-    std::optional<Alignment> align;
-    std::optional<Dimension> offsetX;
-    std::optional<Dimension> offsetY;
-    auto state = static_cast<VisualState>(INDEX);
-    ViewStackProcessor::GetInstance()->SetVisualState(state);
-    ViewStackProcessor::GetInstance()->ClearStack();
-    bool result = ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess();
-    
-    ViewAbstract::SetOverlayBuilder(std::move(buildFunc), align, offsetX, offsetY);
-    ViewStackProcessor::GetInstance()->visualState_ = std::nullopt;
-    ViewAbstract::SetOverlayBuilder(std::move(buildFunc), align, offsetX, offsetY);
-    EXPECT_FALSE(result);
 }
 
 /**
