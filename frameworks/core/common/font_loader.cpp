@@ -14,6 +14,7 @@
  */
 
 #include "core/common/font_loader.h"
+#include "core/pipeline/pipeline_base.h"
 
 namespace OHOS::Ace {
 

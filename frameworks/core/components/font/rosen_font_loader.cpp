@@ -14,6 +14,7 @@
  */
 
 #include "core/components/font/rosen_font_loader.h"
+#include "core/pipeline/pipeline_base.h"
 
 #include <regex>
 

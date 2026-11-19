@@ -44,6 +44,7 @@
 #include "core/common/container_scope.h"
 #include "core/common/clipboard/clipboard_proxy.h"
 #include "core/common/font_manager.h"
+#include "core/components_ng/base/frame_node.h"
 #ifndef CROSS_PLATFORM
 #include "core/common/recorder/node_data_cache.h"
 #endif

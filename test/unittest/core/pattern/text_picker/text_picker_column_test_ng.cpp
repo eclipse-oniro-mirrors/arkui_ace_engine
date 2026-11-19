@@ -26,6 +26,7 @@
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_font_manager.h"
+#include "core/common/font_loader.h"
 
 #include "core/components/button/button_theme.h"
 #include "core/components/theme/icon_theme.h"

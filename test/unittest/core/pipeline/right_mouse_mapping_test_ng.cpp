@@ -14,6 +14,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "core/common/font_loader.h"
 
 #include <chrono>
 #include <string>

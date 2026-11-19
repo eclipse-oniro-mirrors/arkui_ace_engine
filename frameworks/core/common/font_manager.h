@@ -16,20 +16,30 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_FONT_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_FONT_MANAGER_H
 
+#include <cstdint>
+#include <functional>
 #include <list>
+#include <map>
 #include <mutex>
 #include <set>
 #include <shared_mutex>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "base/memory/ace_type.h"
-#include "core/common/font_change_observer.h"
 #include "core/common/font_loader.h"
 #include "core/components/common/layout/constants.h"
-#include "core/components_ng/base/frame_node.h"
-#include "core/pipeline/pipeline_base.h"
 
 namespace OHOS::Ace {
+
+class FontChangeObserver;
+class PipelineBase;
+class RenderNode;
+
+namespace NG {
+class UINode;
+} // namespace NG
 
 struct FontInfo {
     std::string path;

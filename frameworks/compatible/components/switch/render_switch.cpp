@@ -18,6 +18,7 @@
 
 #include "base/log/event_report.h"
 #include "core/common/font_manager.h"
+#include "core/pipeline/pipeline_base.h"
 #include "core/event/multimodal/ace_multimodal_event.h"
 
 namespace OHOS::Ace {

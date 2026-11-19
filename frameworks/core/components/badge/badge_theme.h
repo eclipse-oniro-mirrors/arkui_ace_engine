@@ -17,6 +17,8 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_BADGE_BADGE_THEME_H
 
 #include "core/common/font_manager.h"
+#include "core/pipeline/pipeline_base.h"
+#include "ui/base/versions.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/color.h"
 #include "core/components/theme/theme.h"

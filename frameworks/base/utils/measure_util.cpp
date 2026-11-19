@@ -16,6 +16,7 @@
 #include "base/utils/measure_util.h"
 
 #include "core/components/common/properties/text_style.h"
+#include "core/common/font_manager.h"
 #include "core/pipeline/pipeline_context.h"
 #include "rosen_text/text_style.h"
 #include "rosen_text/typography.h"
@@ -270,6 +271,43 @@ Size MeasureUtil::MeasureTextSize(const TextStyle& textStyle, const std::string&
 #else
     return 0.0f;
 #endif
+}
+
+Size MeasureUtil::MeasureTextSizeWithFontFamily(const TextStyle& textStyle, const std::string& text)
+{
+#ifdef ENABLE_ROSEN_BACKEND
+    MeasureContext content;
+    content.textContent = text;
+    content.fontSize = textStyle.GetFontSize();
+    auto fontweight = StringUtils::FontWeightToString(textStyle.GetFontWeight());
+    content.fontWeight = fontweight;
+    const auto& fontFamilies = textStyle.GetFontFamilies();
+    if (!fontFamilies.empty()) {
+        content.fontFamily = fontFamilies.front();
+        for (size_t index = 1; index < fontFamilies.size(); ++index) {
+            content.fontFamily.append(",").append(fontFamilies[index]);
+        }
+    } else {
+        auto pipeline = PipelineBase::GetCurrentContextSafelyWithCheck();
+        if (pipeline) {
+            auto fontManager = pipeline->GetFontManager();
+            if (fontManager) {
+                content.fontFamily = fontManager->GetAppCustomFont();
+            }
+        }
+    }
+    content.isReturnActualWidth = true;
+    content.maxlines = 1;
+    return MeasureTextSizeInner(content);
+#else
+    return 0.0f;
+#endif
+}
+
+double MeasureUtil::MeasureTextWidthWithFontFamily(const TextStyle& textStyle, const std::string& text)
+{
+    auto width = MeasureTextSizeWithFontFamily(textStyle, text).Width();
+    return std::max(width, 0.0);
 }
 
 double MeasureUtil::MeasureTextWidth(const TextStyle& textStyle, const std::string& text)

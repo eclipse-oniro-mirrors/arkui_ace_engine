@@ -26,6 +26,7 @@
 #include "core/common/clipboard/clipboard_proxy.h"
 #include "core/common/container_scope.h"
 #include "core/common/font_manager.h"
+#include "core/pipeline/pipeline_base.h"
 #include "core/common/ime/text_input_type.h"
 #include "core/common/text_field_manager.h"
 #include "core/components/text/text_utils.h"

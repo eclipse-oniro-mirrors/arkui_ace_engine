@@ -14,6 +14,7 @@
  */
 
 #include "test/unittest/core/pipeline/pipeline_context_test_ng.h"
+#include "core/common/font_loader.h"
 
 #include "core/components_ng/base/ui_tree_collector.h"
 // Add the following two macro definitions to test the private and protected method.
