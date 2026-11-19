@@ -110,6 +110,41 @@ HWTEST_F(FrameNodeAccessorTest, DISABLED_isModifiableTestNotCustomNode2, TestSiz
 }
 
 /**
+ * @tc.name: dispatchInputEventNotNull
+ * @tc.desc: dispatchInputEvent accessor is wired with the context-style signature
+ *           (Ark_VMContext vmContext as the first parameter).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeAccessorTest, dispatchInputEventNotNull, TestSize.Level1)
+{
+    ASSERT_NE(accessor_->dispatchInputEvent, nullptr);
+}
+
+/**
+ * @tc.name: dispatchInputEventNullEvent
+ * @tc.desc: null event returns false without crash (guard before any dispatch).
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeAccessorTest, dispatchInputEventNullEvent, TestSize.Level1)
+{
+    ASSERT_NE(accessor_->dispatchInputEvent, nullptr);
+    Opt_CompetitionStrategy competitionStrategy {};
+    EXPECT_EQ(ARK_FALSE, accessor_->dispatchInputEvent(nullptr, peer_, nullptr, &competitionStrategy));
+}
+
+/**
+ * @tc.name: dispatchInputEventNullCompetitionStrategy
+ * @tc.desc: null competitionStrategy returns false without crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeAccessorTest, dispatchInputEventNullCompetitionStrategy, TestSize.Level1)
+{
+    ASSERT_NE(accessor_->dispatchInputEvent, nullptr);
+    Ark_InputEventType event {};
+    EXPECT_EQ(ARK_FALSE, accessor_->dispatchInputEvent(nullptr, peer_, &event, nullptr));
+}
+
+/**
  * @tc.name: appendChildTest
  * @tc.desc:
  * @tc.type: FUNC
