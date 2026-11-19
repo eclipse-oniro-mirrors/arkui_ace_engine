@@ -707,6 +707,8 @@ frameworks/bridge/declarative_frontend/ark_direct_component/src/arktextclock.ts 
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktextpicker.ts @huawei_g_five
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktoggle.ts @arkuipopupwindow_all
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktoolbaritem.ts @ArkUI_ability_group
+frameworks/bridge/declarative_frontend/ark_direct_component/src/arktabs.ts @arkui_navigation
+frameworks/bridge/declarative_frontend/ark_direct_component/src/arktabcontent.ts @arkui_navigation
 frameworks/bridge/declarative_frontend/ark_layoutalgorithm/ @arkuilayout1
 frameworks/bridge/declarative_frontend/ark_lazylayoutalgorithm/ @arkuiscroll
 frameworks/bridge/declarative_frontend/ark_mock/ @arkuieco3
