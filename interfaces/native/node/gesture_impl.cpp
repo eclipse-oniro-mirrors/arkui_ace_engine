@@ -1164,7 +1164,6 @@ int32_t SetGestureInterrupterToNode(
 {
     CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(interrupter, 0, __FUNCTION__, "GestureInterrupt is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback = reinterpret_cast<int32_t (*)(ArkUIGestureInterruptInfo*)>(interrupter);
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getGestureModifier()->setGestureInterrupterToNode(
@@ -1177,7 +1176,6 @@ int32_t SetGestureInterrupterToNodeWithUserData(ArkUI_NodeHandle node, void* use
 {
     CHECK_UI_THREAD("ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(interrupter, 0, __FUNCTION__, "GestureInterrupt is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback = reinterpret_cast<int32_t (*)(ArkUIGestureInterruptInfo*)>(interrupter);
     auto nodeModel = OHOS::Ace::NodeModel::GetFullImpl();
