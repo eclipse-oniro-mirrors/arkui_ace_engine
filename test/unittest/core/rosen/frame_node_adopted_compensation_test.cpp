@@ -135,9 +135,6 @@ protected:
         innerRenderNode_ = Rosen::RSCanvasNode::Create();
         ASSERT_NE(outerRenderNode_, nullptr);
         ASSERT_NE(innerRenderNode_, nullptr);
-        outerRenderNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
-        innerRenderNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
-        adoptedRenderNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
         outerRenderNode_->SetBounds(OUTER_POSITION_X, OUTER_POSITION_Y, NODE_SIZE, NODE_SIZE);
         outerRenderNode_->SetPivot(HALF_PIVOT, HALF_PIVOT);
         outerRenderNode_->SetScale(TWO_LAYER_SCALE, TWO_LAYER_SCALE);
@@ -262,8 +259,6 @@ protected:
     {
         outerRenderNode_ = Rosen::RSCanvasNode::Create();
         ASSERT_NE(outerRenderNode_, nullptr);
-        outerRenderNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
-        adoptedRenderNode_->SetDrawNodeType(Rosen::DrawNodeType::GeometryPropertyType);
         outerRenderNode_->SetBounds(OUTER_POSITION_X, OUTER_POSITION_Y, NODE_SIZE, INNER_NODE_HEIGHT);
         outerRenderNode_->SetTranslate(LAYER_TRANSLATION_X, LAYER_TRANSLATION_Y, 0.0f);
         auto parentContext = AceType::DynamicCast<NG::RosenRenderContext>(parentNode_->GetRenderContext());
