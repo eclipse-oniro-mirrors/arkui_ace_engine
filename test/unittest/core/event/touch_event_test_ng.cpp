@@ -25,6 +25,8 @@
 #include "core/common/event_manager.h"
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/core/common/mock_reporter.h"
+#include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 
 #include "core/common/ace_application_info.h"
 #include "core/components_ng/event/developer_response_publisher.h"
@@ -83,6 +85,12 @@ void TouchEventTestNg::SetUp()
 
 void TouchEventTestNg::TearDown()
 {
+    // UiSessionManager and Reporter are process-wide singleton mocks shared by
+    // every test case; verify and clear their expectations after each case so
+    // that no case leaks its mock state into a later one, whatever gtest filter
+    // combination is used to run the suite.
+    Mock::VerifyAndClearExpectations(reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance()));
+    Mock::VerifyAndClearExpectations(reinterpret_cast<MockReporter*>(&Reporter::GetInstance()));
     MockPipelineContext::TearDown();
 }
 
@@ -901,6 +909,145 @@ HWTEST_F(TouchEventTestNg, TouchEventReportMultiPointerTest009, TestSize.Level1)
     point.pointers.push_back(tp2);
 
     touchEventActuator->HandleEvent(point);
+    EXPECT_TRUE(callbackCalled);
+}
+
+/**
+ * @tc.name: TouchEventReportGateNotRegisteredTest005
+ * @tc.desc: gate: no component-change client registered -> no report is delivered,
+ *           user callback still executes
+ * @tc.type: FUNC
+ */
+HWTEST_F(TouchEventTestNg, TouchEventReportGateNotRegisteredTest005, TestSize.Level1)
+{
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+    auto frameNode = FrameNode::CreateFrameNode("test", 1102, AceType::MakeRefPtr<Pattern>());
+    touchEventActuator->AttachFrameNode(frameNode);
+
+    auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    EXPECT_CALL(*mockUiSessionManager, GetComponentChangeEventRegistered()).WillRepeatedly(Return(false));
+
+    auto mockReporter = reinterpret_cast<MockReporter*>(&Reporter::GetInstance());
+    EXPECT_CALL(*mockReporter, HandleUISessionReporting(_)).Times(0);
+
+    bool callbackCalled = false;
+    TouchEventFunc callback = [&callbackCalled](TouchEventInfo& info) { callbackCalled = true; };
+    touchEventActuator->ReplaceTouchEvent(std::move(callback));
+
+    TouchEvent point;
+    point.type = TouchType::DOWN;
+    point.id = 1;
+    point.time = std::chrono::steady_clock::now();
+
+    EXPECT_TRUE(touchEventActuator->HandleEvent(point));
+    EXPECT_TRUE(callbackCalled);
+}
+
+/**
+ * @tc.name: TouchEventReportGateMaskNotSubscribedTest006
+ * @tc.desc: gate: client registered but event mask has no COMPONENT_EVENT_GESTURE bit
+ *           -> no report is delivered, user callback still executes
+ * @tc.type: FUNC
+ */
+HWTEST_F(TouchEventTestNg, TouchEventReportGateMaskNotSubscribedTest006, TestSize.Level1)
+{
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+    auto frameNode = FrameNode::CreateFrameNode("test", 1103, AceType::MakeRefPtr<Pattern>());
+    touchEventActuator->AttachFrameNode(frameNode);
+
+    auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    EXPECT_CALL(*mockUiSessionManager, GetComponentChangeEventRegistered()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*mockUiSessionManager, NeedComponentChangeTypeReporting(_)).WillRepeatedly(Return(false));
+
+    auto mockReporter = reinterpret_cast<MockReporter*>(&Reporter::GetInstance());
+    EXPECT_CALL(*mockReporter, HandleUISessionReporting(_)).Times(0);
+
+    bool callbackCalled = false;
+    TouchEventFunc callback = [&callbackCalled](TouchEventInfo& info) { callbackCalled = true; };
+    touchEventActuator->ReplaceTouchEvent(std::move(callback));
+
+    TouchEvent point;
+    point.type = TouchType::DOWN;
+    point.id = 1;
+    point.time = std::chrono::steady_clock::now();
+
+    EXPECT_TRUE(touchEventActuator->HandleEvent(point));
+    EXPECT_TRUE(callbackCalled);
+}
+
+/**
+ * @tc.name: TouchEventReportGatePassThroughTest007
+ * @tc.desc: gate: client registered and subscribed to COMPONENT_EVENT_GESTURE
+ *           -> one report per DOWN/UP/CANCEL is delivered with the attached node id
+ * @tc.type: FUNC
+ */
+HWTEST_F(TouchEventTestNg, TouchEventReportGatePassThroughTest007, TestSize.Level1)
+{
+    constexpr int32_t NODE_ID = 1104;
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+    auto frameNode = FrameNode::CreateFrameNode("test", NODE_ID, AceType::MakeRefPtr<Pattern>());
+    touchEventActuator->AttachFrameNode(frameNode);
+
+    auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    EXPECT_CALL(*mockUiSessionManager, GetComponentChangeEventRegistered()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*mockUiSessionManager, NeedComponentChangeTypeReporting(ComponentEventType::COMPONENT_EVENT_GESTURE))
+        .WillRepeatedly(Return(true));
+
+    int32_t reportedCount = 0;
+    auto mockReporter = reinterpret_cast<MockReporter*>(&Reporter::GetInstance());
+    EXPECT_CALL(*mockReporter, HandleUISessionReporting(_))
+        .Times(3)
+        .WillRepeatedly(Invoke([&reportedCount, NODE_ID](const JsonReport& report) {
+            EXPECT_EQ(report.GetGestureType(), GestureTypeName::TOUCH_EVENT);
+            EXPECT_EQ(report.GetId(), NODE_ID);
+            ++reportedCount;
+        }));
+
+    bool callbackCalled = false;
+    TouchEventFunc callback = [&callbackCalled](TouchEventInfo& info) { callbackCalled = true; };
+    touchEventActuator->ReplaceTouchEvent(std::move(callback));
+
+    for (auto touchType : { TouchType::DOWN, TouchType::UP, TouchType::CANCEL }) {
+        TouchEvent point;
+        point.type = touchType;
+        point.id = 1;
+        point.time = std::chrono::steady_clock::now();
+        EXPECT_TRUE(touchEventActuator->HandleEvent(point));
+    }
+
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(reportedCount, 3);
+}
+
+/**
+ * @tc.name: TouchEventReportGateMoveFilteredTest008
+ * @tc.desc: gate passes but MOVE events are still filtered out before reporting
+ * @tc.type: FUNC
+ */
+HWTEST_F(TouchEventTestNg, TouchEventReportGateMoveFilteredTest008, TestSize.Level1)
+{
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+    auto frameNode = FrameNode::CreateFrameNode("test", 1105, AceType::MakeRefPtr<Pattern>());
+    touchEventActuator->AttachFrameNode(frameNode);
+
+    auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    EXPECT_CALL(*mockUiSessionManager, GetComponentChangeEventRegistered()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*mockUiSessionManager, NeedComponentChangeTypeReporting(ComponentEventType::COMPONENT_EVENT_GESTURE))
+        .WillRepeatedly(Return(true));
+
+    auto mockReporter = reinterpret_cast<MockReporter*>(&Reporter::GetInstance());
+    EXPECT_CALL(*mockReporter, HandleUISessionReporting(_)).Times(0);
+
+    bool callbackCalled = false;
+    TouchEventFunc callback = [&callbackCalled](TouchEventInfo& info) { callbackCalled = true; };
+    touchEventActuator->ReplaceTouchEvent(std::move(callback));
+
+    TouchEvent point;
+    point.type = TouchType::MOVE;
+    point.id = 1;
+    point.time = std::chrono::steady_clock::now();
+
+    EXPECT_TRUE(touchEventActuator->HandleEvent(point));
     EXPECT_TRUE(callbackCalled);
 }
 

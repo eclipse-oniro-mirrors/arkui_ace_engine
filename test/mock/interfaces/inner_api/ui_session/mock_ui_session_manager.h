@@ -40,6 +40,7 @@ public:
     MOCK_METHOD0(FlushPageSceneNodeChanged, void());
     MOCK_METHOD0(FlushPendingSearchClicksIfStable, void());
     MOCK_METHOD0(GetComponentChangeEventRegistered, bool());
+    MOCK_METHOD1(NeedComponentChangeTypeReporting, bool(uint32_t));
     MOCK_METHOD3(SendPageTextToAI, void(int32_t nodeId, const std::string& text, int64_t version));
     MOCK_METHOD1(GetPageTranslateText, int32_t(const std::string& request));
     MOCK_METHOD1(StartPageTranslate, int32_t(const std::string& request));
