@@ -696,6 +696,17 @@ public:
     {
         isFloatingBar_ = isFloatingBar;
     }
+
+    bool IsTabBarClickHandled() const
+    {
+        return tabBarClickHandled_;
+    }
+
+    void ResetTabBarClickHandled()
+    {
+        tabBarClickHandled_ = false;
+    }
+    
     bool IsFloatingBar() const
     {
         return isFloatingBar_;
@@ -982,6 +993,7 @@ private:
     bool isFloatingBar_ = false;
     bool isFloatingTopBar_ = false;
     ColorMode colorInvertColorMode_ = ColorMode::COLOR_MODE_UNDEFINED;
+    bool tabBarClickHandled_ = false;
 
     ACE_DISALLOW_COPY_AND_MOVE(TabBarPattern);
 
