@@ -636,7 +636,7 @@ bool ListLanesLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutW
         return ListLayoutAlgorithm::MeasureFastScrollNeighbors(layoutWrapper, size);
     }
     const auto targetOpt = GetPhysicalLanesRow(GetFastScrollState()->input.targetIndex.value());
-    CHECK_NULL_RETURN(targetOpt, false); 
+    CHECK_NULL_RETURN(targetOpt, false);
     const auto target = *targetOpt;
     const auto [start, end] = GetFastScrollPreparationRange(size);
     if (!std::isfinite(start) || !std::isfinite(end)) {
