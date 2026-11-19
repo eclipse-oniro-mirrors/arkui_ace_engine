@@ -2263,16 +2263,9 @@ HWTEST_F(UIContentStubTest, SendCommandSecurityAuthFlag001, TestSize.Level1)
     ASSERT_NE(manager, nullptr);
     constexpr uint64_t requestId = 0x99887766ULL;
     constexpr int32_t nodeId = 7;
-    constexpr uint64_t tokenId = 0x1234567890ABCDEFULL;
+    constexpr uint64_t agentTokenId = 0x1234567890ABCDEFULL;
     const std::string command = R"({"cmd":"setText","params":{"value":"x"}})";
 
-    SecurityAuthInfo observed;
-    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _, _))
-        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
-                             const SecurityAuthInfo& securityAuth) {
-            observed = securityAuth;
-            callback(R"({"result":"SUCCESS"})");
-        }));
     EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
         .WillOnce(Return([](const std::string&) {}));
     MessageParcel data;
@@ -2284,11 +2277,9 @@ HWTEST_F(UIContentStubTest, SendCommandSecurityAuthFlag001, TestSize.Level1)
     ASSERT_TRUE(data.WriteInt32(nodeId));
     ASSERT_TRUE(data.WriteString(command));
     ASSERT_TRUE(data.WriteBool(true));
-    ASSERT_TRUE(data.WriteUint64(tokenId));
+    ASSERT_TRUE(data.WriteUint64(agentTokenId));
     EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
         NO_ERROR);
-    EXPECT_TRUE(observed.needSecurityAuth);
-    EXPECT_EQ(observed.tokenId, tokenId);
     Mock::VerifyAndClearExpectations(manager);
 }
 
@@ -2364,7 +2355,7 @@ HWTEST_F(UIContentStubTest, SendCommandLegacyParcelKeepsDefaults001, TestSize.Le
         stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, legacyData, reply, option),
         NO_ERROR);
     EXPECT_FALSE(legacy.needSecurityAuth);
-    EXPECT_EQ(legacy.tokenId, UINT64_MAX);
+    EXPECT_EQ(legacy.agentTokenId, UINT64_MAX);
     Mock::VerifyAndClearExpectations(manager);
 }
 

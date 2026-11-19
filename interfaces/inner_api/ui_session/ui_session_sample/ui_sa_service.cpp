@@ -880,13 +880,13 @@ void UiSaService::HandleGetCurrentPageName(sptr<IUiContentService> service, std:
 }
 
 namespace {
-// Optional trailing struct-form argument: "{needSecurityAuth,tokenId}", e.g. "{true,234}".
-// Fields may be omitted: "{true}" keeps the default tokenId, "{}" keeps both defaults.
+// Optional trailing struct-form argument: "{needSecurityAuth,agentTokenId}", e.g. "{true,234}".
+// Fields may be omitted: "{true}" keeps the default agentTokenId, "{}" keeps both defaults.
 // The token is consumed only when fully valid, so JSON command payloads such as
 // "{"cmd":"click"}" are never mistaken for a security auth struct.
 constexpr size_t AUTH_ARG_MIN_LENGTH = 2;   // shortest struct token: "{}"
-constexpr size_t AUTH_ARG_MAX_FIELDS = 2;   // {needSecurityAuth, tokenId}
-constexpr int AUTH_ARG_TOKEN_ID_BASE = 10;  // tokenId is parsed as decimal digits
+constexpr size_t AUTH_ARG_MAX_FIELDS = 2;   // {needSecurityAuth, agentTokenId}
+constexpr int AUTH_ARG_AGENT_TOKEN_ID_BASE = 10;  // agentTokenId is parsed as decimal digits
 SecurityAuthInfo ParseTrailingSecurityAuth(std::vector<std::string>& params)
 {
     SecurityAuthInfo securityAuth;
@@ -923,15 +923,15 @@ SecurityAuthInfo ParseTrailingSecurityAuth(std::vector<std::string>& params)
             return securityAuth;
         }
     }
-    uint64_t tokenId = UINT64_MAX;
+    uint64_t agentTokenId = UINT64_MAX;
     if (fields.size() == AUTH_ARG_MAX_FIELDS && !fields[1].empty()) {
         if (fields[1].find_first_not_of("0123456789") != std::string::npos) {
             return securityAuth;
         }
-        tokenId = std::strtoull(fields[1].c_str(), nullptr, AUTH_ARG_TOKEN_ID_BASE);
+        agentTokenId = std::strtoull(fields[1].c_str(), nullptr, AUTH_ARG_AGENT_TOKEN_ID_BASE);
     }
     securityAuth.needSecurityAuth = needSecurityAuth;
-    securityAuth.tokenId = tokenId;
+    securityAuth.agentTokenId = agentTokenId;
     params.pop_back();
     return securityAuth;
 }
@@ -1002,8 +1002,9 @@ void UiSaService::HandleSendCommandWithFinishCallback(
     int32_t result = params.size() == SEND_COMMAND_WITH_NODEID
         ? service->SendCommand(std::atoi(params[1].c_str()), command, finishCallback, securityAuth)
         : service->SendCommand(command, finishCallback, securityAuth);
-    LOGI("[SendCommandWithFinishCallback] request result=%{public}d, needSecurityAuth=%{public}d, tokenId=%{public}llu",
-        result, securityAuth.needSecurityAuth, static_cast<unsigned long long>(securityAuth.tokenId));
+    LOGI("[SendCommandWithFinishCallback] request result=%{public}d, needSecurityAuth=%{public}d, "
+         "agentTokenId=%{public}llu",
+        result, securityAuth.needSecurityAuth, static_cast<unsigned long long>(securityAuth.agentTokenId));
 }
 
 void UiSaService::HandleSendBatchSetTextWithFinishCallback(
@@ -1025,8 +1026,8 @@ void UiSaService::HandleSendCommandSync(sptr<IUiContentService> service, std::ve
     int32_t id = std::atoi(params[1].c_str());
     std::string command = params[2];
     int32_t result = service->SendCommandSync(id, command, securityAuth);
-    LOGI("[SendCommandSync] result = %{public}d, needSecurityAuth=%{public}d, tokenId=%{public}llu",
-        result, securityAuth.needSecurityAuth, static_cast<unsigned long long>(securityAuth.tokenId));
+    LOGI("[SendCommandSync] result = %{public}d, needSecurityAuth=%{public}d, agentTokenId=%{public}llu",
+        result, securityAuth.needSecurityAuth, static_cast<unsigned long long>(securityAuth.agentTokenId));
 }
 
 void UiSaService::HandleRegisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params)

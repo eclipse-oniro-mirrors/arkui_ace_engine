@@ -684,7 +684,7 @@ int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& comman
         return FAILED;
     }
     if (!data.WriteInt32(id) || !data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
-        !data.WriteUint64(securityAuth.tokenId)) {
+        !data.WriteUint64(securityAuth.agentTokenId)) {
         LOGW("SendCommand write data failed");
         return FAILED;
     }
@@ -706,7 +706,7 @@ int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& co
         return FAILED;
     }
     if (!data.WriteInt32(id) || !data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
-        !data.WriteUint64(securityAuth.tokenId)) {
+        !data.WriteUint64(securityAuth.agentTokenId)) {
         LOGW("SendCommandSync write data failed");
         return FAILED;
     }
@@ -740,7 +740,7 @@ int32_t UIContentServiceProxy::SendCommand(const std::string command, SecurityAu
     }
 
     if (!data.WriteString(command) || !data.WriteBool(securityAuth.needSecurityAuth) ||
-        !data.WriteUint64(securityAuth.tokenId)) {
+        !data.WriteUint64(securityAuth.agentTokenId)) {
         LOGW("SendCommand WriteStringVector  failed");
         return FAILED;
     }
@@ -799,7 +799,7 @@ int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
         writeSuccess = data.WriteInt32(*id);
     }
     writeSuccess = writeSuccess && data.WriteString(command) && data.WriteBool(securityAuth.needSecurityAuth) &&
-        data.WriteUint64(securityAuth.tokenId);
+        data.WriteUint64(securityAuth.agentTokenId);
     if (!writeSuccess) {
         LOGW("SendCommandWithFinishCallback write parcel failed");
         report_->UnregisterSendCommandFinishCallback(requestId);
