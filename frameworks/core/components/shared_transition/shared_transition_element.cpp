@@ -136,7 +136,7 @@ bool SharedTransitionElement::AboardShuttle(Offset& ticket)
         LOGE("Aboard Shuttle Component failed. render passenger is null. id: %{public}s", GetId().c_str());
         return false;
     }
-    const auto& renderBox = AceType::DynamicCast<RenderBox>(passenger);
+    const auto& renderBox = passenger;
     if (!renderBox) {
         LOGE("Aboard Shuttle Component failed. render passenger do not have pajamas. id: %{public}s", GetId().c_str());
         return false;

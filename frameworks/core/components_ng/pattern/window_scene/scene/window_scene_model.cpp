@@ -137,7 +137,7 @@ void WindowSceneModel::Create(int32_t persistentId)
     if (windowNode->GetHitTestMode() == HitTestMode::HTMDEFAULT) {
         windowNode->SetHitTestMode(HitTestMode::HTMBLOCK);
     }
-    auto node = AceType::DynamicCast<FrameNode>(windowNode);
+    RefPtr<FrameNode> node = windowNode;
     CheckParentNodeDfx(node, sceneSession, persistentId);
 }
 

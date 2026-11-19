@@ -91,7 +91,7 @@ public:
 
     RefPtr<Curve> GetCurve() override
     {
-        return curve_ != nullptr ? curve_ : AceType::DynamicCast<Curve>(Curves::EASE_IN_OUT);
+        return curve_ != nullptr ? curve_ : RefPtr<Curve>(Curves::EASE_IN_OUT);
     }
 
 private:
