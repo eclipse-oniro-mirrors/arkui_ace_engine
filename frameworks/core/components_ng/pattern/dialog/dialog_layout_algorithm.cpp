@@ -108,7 +108,7 @@ ForceSplitPageColumnType ResolveSplitColumnType(
     }
     ForceSplitPageColumnType column = ForceSplitPageColumnType::NONE;
     const char* source = "none";
-    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(pipeline->GetForceSplitManager());
+    auto forceSplitMgr = pipeline->GetForceSplitManager();
     if (forceSplitMgr) {
         column = forceSplitMgr->GetLastTouchedColumnType();
         if (column != ForceSplitPageColumnType::NONE) {

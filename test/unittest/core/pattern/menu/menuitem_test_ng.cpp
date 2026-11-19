@@ -1699,6 +1699,9 @@ HWTEST_F(MenuItemTestNg, OnThemeScopeUpdateTest005, TestSize.Level1)
  */
 HWTEST_F(MenuItemTestNg, MenuItemModelNGCreateTestNg001, TestSize.Level1)
 {
+    /**
+     * @tc.steps: step1. Set API target version to 26 and create MenuItem.
+     */
     int32_t setApiVersion = static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX);
     int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
     MockContainer::Current()->SetApiTargetVersion(setApiVersion);
@@ -1706,12 +1709,18 @@ HWTEST_F(MenuItemTestNg, MenuItemModelNGCreateTestNg001, TestSize.Level1)
     itemOption.content = "content";
     MenuItemModelNG menuItemModelInstance;
     menuItemModelInstance.Create(itemOption);
+    /**
+     * @tc.steps: step2. Verify the created FrameNode has valid pattern and event hub.
+     */
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
     auto menuItemPattern = frameNode->GetPattern<MenuItemPattern>();
     ASSERT_NE(menuItemPattern, nullptr);
     auto menuItemEventHub = frameNode->GetEventHub<MenuItemEventHub>();
     ASSERT_NE(menuItemEventHub, nullptr);
+    /**
+     * @tc.steps: step3. Trigger OnClick and verify selected state, then rollback API version.
+     */
     menuItemPattern->OnClick();
     ASSERT_TRUE(menuItemPattern->IsSelected());
     MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
