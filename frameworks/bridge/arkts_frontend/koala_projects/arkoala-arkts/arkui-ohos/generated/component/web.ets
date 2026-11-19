@@ -3474,6 +3474,15 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setVisitedLinkPersistEnabled(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+
+    setAdaptToHandednessAttribute(value: WebHandednessFollowMode): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        thisSerializer.writeInt8(RuntimeType.OBJECT)
+        const valueTmpValue = (value as WebHandednessFollowMode)
+        thisSerializer.writeInt32(valueTmpValue.valueOf())
+        ArkUIGeneratedNativeModule._WebAttribute_setAdaptToHandedness(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setRegisterNativeEmbedRuleAttribute(tag: string | undefined, type: string | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (tag !== undefined) {
@@ -3644,6 +3653,10 @@ export enum CacheMode {
 export enum OverScrollMode {
     NEVER = 0,
     ALWAYS = 1
+}
+export enum WebHandednessFollowMode {
+    NONE = 0,
+    FOLLOW_ANCHOR = 1
 }
 export enum BlurOnKeyboardHideMode {
     SILENT = 0,
@@ -4622,6 +4635,10 @@ export interface WebAttribute extends CommonMethod {
     visitedLinkPersistEnabled(value: boolean | undefined): this {
         throw new Error('Unimplemented method visitedLinkPersistEnabled')
     }
+
+    adaptToHandedness(value: WebHandednessFollowMode): this {
+        throw new Error('Unimplemented method adaptToHandedness')
+    }
     registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {
         throw new Error('Unimplemented method registerNativeEmbedRule')
     }
@@ -5526,6 +5543,12 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
     public visitedLinkPersistEnabled(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
         this.getPeer()?.setVisitedLinkPersistEnabledAttribute(value_casted)
+        return this
+    }
+
+    public adaptToHandedness(value: WebHandednessFollowMode): this {
+        const value_casted = value as (WebHandednessFollowMode)
+        this.getPeer()?.setAdaptToHandednessAttribute(value_casted)
         return this
     }
     public registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {

@@ -2470,6 +2470,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOverScrollMode));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOverScrollMode"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOverScrollMode));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setAdaptToHandedness"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetAdaptToHandedness));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetAdaptToHandedness"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetAdaptToHandedness));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnRenderProcessResponding"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnRenderProcessResponding));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnRenderProcessResponding"),

@@ -65,6 +65,8 @@
 
 namespace OHOS::Ace {
 
+struct WebFocusedElementRect;
+
 class JsonValue;
 
 typedef struct WindowsSurfaceInfoTag {
@@ -273,6 +275,7 @@ public:
     std::vector<std::string> GetDescriptions() override;
     bool IsAcceptAllOptionExcluded() override;
     AcceptFileTypeLists GetAccepts() override;
+    std::shared_ptr<WebFocusedElementRect> GetFocusedElementRect() override;
 
 private:
     std::shared_ptr<OHOS::NWeb::NWebFileSelectorParams> param_;
@@ -1471,6 +1474,8 @@ public:
     void OnRenderExited(OHOS::NWeb::RenderExitReason reason);
     void OnRefreshAccessedHistory(const std::string& url, bool isRefreshed, bool isMainFrame = false);
     bool OnFileSelectorShow(const std::shared_ptr<BaseEventInfo>& info);
+    void UpdateFileSelectorHandednessInfo(const std::shared_ptr<BaseEventInfo>& info);
+    void ResetFileSelectorFocusedRect();
     void OnContextMenuDismissed();
     void OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options);
     bool OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info);

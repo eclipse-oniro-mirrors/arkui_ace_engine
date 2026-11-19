@@ -78,6 +78,7 @@ struct WebPatternProperty {
     // alone to determine whether an API override is active.
     ACE_DEFINE_PROPERTY_GROUP_ITEM(CaretColor, Color);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(OverScrollMode, int32_t);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(AdaptToHandedness, int32_t);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BlurOnKeyboardHideMode, int32_t);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(CopyOptionMode, int32_t);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(MetaViewport, bool);

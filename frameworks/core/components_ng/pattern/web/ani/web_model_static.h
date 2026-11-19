@@ -79,6 +79,7 @@ public:
     static void SetCacheMode(FrameNode* frameNode, const std::optional<WebCacheMode>& cacheMode);
     static void SetDarkMode(FrameNode* frameNode, const std::optional<WebDarkMode>& mode);
     static void SetOverScrollMode(FrameNode* frameNode, const std::optional<OverScrollMode>& mode);
+    static void SetAdaptToHandedness(FrameNode* frameNode, const std::optional<int32_t>& mode);
     static void SetLayoutMode(FrameNode* frameNode, const std::optional<WebLayoutMode>& mode);
     static void SetCopyOptionMode(FrameNode* frameNode, const std::optional<CopyOptions>& mode);
     static void SetKeyboardAvoidMode(FrameNode* frameNode, const std::optional<WebKeyboardAvoidMode>& mode);

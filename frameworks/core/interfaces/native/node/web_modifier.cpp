@@ -18,6 +18,7 @@
 #include "bridge/common/utils/utils.h"
 #include "core/common/resource/resource_object.h"
 #include "core/components_ng/pattern/text/text_model.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/web/web_model_ng.h"
 #include "core/interfaces/native/node/node_drag_modifier.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -1516,6 +1517,21 @@ void ResetOverScrollMode(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     WebModelNG::SetOverScrollMode(frameNode, DEFAULT_OVERSCROLL_MODE);
+}
+
+void SetAdaptToHandedness(ArkUINodeHandle node, ArkUI_Int32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetAdaptToHandedness(frameNode, value);
+}
+
+void ResetAdaptToHandedness(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetAdaptToHandedness(
+        frameNode, static_cast<int32_t>(OHOS::Ace::NG::HandednessFollowMode::NONE));
 }
 
 void SetWebCaretColor(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr)
@@ -3092,6 +3108,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnSearchResultReceiveCallBack = ResetOnSearchResultReceiveCallBack,
         .setOverScrollMode = SetOverScrollMode,
         .resetOverScrollMode = ResetOverScrollMode,
+        .setAdaptToHandedness = SetAdaptToHandedness,
+        .resetAdaptToHandedness = ResetAdaptToHandedness,
         .setOnTouchIconUrlReceivedCallBack = SetOnTouchIconUrlReceivedCallBack,
         .resetOnTouchIconUrlReceivedCallBack = ResetOnTouchIconUrlReceivedCallBack,
         .setOnRenderProcessRespondingCallBack = SetOnRenderProcessRespondingCallBack,
@@ -3373,6 +3391,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnSearchResultReceiveCallBack = ResetOnSearchResultReceiveCallBack,
         .setOverScrollMode = SetOverScrollMode,
         .resetOverScrollMode = ResetOverScrollMode,
+        .setAdaptToHandedness = SetAdaptToHandedness,
+        .resetAdaptToHandedness = ResetAdaptToHandedness,
         .setOnTouchIconUrlReceivedCallBack = SetOnTouchIconUrlReceivedCallBack,
         .resetOnTouchIconUrlReceivedCallBack = ResetOnTouchIconUrlReceivedCallBack,
         .setOnRenderProcessRespondingCallBack = SetOnRenderProcessRespondingCallBack,

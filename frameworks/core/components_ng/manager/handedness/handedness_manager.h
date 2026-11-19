@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_HANDEDNESS_HANDEDNESS_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_HANDEDNESS_HANDEDNESS_MANAGER_H
 
+#include <optional>
 #include <utility>
 
 #include "base/geometry/ng/offset_t.h"
@@ -24,6 +25,7 @@
 
 namespace OHOS::Ace::NG {
 class PipelineContext;
+class Pattern;
 
 /**
  * @brief 智感握姿公共服务 Manager。
@@ -44,6 +46,21 @@ class ACE_FORCE_EXPORT HandednessManager : public virtual AceType {
     DECLARE_ACE_TYPE(HandednessManager, AceType);
 
 public:
+    using WebHandednessAnchorQueryFunc =
+        std::optional<std::pair<int32_t, OffsetF>> (*)(const RefPtr<Pattern>&, int32_t);
+
+    /**
+     * @brief Web 链路：注册 Web 聚焦元素锚点查询函数（由 web 模块适配层在加载时注册）。
+     *
+     * 弹框领域通过函数指针调用，避免对 web 模块的编译期依赖。
+     *
+     * @param func 查询函数；传 nullptr 清除注册
+     */
+    void SetWebHandednessAnchorQueryFunc(WebHandednessAnchorQueryFunc func)
+    {
+        webHandednessAnchorQueryFunc_ = func;
+    }
+
     explicit HandednessManager(const WeakPtr<PipelineContext>& context);
     ~HandednessManager() override = default;
 
@@ -125,6 +142,7 @@ private:
     int32_t operatingHand_ = 0;
     int32_t lastFocusNodeId_ = -1;
     int32_t referenceNodeId_ = -1;
+    WebHandednessAnchorQueryFunc webHandednessAnchorQueryFunc_ = nullptr;
 };
 
 } // namespace OHOS::Ace::NG

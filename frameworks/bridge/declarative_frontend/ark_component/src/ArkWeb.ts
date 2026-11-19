@@ -1046,6 +1046,20 @@ class WebOverScrollModeModifier extends ModifierWithKey<OverScrollMode> {
   }
 }
 
+class WebAdaptToHandednessModifier extends ModifierWithKey<number> {
+  constructor(value: number) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webAdaptToHandednessModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetAdaptToHandedness(node);
+    } else {
+      getUINativeModule().web.setAdaptToHandedness(node, this.value);
+    }
+  }
+}
+
 class WebOnRenderProcessRespondingModifier extends ModifierWithKey<OnRenderProcessRespondingCallback> {
   constructor (value: OnRenderProcessRespondingCallback) {
     super(value);
@@ -1987,6 +2001,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   overScrollMode(mode: OverScrollMode): this {
     modifierWithKey(this._modifiersWithKeys, WebOverScrollModeModifier.identity, WebOverScrollModeModifier, mode);
+    return this;
+  }
+  adaptToHandedness(mode: number): this {
+    modifierWithKey(this._modifiersWithKeys, WebAdaptToHandednessModifier.identity, WebAdaptToHandednessModifier, mode);
     return this;
   }
   textZoomAtio(textZoomAtio: number): this {

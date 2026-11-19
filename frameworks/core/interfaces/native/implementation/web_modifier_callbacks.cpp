@@ -401,7 +401,8 @@ bool OnShowFileSelector(const CallbackHelper<Callback_OnShowFileSelectorEvent_Bo
     return result.value_or(false);
 }
 
-void DefaultOnShowFileSelector(const std::function<void(void*, void*, std::function<void(void*)>)>& callback,
+void DefaultOnShowFileSelector(
+    const std::function<void(void*, void*, int32_t, std::function<void(void*)>)>& callback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info)
 {
     CHECK_NULL_VOID(callback);
@@ -432,7 +433,7 @@ void DefaultOnShowFileSelector(const std::function<void(void*, void*, std::funct
             resultPeer = nullptr;
         }
     };
-    callback(paramPeer, resultPeer, std::move(releaseFunc));
+    callback(paramPeer, resultPeer, eventInfo->GetAdaptToHandedness(), std::move(releaseFunc));
 }
 
 FullScreenVideoOverlayHandlerBridgeVTable CreateFullScreenVideoOverlayHandlerVTable()

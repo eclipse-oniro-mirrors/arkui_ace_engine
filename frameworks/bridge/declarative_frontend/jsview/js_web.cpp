@@ -52,6 +52,8 @@
 #include "core/common/container_scope.h"
 #include "core/components/web/web_event.h"
 #include "core/components_ng/pattern/text/text_model.h"
+#include "core/components/web/web_focused_element_rect.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/web/web_model_ng.h"
 
 #include "bridge/js_frontend/engine/common/js_engine.h"
@@ -2661,6 +2663,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("darkMode", &JSWeb::DarkMode);
     JSClass<JSWeb>::StaticMethod("forceDarkAccess", &JSWeb::ForceDarkAccess);
     JSClass<JSWeb>::StaticMethod("overScrollMode", &JSWeb::OverScrollMode);
+    JSClass<JSWeb>::StaticMethod("adaptToHandedness", &JSWeb::AdaptToHandedness);
     JSClass<JSWeb>::StaticMethod("blurOnKeyboardHideMode", &JSWeb::BlurOnKeyboardHideMode);
     JSClass<JSWeb>::StaticMethod("horizontalScrollBarAccess", &JSWeb::HorizontalScrollBarAccess);
     JSClass<JSWeb>::StaticMethod("verticalScrollBarAccess", &JSWeb::VerticalScrollBarAccess);
@@ -3486,6 +3489,11 @@ void JSWeb::SetCallbackFromController(const JSRef<JSObject> controller)
                 fileSelectorResult->SetResult(*eventInfo);
 
                 obj->SetPropertyObject("fileresult", resultObj);
+                obj->SetProperty("adaptToHandedness", eventInfo->GetAdaptToHandedness());
+                JSRef<JSVal> focusedElementRect = JSWeb::CreateFocusedElementRectHandler(*eventInfo);
+                if (focusedElementRect->IsObject()) {
+                    obj->SetPropertyObject("focusedElementRect", focusedElementRect);
+                }
                 JSRef<JSVal> argv[] = { JSRef<JSVal>::Cast(obj) };
                 auto result = func->Call(webviewController, 1, argv);
 
@@ -4651,6 +4659,27 @@ JSRef<JSVal> JSWeb::CreateFileSelectorParamHandler(const FileSelectorEvent& even
     return paramObj;
 }
 
+JSRef<JSVal> JSWeb::CreateFocusedElementRectHandler(const FileSelectorEvent& eventInfo)
+{
+    const auto& param = eventInfo.GetParam();
+    if (!param) {
+        return JSVal::Undefined();
+    }
+    auto focusedElementRect = param->GetFocusedElementRect();
+    if (!focusedElementRect) {
+        return JSVal::Undefined();
+    }
+    float density = static_cast<float>(PipelineBase::GetCurrentDensity());
+    float webOffsetX = eventInfo.GetWebOffsetX();
+    float webOffsetY = eventInfo.GetWebOffsetY();
+    JSRef<JSObject> focusedElementRectObj = JSRef<JSObject>::New();
+    focusedElementRectObj->SetProperty("x", focusedElementRect->x * density + webOffsetX);
+    focusedElementRectObj->SetProperty("y", focusedElementRect->y * density + webOffsetY);
+    focusedElementRectObj->SetProperty("width", focusedElementRect->width * density);
+    focusedElementRectObj->SetProperty("height", focusedElementRect->height * density);
+    return focusedElementRectObj;
+}
+
 void JSWeb::OnFileSelectorShow(const JSCallbackInfo& args)
 {
 #ifdef ACE_ENGINE_API_METRICS_EXT_ENABLE
@@ -5303,6 +5332,21 @@ void JSWeb::OverScrollMode(int overScrollMode)
             break;
     }
     WebModel::GetInstance()->SetOverScrollMode(mode);
+}
+
+void JSWeb::AdaptToHandedness(int adaptToHandedness)
+{
+    auto mode = NG::HandednessFollowMode::NONE;
+    constexpr int32_t followAnchor = static_cast<int32_t>(NG::HandednessFollowMode::FOLLOW_ANCHOR);
+    switch (adaptToHandedness) {
+        case followAnchor:
+            mode = NG::HandednessFollowMode::FOLLOW_ANCHOR;
+            break;
+        default:
+            mode = NG::HandednessFollowMode::NONE;
+            break;
+    }
+    WebModel::GetInstance()->SetAdaptToHandedness(static_cast<int32_t>(mode));
 }
 
 void JSWeb::BlurOnKeyboardHideMode(int blurOnKeyboardHideMode)

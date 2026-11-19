@@ -8175,6 +8175,10 @@ typedef struct Opt_WebElementType {
     Ark_Tag tag;
     Ark_WebElementType value;
 } Opt_WebElementType;
+typedef enum Ark_WebHandednessFollowMode {
+    ARK_WEB_HANDEDNESS_FOLLOW_MODE_NONE = 0,
+    ARK_WEB_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR = 1,
+} Ark_WebHandednessFollowMode;
 typedef enum Ark_WebKeyboardAppearanceMode {
     ARK_WEB_KEYBOARD_APPEARANCE_MODE_NONE_IMMERSIVE = 0,
     ARK_WEB_KEYBOARD_APPEARANCE_MODE_IMMERSIVE = 1,
@@ -29360,6 +29364,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                const Opt_Float64* value);
     void (*setVisitedLinkPersistEnabled)(Ark_NativePointer node,
                                          const Opt_Boolean* value);
+    void (*setAdaptToHandedness)(Ark_NativePointer node,
+                                 Ark_WebHandednessFollowMode value);
     void (*setRegisterNativeEmbedRule)(Ark_NativePointer node,
                                        const Opt_String* tag,
                                        const Opt_String* type);
