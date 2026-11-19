@@ -1836,6 +1836,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage065A, TestS
     auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
     ASSERT_NE(pipeline, nullptr);
     pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->SetTaskExecutor(pipeline->GetTaskExecutor());
     auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
     ASSERT_NE(dragDropManager, nullptr);
     auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
@@ -1881,6 +1882,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage065B, TestS
     auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
     ASSERT_NE(pipeline, nullptr);
     pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->SetTaskExecutor(pipeline->GetTaskExecutor());
     auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
     ASSERT_NE(dragDropManager, nullptr);
     auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
@@ -1924,6 +1926,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage065C, TestS
     auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
     ASSERT_NE(pipeline, nullptr);
     pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->SetTaskExecutor(pipeline->GetTaskExecutor());
     auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
     ASSERT_NE(dragDropManager, nullptr);
     auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
@@ -2035,6 +2038,7 @@ HWTEST_F(DragDropManagerTestNgCoverage, DragDropManagerTestNgCoverage065F, TestS
     auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();
     ASSERT_NE(pipeline, nullptr);
     pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->SetTaskExecutor(pipeline->GetTaskExecutor());
     auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
     ASSERT_NE(dragDropManager, nullptr);
     auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();

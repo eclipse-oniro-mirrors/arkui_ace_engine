@@ -112,6 +112,9 @@ void EventHub::OnAttachContext(PipelineContext *context)
 
 void EventHub::OnDetachContext(PipelineContext *context)
 {
+    if (gestureEventHub_) {
+        gestureEventHub_->CancelDragSnapshot();
+    }
     auto host = host_.Upgrade();
     CHECK_NULL_VOID(host);
     if (HasOnAreaChanged() || HasInnerOnAreaChanged()) {
@@ -800,6 +803,9 @@ void EventHub::ClearStateStyle()
 
 void EventHub::OnDetachClear()
 {
+    if (gestureEventHub_) {
+        gestureEventHub_->CancelDragSnapshot();
+    }
     FireOnDetach();
     FireOnDisappear();
     ClearStateStyle();

@@ -42,6 +42,9 @@ public:
     static void Create(
         const RefPtr<AceType>& customNode, JsCallback&& callback, bool enableInspector, const SnapshotParam& param,
         bool flag = true);
+    // Registers UI cleanup before scheduling capture, so callers can cancel even without a service response.
+    static void CreateWithCleanup(const RefPtr<AceType>& customNode, JsCallback&& callback, bool enableInspector,
+        const SnapshotParam& param, const std::function<void(std::function<void()>)>& onReady, bool flag = true);
     static SnapshotSizeLimitation GetSizeLimitation();
     static void GetNormalCapture(const RefPtr<FrameNode>& frameNode, NormalCallback&& callback);
 

@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 
 #include "base/memory/ace_type.h"
 #include "base/utils/noncopyable.h"
@@ -27,6 +28,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_proxy.h"
+#include "core/components_ng/manager/drag_drop/drag_snapshot_request.h"
 #include "core/event/pointer_event.h"
 #include "core/gestures/velocity_tracker.h"
 
@@ -153,6 +155,13 @@ public:
     void DoDropAction(const RefPtr<FrameNode>& dragFrameNode, const DragPointerEvent& pointerEvent,
         const RefPtr<UnifiedData>& unifiedData, const std::string& udKey);
     void RequestDragSummaryInfoAndPrivilege();
+    // Snapshot ownership and cleanup are confined to the UI thread.
+    std::shared_ptr<DragSnapshotRequest> CreateDragSnapshotRequest(DragSnapshotRequest::Callback callback);
+    void CompleteDragSnapshotRequest(
+        const std::shared_ptr<DragSnapshotRequest>& request, const RefPtr<PixelMap>& pixelMap);
+    void CancelDragSnapshotRequest(const std::shared_ptr<DragSnapshotRequest>& request);
+    void CancelPendingDragSnapshots();
+
     RefPtr<UnifiedData> RequestUDMFDataWithUDKey(const std::string& udKey);
     void TryGetDataBackGround(
         const RefPtr<FrameNode>& dragFrameNode, const DragPointerEvent& pointerEvent,
@@ -761,6 +770,7 @@ public:
 #endif
 
 private:
+    std::unordered_set<std::shared_ptr<DragSnapshotRequest>> pendingDragSnapshots_;
     double CalcDragPreviewDistanceWithPoint(
         const OHOS::Ace::Dimension& preserverHeight, int32_t x, int32_t y, const DragPreviewInfo& info);
     Offset CalcDragMoveOffset(

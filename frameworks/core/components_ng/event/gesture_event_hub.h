@@ -35,6 +35,7 @@
 #include "core/components_ng/gestures/recognizers/exclusive_recognizer.h"
 #include "core/components_ng/gestures/recognizers/parallel_recognizer.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_proxy.h"
+#include "core/components_ng/manager/drag_drop/drag_snapshot_request.h"
 #include "core/event/pointer_event.h"
 #include "core/gestures/gesture_info.h"
 #include "core/components/common/properties/placement.h"
@@ -452,7 +453,11 @@ public:
     bool TriggerTouchEvent(const TouchEvent& point);
     void SetRecognizerDelayStatus(const RecognizerDelayStatus& recognizerDelayStatus = RecognizerDelayStatus::NONE);
     void DragNodeDetachFromParent();
+    void CancelDragSnapshot();
 private:
+    std::weak_ptr<DragSnapshotRequest> pendingDragSnapshot_;
+    WeakPtr<DragDropManager> pendingDragSnapshotManager_;
+
     void RegisterBasicRecognizers(
         const std::list<RefPtr<NGGestureRecognizer>>& recognizers,
         int32_t touchId);
