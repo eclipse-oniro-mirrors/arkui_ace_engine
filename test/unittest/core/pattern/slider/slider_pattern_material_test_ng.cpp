@@ -1055,6 +1055,8 @@ HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_StartLongPressTimer_Image_00
     pattern->StartLongPressTimer();
 }
 
+
+
 /**
  * @tc.name: SliderPattern_HandleLongPress_NoMaterial_001
  * @tc.desc: Test HandleLongPress returns early when HasSystemMaterial is false

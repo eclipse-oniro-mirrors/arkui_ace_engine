@@ -12,10 +12,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "base/log/log_wrapper.h"
 #include "core/interfaces/native/generated/interface/arkoala_api_generated.h"
 #include "core/common/dynamic_module_helper.h"
 #include "ui/base/utils/utils.h"
+
 namespace OHOS::Ace::NG::GeneratedModifier {
 #ifdef ACE_UNITTEST
 const GENERATED_ArkUICheckboxGroupModifier* GetCheckboxGroupStaticModifier();

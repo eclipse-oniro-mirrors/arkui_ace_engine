@@ -651,6 +651,7 @@ RefPtr<FrameNode> DialogView::CreateDialogNode(const int32_t nodeId, const Dialo
     auto dialogContext = dialog->GetRenderContext();
     CHECK_NULL_RETURN(dialogContext, dialog);
     pattern->SetDialogProperties(param);
+
     auto isSubWindow = dialogLayoutProp->GetShowInSubWindowValue(false) && !pattern->IsUIExtensionSubWindow();
     if (isSubWindow || !dialogLayoutProp->GetIsModal().value_or(true)) {
         dialogContext->UpdateBackgroundColor(Color(0x00000000));

@@ -226,11 +226,10 @@ public:
     {
         return sliderContentModifier_;
     }
-
+    Axis GetDirection() const;
     void UpdateSliderComponentColor(const Color& color, const SliderColorType sliderColorType, const Gradient& value);
     void UpdateSliderComponentMedia();
     void UpdateSliderComponentString(const bool isShowTips, const std::string& value);
-    Axis GetDirection() const;
     int32_t OnInjectionEvent(const std::string& command) override;
     CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool IsContentModifierNode(const RefPtr<FrameNode>& node);
@@ -275,7 +274,6 @@ private:
     void InitializeBubble();
     void UpdatePaintRect(RefPtr<SliderTheme> theme, SliderModel::SliderMode& sliderMode, RoundRect& paintRect,
         const RectF& rect, float rectRadius);
-
     bool AtMousePanArea(const Offset& offsetInFrame);
     bool AtTouchPanArea(const Offset& offsetInFrame);
     bool AtPanArea(const Offset& offset, const SourceType& sourceType);
@@ -492,7 +490,6 @@ private:
         RefPtr<FrameNode>& node, uint32_t nodeIndex, SliderModel::SliderShowStepOptions& options);
 
     void RemoveCallbackOnDetach(FrameNode* frameNode);
-
     int32_t CheckAccessibilityStepCount();
 
     Axis direction_ = Axis::HORIZONTAL;

@@ -1586,7 +1586,6 @@ void SubwindowManager::OnUIExtensionWindowSizeChange(int32_t instanceId, Rect wi
     if (!container->IsUIExtensionWindow() || uiExtensionWindowRect_ == windowRect) {
         return;
     }
-
     auto allSubcontainerId = GetAllSubContainerId(instanceId);
     std::for_each(allSubcontainerId.begin(), allSubcontainerId.end(), [](int32_t subContainerId) {
         auto subContainer = Container::GetContainer(subContainerId);

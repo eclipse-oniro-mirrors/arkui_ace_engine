@@ -617,6 +617,7 @@ public:
     }
 
     void CheckAndShowAnimation();
+
     bool GetMenuMaskEnable() const;
     Color GetMenuMaskColor() const;
     BlurStyle GetMenuMaskBlurStyle() const;
@@ -744,7 +745,7 @@ private:
     bool hasFoldModeChangeTransition_ = false;
     OffsetF previewDisappearStartOffset_;
     RefPtr<FrameNode> filterColumnNode_;
-    bool isFilterInSubWindow_ = false; 
+    bool isFilterInSubWindow_ = false;
     MenuDumpInfo dumpInfo_;
     bool hasCustomRadius_ = false;
     PreviewMenuAnimationInfo animationInfo_;

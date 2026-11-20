@@ -369,7 +369,6 @@ void MenuItemModelNG::Create(const MenuItemProperties& menuItemProps)
         MENU_ITEM_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<MenuItemPattern>(); });
     CHECK_NULL_VOID(menuItem);
     stack->Push(menuItem);
-
     auto pipeline = PipelineBase::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
     auto theme = pipeline->GetTheme<SelectTheme>();

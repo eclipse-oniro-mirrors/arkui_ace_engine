@@ -56,7 +56,6 @@ std::string GetErrorMsg(int32_t errorCode)
     return strMsg;
 }
 
-
 ani_error GetErrorObject(ani_env *env, const std::string &errMsg, int32_t code)
 {
     CHECK_NULL_RETURN(env, nullptr);

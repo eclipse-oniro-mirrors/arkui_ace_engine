@@ -1160,14 +1160,14 @@ void SliderModelNG::ResetBlockColor(FrameNode* frameNode)
     ACE_RESET_NODE_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty,
         BlockGradientColor, PROPERTY_UPDATE_RENDER, frameNode);
 }
-
+ 
 void SliderModelNG::ResetSelectColor()
 {
     ACE_RESET_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, SelectColor, PROPERTY_UPDATE_RENDER);
     ACE_RESET_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, SelectIsResourceColor, PROPERTY_UPDATE_RENDER);
     ACE_RESET_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, SelectGradientColor, PROPERTY_UPDATE_RENDER);
 }
-
+ 
 void SliderModelNG::ResetSelectColor(FrameNode* frameNode)
 {
     ACE_RESET_NODE_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, SelectColor,
@@ -1177,14 +1177,14 @@ void SliderModelNG::ResetSelectColor(FrameNode* frameNode)
     ACE_RESET_NODE_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty,
         SelectGradientColor, PROPERTY_UPDATE_RENDER, frameNode);
 }
-
+ 
 void SliderModelNG::ResetTrackColor()
 {
     ACE_RESET_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, TrackBackgroundColor, PROPERTY_UPDATE_RENDER);
     ACE_RESET_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, TrackBackgroundIsResourceColor, PROPERTY_UPDATE_RENDER);
     ACE_RESET_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty, TrackBackgroundColorSetByUser, PROPERTY_UPDATE_RENDER);
 }
-
+ 
 void SliderModelNG::ResetTrackColor(FrameNode* frameNode)
 {
     ACE_RESET_NODE_PAINT_PROPERTY_WITH_FLAG(SliderPaintProperty,

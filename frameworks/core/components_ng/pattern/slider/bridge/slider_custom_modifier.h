@@ -42,6 +42,6 @@ struct ArkUISliderCustomModifier {
 namespace CustomModifier {
 const ArkUISliderCustomModifier* GetSliderCustomModifier();
 } // namespace CustomModifier
-} // OHOS::Ace::NG
+}//OHOS::Ace::NG
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_SLIDER_BRIDGE_SLIDER_CUSTOM_MODIFIER_H

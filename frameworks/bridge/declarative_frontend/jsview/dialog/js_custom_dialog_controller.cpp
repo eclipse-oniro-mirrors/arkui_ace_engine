@@ -74,7 +74,6 @@ const std::vector<NG::HandednessFollowMode> DIALOG_HANDEDNESS_FOLLOW_MODE = { NG
     NG::HandednessFollowMode::FOLLOW_ANCHOR, NG::HandednessFollowMode::FOLLOW_GRIP_HAND };
 constexpr int32_t DEFAULT_ANIMATION_DURATION = 200;
 constexpr float DEFAULT_AVOID_DISTANCE = 16.0f;
-
 } // namespace
 
 void ParseCustomDialogLevelOrder(DialogProperties& properties, JSRef<JSObject> obj)

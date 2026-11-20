@@ -449,9 +449,9 @@ void CheckBoxModelNG::CreateWithResourceObj(
         return;
     }
     auto&& updateFunc = [type, weak = AceType::WeakClaim(frameNode)](const RefPtr<ResourceObject>& resObj) {
-        CHECK_NULL_VOID(resObj);
         auto frameNode = weak.Upgrade();
         CHECK_NULL_VOID(frameNode);
+        CHECK_NULL_VOID(resObj);
         Color result;
         if (!ResourceParseUtils::ParseResColor(resObj, result)) {
             ResetComponentColor(AceType::RawPtr(frameNode), type);
