@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include "base/memory/ace_type.h"
+#include "base/geometry/rect.h"
 #include "base/utils/string_utils.h"
 #include "base/utils/utf_helper.h"
 #include "core/common/ime/text_editing_value.h"
@@ -95,6 +96,47 @@ public:
 
     // Requests that this client perform the given action.
     virtual void PerformAction(TextInputAction action, bool forceCloseKeyboard = false) = 0;
+
+#if defined(IOS_PLATFORM)
+    // iOS keyboard trackpad caret drag (UIKit floating cursor). The adapter has
+    // no text layout, so it cannot answer characterRangeAtPoint: itself; instead
+    // it forwards the drag lifecycle here. (x, y) is the drag point in the window
+    // coordinate space shared with GetInputEditingValue consumers (GetEditingBoxY).
+    enum class FloatingCursorState { BEGIN, UPDATE, END };
+    virtual void UpdateFloatingCursor(FloatingCursorState state, double x, double y) {}
+
+    // Caret rect in the window coordinate space. Pushed with the editing state
+    // so the adapter can answer caretRectForPosition:, which UIKit uses to
+    // anchor the floating cursor at the drag start.
+    virtual Rect GetCaretWindowRect() { return Rect(); }
+
+    // Index the caret would land on when moving `lines` visual lines up (isUp)
+    // or down from `fromIndex`; -1 when unavailable. Pure query relative to the
+    // given anchor: UIKit accumulates consecutive arrow presses as growing
+    // offsets from the pre-gesture caret, so the answer must NOT be computed
+    // from the engine's current caret (that double-counts applied moves).
+    virtual int32_t GetIndexAfterLineMove(int32_t fromIndex, bool isUp, int32_t lines) { return -1; }
+
+    // Caret index hit-tested at a point in the window coordinate space; -1 when
+    // unavailable. Pure query used by the adapter to answer UIKit's
+    // closestPositionToPoint: / characterRangeAtPoint: with real layout data
+    // instead of echoing the current selection - the echo made the floating
+    // cursor's magnet/target planning operate on stale data and dulled the
+    // trackpad drag compared with a real UITextView.
+    virtual int32_t GetCaretIndexAtPoint(double x, double y) { return -1; }
+
+    // The iOS soft keyboard inserts '\n' itself through shouldChangeTextInRange/
+    // insertText; the adapter calls this before PerformAction so the pattern must
+    // not insert the newline again. The flag is consumed and cleared by each
+    // PerformAction call. Non-virtual on purpose: keeps the vtable layout stable
+    // for already-compiled components.
+    void SetPlatformWillInsertNewline(bool willInsert) { platformWillInsertNewline_ = willInsert; }
+
+protected:
+    bool platformWillInsertNewline_ = false;
+
+public:
+#endif
 
     virtual void InsertValue(const std::string& insertValue, bool isIME = false) {};
     virtual void InsertValue(const std::u16string& insertValue, bool isIME = false)

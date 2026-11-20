@@ -5711,12 +5711,26 @@ void RichEditorPattern::UpdateEditingValue(const std::shared_ptr<TextEditingValu
     } else {
 #ifdef CROSS_PLATFORM
         editingValue_ = value;
-#ifdef ANDROID_PLATFORM
+#if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
         if (value->appendText.empty()) {
-            // update cursor position only
-            if (value->selection.IsValid() && value->selection.GetStart() == value->selection.GetEnd() &&
-                !value->text.empty()) {
-                TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "UpdateEditingValue set caret to %{public}d", value->selection.GetEnd());
+            // Selection-only event (no appended text, no delete). Apply it as a
+            // real caret move: it is either the IME caret echo or a
+            // native caret update from setSelectedTextRange: (e.g. hardware
+            // keyboard navigation while the soft keyboard is closed). Dropping it
+            // would clear the event selection and push the stale engine caret
+            // back to the adapter, so later input lands at the wrong offset.
+            bool isRealCaretMove = value->selection.IsValid() &&
+                value->selection.GetStart() == value->selection.GetEnd() && !value->text.empty();
+#ifdef IOS_PLATFORM
+            // On iOS, selections riding on composing/unmark events are the
+            // keyboard's temporary autocorrect anchors, not caret commands; keep
+            // skipping those.
+            isRealCaretMove = isRealCaretMove && !value->compose.IsValid() && !value->unmarkText &&
+                !value->discardedMarkedText;
+#endif
+            if (isRealCaretMove) {
+                TAG_LOGI(AceLogTag::ACE_RICH_TEXT,
+                    "UpdateEditingValue set caret to %{public}d", value->selection.GetEnd());
                 SetCaretPosition(value->selection.GetEnd());
                 StartTwinkling();
             }
@@ -6083,6 +6097,7 @@ bool RichEditorPattern::UnableStandardInputCrossPlatform(bool isFocusViewChanged
     config.type = TextInputType::UNSPECIFIED;
     config.action = GetTextInputActionValue(GetDefaultTextInputAction());
     config.maxLength = maxLength_.value_or(INT_MAX);
+    config.insertNewlineOnEnter = config.action == TextInputAction::NEW_LINE;
     config.obscureText = false;
     auto inputMethodManager = InputMethodManager::GetInstance();
     CHECK_NULL_RETURN(inputMethodManager, false);
@@ -6232,17 +6247,57 @@ bool RichEditorPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 void RichEditorPattern::UpdateCaretInfoToController()
 {
     CHECK_NULL_VOID(HasFocus());
+#if defined(ENABLE_STANDARD_INPUT)
+    PushCaretInfoToInputMethod();
+#else
+#if defined(CROSS_PLATFORM)
+    // Coalesce pushes to the end of the layout pass: during the keyboard's
+    // autocorrect replay (alternating delete/insert events) the intermediate
+    // states must not be pushed to the adapter, otherwise the adapter text is
+    // rewritten mid-replay and subsequent keyboard events land at wrong
+    // offsets, merging lines.
+    if (caretInfoPushPending_) {
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    caretInfoPushPending_ = true;
+    // Guarantee the after-layout task runs even when nothing else dirtied the
+    // node: without a layout pass the deferred push would never execute.
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    auto weak = WeakClaim(this);
+    pipeline->AddAfterLayoutTask([weak]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->caretInfoPushPending_ = false;
+        pattern->PushCaretInfoToInputMethod();
+    });
+#else
+    PushCaretInfoToInputMethod();
+#endif
+#endif
+}
+
+void RichEditorPattern::PushCaretInfoToInputMethod()
+{
+    CHECK_NULL_VOID(HasFocus());
     std::u16string text = u"";
     for (auto iter = spans_.begin(); iter != spans_.end(); iter++) {
         text += (*iter)->content;
     }
 #if defined(CROSS_PLATFORM)
-#if defined(IOS_PLATFORM)
-    if (editingValue_ && editingValue_->selection.IsValid() && editingValue_->selection.GetEnd() < caretPosition_) {
-#else
+    // The selection in a platform event is the keyboard's autocorrect buffer anchor,
+    // not a real caret command: replaying it back into the engine caret drags the
+    // caret to a stale position (older line ends), so later input lands on the wrong
+    // line and the candidate bar shows the whole line. Only real text-appending
+    // events may snap the caret (same as the platform-specific branch). Selection-only events
+    // never reach this guard as caret commands: they are applied in
+    // UpdateEditingValue before the caret is pushed back, so a native caret move is
+    // echoed to the adapter with its new position instead of being overwritten here.
     if (editingValue_ && editingValue_->selection.IsValid() &&
         editingValue_->selection.GetEnd() < caretPosition_ && !editingValue_->appendText.empty()) {
-#endif
         SetCaretPosition(editingValue_->selection.GetEnd());
     }
     if (editingValue_ && editingValue_->selection.IsValid()) {
@@ -12386,6 +12441,133 @@ void RichEditorPattern::CloseTextCustomKeyboard(int32_t nodeId, bool isUIExtensi
 
 void RichEditorPattern::OnTextInputActionUpdate(TextInputAction value) {}
 
+#if defined(IOS_PLATFORM)
+void RichEditorPattern::UpdateFloatingCursor(FloatingCursorState state, double x, double y)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (state == FloatingCursorState::END) {
+        // Drag finished: echo the landed caret back to the keyboard so its
+        // autocorrect session continues from the new position.
+        StartTwinkling();
+        PushCaretInfoToInputMethod();
+        host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+        return;
+    }
+    // BEGIN/UPDATE: (x, y) is in the adapter window space; convert to this
+    // node's local space, then to paragraph text space exactly like the click
+    // path (CalcCaretInfoByClick) and hit-test the text layout.
+    auto globalOffset = GetParentGlobalOffset();
+    Offset local(static_cast<float>(x) - globalOffset.GetX(),
+        static_cast<float>(y) - globalOffset.GetY());
+    auto textRect = GetTextRect();
+    textRect.SetTop(textRect.GetY() - std::min(baselineOffset_, 0.0f));
+    textRect.SetHeight(textRect.Height() - std::max(baselineOffset_, 0.0f));
+    // Clamp the probe into the text rect. UIKit's lens can ride outside the
+    // text (magnet/drag inertia), and GetGlyphPositionAtCoordinate resolves a
+    // point above the first line as the document START regardless of x - the
+    // caret then jumps to position 0, the lens magnets to it, and the drag
+    // deadlocks at the text start. Clamping makes an out-of-bounds probe land
+    // on the nearest line at the probe's x, matching UITextView semantics.
+    float clampedX = local.GetX();
+    float clampedY = local.GetY();
+    if (GreatNotEqual(textRect.Width(), 2.0f) && GreatNotEqual(textRect.Height(), 2.0f)) {
+        clampedX = static_cast<float>(std::clamp(static_cast<double>(local.GetX()),
+            textRect.GetX() + 1.0, textRect.Right() - 1.0));
+        clampedY = static_cast<float>(std::clamp(static_cast<double>(local.GetY()),
+            textRect.GetY() + 1.0, textRect.Bottom() - 1.0));
+    }
+    if (paragraphs_.GetParagraphs().empty()) {
+        return;
+    }
+    Offset textOffset = { clampedX - textRect.GetX(), clampedY - textRect.GetY() };
+    auto positionWithAffinity = paragraphs_.GetGlyphPositionAtCoordinate(textOffset);
+    SetCaretPositionWithAffinity(positionWithAffinity);
+    // Keep the caret solid on while dragging. Otherwise it keeps blinking on
+    // its own timer phase and looks like it vanishes mid-drag, reappearing only
+    // when the drag ends (same reason the click path restarts twinkling).
+    StartTwinkling();
+    // Refresh the overlay caret rect synchronously. The overlay cache is
+    // normally refreshed at paint time (next frame), while UIKit queries
+    // caretRectForPosition in the same runloop turn to plan its next drag
+    // probe; a stale rect makes its probe loop oscillate and finally give up,
+    // so the caret freezes after a few sweeps.
+    auto [caretOffset, caretHeight] = CalculateCaretOffsetAndHeight();
+    auto richEditorOverlay = DynamicCast<RichEditorOverlayModifier>(overlayMod_);
+    CHECK_NULL_VOID(richEditorOverlay);
+    richEditorOverlay->SetCaretOffsetAndHeight(caretOffset, caretHeight);
+    host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+}
+
+Rect RichEditorPattern::GetCaretWindowRect()
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, Rect());
+    auto caretRect = GetCaretRect();
+    auto globalOffset = GetParentGlobalOffset();
+    return Rect(globalOffset.GetX() + caretRect.Left(), globalOffset.GetY() + caretRect.Top(),
+        caretRect.Width(), caretRect.Height());
+}
+
+int32_t RichEditorPattern::GetIndexAfterLineMove(int32_t fromIndex, bool isUp, int32_t lines)
+{
+    if (lines <= 0) {
+        return fromIndex;
+    }
+    // Anchor caret rect in visual (click) space; CalcCursorOffsetByPosition is
+    // the same pure layout query the overlay uses for the current caret.
+    float caretHeight = 0.0f;
+    auto caretOffset = CalcCursorOffsetByPosition(fromIndex, caretHeight, false, false);
+    if (NearZero(caretHeight)) {
+        caretHeight = paragraphs_.minParagraphFontSize.value_or(GetTextThemeFontSize());
+    }
+    float targetY = isUp ? caretOffset.GetY() - (lines - 0.5f) * caretHeight
+                         : caretOffset.GetY() + caretHeight + (lines - 0.5f) * caretHeight;
+    // Convert the target point to paragraph text space exactly like the click
+    // path (CalcCaretInfoByClick) does, then hit-test the text layout.
+    auto textRect = GetTextRect();
+    textRect.SetTop(textRect.GetY() - std::min(baselineOffset_, 0.0f));
+    textRect.SetHeight(textRect.Height() - std::max(baselineOffset_, 0.0f));
+    // Clamp overshooting moves to the document boundaries. The glyph hit test
+    // resolves far-off coordinates by X proximity on the first/last line, which
+    // returns unstable indices (e.g. alternating 0/1) and makes UIKit re-probe
+    // with oscillating offsets; a stable boundary answer settles it.
+    if (isUp && targetY < textRect.GetY()) {
+        return 0;
+    }
+    if (!isUp && targetY > textRect.Bottom()) {
+        return GetTextContentLength();
+    }
+    Offset textOffset = { caretOffset.GetX() - textRect.GetX(), targetY - textRect.GetY() };
+    auto positionWithAffinity = paragraphs_.GetGlyphPositionAtCoordinate(textOffset);
+    auto result = static_cast<int32_t>(positionWithAffinity.position_);
+    return (result >= 0 && result <= GetTextContentLength()) ? result : -1;
+}
+
+int32_t RichEditorPattern::GetCaretIndexAtPoint(double x, double y)
+{
+    // Same window->local conversion and text-space math as UpdateFloatingCursor
+    // (including the clamp into the text rect), as a pure query.
+    auto globalOffset = GetParentGlobalOffset();
+    Offset local(static_cast<float>(x) - globalOffset.GetX(),
+        static_cast<float>(y) - globalOffset.GetY());
+    auto textRect = GetTextRect();
+    textRect.SetTop(textRect.GetY() - std::min(baselineOffset_, 0.0f));
+    textRect.SetHeight(textRect.Height() - std::max(baselineOffset_, 0.0f));
+    float clampedX = local.GetX();
+    float clampedY = local.GetY();
+    if (GreatNotEqual(textRect.Width(), 2.0f) && GreatNotEqual(textRect.Height(), 2.0f)) {
+        clampedX = static_cast<float>(std::clamp(static_cast<double>(local.GetX()),
+            textRect.GetX() + 1.0, textRect.Right() - 1.0));
+        clampedY = static_cast<float>(std::clamp(static_cast<double>(local.GetY()),
+            textRect.GetY() + 1.0, textRect.Bottom() - 1.0));
+    }
+    Offset textOffset = { clampedX - textRect.GetX(), clampedY - textRect.GetY() };
+    auto positionWithAffinity = paragraphs_.GetGlyphPositionAtCoordinate(textOffset);
+    return static_cast<int32_t>(positionWithAffinity.position_);
+}
+#endif
+
 void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard)
 {
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "PerformAction, action=%{public}d", action);
@@ -12395,7 +12577,22 @@ void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKey
     if (action == TextInputAction::NEW_LINE) {
         TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "action=%{public}d, forceCloseKeyboard=%{public}d", action,
             forceCloseKeyboard);
+#if defined(IOS_PLATFORM)
+        // When the platform text delegate drives this action (soft keyboard), the
+        // native editor inserts '\n' itself (insertNewlineOnEnter) so the keyboard
+        // resets its autocorrect session at the line break; inserting here too
+        // would duplicate the newline. When Enter arrives from the key event path
+        // (physical keyboard while the soft keyboard is closed), the event never
+        // goes through shouldChangeTextInRange/insertText, so nobody else inserts
+        // and PerformAction must do it.
+        bool platformWillInsertNewline = platformWillInsertNewline_;
+        platformWillInsertNewline_ = false;
+        if (!platformWillInsertNewline) {
+            InsertValue(u"\n", true);
+        }
+#else
         InsertValue(u"\n", true);
+#endif
     }
     // Enter key type callback
     TextFieldCommonEvent event;
@@ -14356,11 +14553,15 @@ const TextEditingValue& RichEditorPattern::GetInputEditingValue() const
             if (!span) {
                 continue;
             }
-            if (span->spanItemType == SpanItemType::NORMAL) {
-                text.append(UtfUtils::Str16ToStr8(span->content));
-            } else {
-                text.append(" ");
-            }
+            // Use the real span content for every span type so this text is identical
+            // to the one pushed by PushCaretInfoToInputMethod (raw content concat).
+            // Substituting a single space for non-NORMAL spans desynchronizes the
+            // adapter text length (symbol spans hold two spaces, image spans one):
+            // every keyboard Show then rewrites the adapter text with a different
+            // length, invalidating the keyboard's cached offsets and making its
+            // autocorrect re-anchor over the whole line (candidate bar shows the
+            // entire line).
+            text.append(UtfUtils::Str16ToStr8(span->content));
         }
         value.text = text;
     }
