@@ -515,6 +515,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::IsTransPageEnabled)
         },
         ani_native_function {
+            "_Common_SetDynamicDimming",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::SetDynamicDimming)
+        },
+        ani_native_function {
             "_Common_SetFrameRateRange",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::SetFrameRateRange)

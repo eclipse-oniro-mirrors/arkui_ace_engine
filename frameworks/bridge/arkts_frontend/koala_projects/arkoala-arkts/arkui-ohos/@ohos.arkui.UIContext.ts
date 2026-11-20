@@ -1667,6 +1667,10 @@ export class UIContext {
         return ArkUIAniModule._Common_IsTransPageEnabled(this.instanceId_);
     }
 
+    public setDynamicDimming(id: string, value: double): void {
+        ArkUIAniModule._Common_SetDynamicDimming(id, value, this.instanceId_);
+    }
+
     public createModalUIExtension(want: Want, options?: ModalUIExtensionOptions, callback?: ModalUIExtensionCallback): int {
         let innerOptions: ModalUIExtensionInnerOptions = UIContext.parseModalUIExtensionOptions(options);
         innerOptions.instanceId = this.instanceId_;
