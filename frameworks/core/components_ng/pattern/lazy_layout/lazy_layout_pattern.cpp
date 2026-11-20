@@ -66,7 +66,8 @@ public:
         auto host = source->GetHostNode();
         RefPtr<LayoutAlgorithm> algorithm;
         if (AceType::InstanceOf<FrameNode>(source)) {
-            algorithm = host->GetPattern()->CreateLayoutAlgorithm();
+            auto pattern = host->GetPattern();
+            algorithm = pattern ? pattern->CreateLayoutAlgorithm() : nullptr;
         } else {
             const auto& sourceAlgorithm = source->GetLayoutAlgorithm();
             algorithm = sourceAlgorithm ? sourceAlgorithm->GetLayoutAlgorithm() : nullptr;
@@ -244,6 +245,7 @@ private:
     {
         auto geometry = GetGeometryNode();
         auto property = GetLayoutProperty();
+        CHECK_NULL_VOID(property);
         auto pipeline = GetHostNode()->GetContext();
         if (!measuredHost_ && AceType::InstanceOf<FrameNode>(source_) && pipeline &&
             pipeline->GetPixelRoundMode() == PixelRoundMode::PIXEL_ROUND_AFTER_MEASURE) {
