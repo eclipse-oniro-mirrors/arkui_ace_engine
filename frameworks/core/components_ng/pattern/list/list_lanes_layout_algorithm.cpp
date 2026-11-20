@@ -635,7 +635,11 @@ bool ListLanesLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutW
     if (lanes_ == 1) {
         return ListLayoutAlgorithm::MeasureFastScrollNeighbors(layoutWrapper, size);
     }
-    const int32_t targetIndex = GetFastScrollState()->input.targetIndex.value();
+    const auto* state = GetFastScrollState();
+    if (!state || !state->input.targetIndex) {
+        return false;
+    }
+    const int32_t targetIndex = state->input.targetIndex.value();
     const auto target = GetPhysicalLanesRow(targetIndex).value_or(
         ListPositionMap::EstimateRange { targetIndex, targetIndex });
     const auto [start, end] = GetFastScrollPreparationRange(size);
