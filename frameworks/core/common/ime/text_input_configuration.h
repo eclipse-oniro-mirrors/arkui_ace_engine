@@ -35,6 +35,10 @@ struct TextInputConfiguration {
     TextInputAction action = TextInputAction::UNSPECIFIED;
     std::string inputFilter;
     uint32_t maxLength;
+    // Cross-platform: true when pressing Enter inserts a '\n' into the engine text
+    // (TextArea/RichEditor with NEW_LINE action and no blurOnSubmit). The platform
+    // adapter mirrors the newline locally so IME composing starts at the correct caret.
+    bool insertNewlineOnEnter = false;
     // Below maybe supported in the future. Just keep for placeholder.
     bool autoCorrect = false;
     std::string capitalization;
