@@ -1,6 +1,10 @@
 {
   "src": [
     "pages/Index",
+    "pages/example/ImageDecodeQualityMatrixExample",
+    "pages/example/ImageOnCompleteFieldsExample",
+    "pages/example/ImageAutoResizeDynamicExample",
+    "pages/example/ImageSourceSizeDownsampleExample",
     "pages/SVG/Index",
     "pages/SVG/svgExample001",
     "pages/SVG/svgExample002",
