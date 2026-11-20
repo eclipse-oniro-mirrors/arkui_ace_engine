@@ -39,20 +39,6 @@ static constexpr int32_t PARAM_INDEX_ONE = 1;
 static constexpr int32_t US_CONVERT = 1000;
 } // namespace
 
-std::unique_ptr<NG::MovingPhotoModelNG> NG::MovingPhotoModelNG::instance_ = nullptr;
-std::mutex NG::MovingPhotoModelNG::mutex_;
-
-NG::MovingPhotoModelNG* NG::MovingPhotoModelNG::GetInstance()
-{
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
-            instance_.reset(new NG::MovingPhotoModelNG());
-        }
-    }
-    return instance_.get();
-}
-
 napi_value JsCreate(napi_env env, napi_callback_info info)
 {
     size_t argc = MAX_ARG_NUM;
