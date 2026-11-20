@@ -57,10 +57,21 @@ void MenuLayoutProperty::DividerToJsonValue(std::unique_ptr<JsonValue>& json) co
 {
     if (propItemDivider_.has_value()) {
         auto divider = JsonUtil::Create(true);
-        divider->Put("strokeWidth", propItemDivider_.value().strokeWidth.ToString().c_str());
-        divider->Put("startMargin", propItemDivider_.value().startMargin.ToString().c_str());
-        divider->Put("endMargin", propItemDivider_.value().endMargin.ToString().c_str());
-        divider->Put("color", propItemDivider_.value().color.ColorToString().c_str());
+        auto itemDivider = propItemDivider_.value();
+        auto isFloating = GetItemDividerMode().value_or(DividerMode::FLOATING_ABOVE_MENU) ==
+                          DividerMode::FLOATING_ABOVE_MENU;
+        divider->Put("strokeWidth", itemDivider.strokeWidth.ToString().c_str());
+        divider->Put("startMargin",
+            (isFloating && itemDivider.startMargin.Unit() == DimensionUnit::INVALID
+                ? Dimension() : itemDivider.startMargin)
+                .ToString()
+                .c_str());
+        divider->Put("endMargin",
+            (isFloating && itemDivider.endMargin.Unit() == DimensionUnit::INVALID
+                ? Dimension() : itemDivider.endMargin)
+                .ToString()
+                .c_str());
+        divider->Put("color", itemDivider.color.ColorToString().c_str());
         json->Put("itemDivider", divider);
     }
     if (propItemGroupDivider_.has_value()) {
