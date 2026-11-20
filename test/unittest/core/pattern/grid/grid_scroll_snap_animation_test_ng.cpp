@@ -685,7 +685,10 @@ HWTEST_F(GridItemSnapTakeoverTest, ProviderApproachHandsOffAtExactDistance, Test
     executor_->Drain();
     EXPECT_EQ(snapCalls, 1);
     EXPECT_DOUBLE_EQ(seenOffset, 200.0);
-    EXPECT_DOUBLE_EQ(seenVelocity, 1200.0);
+    // The provider receives the LIVE residual at the handoff instant: the raw frame delta
+    // (-220 - -180 = -40 px over the 40 ms handoff frame) = -1000 px/s, sign-flipped by the
+    // target callback to +1000 — the same value the stage-2 spring starts with.
+    EXPECT_DOUBLE_EQ(seenVelocity, 1000.0);
     EXPECT_FLOAT_EQ(MockAnimationManager::GetInstance().params_.velocity, -1000.0f);
     EXPECT_EQ(scrollStops_, 0);
     FinishSnap();
@@ -728,7 +731,9 @@ HWTEST_F(GridItemSnapTakeoverTest, ProviderReverseApproachKeepsDistanceAndVeloci
     EXPECT_EQ(approachCalls, 1);
     EXPECT_EQ(snapCalls, 1);
     EXPECT_DOUBLE_EQ(seenOffset, 440.0);
-    EXPECT_DOUBLE_EQ(seenVelocity, -1200.0);
+    // LIVE residual at handoff: raw delta (-420 - -460 = +40 px over 40 ms) = +1000 px/s,
+    // sign-flipped to -1000 for the provider; the stage-2 spring starts at the same +1000.
+    EXPECT_DOUBLE_EQ(seenVelocity, -1000.0);
     EXPECT_FLOAT_EQ(MockAnimationManager::GetInstance().params_.velocity, 1000.0f);
     FinishSnap();
     EXPECT_NEAR(pattern_->GetTotalOffset(), 200.0f, 0.01f);
@@ -798,7 +803,10 @@ HWTEST_F(GridItemSnapTakeoverTest, ProviderPositiveApproachWithZeroReleaseVeloci
     FinishSnap();
     EXPECT_EQ(snapCalls, 1);
     EXPECT_DOUBLE_EQ(seenOffset, 60.0);
-    EXPECT_DOUBLE_EQ(seenVelocity, 0.0);
+    // Zero RELEASE velocity still hands the LIVE residual to the provider: the approach
+    // frame's raw delta (-90 px over the 16 ms default frame interval) = -5625 px/s,
+    // sign-flipped to +5625. The release value is never re-reported at the handoff.
+    EXPECT_DOUBLE_EQ(seenVelocity, 5625.0);
     FinishSnap();
     EXPECT_NEAR(pattern_->GetTotalOffset(), 400.0f, 0.01f);
 }
@@ -1312,7 +1320,13 @@ HWTEST_P(GridProviderFlingBudgetTest, ProviderBudgetDestinationAndHandoff, TestS
     executor_->Drain();
     ASSERT_EQ(snapCalls_, 1);
     EXPECT_NEAR(seenOffset_, startOffset_ + direction_ * approach_, 0.01);
-    EXPECT_DOUBLE_EQ(seenVelocity_, direction_ * releaseSpeed_);
+    // LIVE residual at the handoff instant: the handoff frame is delivered 10 px beyond the
+    // approach point, so the raw delta is direction * (approach + 10) px over the 16 ms
+    // default frame interval — sign-flipped into the provider callback.
+    constexpr double budgetFrameIntervalS = 0.016;
+    const double expectedHandoffVelocity = direction_ * (approach_ + 10.0) / budgetFrameIntervalS;
+    // snapVelocity_ is measured in float; compare with a relative tolerance.
+    EXPECT_NEAR(seenVelocity_, expectedHandoffVelocity, std::abs(expectedHandoffVelocity) * 1e-4);
     auto curve = AceType::DynamicCast<ResponsiveSpringMotion>(manager.params_.curve);
     ASSERT_NE(curve, nullptr);
     EXPECT_FLOAT_EQ(curve->GetResponse(), 0.7f);

@@ -951,7 +951,6 @@ private:
     struct ItemSnapApproach {
         uint32_t generation;
         float endPos;
-        float startVelocity;
         bool earlyHandoff;
         std::function<void(float, float)> onHandoff;
     };
