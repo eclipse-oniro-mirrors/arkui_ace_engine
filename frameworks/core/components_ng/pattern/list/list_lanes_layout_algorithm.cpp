@@ -651,8 +651,10 @@ bool ListLanesLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutW
         }
         position += size + spaceWidth_;
         auto row = GetPhysicalLanesRow(index);
-        CHECK_NULL_RETURN(row, false);
-        index = row->endIndex + 1;
+        if (row)
+        {
+            index = row->endIndex + 1;
+        }
     }
     position = -spaceWidth_;
     index = target.startIndex - 1;
@@ -662,8 +664,10 @@ bool ListLanesLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutW
         }
         position -= size + spaceWidth_;
         auto row = GetPhysicalLanesRow(index);
-        CHECK_NULL_RETURN(row, false);
-        index = row->startIndex - 1;
+        if (row)
+        {
+            index = row->startIndex - 1;
+        }
     }
     return true;
 }
