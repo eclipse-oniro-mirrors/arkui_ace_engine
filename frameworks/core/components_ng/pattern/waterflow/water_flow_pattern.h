@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 
+#include <cstdint>
 #include <list>
 #include <map>
 #include <optional>
@@ -24,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -39,8 +41,8 @@ class WaterFlowLayoutProperty;
 class WaterFlowSections;
 struct WaterFlowFastScrollState;
 
-class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
-    DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern);
+class ACE_EXPORT WaterFlowPattern : public ScrollablePattern, public StickyHeaderPattern {
+    DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern, StickyHeaderPattern);
 
 public:
     ~WaterFlowPattern() override;
@@ -171,6 +173,15 @@ public:
 
     bool UpdateStartIndex(int32_t index);
 
+    void SetEdge(bool isHeader, const RefPtr<UINode>& edge, uint64_t generation);
+    void SetEdgeContent(bool isHeader, const RefPtr<UINode>& content);
+    bool HasStickyHeader() const override;
+    void UpdateEdgePositions() override;
+    void OnDetachFromFrameNode(FrameNode* frameNode) override;
+    WaterFlowChildIndexMap GetEdgeIndexMap() const;
+    int32_t GetDataCount() const;
+    // Keep header first and footer last without including either in FlowItem/Sections indices.
+    void SyncEdgeSlots();
     void AddFooter(const RefPtr<NG::UINode>& footer);
 
     void ResetLayoutInfo();
@@ -382,6 +393,11 @@ private:
     double GetTopEdgeEffectPos() const;
     SizeF GetContentSize() const;
     void MarkDirtyNodeSelf();
+    void EnableEdgeSlots();
+    RefPtr<UINode> GetStickyFooter() const override
+    {
+        return footer_.Upgrade();
+    }
     // align to the very top via precise index jump when a backToTop animation settles short of the top
     void CheckBackToTopFallback();
     void OnScrollEndCallback() override;

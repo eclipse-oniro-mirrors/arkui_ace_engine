@@ -16,6 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_INFO_BASE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_INFO_BASE_H
 
+#include <algorithm>
+#include <cstdint>
+
 #include "base/memory/ace_type.h"
 #include "base/utils/noncopyable.h"
 #include "core/components/scroll/scroll_controller_base.h"
@@ -25,6 +28,42 @@
 #include "core/components_ng/property/measure_property.h"
 
 namespace OHOS::Ace::NG {
+
+// New attributes follow visual order: header, data, footer.
+// The constructor footer retains its historical mapping until an edge attribute is used.
+struct WaterFlowChildIndexMap {
+    bool hasHeader = false;
+    bool hasFooter = false;
+    int32_t rawCount = 0;
+
+    int32_t EdgeCount() const
+    {
+        return (hasHeader ? 1 : 0) + (hasFooter ? 1 : 0);
+    }
+    int32_t HeaderIndex() const
+    {
+        return hasHeader ? 0 : -1;
+    }
+    int32_t FooterIndex() const
+    {
+        return hasFooter ? rawCount - 1 : -1;
+    }
+    int32_t DataToNode(int32_t index) const
+    {
+        return hasHeader ? index + 1 : index;
+    }
+    int32_t NodeToData(int32_t index) const
+    {
+        if (index < 0 || index >= rawCount || index == HeaderIndex() || index == FooterIndex()) {
+            return -1;
+        }
+        return hasHeader ? index - 1 : index;
+    }
+    int32_t DataCount(int32_t rawCount) const
+    {
+        return std::max(0, rawCount - EdgeCount());
+    }
+};
 
 class WaterFlowLayoutInfoBase : public AceType {
     DECLARE_ACE_TYPE(WaterFlowLayoutInfoBase, AceType);
@@ -171,7 +210,7 @@ public:
     // convert FlowItem's index to children node index.
     inline int32_t NodeIdx(int32_t idx) const
     {
-        return idx + footerIndex_ + 1;
+        return edgeSlots_ ? edgeIndexMap_.DataToNode(idx) : idx + footerIndex_ + 1;
     }
 
     /**
@@ -179,7 +218,7 @@ public:
      */
     inline int32_t ItemCnt(int32_t childrenCount) const
     {
-        return childrenCount - footerIndex_ - 1;
+        return edgeSlots_ ? edgeIndexMap_.DataCount(childrenCount) : childrenCount - footerIndex_ - 1;
     }
 
     /**
@@ -230,12 +269,23 @@ public:
 
     float GetViewStartBound(bool ignoreFixOffset = false) const
     {
-        return ignoreFixOffset ? 0.0f : -startFixOffset_;
+        return 0.0f - (ignoreFixOffset ? 0.0f : startFixOffset_);
     }
 
     float GetViewEndBound(float mainSize, bool ignoreFixOffset = false) const
     {
         return mainSize + expandHeight_ + (ignoreFixOffset ? 0.0f : endFixOffset_);
+    }
+
+    // Only the new edge-attribute path uses this mapping; legacy segmented footer stays unchanged.
+    bool edgeSlots_ = false;
+    WaterFlowChildIndexMap edgeIndexMap_;
+    float headerHeight_ = 0.0f;
+    float edgeFooterHeight_ = 0.0f;
+
+    int32_t SegmentedItemCount() const
+    {
+        return edgeSlots_ ? ItemCnt(GetChildrenCount()) : GetChildrenCount();
     }
 
     bool itemStart_ = false;

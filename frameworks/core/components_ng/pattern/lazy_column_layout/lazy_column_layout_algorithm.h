@@ -22,7 +22,7 @@
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_info.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_property.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 
 namespace OHOS::Ace::NG {
 
@@ -91,7 +91,8 @@ private:
     // Publish a materialized item's sticky-header state to its previous lazy sibling; only this single-axis
     // container has a unique next vertical section (protocol: LazyLayoutPattern::PublishNextStickyHeaderGap).
     void UpdateSiblingHandoffGap(
-        LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& wrapper, int32_t itemIndex) const;
+        LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& wrapper, int32_t itemIndex,
+        bool layoutOnly = false) const;
     AdjustOffset GetAdjustOffset(const RefPtr<LayoutWrapper>& item);
     void ApplyLazyNodeAdjustOffset(const RefPtr<LayoutWrapper>& wrapper, float& referencePos, bool forward);
     void MeasureForward(LayoutWrapper* layoutWrapper, int32_t startIndex, float startPos);

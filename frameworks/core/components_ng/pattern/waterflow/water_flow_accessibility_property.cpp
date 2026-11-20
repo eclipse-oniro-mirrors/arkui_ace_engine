@@ -53,7 +53,7 @@ int32_t WaterFlowAccessibilityProperty::GetCollectionItemCounts() const
     CHECK_NULL_RETURN(frameNode, 0);
     auto pattern = frameNode->GetPattern<WaterFlowPattern>();
     CHECK_NULL_RETURN(pattern, 0);
-    return pattern->GetChildrenCount();
+    return pattern->GetDataCount();
 }
 
 AceCollectionInfo WaterFlowAccessibilityProperty::GetCollectionInfo() const

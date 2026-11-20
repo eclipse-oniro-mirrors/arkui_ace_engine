@@ -75,8 +75,12 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
     pattern->GetRepeatCountInfo(host, info_->repeatDifference_, info_->firstRepeatCount_, info_->childrenCount_);
     info_->axis_ = axis_ = props_->GetAxis();
     auto [idealSize, matchChildren, originalWidth] = WaterFlowLayoutUtils::PreMeasureSelf(wrapper_, axis_);
+    MeasureEdges(wrapper, info_, idealSize);
     sections_ = pattern->GetSections();
-    if (sections_ && !IsSectionValid(info_, info_->childrenCount_)) {
+    const bool emptyEdges = info_->edgeSlots_ && info_->SegmentedItemCount() == 0 &&
+        sections_ && sections_->GetSectionInfo().empty();
+    const int32_t dataCount = info_->edgeSlots_ ? info_->ItemCnt(info_->childrenCount_) : info_->childrenCount_;
+    if (sections_ && !emptyEdges && !IsSectionValid(info_, dataCount)) {
         info_->isDataValid_ = false;
         return;
     }
@@ -126,6 +130,7 @@ void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
         return;
     }
     if (!info_->isDataValid_) {
+        LayoutEdges(wrapper, info_, info_->headerHeight_);
         return;
     }
 
@@ -166,6 +171,7 @@ void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
     wrapper_->SetActiveChildRange(info_->NodeIdx(info_->startIndex_), info_->NodeIdx(info_->endIndex_), cacheCount,
         cacheCount, props_->GetShowCachedItemsValue(false));
 
+    LayoutEdges(wrapper_, info_, info_->GetMaxMainHeight());
     UpdateOverlay(wrapper_);
 
     ClearUnlayoutedItems(wrapper_);
@@ -197,7 +203,7 @@ void PrepareJump(const RefPtr<WaterFlowLayoutInfo>& info, std::optional<float>& 
         // implies that LayoutInfo has already been reset, no need to jump
         return;
     }
-    info->jumpIndex_ = std::min(info->startIndex_, info->GetChildrenCount() - 1);
+    info->jumpIndex_ = std::min(info->startIndex_, info->SegmentedItemCount() - 1);
     info->align_ = ScrollAlign::START;
     float itemOffset = (info->itemInfos_.size() <= static_cast<size_t>(info->startIndex_))
                            ? info->storedOffset_
@@ -213,7 +219,7 @@ int32_t WaterFlowSegmentedLayout::CheckDirtyItem(bool forceMeasure) const
         if (static_cast<int32_t>(info_->itemInfos_.size()) <= i) {
             break;
         }
-        auto child = wrapper_->GetChildByIndex(i);
+        auto child = wrapper_->GetChildByIndex(info_->edgeSlots_ ? info_->NodeIdx(i) : i);
         const bool itemDirty = IsChildMeasureDirty(child);
         if (!forceMeasure) {
             if (!itemDirty) {
@@ -261,12 +267,13 @@ void WaterFlowSegmentedLayout::Init(const SizeF& frameSize, double originalWidth
         SegmentedInit(sections, info_->margins_, frameSize);
     } else {
         RegularInit(frameSize, originalWidth);
-        if (info_->footerIndex_ >= 0) {
+        if (info_->footerIndex_ >= 0 && !info_->edgeSlots_) {
             InitFooter(frameSize.CrossSize(axis_));
         }
     }
 
-    int32_t updateIdx = wrapper_->GetHostNode()->GetChildrenUpdated();
+    int32_t updateIdx = info_->edgeSlots_ ? GetUpdateIdx(wrapper_, info_->footerIndex_)
+                                        : wrapper_->GetHostNode()->GetChildrenUpdated();
     if (updateIdx != -1) {
         if (updateIdx <= info_->endIndex_) {
             PrepareJump(info_, postJumpOffset_);
@@ -331,7 +338,7 @@ void WaterFlowSegmentedLayout::RegularInit(const SizeF& frameSize, double origin
     auto crossSize = frameSize.CrossSize(axis_);
     std::vector<double> crossLens;
     std::pair<std::vector<double>, double> cross;
-    auto childrenCount = info_->GetChildrenCount();
+    auto childrenCount = info_->SegmentedItemCount();
     if (axis_ == Axis::VERTICAL) {
         cross = ParseTemplateArgs(
             WaterFlowLayoutUtils::PreParseArgs(columnsTemplate), crossSize, crossGaps_[0], childrenCount);
@@ -358,7 +365,10 @@ void WaterFlowSegmentedLayout::RegularInit(const SizeF& frameSize, double origin
         ++index;
     }
     info_->margins_.resize(1);
-    info_->segmentTails_ = { (info_->footerIndex_ >= 0) ? childrenCount - 2 : childrenCount - 1 };
+    if (info_->edgeSlots_ && info_->itemInfos_.empty()) {
+        info_->ResetSegmentStartPos();
+    }
+    info_->segmentTails_ = { (info_->footerIndex_ >= 0 && !info_->edgeSlots_) ? childrenCount - 2 : childrenCount - 1 };
 }
 
 void WaterFlowSegmentedLayout::InitFooter(float crossSize)
@@ -371,7 +381,7 @@ void WaterFlowSegmentedLayout::InitFooter(float crossSize)
         info_->items_.back().try_emplace(0);
     }
     info_->margins_.emplace_back();
-    auto childrenCount = info_->GetChildrenCount();
+    auto childrenCount = info_->SegmentedItemCount();
     info_->segmentTails_.emplace_back(childrenCount - 1);
 
     if (info_->footerIndex_ != childrenCount - 1) {
@@ -438,7 +448,7 @@ void WaterFlowSegmentedLayout::MeasureOnJump(int32_t jumpIdx)
     if (info_->extraOffset_) {
         postJumpOffset_ = postJumpOffset_.value_or(0.0f) + *info_->extraOffset_;
     }
-    auto childrenCount = info_->GetChildrenCount();
+    auto childrenCount = info_->SegmentedItemCount();
     if (jumpIdx >= childrenCount) {
         return;
     }
@@ -463,6 +473,9 @@ void WaterFlowSegmentedLayout::MeasureOnJump(int32_t jumpIdx)
     }
     if (info_->jumpIndex_ == LAST_ITEM) {
         auto maxHeight = info_->GetMaxMainHeight() - info_->BotMargin();
+        if (info_->edgeSlots_) {
+            maxHeight += info_->BotMargin() + info_->edgeFooterHeight_;
+        }
         info_->currentOffset_ = SolveJumpOffset({ 0, maxHeight, 0 }) + postJumpOffset_.value_or(0.0f);
     } else {
         info_->currentOffset_ = SolveJumpOffset(item) + postJumpOffset_.value_or(0.0f);
@@ -528,7 +541,7 @@ float WaterFlowSegmentedLayout::SolveJumpOffset(const WaterFlowLayoutInfo::ItemI
 
 void WaterFlowSegmentedLayout::MeasureToTarget(int32_t targetIdx, std::optional<int64_t> cacheDeadline, bool force)
 {
-    targetIdx = std::min(targetIdx, info_->GetChildrenCount() - 1);
+    targetIdx = std::min(targetIdx, info_->SegmentedItemCount() - 1);
     for (int32_t i = static_cast<int32_t>(info_->itemInfos_.size()); i <= targetIdx; ++i) {
         int32_t seg = info_->GetSegment(i);
         auto position = WaterFlowLayoutUtils::GetItemPosition(info_, i, mainGaps_[seg]);
@@ -554,7 +567,7 @@ void WaterFlowSegmentedLayout::MeasureToTarget(int32_t targetIdx, std::optional<
 void WaterFlowSegmentedLayout::Fill(int32_t startIdx)
 {
     const float viewEndBound = info_->GetViewEndBound(mainSize_);
-    for (int32_t i = startIdx; i < info_->GetChildrenCount(); ++i) {
+    for (int32_t i = startIdx; i < info_->SegmentedItemCount(); ++i) {
         auto position = WaterFlowLayoutUtils::GetItemPosition(info_, i, mainGaps_[info_->GetSegment(i)]);
         if (GreatOrEqual(position.startMainPos + info_->currentOffset_, viewEndBound)) {
             break;
@@ -608,7 +621,7 @@ RefPtr<LayoutWrapper> WaterFlowSegmentedLayout::MeasureItem(
     // live in WaterFlowLayoutUtils::GetWaterFlowItem — its build scope replaces
     // the local one this function used to carry.
     auto item = WaterFlowLayoutUtils::GetWaterFlowItem(
-        wrapper_, idx, !deadline.has_value(), deadline.has_value());
+        wrapper_, info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, !deadline.has_value(), deadline.has_value());
     CHECK_NULL_RETURN(item, nullptr);
     // override user-defined main size
     if (NonNegative(userDefMainSize)) {
@@ -665,7 +678,8 @@ void WaterFlowSegmentedLayout::LayoutItem(int32_t idx, float crossPos, const Off
     // Shell-aware lookup: a live placeholder shell of this index is invisible
     // to the plain lazy index walk, and skipping it here would leave the
     // measured shell at the stale origin offset (blank reserved slot).
-    auto wrapper = WaterFlowLayoutUtils::GetWaterFlowItemForLayout(wrapper_, idx, isCache);
+    auto wrapper = WaterFlowLayoutUtils::GetWaterFlowItemForLayout(
+        wrapper_, info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, isCache);
     CHECK_NULL_VOID(wrapper);
     wrapper->GetGeometryNode()->SetMarginFrameOffset(offset + padding);
     if (CheckNeedLayout(wrapper, isCache)) {
@@ -708,7 +722,7 @@ void WaterFlowSegmentedLayout::SyncPreloadItem(LayoutWrapper* host, int32_t item
 void WaterFlowSegmentedLayout::MeasureRemainingLazyChild(int32_t startIdx, int32_t endIdx, bool forward)
 {
     for (int32_t idx = startIdx; idx <= endIdx; idx++) {
-        auto item = wrapper_->GetChildByIndex(idx);
+        auto item = wrapper_->GetChildByIndex(info_->edgeSlots_ ? info_->NodeIdx(idx) : idx);
         CHECK_NULL_VOID(item);
         auto itemLayoutProperty = item->GetLayoutProperty();
         if (itemLayoutProperty->GetNeedLazyLayout()) {

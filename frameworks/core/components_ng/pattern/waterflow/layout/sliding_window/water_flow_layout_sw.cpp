@@ -48,9 +48,24 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     auto [size, matchChildren, originalWidth] = WaterFlowLayoutUtils::PreMeasureSelf(wrapper_, axis_);
     syncLoad_ = props_->GetSyncLoad().value_or(true) || matchChildren ||
                 !NearZero(info_->delta_) || info_->targetIndex_.has_value() || fastScrollState_;
+    if (info_->edgeSlots_) {
+        MeasureEdges(wrapper, info_, size);
+    }
     Init(size, originalWidth);
     CalculateContentClipFixOffset(wrapper_, info_);
 
+    if (info_->edgeSlots_ && itemCnt_ == 0 && (!sections_ || sections_->GetSectionInfo().empty())) {
+        if (matchChildren) {
+            const auto& constraint = props_->GetLayoutConstraint().value();
+            mainLen_ = std::clamp(info_->headerHeight_ + info_->edgeFooterHeight_,
+                constraint.minSize.MainSize(axis_), constraint.maxSize.MainSize(axis_));
+            size.SetMainSize(mainLen_, axis_);
+            AddPaddingToSize(props_->CreatePaddingAndBorder(), size);
+            wrapper_->GetGeometryNode()->SetFrameSize(size);
+        }
+        info_->SyncEmptyEdges(mainLen_);
+        return;
+    }
     if (!IsSectionValid(info_, itemCnt_) || !CheckData()) {
         info_->isDataValid_ = false;
         return;
@@ -306,6 +321,10 @@ void WaterFlowLayoutSW::ApplyFastScrollWindow()
 
 void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
 {
+    if (info_->edgeSlots_ && (!info_->isDataValid_ || itemCnt_ == 0)) {
+        LayoutEdges(wrapper, info_, info_->headerHeight_);
+        return;
+    }
     if (info_->lanes_.empty()) {
         TAG_LOGW(AceLogTag::ACE_WATERFLOW, "Lanes not initialized, can't perform layout");
         return;
@@ -314,16 +333,32 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         return;
     }
     if (info_->targetIndex_) {
-        // During target-position measurement the footer may remain active from the previous frame
-        // or become active before normal footer cleanup runs. Layout is skipped here, so explicitly
-        // deactivate it to avoid a one-frame flash.
-        DeactivateFooter();
+        // New edge slots keep their geometry during target-position measurement. Only the legacy
+        // footer is deactivated here to avoid a one-frame flash before normal footer cleanup.
+        if (info_->edgeSlots_) {
+            // A reload/jump may change the first lane before Pattern calibrates totalOffset_.
+            // Normalize both the edge origin and body boundary with the current measured offset.
+            const float edgeOffset = info_->StartIndex() == 0 &&
+                props_->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN
+                ? info_->StartPos() - info_->TopMargin() : info_->Offset();
+            LayoutEdges(wrapper, info_, info_->EndPos() - edgeOffset + info_->BotMargin(), edgeOffset);
+        } else {
+            DeactivateFooter();
+        }
         // no item moves during MeasureToTarget tasks
         return;
     }
     if (!GetHasMeasured()) {
         TAG_LOGW(AceLogTag::ACE_WATERFLOW, "Layout called before Measure, skip layout");
         return;
+    }
+
+    float edgeOffset = 0.0f;
+    if (info_->edgeSlots_) {
+        // Preserve the measured origin before EndCacheUpdate switches back to synchronized positions.
+        edgeOffset = info_->StartIndex() == 0 &&
+            props_->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN
+            ? info_->StartPos() - info_->TopMargin() : info_->Offset();
     }
 
     const int32_t cacheCount = props_->GetCachedCountValue(info_->defCachedCount_);
@@ -354,7 +389,9 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
     wrapper->SetActiveChildRange(
         nodeIdx(activeStartIndex), nodeIdx(activeEndIndex), cacheCount, cacheCount, showCache);
 
-    if (info_->itemEnd_) {
+    if (info_->edgeSlots_) {
+        LayoutEdges(wrapper, info_, info_->EndPos() - edgeOffset + info_->BotMargin(), edgeOffset);
+    } else if (info_->itemEnd_) {
         LayoutFooter(paddingOffset, reverse);
     } else if (info_->footerIndex_ == 0) {
         DeactivateFooter();
@@ -942,9 +979,10 @@ ScrollAlign WaterFlowLayoutSW::ParseAutoAlign(int32_t jumpIdx, bool inView)
 
 void WaterFlowLayoutSW::MeasureOnJump(int32_t jumpIdx, ScrollAlign align)
 {
+    const bool toContentEnd = jumpIdx == LAST_ITEM && info_->edgeSlots_;
     if (jumpIdx == LAST_ITEM) {
         jumpIdx = itemCnt_ - 1;
-    } else if (jumpIdx == itemCnt_ && info_->footerIndex_ == 0) {
+    } else if (jumpIdx == itemCnt_ && (info_->edgeSlots_ ? info_->footerIndex_ >= 0 : info_->footerIndex_ == 0)) {
         // jump to footer
         info_->delta_ = -Infinity<float>();
     }
@@ -968,6 +1006,9 @@ void WaterFlowLayoutSW::MeasureOnJump(int32_t jumpIdx, ScrollAlign align)
         info_->needFixOffsetCache_ = true;
     }
     Jump(jumpIdx, align, noSkip);
+    if (toContentEnd && align == ScrollAlign::END) {
+        info_->delta_ -= info_->edgeFooterHeight_ + info_->BotMargin();
+    }
     if (info_->extraOffset_) {
         info_->delta_ += *info_->extraOffset_;
     }
@@ -1046,8 +1087,10 @@ void WaterFlowLayoutSW::AdjustOverScroll()
     float maxEnd = info_->EndPos();
     float minStart = info_->StartPos();
 
-    if (LessOrEqual(maxEnd, info_->GetViewEndBound(mainLen_, true)) && info_->footerIndex_ == 0) {
-        info_->footerHeight_ = WaterFlowLayoutUtils::MeasureFooter(wrapper_, axis_);
+    const bool hasFooter = info_->edgeSlots_ ? info_->footerIndex_ >= 0 : info_->footerIndex_ == 0;
+    if (LessOrEqual(maxEnd, info_->GetViewEndBound(mainLen_, true)) && hasFooter) {
+        info_->footerHeight_ = info_->edgeSlots_ ? info_->edgeFooterHeight_
+            : WaterFlowLayoutUtils::MeasureFooter(wrapper_, axis_);
         maxEnd += info_->footerHeight_;
     }
 
@@ -1208,7 +1251,7 @@ void WaterFlowLayoutSW::PostMeasureSelf(float selfCrossLen)
 
 inline int32_t WaterFlowLayoutSW::nodeIdx(int32_t idx) const
 {
-    return idx + info_->footerIndex_ + 1;
+    return info_->NodeIdx(idx);
 }
 
 bool WaterFlowLayoutSW::PreloadItem(LayoutWrapper* host, int32_t itemIdx, int64_t deadline)

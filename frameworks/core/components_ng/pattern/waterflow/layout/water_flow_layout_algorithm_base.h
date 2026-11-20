@@ -79,6 +79,9 @@ public:
     int32_t measuredEndIndex_ = -1;
 
 protected:
+    void MeasureEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, const SizeF& size);
+    void LayoutEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd,
+        std::optional<float> layoutOffset = std::nullopt);
     void BeginTargetPreparation();
     bool YieldTargetPreparation(LayoutWrapper* wrapper);
     void ReleaseTargetPreparationItems(LayoutWrapper* wrapper);

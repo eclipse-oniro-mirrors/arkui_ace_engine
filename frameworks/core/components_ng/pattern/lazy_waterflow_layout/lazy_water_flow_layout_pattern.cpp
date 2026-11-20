@@ -22,7 +22,7 @@
 #include "core/components_ng/pattern/lazy_waterflow_layout/lazy_water_flow_layout_info.h"
 #include "core/components_ng/pattern/lazy_waterflow_layout/lazy_water_flow_layout_property.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 
 namespace OHOS::Ace::NG {
 

@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/pipeline_ng/pipeline_context.h"
+
+#include "core/components_ng/base/scroll_viewport_coordinator.h"
 #include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/inspector_occlusion_collector.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -6834,6 +6836,19 @@ void PipelineContext::Finish(bool /* autoFinish */) const
 void PipelineContext::AddAfterLayoutTask(std::function<void()>&& task, bool isFlushInImplicitAnimationTask)
 {
     taskScheduler_->AddAfterLayoutTask(std::move(task), isFlushInImplicitAnimationTask);
+}
+
+RefPtr<ScrollViewportCoordinator> PipelineContext::GetScrollViewportCoordinator()
+{
+    if (!scrollViewportCoordinator_) {
+        scrollViewportCoordinator_ = MakeRefPtr<ScrollViewportCoordinator>();
+        AddPersistAfterLayoutTask([weak = WeakClaim(this)]() {
+            auto pipeline = weak.Upgrade();
+            CHECK_NULL_VOID(pipeline);
+            pipeline->scrollViewportCoordinator_->Flush(AceType::RawPtr(pipeline));
+        });
+    }
+    return scrollViewportCoordinator_;
 }
 
 void PipelineContext::AddPersistAfterLayoutTask(std::function<void()>&& task)

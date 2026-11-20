@@ -19,11 +19,14 @@
 #include "base/geometry/dimension.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "core/interfaces/native/ani/frame_node_peer_impl.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
@@ -424,29 +427,136 @@ void SetSupportEmptyBranchInLazyLoadingImpl(Ark_NativePointer node, const Opt_Bo
     auto enabled = Converter::OptConvertPtr<bool>(value).value_or(false);
     WaterFlowModelStatic::SetSupportEmptyBranchInLazyLoading(frameNode, enabled);
 }
+void SetEdgeBuilder(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder, bool header)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    const auto generation = WaterFlowModelStatic::BeginEdgeUpdate(frameNode, header);
+    CHECK_NULL_VOID(generation);
+    auto optBuilder = Converter::GetOptPtr(builder);
+    if (!optBuilder) {
+        WaterFlowModelStatic::SetEdge(frameNode, header, nullptr, generation);
+        return;
+    }
+    CallbackHelper(*optBuilder).BuildAsync(
+        [weak = AceType::WeakClaim(frameNode), header, generation](const RefPtr<UINode>& content) {
+            auto host = weak.Upgrade();
+            CHECK_NULL_VOID(host);
+            WaterFlowModelStatic::SetEdge(AceType::RawPtr(host), header, content, generation);
+        }, node);
+}
+
+void SetHeaderImpl(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder)
+{
+    SetEdgeBuilder(node, builder, true);
+}
+
+void SetFooterImpl(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder)
+{
+    SetEdgeBuilder(node, builder, false);
+}
+
+void SetEdgeContent(Ark_NativePointer node,
+    const Opt_Union_CustomNodeBuilder_ComponentContentBase* value, bool header)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto content = Converter::GetOptPtr(value);
+    if (!content) {
+        SetEdgeBuilder(node, nullptr, header);
+        return;
+    }
+    if (content->selector == 0) {
+        auto builder = Converter::ArkValue<Opt_CustomNodeBuilder>(content->value0);
+        SetEdgeBuilder(node, &builder, header);
+    } else if (content->selector == 1) {
+        auto peer = reinterpret_cast<FrameNodePeer*>(content->value1);
+        CHECK_NULL_VOID(peer);
+        auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+        CHECK_NULL_VOID(pattern);
+        pattern->SetEdgeContent(header, FrameNodePeer::GetFrameNodeByPeer(peer));
+    }
+}
+
+void SetHeaderContentImpl(Ark_NativePointer node, const Opt_Union_CustomNodeBuilder_ComponentContentBase* value)
+{
+    SetEdgeContent(node, value, true);
+}
+
+void SetFooterContentImpl(Ark_NativePointer node, const Opt_Union_CustomNodeBuilder_ComponentContentBase* value)
+{
+    SetEdgeContent(node, value, false);
+}
+
+void SetStickyImpl(Ark_NativePointer node, const Opt_StickyStyle* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto opt = Converter::GetOptPtr(value);
+    auto style = StickyStyle::NONE;
+    if (opt) {
+        switch (*opt) {
+            case ARK_STICKY_STYLE_HEADER: style = StickyStyle::HEADER; break;
+            case ARK_STICKY_STYLE_FOOTER: style = StickyStyle::FOOTER; break;
+            case ARK_STICKY_STYLE_BOTH: style = StickyStyle::BOTH; break;
+            default: break;
+        }
+    }
+    WaterFlowModelStatic::SetSticky(frameNode, style);
+}
+
 } // WaterFlowAttributeModifier
+namespace {
+// SDK preview builds can still use the table generated before the edge attributes.
+template<typename Modifier>
+constexpr auto SetEdgeModifiersIfSupported(Modifier& modifier, int)
+    -> decltype(modifier.setHeader = WaterFlowAttributeModifier::SetHeaderContentImpl, void())
+{
+    modifier.setHeader = WaterFlowAttributeModifier::SetHeaderContentImpl;
+    modifier.setFooter = WaterFlowAttributeModifier::SetFooterContentImpl;
+    modifier.setSticky = WaterFlowAttributeModifier::SetStickyImpl;
+}
+
+template<typename Modifier>
+constexpr auto SetEdgeModifiersIfSupported(Modifier& modifier, long)
+    -> decltype(modifier.setHeader = WaterFlowAttributeModifier::SetHeaderImpl, void())
+{
+    modifier.setHeader = WaterFlowAttributeModifier::SetHeaderImpl;
+    modifier.setFooter = WaterFlowAttributeModifier::SetFooterImpl;
+    modifier.setSticky = WaterFlowAttributeModifier::SetStickyImpl;
+}
+
+template<typename Modifier>
+constexpr void SetEdgeModifiersIfSupported(Modifier&, ...)
+{}
+} // namespace
+
 const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
 {
-    static const GENERATED_ArkUIWaterFlowModifier ArkUIWaterFlowModifierImpl {
-        WaterFlowModifier::ConstructImpl,
-        WaterFlowInterfaceModifier::SetWaterFlowOptionsImpl,
-        WaterFlowAttributeModifier::SetColumnsTemplateImpl,
-        WaterFlowAttributeModifier::SetItemConstraintSizeImpl,
-        WaterFlowAttributeModifier::SetRowsTemplateImpl,
-        WaterFlowAttributeModifier::SetColumnsGapImpl,
-        WaterFlowAttributeModifier::SetRowsGapImpl,
-        WaterFlowAttributeModifier::SetLayoutDirectionImpl,
-        WaterFlowAttributeModifier::SetScrollSnapStrategyImpl,
-        WaterFlowAttributeModifier::SetCachedCount0Impl,
-        WaterFlowAttributeModifier::SetSyncLoadImpl,
-        WaterFlowAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl,
-        WaterFlowAttributeModifier::SetOnScrollFrameBeginImpl,
-        WaterFlowAttributeModifier::SetOnScrollIndexImpl,
-        WaterFlowAttributeModifier::SetOnWillScrollImpl,
-        WaterFlowAttributeModifier::SetOnDidScrollImpl,
-        WaterFlowAttributeModifier::SetScrollPlaceholderImpl,
-        WaterFlowAttributeModifier::SetCachedCount1Impl,
-    };
+    static constexpr GENERATED_ArkUIWaterFlowModifier ArkUIWaterFlowModifierImpl = [] {
+        GENERATED_ArkUIWaterFlowModifier modifier {};
+        modifier.construct = WaterFlowModifier::ConstructImpl;
+        modifier.setWaterFlowOptions = WaterFlowInterfaceModifier::SetWaterFlowOptionsImpl;
+        modifier.setColumnsTemplate = WaterFlowAttributeModifier::SetColumnsTemplateImpl;
+        modifier.setItemConstraintSize = WaterFlowAttributeModifier::SetItemConstraintSizeImpl;
+        modifier.setRowsTemplate = WaterFlowAttributeModifier::SetRowsTemplateImpl;
+        modifier.setColumnsGap = WaterFlowAttributeModifier::SetColumnsGapImpl;
+        modifier.setRowsGap = WaterFlowAttributeModifier::SetRowsGapImpl;
+        modifier.setLayoutDirection = WaterFlowAttributeModifier::SetLayoutDirectionImpl;
+        modifier.setScrollSnapStrategy = WaterFlowAttributeModifier::SetScrollSnapStrategyImpl;
+        modifier.setCachedCount0 = WaterFlowAttributeModifier::SetCachedCount0Impl;
+        modifier.setSyncLoad = WaterFlowAttributeModifier::SetSyncLoadImpl;
+        modifier.setSupportEmptyBranchInLazyLoading =
+            WaterFlowAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl;
+        modifier.setOnScrollFrameBegin = WaterFlowAttributeModifier::SetOnScrollFrameBeginImpl;
+        modifier.setOnScrollIndex = WaterFlowAttributeModifier::SetOnScrollIndexImpl;
+        modifier.setOnWillScroll = WaterFlowAttributeModifier::SetOnWillScrollImpl;
+        modifier.setOnDidScroll = WaterFlowAttributeModifier::SetOnDidScrollImpl;
+        modifier.setScrollPlaceholder = WaterFlowAttributeModifier::SetScrollPlaceholderImpl;
+        modifier.setCachedCount1 = WaterFlowAttributeModifier::SetCachedCount1Impl;
+        SetEdgeModifiersIfSupported(modifier, 0);
+        return modifier;
+    }();
     return &ArkUIWaterFlowModifierImpl;
 }
 

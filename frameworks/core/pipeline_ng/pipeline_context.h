@@ -89,6 +89,7 @@ class MemoryManager;
 class ContentChangeManager;
 class InspectorOffscreenNodesMgr;
 class OverlayManager;
+class ScrollViewportCoordinator;
 class PostEventManager;
 class PrivacySensitiveManager;
 class ContainerModalPattern;
@@ -444,6 +445,8 @@ public:
     void AddAfterLayoutTask(std::function<void()>&& task, bool isFlushInImplicitAnimationTask = false);
 
     void AddPersistAfterLayoutTask(std::function<void()>&& task);
+
+    RefPtr<ScrollViewportCoordinator> GetScrollViewportCoordinator();
 
     void AddAfterModifierTask(std::function<void()>&& task);
 
@@ -1423,6 +1426,7 @@ protected:
     void PostKeyboardAvoidTask();
 
 private:
+    RefPtr<ScrollViewportCoordinator> scrollViewportCoordinator_;
     std::function<std::optional<InspectorWindowSnapshot>()> inspectorWindowSnapshot_;
     std::string inspectorAppTitle_;
     RefPtr<ContainerModalPattern> GetContainerModalPatternForTitleHeight();

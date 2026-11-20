@@ -417,10 +417,71 @@ class WaterFlowInitializeModifier extends ModifierWithKey {
 }
 WaterFlowInitializeModifier.identity = Symbol('waterFlowInitialize');
 
+class WaterFlowHeaderModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetHeader(node);
+    } else {
+      getUINativeModule().waterFlow.setHeader(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return this.stageValue !== this.value;
+  }
+}
+WaterFlowHeaderModifier.identity = Symbol('waterFlowHeader');
+
+class WaterFlowFooterModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetFooter(node);
+    } else {
+      getUINativeModule().waterFlow.setFooter(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return this.stageValue !== this.value;
+  }
+}
+WaterFlowFooterModifier.identity = Symbol('waterFlowFooter');
+
+class WaterFlowStickyModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetSticky(node);
+    } else {
+      getUINativeModule().waterFlow.setSticky(node, this.value);
+    }
+  }
+}
+WaterFlowStickyModifier.identity = Symbol('waterFlowSticky');
+
 class ArkWaterFlowComponent extends ArkScrollable {
   constructor(nativePtr, classType) {
     super(nativePtr, classType);
   }
+  header(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
+    return this;
+  }
+  footer(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowFooterModifier.identity, WaterFlowFooterModifier, value);
+    return this;
+  }
+  sticky(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowStickyModifier.identity, WaterFlowStickyModifier, value);
+    return this;
+  }
+
   scrollSnapStrategy(value) {
     modifierWithKey(this._modifiersWithKeys, WaterFlowScrollSnapStrategyModifier.identity,
       WaterFlowScrollSnapStrategyModifier, value);
@@ -564,6 +625,16 @@ class ArkWaterFlowComponent extends ArkScrollable {
 
 
 class JSWaterFlow extends JSContainerBase {
+  static header(value) {
+    getUINativeModule().waterFlow.setHeader(true, value);
+  }
+  static footer(value) {
+    getUINativeModule().waterFlow.setFooter(true, value);
+  }
+  static sticky(value) {
+    getUINativeModule().waterFlow.setSticky(true, value);
+  }
+
   static create(params) {
     getUINativeModule().waterFlow.create(params);
   }
