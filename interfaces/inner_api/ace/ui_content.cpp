@@ -43,7 +43,7 @@ constexpr char OHOS_ACE_IS_BRAND_COLOR_VALID[] = "OHOS_ACE_IsBrandColorValid";
 
 OHOS::AbilityRuntime::Context* context_ = nullptr;
 std::atomic<bool> UIContent::successFlag_{false};
-std::mutex UIContent::mtx_;
+std::shared_mutex UIContent::mtx_;
 std::string UIContent::angleConfigJson_ = "";
 std::atomic<bool> UIContent::setUICorrectionConfigSuccessFlag_{false};
 std::mutex UIContent::setUICorrectionConfigMutex_;
@@ -191,7 +191,7 @@ bool UIContent::SetXComponentCompensationAngle(const std::string& configStr)
         return true;
     }
         
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::unique_lock<std::shared_mutex> lock(mtx_);
     if (successFlag_.load(std::memory_order_relaxed)) {
         return true;
     }
@@ -207,6 +207,7 @@ bool UIContent::SetXComponentCompensationAngle(const std::string& configStr)
 
 const std::string& UIContent::GetXComponentCompensationAngle()
 {
+    std::shared_lock<std::shared_mutex> lock(mtx_);
     return UIContent::angleConfigJson_;
 }
 
