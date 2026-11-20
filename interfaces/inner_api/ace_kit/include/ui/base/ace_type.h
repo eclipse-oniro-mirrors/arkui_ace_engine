@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_INTERFACES_INNER_API_ACE_KIT_INCLUDE_BASE_ACE_TYPE_H
 #define FOUNDATION_ACE_INTERFACES_INNER_API_ACE_KIT_INCLUDE_BASE_ACE_TYPE_H
 
+#include <type_traits>
+
 #include "ui/base/referenced.h"
 
 #include "ui/base/type_info_base.h"
@@ -60,26 +62,31 @@ public:
     template<class T, class O>
     static T* DynamicCast(O* rawPtr)
     {
+        static_assert(!std::is_base_of_v<T, O>, "DynamicCast does not support UpCast or IdentityCast.");
         return TypeInfoHelper::DynamicCast<T>(rawPtr);
     }
     template<class T, class O>
     static const T* DynamicCast(const O* rawPtr)
     {
+        static_assert(!std::is_base_of_v<T, O>, "DynamicCast does not support UpCast or IdentityCast.");
         return TypeInfoHelper::DynamicCast<T>(rawPtr);
     }
     template<class T, class O>
     static RefPtr<T> DynamicCast(const RefPtr<O>& ptr)
     {
+        static_assert(!std::is_base_of_v<T, O>, "DynamicCast does not support UpCast or IdentityCast.");
         return Claim(DynamicCast<T>(RawPtr(ptr)));
     }
     template<class T, class O>
     static RefPtr<T> DynamicCast(RefPtr<O>&& ptr)
     {
+        static_assert(!std::is_base_of_v<T, O>, "DynamicCast does not support UpCast or IdentityCast.");
         return Transfer<T>(ptr);
     }
     template<class T, class O>
     static WeakPtr<T> DynamicCast(const WeakPtr<O>& weak)
     {
+        static_assert(!std::is_base_of_v<T, O>, "DynamicCast does not support UpCast or IdentityCast.");
         auto ptr = weak.Upgrade();
         return WeakClaim(DynamicCast<T>(RawPtr(ptr)));
     }
