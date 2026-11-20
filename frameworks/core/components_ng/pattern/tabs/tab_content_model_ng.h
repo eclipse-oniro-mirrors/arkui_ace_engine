@@ -118,6 +118,7 @@ public:
     void SetDefaultVisibility(const NG::TabContentDefaultVisibility& defaultVisibility) override;
     static void SetDefaultVisibility(FrameNode* node, const NG::TabContentDefaultVisibility& defaultVisibility);
     static void SetSidebarSection(FrameNode* node, const SidebarSection& section);
+    static void SetKeepAlive(FrameNode* node, bool keepAlive);
     static void SetCustomTabBar(FrameNode* node, FrameNode* tabBar);
     static void UpdateDefaultSymbol(RefPtr<TabTheme>& tabTheme, RefPtr<TextLayoutProperty> symbolProperty);
     static void UpdateSymbolEffect(RefPtr<TextLayoutProperty> symbolProperty, bool isActive);

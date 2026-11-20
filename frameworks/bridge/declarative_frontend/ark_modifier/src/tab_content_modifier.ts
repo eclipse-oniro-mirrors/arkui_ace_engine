@@ -14,76 +14,79 @@
  */
 
 class LazyArkTabContentComponent extends ArkComponent {
-    static module: TabContentComponentModule | undefined = undefined;
+  static module: TabContentComponentModule | undefined = undefined;
 
-    constructor(nativePtr: KNode, classType: ModifierType) {
-      super(nativePtr, classType);
-      if (LazyArkTabContentComponent.module === undefined) {
-        LazyArkTabContentComponent.module = globalThis.requireNapi('arkui.components.arktabcontent');
-      }
-      this.lazyComponent = LazyArkTabContentComponent.module.createComponent(nativePtr, classType);
+  constructor(nativePtr: KNode, classType: ModifierType) {
+    super(nativePtr, classType);
+    if (LazyArkTabContentComponent.module === undefined) {
+      LazyArkTabContentComponent.module = globalThis.requireNapi('arkui.components.arktabcontent');
     }
-
-    setMap(): void {
-      this.lazyComponent._modifiersWithKeys = this._modifiersWithKeys;
-    }
-
-    allowChildCount(): number {
-      return this.lazyComponent.allowChildCount();
-    }
-
-    tabBar(value: SubTabBarStyle | BottomTabBarStyle | ComponentContent): this {
-      this.lazyComponent.tabBar(value);
-      return this;
-    }
-
-    size(value: SizeOptions): this {
-      this.lazyComponent.size(value);
-      return this;
-    }
-
-    width(value: Length): this {
-      this.lazyComponent.width(value);
-      return this;
-    }
-
-    height(value: Length): this {
-      this.lazyComponent.height(value);
-      return this;
-    }
-
-    onWillShow(event: VoidCallback): this {
-      this.lazyComponent.onWillShow(event);
-      return this;
-    }
-
-    onWillHide(event: VoidCallback): this {
-      this.lazyComponent.onWillHide(event);
-      return this;
-    }
-
-    tabBarVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this {
-      this.lazyComponent.tabBarVisibility(visibility, displayMode);
-      return this;
-    }
-
-    sidebarSection(value: SidebarSection): this {
-      this.lazyComponent.sidebarSection(value);
-      return this;
-    }
+    this.lazyComponent = LazyArkTabContentComponent.module.createComponent(nativePtr, classType);
   }
+
+  setMap(): void {
+    this.lazyComponent._modifiersWithKeys = this._modifiersWithKeys;
+  }
+
+  allowChildCount(): number {
+    return this.lazyComponent.allowChildCount();
+  }
+
+  tabBar(value: SubTabBarStyle | BottomTabBarStyle | ComponentContent): this {
+    this.lazyComponent.tabBar(value);
+    return this;
+  }
+
+  size(value: SizeOptions): this {
+    this.lazyComponent.size(value);
+    return this;
+  }
+
+  width(value: Length): this {
+    this.lazyComponent.width(value);
+    return this;
+  }
+
+  height(value: Length): this {
+    this.lazyComponent.height(value);
+    return this;
+  }
+
+  onWillShow(event: VoidCallback): this {
+    this.lazyComponent.onWillShow(event);
+    return this;
+  }
+
+  onWillHide(event: VoidCallback): this {
+    this.lazyComponent.onWillHide(event);
+    return this;
+  }
+
+  tabBarVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this {
+    this.lazyComponent.tabBarVisibility(visibility, displayMode);
+    return this;
+  }
+
+  sidebarSection(value: SidebarSection): this {
+    this.lazyComponent.sidebarSection(value);
+    return this;
+  }
+
+  keepAlive(value: boolean): this {
+    this.lazyComponent.keepAlive(value);
+    return this;
+  }
+}
 
 class TabContentModifier extends LazyArkTabContentComponent implements AttributeModifier<TabContentAttribute> {
-
-    constructor(nativePtr: KNode, classType: ModifierType) {
-      super(nativePtr, classType);
-      this._modifiersWithKeys = new ModifierMap();
-      this.setMap();
-    }
-    
-    applyNormalAttribute(instance: TabContentAttribute): void {
-      ModifierUtils.applySetOnChange(this);
-      ModifierUtils.applyAndMergeModifier<TabContentAttribute, ArkTabContentComponent, ArkComponent>(instance, this);
-    }
+  constructor(nativePtr: KNode, classType: ModifierType) {
+    super(nativePtr, classType);
+    this._modifiersWithKeys = new ModifierMap();
+    this.setMap();
   }
-   
+
+  applyNormalAttribute(instance: TabContentAttribute): void {
+    ModifierUtils.applySetOnChange(this);
+    ModifierUtils.applyAndMergeModifier<TabContentAttribute, ArkTabContentComponent, ArkComponent>(instance, this);
+  }
+}
