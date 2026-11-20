@@ -32,6 +32,12 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+// A layout-dependent final target legitimately needs one or two stabilization stages (each
+// re-resolves after a layout pass). A chain that keeps re-resolving DIFFERENT endpoints is
+// runaway — observed with mock animation backends whose spring-to-content writeback defers
+// the pattern sync — so the number of published stabilizations is bounded.
+constexpr uint32_t MAX_ITEM_SNAP_STABILIZATIONS = 6;
+
 // Spring curve for one item snap stage; long stages reduce the minimum amplitude ratio so the
 // spring settles without visible oscillation around the target. Final provider stages use
 // the same slow spring as built-in item alignment.
@@ -264,6 +270,20 @@ void Scrollable::FlushItemSnapAnimationStart()
 }
 
 // Feat-20260806915268 item snap stage helpers (definitions live in scrollable_item_snap.cpp).
+// Resets the chain to idle and publishes the motion stop; shared by the genuine final-stage
+// completion and the stabilization-budget exhaustion path below.
+void Scrollable::FinalizeItemSnapStage(int32_t source)
+{
+    state_ = AnimationState::IDLE;
+    nextStep_.reset();
+    itemSnapChainActive_ = false;
+    axisSnapDistance_ = 0.f;
+    snapDirection_ = SnapDirection::NONE;
+    snapAnimationFromScrollBar_ = false;
+    ACE_SCOPED_TRACE("Item snap final stage finish, id:%d", nodeId_);
+    ProcessScrollMotionStop(source);
+}
+
 // Dispatches a finished stage by generation; posts the handoff as a UI task and re-checks
 // the generation before running it. The handoff carries TWO velocities: providerVelocity
 // feeds the re-evaluation's decision (the live velocity at the handoff instant — what
@@ -278,20 +298,22 @@ void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, i
         return;
     }
     // Completion may also arrive from a backend cancellation. Consume this generation
-    // before publishing a continuation so a repeated completion cannot finish the chain twice.
+    // before publishing a continuation so a repeated completion cannot finish the chain twice
+    // (the moved-out-handoff duplicate is discarded by the check above instead of running the
+    // final cleanup a second time and double-firing the stop events).
     const auto continuationGeneration = ++itemSnapGeneration_;
     if (finalStage && !onHandoff) {
-        state_ = AnimationState::IDLE;
-        nextStep_.reset();
-        itemSnapChainActive_ = false;
-        axisSnapDistance_ = 0.f;
-        snapDirection_ = SnapDirection::NONE;
-        snapAnimationFromScrollBar_ = false;
-        ACE_SCOPED_TRACE("Item snap final stage finish, id:%d", nodeId_);
-        ProcessScrollMotionStop(source);
+        FinalizeItemSnapStage(source);
         return;
     }
     if (onHandoff) {
+        // Layout-dependent final targets can require another stabilization stage, but a chain
+        // whose re-resolution keeps moving the endpoint is runaway; publish the stop instead
+        // of yet another stage once the stabilization budget is spent.
+        if (++itemSnapStabilizations_ > MAX_ITEM_SNAP_STABILIZATIONS) {
+            FinalizeItemSnapStage(source);
+            return;
+        }
         // Hand off while the snap chain is still current. The re-evaluation receives the
         // LIVE velocity at the handoff instant (snapVelocity_): what the motion still has
         // left when the finishing stage ends. The same value drives the next stage spring's
@@ -299,8 +321,7 @@ void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, i
         // full spring course ends nearly at rest (1~10 px/s on a real backend), so a fully
         // decayed stage reports a velocity close to zero; a cut-short stage or an immediate
         // handoff (near-zero delta) still carries real speed. continuationGeneration (not
-        // the consumed stage generation) keeps this handoff live for the posted task while
-        // a repeated backend completion of the same stage stays discarded.
+        // the consumed stage generation) keeps this handoff live for the posted task.
         PostItemSnapHandoff(continuationGeneration, snapVelocity_, snapVelocity_, std::move(onHandoff));
     }
 }

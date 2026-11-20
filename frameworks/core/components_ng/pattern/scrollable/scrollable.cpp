@@ -664,6 +664,12 @@ void Scrollable::CancelItemSnapChain()
     // only reset when an item-snap-driven animation is in flight: legacy List/Scroll wheel
     // chaining relies on that state surviving across wheel ticks by design.
     itemSnapGeneration_++;
+    // A continuation re-entry restarts the chain while it is still active (its stabilization
+    // budget must carry over); only a genuinely new chain — the previous one finalized or
+    // already cancelled — restarts the budget.
+    if (!itemSnapChainActive_) {
+        itemSnapStabilizations_ = 0;
+    }
     // Invalidate the old friction completion before stopping/replacing its property animation.
     // Its generation check is opt-in, so legacy NONE/List completion paths retain their contract.
     ++frictionGeneration_;

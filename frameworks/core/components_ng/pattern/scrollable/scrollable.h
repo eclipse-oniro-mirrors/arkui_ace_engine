@@ -569,6 +569,7 @@ private:
 
     void OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source,
         std::function<void(float, float)>&& onHandoff);
+    void FinalizeItemSnapStage(int32_t source);
     void PostItemSnapHandoff(uint32_t generation, float providerVelocity, float motionVelocity,
         std::function<void(float, float)>&& onHandoff);
 
@@ -958,6 +959,9 @@ private:
     // Generation token of the two-stage item snap chain: bumped on every stage start and on
     // interruption so completion callbacks of superseded/interrupted stages are ignored.
     uint32_t itemSnapGeneration_ = 0;
+    // Stabilization stages published by the current chain (OnItemSnapStageFinished re-handoffs);
+    // bounded by MAX_ITEM_SNAP_STABILIZATIONS and reset on every chain start/cancel.
+    uint32_t itemSnapStabilizations_ = 0;
     // Feat-20260806915268: a friction fling is running whose stop must trigger the item snap settle
     // (built-in align). Cleared by the settle itself and by CancelItemSnapChain.
     bool needItemSnapSettle_ = false;

@@ -213,6 +213,13 @@ ScrollablePattern::~ScrollablePattern()
                 nodeId, (TRAILING_ANIMATION + std::to_string(nodeId) + std::string(" ") + nodeTag).c_str());
         }
     }
+    // The pattern is going away: kill any in-flight item snap chain and parked states so a
+    // posted handoff can neither fire into a dead pattern nor leave the scrollable parked in
+    // TRANSITION when its owning node is destroyed mid-chain.
+    auto scrollable = GetScrollable();
+    if (scrollable) {
+        scrollable->StopScrollable();
+    }
     if (scrollBarProxy_) {
         scrollBarProxy_->UnRegisterNestScrollableNode(AceType::WeakClaim(this));
     }
