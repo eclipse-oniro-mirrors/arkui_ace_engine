@@ -100,6 +100,12 @@ enum class TextClockWeekType {
     WEEK_FULL_TYPE = 1,
     WEEK_SHORT_TYPE = 2,
 };
+
+bool ShouldSkipDigitLocalization()
+{
+    std::string language = Localization::GetInstance()->GetLanguage();
+    return language == "zh" || language == "my";
+}
 } // namespace
 
 TextClockPattern::TextClockPattern()
@@ -428,7 +434,7 @@ std::string TextClockPattern::GetCurrentFormatDateTime()
     CHECK_NULL_RETURN(textClockLayoutProperty, "");
     auto propFormat = textClockLayoutProperty->GetFormat();
     if ((!propFormat.has_value() || propFormat.value().empty())
-        && Localization::GetInstance()->GetLanguage() != "zh") {
+        && !ShouldSkipDigitLocalization()) {
         return Localization::GetInstance()->FormatDateTimeMatchHourField(dateTime, GetDefaultFormat());
     }
     dateTime.week = static_cast<uint32_t>(timeZoneTime->tm_wday); // 0-6
@@ -503,9 +509,9 @@ std::string TextClockPattern::ParseDateTime(const std::string& dateTimeValue,
             formatElementMap_[2] = tempFormatElement;
             outputDateTime = SpliceDateTime(curDateTime);
         } else {
-            outputDateTime = Localization::GetInstance()->GetLanguage() != "zh"
-                ? Localization::GetInstance()->LocalizeDigits(tempdateTimeValue)
-                : tempdateTimeValue;
+            outputDateTime = ShouldSkipDigitLocalization()
+                ? tempdateTimeValue
+                : Localization::GetInstance()->LocalizeDigits(tempdateTimeValue);
         }
     }
     return outputDateTime;
@@ -821,7 +827,7 @@ std::string TextClockPattern::CheckDateTimeElement(const std::vector<std::string
     std::string curDateTimeElement = "yMdHhmsSaE";
     if (curDateTimeElement.find(element) != std::string::npos) {
         format = curDateTime[elementIndex];
-        if (element != 'a' && element != 'E' && Localization::GetInstance()->GetLanguage() != "zh") {
+        if (element != 'a' && element != 'E' && !ShouldSkipDigitLocalization()) {
             format = Localization::GetInstance()->LocalizeDigits(format);
         }
         if ((oneElement)) {
