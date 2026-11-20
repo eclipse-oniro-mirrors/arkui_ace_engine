@@ -39,6 +39,7 @@ gen_obj("arkui_arcswiper_abc") {
 }
 
 ohos_shared_library("arcswiper") {
+  branch_protector_ret = "pac_ret"
   defines = [
     "USE_ARK_ENGINE",
     "NOGDI",

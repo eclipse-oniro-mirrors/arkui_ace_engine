@@ -465,7 +465,7 @@ bool JsAccessibilityManager::NeedChangeToReadableNode(const RefPtr<NG::FrameNode
     const auto& accessibilityManager = context->GetAccessibilityManager();
     CHECK_NULL_RETURN(accessibilityManager, true);
     CHECK_EQUAL_RETURN(accessibilityManager->GetTreeId(), 0, true);
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
+    auto ngPipeline = context;
     CHECK_NULL_RETURN(ngPipeline, true);
     auto container = Platform::AceContainer::GetContainer(ngPipeline->GetInstanceId());
     CHECK_NULL_RETURN(container, true);

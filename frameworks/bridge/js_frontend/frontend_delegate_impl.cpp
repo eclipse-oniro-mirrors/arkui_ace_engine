@@ -835,7 +835,7 @@ void FrontendDelegateImpl::TriggerPageUpdate(int32_t pageId, bool directExecute)
         return;
     }
 
-    auto jsPage = AceType::DynamicCast<Framework::JsAcePage>(page);
+    auto jsPage = page;
     ACE_DCHECK(jsPage);
 
     // Pop all JS command and execute them in UI thread.
@@ -2036,7 +2036,7 @@ void FrontendDelegateImpl::FlushAnimationTasks()
     if (!page) {
         return;
     }
-    auto jsPage = AceType::DynamicCast<Framework::JsAcePage>(page);
+    auto jsPage = page;
     if (jsPage && jsPage->GetCommandSize() > 0) {
         TriggerPageUpdate(pageId);
     }

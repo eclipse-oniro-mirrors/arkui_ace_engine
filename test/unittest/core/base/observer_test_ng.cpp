@@ -2453,7 +2453,7 @@ HWTEST_F(ObserverTestNg, FireAboutToAppearWithCustomNode001, TestSize.Level1)
  
     auto customNode = CustomNode::CreateCustomNode(33, "test_custom");
     ASSERT_NE(customNode, nullptr);
-    auto customNodeBase = AceType::DynamicCast<CustomNodeBase>(customNode);
+    RefPtr<CustomNodeBase> customNodeBase = customNode;
     ASSERT_NE(customNodeBase, nullptr);
     contentNode->SetNavDestinationCustomNode(AceType::WeakClaim(AceType::RawPtr(customNodeBase)));
  

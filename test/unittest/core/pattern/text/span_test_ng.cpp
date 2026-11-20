@@ -20,6 +20,7 @@
 
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/image/image_model_ng.h"
+#include "core/components_ng/pattern/image/image_render_property.h"
 #include "core/components_ng/pattern/text/span/image_span_view.h"
 #include "core/components_ng/pattern/text/span_model_ng.h"
 #include "core/components_ng/pattern/text/span/symbol_span_model_ng.h"
@@ -616,6 +617,119 @@ HWTEST_F(SpanTestNg, Create001, TestSize.Level1)
     ASSERT_NE(layoutProperty, nullptr);
     EXPECT_EQ(layoutProperty->GetImageFitValue(ImageFit::COVER), ImageFit::FILL);
     EXPECT_EQ(layoutProperty->GetVerticalAlignValue(VerticalAlign::BOTTOM), VerticalAlign::TOP);
+}
+
+/**
+ * @tc.name: ImageSpanSetBorderRadiusTest001
+ * @tc.desc: Test ImageSpanView::SetBorderRadius updates render context and image render property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SpanTestNg, ImageSpanSetBorderRadiusTest001, TestSize.Level1)
+{
+    ImageModelNG imageSpan;
+    ImageInfoConfig imageInfoConfig;
+    RefPtr<PixelMap> pixMap = nullptr;
+    imageInfoConfig.pixelMap = pixMap;
+    imageSpan.Create(imageInfoConfig);
+    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(frameNode, nullptr);
+
+    BorderRadiusProperty borderRadius;
+    borderRadius.SetRadius(Dimension(10.0, DimensionUnit::VP));
+    ImageSpanView::SetBorderRadius(AceType::RawPtr(frameNode), borderRadius);
+
+    // ViewAbstract chain: border radius is written to the render context.
+    auto renderContext = frameNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    auto renderRadius = renderContext->GetBorderRadiusValue(BorderRadiusProperty {});
+    ASSERT_TRUE(renderRadius.radiusTopLeft.has_value());
+    EXPECT_EQ(renderRadius.radiusTopLeft.value(), Dimension(10.0, DimensionUnit::VP));
+
+    // ImageModelNG chain: border radius is written to the image render property.
+    auto imageRenderProperty = frameNode->GetPaintProperty<ImageRenderProperty>();
+    ASSERT_NE(imageRenderProperty, nullptr);
+    EXPECT_TRUE(imageRenderProperty->HasBorderRadius());
+    EXPECT_EQ(imageRenderProperty->GetBorderRadiusValue().radiusTopLeft.value(), Dimension(10.0, DimensionUnit::VP));
+    EXPECT_TRUE(imageRenderProperty->GetNeedBorderRadiusValue());
+    // Modifier path regression: first set must produce the render change flag.
+    EXPECT_TRUE(imageRenderProperty->GetPropertyChangeFlag() & PROPERTY_UPDATE_RENDER);
+}
+
+/**
+ * @tc.name: ImageSpanSetBorderRadiusTest002
+ * @tc.desc: Test modifier path radius change: second set with a new value updates property and flag again.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SpanTestNg, ImageSpanSetBorderRadiusTest002, TestSize.Level1)
+{
+    ImageModelNG imageSpan;
+    ImageInfoConfig imageInfoConfig;
+    RefPtr<PixelMap> pixMap = nullptr;
+    imageInfoConfig.pixelMap = pixMap;
+    imageSpan.Create(imageInfoConfig);
+    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(frameNode, nullptr);
+    auto imageRenderProperty = frameNode->GetPaintProperty<ImageRenderProperty>();
+    ASSERT_NE(imageRenderProperty, nullptr);
+
+    // First set produces the render change flag.
+    BorderRadiusProperty firstRadius;
+    firstRadius.SetRadius(Dimension(10.0, DimensionUnit::VP));
+    ImageSpanView::SetBorderRadius(AceType::RawPtr(frameNode), firstRadius);
+    EXPECT_TRUE(imageRenderProperty->GetPropertyChangeFlag() & PROPERTY_UPDATE_RENDER);
+
+    // Clean the flag, then change to a new value.
+    imageRenderProperty->CleanDirty();
+    EXPECT_EQ(imageRenderProperty->GetPropertyChangeFlag(), PROPERTY_UPDATE_NORMAL);
+
+    BorderRadiusProperty secondRadius;
+    secondRadius.SetRadius(Dimension(20.0, DimensionUnit::VP));
+    ImageSpanView::SetBorderRadius(AceType::RawPtr(frameNode), secondRadius);
+
+    // Second change still updates the value and produces the flag again.
+    EXPECT_EQ(imageRenderProperty->GetBorderRadiusValue().radiusTopLeft.value(), Dimension(20.0, DimensionUnit::VP));
+    EXPECT_TRUE(imageRenderProperty->GetPropertyChangeFlag() & PROPERTY_UPDATE_RENDER);
+}
+
+/**
+ * @tc.name: ImageSpanSetBorderRadiusTest003
+ * @tc.desc: Test modifier path radius change: reset then set again still takes effect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SpanTestNg, ImageSpanSetBorderRadiusTest003, TestSize.Level1)
+{
+    ImageModelNG imageSpan;
+    ImageInfoConfig imageInfoConfig;
+    RefPtr<PixelMap> pixMap = nullptr;
+    imageInfoConfig.pixelMap = pixMap;
+    imageSpan.Create(imageInfoConfig);
+    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(frameNode, nullptr);
+    auto imageRenderProperty = frameNode->GetPaintProperty<ImageRenderProperty>();
+    ASSERT_NE(imageRenderProperty, nullptr);
+    auto renderContext = frameNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+
+    // First set.
+    BorderRadiusProperty radius;
+    radius.SetRadius(Dimension(10.0, DimensionUnit::VP));
+    ImageSpanView::SetBorderRadius(AceType::RawPtr(frameNode), radius);
+
+    // Reset: render context radius goes back to zero.
+    ImageSpanView::ResetBorderRadius(AceType::RawPtr(frameNode));
+    EXPECT_EQ(renderContext->GetBorderRadiusValue(BorderRadiusProperty {}).radiusTopLeft.value(), Dimension(0));
+
+    // Clean the flag, then set again with a new value.
+    imageRenderProperty->CleanDirty();
+    EXPECT_EQ(imageRenderProperty->GetPropertyChangeFlag(), PROPERTY_UPDATE_NORMAL);
+
+    BorderRadiusProperty newRadius;
+    newRadius.SetRadius(Dimension(30.0, DimensionUnit::VP));
+    ImageSpanView::SetBorderRadius(AceType::RawPtr(frameNode), newRadius);
+
+    // Re-set after reset still updates value and produces the render change flag.
+    EXPECT_EQ(imageRenderProperty->GetBorderRadiusValue().radiusTopLeft.value(), Dimension(30.0, DimensionUnit::VP));
+    EXPECT_TRUE(imageRenderProperty->GetPropertyChangeFlag() & PROPERTY_UPDATE_RENDER);
 }
 
 /**

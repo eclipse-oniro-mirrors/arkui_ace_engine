@@ -18,6 +18,7 @@ template("ace_base_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     if (current_os == "ohos") {
       sanitize = {
         integer_overflow = true
@@ -165,6 +166,7 @@ foreach(item, ace_platforms) {
   }
 
   ohos_source_set("ace_memory_monitor_" + item.name) {
+    branch_protector_ret = "pac_ret"
     platform = item.name
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part

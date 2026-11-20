@@ -120,7 +120,7 @@ HWTEST_F(AppBarLayoutAlgorithmTest, AtomicServiceLayoutAlgorithm002, TestSize.Le
      * @tc.steps: step2. Verify it can be cast to LinearLayoutAlgorithm.
      * @tc.expected: Cast should succeed.
      */
-    auto linearLayoutAlgorithm = AceType::DynamicCast<LinearLayoutAlgorithm>(layoutAlgorithm);
+    RefPtr<LinearLayoutAlgorithm> linearLayoutAlgorithm = layoutAlgorithm;
     ASSERT_NE(linearLayoutAlgorithm, nullptr);
     EXPECT_EQ(linearLayoutAlgorithm, layoutAlgorithm);
 }
@@ -143,7 +143,7 @@ HWTEST_F(AppBarLayoutAlgorithmTest, AtomicServiceLayoutAlgorithm003, TestSize.Le
      * @tc.steps: step2. Verify it can be cast to LinearLayoutAlgorithm.
      * @tc.expected: Cast should succeed.
      */
-    auto linearLayoutAlgorithm = AceType::DynamicCast<LinearLayoutAlgorithm>(layoutAlgorithm);
+    RefPtr<LinearLayoutAlgorithm> linearLayoutAlgorithm = layoutAlgorithm;
     ASSERT_NE(linearLayoutAlgorithm, nullptr);
     EXPECT_EQ(linearLayoutAlgorithm, layoutAlgorithm);
 }

@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+#include <functional>
+#include <vector>
+
 #include "observer_listener.h"
 
 #include "cj_lambda.h"
@@ -78,23 +81,38 @@ void CJObserverListener::CallCJMethod(const std::string& methodName, void* argv)
         return;
     }
     LOGI("CallCJMethod methodName = %{public}s", methodName.c_str());
-    for (auto callback : cjCallBack_[methodName]) {
-        callback.second(argv);
+    std::vector<std::function<void(void*)>> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = cjCallBack_.find(methodName);
+        if (it == cjCallBack_.end()) {
+            return;
+        }
+        for (const auto& pair : it->second) {
+            callbacks.push_back(pair.second);
+        }
+    }
+    for (auto& callback : callbacks) {
+        if (callback) {
+            callback(argv);
+        }
     }
 }
 
 void CJObserverListener::OnScrollEventStateChange(
     const std::string& id, int32_t uniqueId, Ace::NG::ScrollEventType eventType, float offset, Ace::Axis axis)
 {
-    std::lock_guard<std::mutex> lock(mtx_);
     LOGI("CJObserverListener::OnScrollEventStateChange is called");
-    if (cjCallBack_.empty()) {
-        LOGI("CJObserverListener::OnScrollEventStateChange not register!");
-        return;
-    }
-    if (cjCallBack_.find(EVENT_SCROLL) == cjCallBack_.end()) {
-        LOGE("CJObserverListener::OnScrollEventStateChange not this event!");
-        return;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (cjCallBack_.empty()) {
+            LOGI("CJObserverListener::OnScrollEventStateChange not register!");
+            return;
+        }
+        if (cjCallBack_.find(EVENT_SCROLL) == cjCallBack_.end()) {
+            LOGE("CJObserverListener::OnScrollEventStateChange not this event!");
+            return;
+        }
     }
 
     struct ScrollEventInfo {
@@ -110,15 +128,17 @@ void CJObserverListener::OnScrollEventStateChange(
 
 void CJObserverListener::OnTabContentUpdateStateChange(const Ace::NG::TabContentInfo& tabContentInfo)
 {
-    std::lock_guard<std::mutex> lock(mtx_);
     LOGI("CJObserverListener::OnTabContentUpdateStateChange is called");
-    if (cjCallBack_.empty()) {
-        LOGI("CJObserverListener::OnTabContentUpdateStateChange not register!");
-        return;
-    }
-    if (cjCallBack_.find(EVENT_TAB_CONTENT_UPDATE) == cjCallBack_.end()) {
-        LOGE("CJObserverListener::OnTabContentUpdateStateChange not this event!");
-        return;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (cjCallBack_.empty()) {
+            LOGI("CJObserverListener::OnTabContentUpdateStateChange not register!");
+            return;
+        }
+        if (cjCallBack_.find(EVENT_TAB_CONTENT_UPDATE) == cjCallBack_.end()) {
+            LOGE("CJObserverListener::OnTabContentUpdateStateChange not this event!");
+            return;
+        }
     }
 
     struct TabContentInfo {

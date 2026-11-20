@@ -65,7 +65,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ICleanNodeHostInheritance, TestSize.Level
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::INPUT);
     EXPECT_EQ(hostInterface->GetIsShowSymbol(), true);
@@ -101,7 +101,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ProcessCancelButtonCreatesResponseArea, T
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
 }
@@ -119,7 +119,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ThreeStateDisplay_ConstantAlwaysShows, Te
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
 }
@@ -138,7 +138,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ThreeStateDisplay_InvisibleAlwaysHides, T
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::INVISIBLE),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
     // INVISIBLE style: cancel button should be hidden regardless of content
@@ -167,7 +167,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ThreeStateDisplay_InputShowsWhenContent, 
     spanItem->content = u"hello1";
     pattern->spans_.push_back(spanItem);
     pattern->OnModifyDone();
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
     // INPUT style with content: cancel button should be shown
@@ -185,7 +185,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClickedClearsContent, Test
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // HandleCleanNodeClicked should not crash even with empty content
     hostInterface->HandleCleanNodeClicked();
@@ -204,7 +204,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, PropertyGettersReturnSetValues, TestSize.
     auto* frameNode = AceType::RawPtr(richEditorNode_);
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(20.0_vp), Color::RED, "icon.png");
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::CONSTANT);
     EXPECT_EQ(hostInterface->GetCancelIconSize().Value(), 20.0f);
@@ -258,7 +258,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ProcessCancelButton_RefreshExistingArea, 
     pattern->MarkCancelButtonDirty();
     pattern->OnModifyDone();
     ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
 }
@@ -319,7 +319,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ResetCancelButton_RestoresDefaults, TestS
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(20.0_vp), Color::RED, "icon.png");
     // Verify properties are set
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::CONSTANT);
     EXPECT_TRUE(hostInterface->HasCancelIconSize());
@@ -352,7 +352,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, SetCancelButton_CombinedSetter, TestSize.
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, SingleLine, true, frameNode);
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::BLUE, "cancel.png");
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::CONSTANT);
     EXPECT_EQ(hostInterface->GetCancelIconSize().Value(), 16.0f);
@@ -383,7 +383,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, UpdateShowState_InvisibleStyleHides, Test
     pattern->OnModifyDone();
     // Area should still exist (Refresh path, not ClearArea)
     ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_EQ(hostInterface->GetCleanNodeStyle().value(), CleanNodeStyle::INVISIBLE);
 }
@@ -407,7 +407,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, UpdateShowState_InputStyleNoContentHides,
     ASSERT_NE(pattern->cleanNodeResponseArea_, nullptr);
     // With INPUT style and empty content, IsContentEmpty returns true,
     // so UpdateShowState should call UpdateCleanNode(false)
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_TRUE(hostInterface->IsShowCancelButtonMode());
     EXPECT_TRUE(hostInterface->IsContentEmpty());
@@ -423,7 +423,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClicked_NotCrashingWithCon
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // With empty content, HandleCleanNodeClicked should not crash
     EXPECT_TRUE(hostInterface->IsContentEmpty());
@@ -441,7 +441,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClickedRequestsFocusWhenNo
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
 
     EXPECT_FALSE(pattern->HasFocus());
@@ -459,7 +459,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClickedSetsEditingState, T
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
 
     pattern->isEditing_ = true;
@@ -476,7 +476,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClickedStartsTwinkling, Te
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
 
     pattern->isEditing_ = true;
@@ -493,7 +493,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClickedNoSideEffectWhenAlr
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
 
     auto focusHub = richEditorNode_->GetOrCreateFocusHub();
@@ -523,7 +523,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, IsShowCancelButtonMode_NotSingleLine, Tes
     // Set cancel button but do NOT set SingleLine
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // SingleLine is false by default, so mode should be false
     EXPECT_FALSE(hostInterface->IsShowCancelButtonMode());
@@ -542,7 +542,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, IsShowCancelButtonMode_NotSetCancelButton
     auto* frameNode = AceType::RawPtr(richEditorNode_);
     RichEditorModelNG::SetSingleLine(frameNode, true);
     // Do not call SetCancelButton
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_FALSE(hostInterface->IsShowCancelButtonMode());
 }
@@ -559,7 +559,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, IsInResponseArea_CancelButtonTouched, Tes
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // Set cancelButtonTouched_ = true
     hostInterface->SetCancelButtonTouched(true);
@@ -625,7 +625,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, OnCleanNodeHoverEnter_ResetsMouseStyle, T
     ASSERT_NE(pattern, nullptr);
     // Set a non-DEFAULT mouse style
     pattern->currentMouseStyle_ = MouseFormat::TEXT_CURSOR;
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     hostInterface->OnCleanNodeHoverEnter();
     EXPECT_EQ(pattern->currentMouseStyle_, MouseFormat::DEFAULT);
@@ -641,7 +641,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, OnCleanNodeHoverEnter_AlreadyDefault, Tes
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
     pattern->currentMouseStyle_ = MouseFormat::DEFAULT;
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     hostInterface->OnCleanNodeHoverEnter();
     EXPECT_EQ(pattern->currentMouseStyle_, MouseFormat::DEFAULT);
@@ -712,7 +712,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, SetCleanHoverColorAndRect_DelegatesToOver
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // Create a cancel button so overlay modifier is initialized
     auto* frameNode = AceType::RawPtr(richEditorNode_);
@@ -741,7 +741,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ClearCleanHoverColorAndRects_DelegatesToO
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     auto* frameNode = AceType::RawPtr(richEditorNode_);
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
@@ -768,7 +768,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, ClearCleanHoverColorAndRects_NullOverlay,
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
     pattern->hostOverlayMod_ = nullptr;
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // Should not crash
     hostInterface->ClearCleanHoverColorAndRects();
@@ -873,7 +873,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClicked_IsDraggingReturns,
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // Simulate dragging state by setting drag state
     pattern->status_ = Status::DRAGGING;
@@ -891,7 +891,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, HandleCleanNodeClicked_DeletesContent, Te
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // Add content
     auto spanItem = AceType::MakeRefPtr<SpanItem>();
@@ -971,7 +971,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_HandleButtonMouseEv
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     // Ensure cleanNode_ is set
     ASSERT_NE(cleanArea->cleanNode_, nullptr);
@@ -996,7 +996,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_HandleButtonMouseEv
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     ASSERT_NE(cleanArea->cleanNode_, nullptr);
     // First set hover state
@@ -1022,7 +1022,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_HandleResponseButto
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     ASSERT_NE(cleanArea->cleanNode_, nullptr);
     pattern->cancelButtonTouched_ = false;
@@ -1045,7 +1045,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_HandleResponseButto
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     ASSERT_NE(cleanArea->cleanNode_, nullptr);
     // First touch down (may return early in mock env due to missing theme)
@@ -1072,7 +1072,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_HandleCleanNodeHove
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     ASSERT_NE(cleanArea->cleanNode_, nullptr);
     HoverInfo info;
@@ -1100,7 +1100,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_SetAccessibilityCle
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     ASSERT_NE(cleanArea->cleanNode_, nullptr);
     // Verify SetAccessibilityClearAction does not crash and sets expected properties.
@@ -1126,7 +1126,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, CleanNodeResponseArea_AfterLayoutProcessC
     RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
         CalcDimension(16.0_vp), Color::WHITE, "");
     pattern->OnModifyDone();
-    auto cleanArea = AceType::DynamicCast<CleanNodeResponseArea>(pattern->cleanNodeResponseArea_);
+    auto cleanArea = pattern->cleanNodeResponseArea_;
     ASSERT_NE(cleanArea, nullptr);
     // Should not crash
     cleanArea->AfterLayoutProcessCleanResponse();
@@ -1172,7 +1172,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, IsContentEmpty_SpanStringMode, TestSize.L
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // In span string mode with no styled string, content should be empty
     EXPECT_TRUE(hostInterface->IsContentEmpty());
@@ -1187,7 +1187,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, IsContentEmpty_WithSpans, TestSize.Level1
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     // Initially empty
     EXPECT_TRUE(hostInterface->IsContentEmpty());
@@ -1210,7 +1210,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, GetIsDisabled_DefaultFalse, TestSize.Leve
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     EXPECT_FALSE(hostInterface->GetIsDisabled());
 }
@@ -1224,7 +1224,7 @@ HWTEST_F(RichEditorCancelButtonTestNg, GetHost_ReturnsFrameNode, TestSize.Level1
 {
     auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(pattern, nullptr);
-    auto hostInterface = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    RefPtr<ICleanNodeHost> hostInterface = pattern;
     ASSERT_NE(hostInterface, nullptr);
     auto host = hostInterface->GetHost();
     ASSERT_NE(host, nullptr);

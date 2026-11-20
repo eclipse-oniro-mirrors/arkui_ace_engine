@@ -24,11 +24,106 @@
 #include "frameworks/core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "frameworks/core/components_ng/pattern/list/list_model.h"
 #include "frameworks/core/components_ng/pattern/list/list_model_ng.h"
+#include "frameworks/core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "frameworks/core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
 #include "frameworks/core/components_ng/base/view_stack_model.h"
 using namespace OHOS::Ace::Framework;
 
 namespace OHOS::Ace::NG {
+namespace {
+// scrollSnapStrategy provider plumbing. The public provider works in vp / vp-s while the scroll
+// runtime consumes px, so every boundary converts once; a non-number return becomes NaN and the
+// shared snap chain applies the natural-decay / handoff-position fallbacks.
+SnapOffsetFunc MakeSnapOffsetProvider(
+    EcmaVM* vm, const Local<JSValueRef>& funcValue, const Local<JSValueRef>& thisValue,
+    FrameNode* frameNode, bool isJSView)
+{
+    auto weakNode = AceType::WeakClaim(frameNode);
+    Local<panda::FunctionRef> funcRef = funcValue->ToObject(vm);
+    auto receiver = panda::CopyableGlobal(vm, thisValue->ToObject(vm));
+    return [func = panda::CopyableGlobal(vm, funcRef), receiver, weakNode, isJSView](
+               double velocity) -> double {
+        auto vm = func.GetEcmaVM();
+        CHECK_EQUAL_RETURN(ArkTSUtils::CheckJavaScriptScope(vm), false,
+            std::numeric_limits<double>::quiet_NaN());
+        panda::LocalScope scope(vm);
+        panda::TryCatch trycatch(vm);
+        PipelineContext::SetCallBackNode(weakNode);
+        panda::Local<JSValueRef> params[] = { panda::NumberRef::New(vm, Dimension(velocity).ConvertToVp()) };
+        auto result = func->Call(vm, receiver.ToLocal(), params, 1); // 1: array length
+        if (isJSView) {
+            ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        }
+        if (!result->IsNumber()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return Dimension(result->ToNumber(vm)->Value(), DimensionUnit::VP).ConvertToPx();
+    };
+}
+
+SnapApproachOffsetFunc MakeSnapApproachOffsetProvider(
+    EcmaVM* vm, const Local<JSValueRef>& funcValue, const Local<JSValueRef>& thisValue,
+    FrameNode* frameNode, bool isJSView)
+{
+    auto weakNode = AceType::WeakClaim(frameNode);
+    Local<panda::FunctionRef> funcRef = funcValue->ToObject(vm);
+    auto receiver = panda::CopyableGlobal(vm, thisValue->ToObject(vm));
+    return [func = panda::CopyableGlobal(vm, funcRef), receiver, weakNode, isJSView](
+               double velocity, double decayOffset) -> double {
+        auto vm = func.GetEcmaVM();
+        CHECK_EQUAL_RETURN(ArkTSUtils::CheckJavaScriptScope(vm), false,
+            std::numeric_limits<double>::quiet_NaN());
+        panda::LocalScope scope(vm);
+        panda::TryCatch trycatch(vm);
+        PipelineContext::SetCallBackNode(weakNode);
+        panda::Local<JSValueRef> params[] = { panda::NumberRef::New(vm, Dimension(velocity).ConvertToVp()),
+            panda::NumberRef::New(vm, Dimension(decayOffset).ConvertToVp()) };
+        auto result = func->Call(vm, receiver.ToLocal(), params, 2); // 2: array length
+        if (isJSView) {
+            ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        }
+        if (!result->IsNumber()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return Dimension(result->ToNumber(vm)->Value(), DimensionUnit::VP).ConvertToPx();
+    };
+}
+
+// Parses the ArkTS scrollSnapStrategy argument: a ScrollSnapAlign number or a provider object
+// with calculateSnapOffset / calculateApproachOffset functions. Returns false for anything else.
+bool ParseScrollSnapStrategyValue(EcmaVM* vm, const Local<JSValueRef>& valueArg,
+    const Local<JSValueRef>& node, FrameNode* frameNode, ScrollSnapStrategy& strategy)
+{
+    if (valueArg->IsNumber()) {
+        int32_t align = valueArg->Int32Value(vm);
+        if (align <= static_cast<int32_t>(ScrollSnapAlign::NONE) ||
+            align > static_cast<int32_t>(ScrollSnapAlign::END)) {
+            return false;
+        }
+        strategy.align = static_cast<ScrollSnapAlign>(align);
+        return true;
+    }
+    if (!valueArg->IsObject(vm)) {
+        return false;
+    }
+    auto obj = valueArg->ToObject(vm);
+    auto snapFuncValue = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateSnapOffset"));
+    auto approachFuncValue = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "calculateApproachOffset"));
+    // A custom provider requires calculateSnapOffset to be a function.
+    if (!snapFuncValue->IsFunction(vm)) {
+        return false;
+    }
+    strategy.hasProvider = true;
+    bool isJSView = ArkTSUtils::IsJsView(vm, node);
+    strategy.calculateSnapOffset = MakeSnapOffsetProvider(vm, snapFuncValue, obj, frameNode, isJSView);
+    if (approachFuncValue->IsFunction(vm)) {
+        strategy.calculateApproachOffset =
+            MakeSnapApproachOffsetProvider(vm, approachFuncValue, obj, frameNode, isJSView);
+    }
+    return true;
+}
+} // namespace
+
 constexpr int32_t LIST_ARG_INDEX_0 = 0;
 constexpr int32_t LIST_ARG_INDEX_1 = 1;
 constexpr int32_t LIST_ARG_INDEX_2 = 2;
@@ -935,6 +1030,39 @@ ArkUINativeModuleValue ListBridge::ResetScrollSnapAlign(ArkUIRuntimeCallInfo* ru
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getListModifier()->resetScrollSnapAlign(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ListBridge::SetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    ArkUINodeHandle nativeNode = nullptr;
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_0);
+    Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_1);
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ScrollSnapStrategy strategy;
+    if (ParseScrollSnapStrategyValue(vm, valueArg, node, frameNode, strategy)) {
+        ListModelNG::SetScrollSnapStrategy(frameNode, strategy);
+    } else {
+        // undefined / null / invalid value clears the strategy (last-set-wins default).
+        ListModelNG::ResetScrollSnapStrategy(frameNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ListBridge::ResetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    ArkUINodeHandle nativeNode = nullptr;
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_0);
+    CHECK_EQUAL_RETURN(ArkTSUtils::GetNativeNode(nativeNode, node, vm), false, panda::JSValueRef::Undefined(vm));
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ListModelNG::ResetScrollSnapStrategy(frameNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

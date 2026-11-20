@@ -19,6 +19,7 @@ template("ace_capability_ohos_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     defines += invoker.defines
@@ -117,6 +118,7 @@ foreach(item, ace_platforms) {
   platform = item.name
   if (platform == "ohos") {
     ace_capability_ohos_source_set("ace_capability_ohos") {
+      branch_protector_ret = "pac_ret"
       defines = []
       config = {
       }

@@ -169,7 +169,7 @@ void BarItemLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 {
     auto hostNode = AceType::DynamicCast<BarItemNode>(layoutWrapper->GetHostNode());
     CHECK_NULL_VOID(hostNode);
-    auto barItemLayoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto barItemLayoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(barItemLayoutProperty);
     bool isUsedInToolbarConfiguratuon = hostNode->IsBarItemUsedInToolbarConfiguration();
 
@@ -195,7 +195,7 @@ void BarItemLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 {
     auto hostNode = AceType::DynamicCast<BarItemNode>(layoutWrapper->GetHostNode());
     CHECK_NULL_VOID(hostNode);
-    auto barItemLayoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto barItemLayoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(barItemLayoutProperty);
 
     float textHeight = 0.0f;

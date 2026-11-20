@@ -40,6 +40,7 @@ gen_obj("composetitlebar_abc_preview") {
 }
 
 ohos_shared_library("composetitlebar") {
+  branch_protector_ret = "pac_ret"
   sources = [ "composetitlebar.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

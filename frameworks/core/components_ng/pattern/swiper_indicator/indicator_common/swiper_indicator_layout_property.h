@@ -47,7 +47,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SwiperIndicatorLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propIndicatorLayoutStyle_ = CloneIndicatorLayoutStyle();
         value->propDigitIndicatorLayoutStyle_ = CloneDigitIndicatorLayoutStyle();
         value->propDirection_ = CloneDirection();

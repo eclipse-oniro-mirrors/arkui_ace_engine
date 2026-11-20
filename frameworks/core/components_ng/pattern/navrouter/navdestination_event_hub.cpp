@@ -128,7 +128,7 @@ void NavDestinationEventHub::FireOnShownEvent(
     // trigger a page-scene detection cycle so ExitOtherSearchPresence emits a
     // false event for the previous NavDestination (A false before B true).
     // No-op when no search ruleSet is registered.
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto ngPipeline = pipelineContext;
     if (ngPipeline) {
         auto contentChangeManager = ngPipeline->GetContentChangeManager();
         if (contentChangeManager) {

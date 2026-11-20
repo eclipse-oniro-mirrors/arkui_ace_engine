@@ -3595,4 +3595,696 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextS
     EXPECT_TRUE(textLayoutProperty->HasFontWeight());
     EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::MEDIUM);
 }
+
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisMaxLines001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle sets maxLines(1) when textOverflow is ELLIPSIS.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisMaxLines001,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::ELLIPSIS);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_ClipMaxLines001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle sets maxLines(1) when textOverflow is CLIP.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_ClipMaxLines001,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::CLIP;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::CLIP);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeNotApplied001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle does not apply MARQUEE overflow — both
+ *            textOverflow and maxLines are reset so marquee effect does not take effect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeNotApplied001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::MARQUEE;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    textLayoutProperty->UpdateTextOverflow(TextOverflow::ELLIPSIS);
+    textLayoutProperty->UpdateMaxLines(1);
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_FALSE(textLayoutProperty->HasTextOverflow());
+    EXPECT_FALSE(textLayoutProperty->HasMaxLines());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisToClipSwitch001
+ * @tc.desc: Test switching textOverflow from ELLIPSIS to CLIP does not leak or lose maxLines.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisToClipSwitch001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+
+    style.textOverflow = TextOverflow::CLIP;
+    pattern->SetSelectedTextStyleVal(style);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::CLIP);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_RestoreItemOriginalStyle_ResetMaxLines001
+ * @tc.desc: Test RestoreItemOriginalStyle resets maxLines alongside textOverflow.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_RestoreItemOriginalStyle_ResetMaxLines001,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle style;
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = Color::BLACK;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    EXPECT_FALSE(textLayoutProperty->HasMaxLines());
+    EXPECT_FALSE(textLayoutProperty->HasTextOverflow());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_RestoreItemOriginalStyle_PreservesUserMaxLines001
+ * @tc.desc: Test RestoreItemOriginalStyle restores user-set maxLines and textOverflow from
+ *            cache instead of blindly resetting them. Pre-set maxLines(2) and CLIP, cache,
+ *            apply ELLIPSIS style (sets maxLines=1), then restore — verify original values
+ *            are recovered, not destroyed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_RestoreItemOriginalStyle_PreservesUserMaxLines001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    textLayoutProperty->UpdateMaxLines(2);
+    textLayoutProperty->UpdateTextOverflow(TextOverflow::CLIP);
+
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle style;
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = Color::BLACK;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::ELLIPSIS);
+
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 2);
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::CLIP);
+}
+
+/**
+ * @tc.name: SetSelectedTextStyle_NoCustomStyle_PopulatesCacheWithoutFontColorOverride
+ * @tc.desc: When no selectedTextStyle is set, SetSelectedTextStyle(false) still runs
+ *            CacheOriginalItemStyle and AddAnimationTextProperties (for restoration),
+ *            but skips UpdateTextNodeFontColor (which would break dark mode switching).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, SetSelectedTextStyle_NoCustomStyle_PopulatesCacheWithoutFontColorOverride,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    pattern->totalItemCount_ = 1;
+    pattern->itemPosition_[0] = { 0.0f, 100.0f, nullptr };
+
+    EXPECT_FALSE(pattern->HasSelectedTextStyle());
+    pattern->animationProperties_.clear();
+    pattern->originalItemStyle_.clear();
+    pattern->isModified_ = false;
+
+    pattern->SetSelectedTextStyle(false);
+
+    // Cache and animation properties are populated (for restoration and future use)
+    EXPECT_FALSE(pattern->animationProperties_.empty());
+    EXPECT_FALSE(pattern->originalItemStyle_.empty());
+    EXPECT_FALSE(pattern->isModified_);
+}
+
+/**
+ * @tc.name: SetSelectedTextStyle_NoCustomStyle_OnColorConfig_PopulatesCache
+ * @tc.desc: When no selectedTextStyle is set, OnColorConfigurationUpdate still runs
+ *            SetSelectedTextStyle(true) which populates cache, but UpdateTextNodeFontColor
+ *            is skipped (dark mode switching via layout property works correctly).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, SetSelectedTextStyle_NoCustomStyle_OnColorConfig_PopulatesCache,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    pattern->totalItemCount_ = 1;
+    pattern->itemPosition_[0] = { 0.0f, 100.0f, nullptr };
+
+    EXPECT_FALSE(pattern->HasSelectedTextStyle());
+    pattern->animationProperties_.clear();
+    pattern->originalItemStyle_.clear();
+
+    pattern->OnColorConfigurationUpdate();
+
+    // Cache is populated (for restoration), not empty
+    EXPECT_FALSE(pattern->animationProperties_.empty());
+    EXPECT_FALSE(pattern->originalItemStyle_.empty());
+}
+
+/**
+ * @tc.name: SetSelectedTextStyle_WithCustomStyle_PopulatesProperties
+ * @tc.desc: When selectedTextStyle is set, SetSelectedTextStyle(false) populates
+ *            animationProperties_ and originalItemStyle_ for all items.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, SetSelectedTextStyle_WithCustomStyle_PopulatesProperties, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textColor = Color::GREEN;
+    pattern->SetSelectedTextStyleVal(style);
+    EXPECT_TRUE(pattern->HasSelectedTextStyle());
+
+    for (int32_t i = 0; i < 3; ++i) {
+        auto textPattern = AceType::MakeRefPtr<TextPattern>();
+        auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+        ASSERT_NE(textNode, nullptr);
+        frameNode->AddChild(textNode);
+        pattern->itemPosition_[i] = { i * 100.0f, (i + 1) * 100.0f, nullptr };
+    }
+    pattern->totalItemCount_ = 3;
+    pattern->selectedIndex_ = 1;
+
+    pattern->animationProperties_.clear();
+    pattern->originalItemStyle_.clear();
+    pattern->SetSelectedTextStyle(false);
+
+    EXPECT_EQ(pattern->animationProperties_.size(), static_cast<size_t>(3));
+    EXPECT_FALSE(pattern->originalItemStyle_.empty());
+}
+
+/**
+ * @tc.name: CacheOriginalItemStyle_SavesCachedThemeFontColor
+ * @tc.desc: CacheOriginalItemStyle stores the theme color at cache time into cachedThemeFontColor_,
+ *            which OnColorConfigurationUpdate uses to identify default-colored items.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, CacheOriginalItemStyle_SavesCachedThemeFontColor, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color themeColor = Color::BLUE;
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    pattern->cachedThemeFontColor_ = Color::BLACK;
+    pattern->originalItemStyle_.clear();
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, themeColor);
+
+    EXPECT_EQ(pattern->cachedThemeFontColor_, themeColor);
+}
+
+/**
+ * @tc.name: OnColorConfigurationUpdate_WithSelectedTextStyle_NonSelectedItemsColorUpdated
+ * @tc.desc: OnColorConfigurationUpdate updates non-selected items' text color from old theme
+ *            color to new theme color via UpdateDefaultTextStyle's per-item color match check
+ *            (cachedThemeFontColor_), while preserving user-set custom colors.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    OnColorConfigurationUpdate_WithSelectedTextStyle_NonSelectedItemsColorUpdated, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto theme = frameNode->GetTheme<ContainerPickerTheme>(true);
+    ASSERT_NE(theme, nullptr);
+    Color themeColor = theme->GetFontColor();
+
+    PickerTextStyle style;
+    style.textColor = Color::GREEN;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    pattern->SetSelectedTextStyleVal(style);
+    EXPECT_TRUE(pattern->HasSelectedTextStyle());
+
+    Color oldThemeColor = Color::BLUE;
+    ASSERT_NE(oldThemeColor, themeColor);
+    Color userColor = Color::RED;
+    ASSERT_NE(userColor, oldThemeColor);
+
+    std::vector<RefPtr<TextLayoutProperty>> textProps;
+    for (int32_t i = 0; i < 3; ++i) {
+        auto textPattern = AceType::MakeRefPtr<TextPattern>();
+        auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+        ASSERT_NE(textNode, nullptr);
+        frameNode->AddChild(textNode);
+        auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+        ASSERT_NE(textLayoutProperty, nullptr);
+        if (i == 0) {
+            textLayoutProperty->UpdateTextColor(oldThemeColor);
+        } else if (i == 1) {
+            textLayoutProperty->UpdateTextColor(oldThemeColor);
+        } else {
+            textLayoutProperty->UpdateTextColor(userColor);
+        }
+        textProps.push_back(textLayoutProperty);
+        pattern->itemPosition_[i] = { i * 100.0f, (i + 1) * 100.0f, nullptr };
+    }
+    pattern->totalItemCount_ = 3;
+    pattern->selectedIndex_ = 1;
+    pattern->cachedThemeFontColor_ = oldThemeColor;
+    pattern->isUseDefaultFontColor_ = false;
+
+    pattern->OnColorConfigurationUpdate();
+
+    EXPECT_EQ(textProps[0]->GetTextColor().value(), themeColor);
+    EXPECT_EQ(textProps[2]->GetTextColor().value(), userColor);
+}
+
+/**
+ * @tc.name: OnColorConfigurationUpdate_NoSelectedTextStyle_DefaultColorUpdated
+ * @tc.desc: When no selectedTextStyle is set, OnColorConfigurationUpdate still updates
+ *            text color via UpdateDefaultTextStyle's per-item color match check,
+ *            even though isUseDefaultFontColor_ is false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    OnColorConfigurationUpdate_NoSelectedTextStyle_DefaultColorUpdated, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto theme = frameNode->GetTheme<ContainerPickerTheme>(true);
+    ASSERT_NE(theme, nullptr);
+    Color themeColor = theme->GetFontColor();
+
+    EXPECT_FALSE(pattern->HasSelectedTextStyle());
+
+    Color oldThemeColor = Color::BLUE;
+    ASSERT_NE(oldThemeColor, themeColor);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+    textLayoutProperty->UpdateTextColor(oldThemeColor);
+    pattern->totalItemCount_ = 1;
+    pattern->itemPosition_[0] = { 0.0f, 100.0f, nullptr };
+    pattern->cachedThemeFontColor_ = oldThemeColor;
+    pattern->isUseDefaultFontColor_ = false;
+
+    pattern->OnColorConfigurationUpdate();
+
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), themeColor);
+}
+
+/**
+ * @tc.name: SetDefaultTextStyle_NoTextColor_SetsIsUseDefaultFontColor
+ * @tc.desc: When text has no color, SetDefaultTextStyle sets the theme color and
+ *            isUseDefaultFontColor_ to true (regression test for existing behavior).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, SetDefaultTextStyle_NoTextColor_SetsIsUseDefaultFontColor, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto theme = frameNode->GetTheme<ContainerPickerTheme>(true);
+    ASSERT_NE(theme, nullptr);
+    Color themeColor = theme->GetFontColor();
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+    EXPECT_FALSE(textLayoutProperty->GetTextColor().has_value());
+
+    pattern->isUseDefaultFontColor_ = false;
+    pattern->isModified_ = false;
+    pattern->SetDefaultTextStyle(textNode, themeColor);
+
+    EXPECT_TRUE(pattern->isUseDefaultFontColor_);
+    EXPECT_TRUE(textLayoutProperty->GetTextColor().has_value());
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), themeColor);
+}
+
+/**
+ * @tc.name: PlayInertialAnimation_CompletionCondition_OverscrollEnd_NeedsSnap
+ * @tc.desc: When canLoop=false and items are overscrolled past the end boundary,
+ *            CalculateMiddleLineOffset() is non-zero, so PlaySpringAnimation is triggered
+ *            (animated spring rebound) instead of FireAnimationEndEvent (instant snap).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, PlayInertialAnimation_CompletionCondition_OverscrollEnd_NeedsSnap,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->height_ = 500.0f;
+    pattern->pickerItemHeight_ = 100.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->isLoop_ = false;
+
+    // Overscroll past end: last item's endPos (200) < middlePos (250)
+    pattern->itemPosition_[0] = { -300.0f, -200.0f, nullptr };
+    pattern->itemPosition_[1] = { -200.0f, -100.0f, nullptr };
+    pattern->itemPosition_[2] = { -100.0f, 0.0f, nullptr };
+    pattern->itemPosition_[3] = { 0.0f, 100.0f, nullptr };
+    pattern->itemPosition_[4] = { 100.0f, 200.0f, nullptr };
+
+    // mainDeltaSum_ is 0 (simulating GetLayoutProperties reset)
+    pattern->mainDeltaSum_ = 0.0f;
+
+    // CalculateMiddleLineOffset() is non-zero → needs animated snap
+    EXPECT_FALSE(NearZero(pattern->CalculateMiddleLineOffset()));
+}
+
+/**
+ * @tc.name: PlayInertialAnimation_CompletionCondition_WithinBoundsAligned_NoSnap
+ * @tc.desc: When items are within bounds and aligned to the center,
+ *            CalculateMiddleLineOffset() is zero, so FireAnimationEndEvent is called
+ *            (no animation needed — already aligned).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, PlayInertialAnimation_CompletionCondition_WithinBoundsAligned_NoSnap,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->height_ = 500.0f;
+    pattern->pickerItemHeight_ = 100.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->isLoop_ = false;
+
+    // Items aligned: middle item (index 2) at center [200,300], height=500 → middlePos=250
+    pattern->itemPosition_[0] = { 0.0f, 100.0f, nullptr };
+    pattern->itemPosition_[1] = { 100.0f, 200.0f, nullptr };
+    pattern->itemPosition_[2] = { 200.0f, 300.0f, nullptr };
+    pattern->itemPosition_[3] = { 300.0f, 400.0f, nullptr };
+    pattern->itemPosition_[4] = { 400.0f, 500.0f, nullptr };
+
+    pattern->mainDeltaSum_ = 0.0f;
+
+    // Already aligned → no snap needed
+    EXPECT_TRUE(NearZero(pattern->CalculateMiddleLineOffset()));
+}
+
+/**
+ * @tc.name: PlayInertialAnimation_CompletionCondition_WithinBoundsNotAligned_NeedsSnap
+ * @tc.desc: When items are within bounds but NOT aligned to center,
+ *            CalculateMiddleLineOffset() is non-zero, so PlaySpringAnimation is triggered
+ *            (animated snap to nearest item). This covers the reviewer's concern that
+ *            within-bounds inertia stops must get animated snapping, not instant jumps.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    PlayInertialAnimation_CompletionCondition_WithinBoundsNotAligned_NeedsSnap, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->height_ = 500.0f;
+    pattern->pickerItemHeight_ = 100.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->isLoop_ = false;
+
+    // Within bounds but shifted by 30px (not aligned to item boundary)
+    pattern->itemPosition_[0] = { 30.0f, 130.0f, nullptr };
+    pattern->itemPosition_[1] = { 130.0f, 230.0f, nullptr };
+    pattern->itemPosition_[2] = { 230.0f, 330.0f, nullptr };
+    pattern->itemPosition_[3] = { 330.0f, 430.0f, nullptr };
+    pattern->itemPosition_[4] = { 430.0f, 530.0f, nullptr };
+
+    pattern->mainDeltaSum_ = 0.0f;
+
+    // Not aligned → needs animated snap (CalculateMiddleLineOffset non-zero)
+    EXPECT_FALSE(NearZero(pattern->CalculateMiddleLineOffset()));
+}
+
+/**
+ * @tc.name: PlayInertialAnimation_CompletionCondition_MainDeltaSumReset_StillNeedsSnap
+ * @tc.desc: Core regression test for canLoop=false fling-to-end snap-back failure.
+ *            CalcEndOffset sets mainDeltaSum_ (overscroll amount), then GetLayoutProperties
+ *            resets it to 0 during layout passes within the animation. The fix replaces
+ *            the mainDeltaSum_ check with CalculateMiddleLineOffset(), which reads from
+ *            itemPosition_ and is not affected by the reset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    PlayInertialAnimation_CompletionCondition_MainDeltaSumReset_StillNeedsSnap, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->height_ = 500.0f;
+    pattern->pickerItemHeight_ = 100.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->isLoop_ = false;
+
+    // Overscroll past end
+    pattern->itemPosition_[0] = { -300.0f, -200.0f, nullptr };
+    pattern->itemPosition_[1] = { -200.0f, -100.0f, nullptr };
+    pattern->itemPosition_[2] = { -100.0f, 0.0f, nullptr };
+    pattern->itemPosition_[3] = { 0.0f, 100.0f, nullptr };
+    pattern->itemPosition_[4] = { 100.0f, 200.0f, nullptr };
+
+    // Step 1: CalcEndOffset sets mainDeltaSum_ to non-zero (overscroll amount)
+    pattern->mainDeltaSum_ = 50.0f;
+    EXPECT_FALSE(NearZero(pattern->CalculateMiddleLineOffset()));
+
+    // Step 2: GetLayoutProperties resets mainDeltaSum_ to 0 during layout pass
+    pattern->mainDeltaSum_ = 0.0f;
+
+    // Step 3: CalculateMiddleLineOffset() still non-zero — needs animated snap.
+    //         Old code: !NearZero(0.0) → false → FireAnimationEndEvent (wrong — instant jump, item sticks)
+    //         New code: !NearZero(CalculateMiddleLineOffset()) → true → PlaySpringAnimation (correct)
+    EXPECT_FALSE(NearZero(pattern->CalculateMiddleLineOffset()));
+}
+
+/**
+ * @tc.name: SetSelectedTextStyle_ClearStyle_RestoresItemDefaults
+ * @tc.desc: Regression test: set custom selectedTextStyle (color/fontSize/fontWeight),
+ *            then clear it via SetSelectedTextStyleVal(PickerTextStyle()).
+ *            SetSelectedTextStyle(false) must restore items to defaults via
+ *            RestoreItemOriginalStyle — the guard on UpdateTextNodeFontColor
+ *            must not skip the restoration loop.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, SetSelectedTextStyle_ClearStyle_RestoresItemDefaults, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto theme = frameNode->GetTheme<ContainerPickerTheme>(true);
+    ASSERT_NE(theme, nullptr);
+    Color themeColor = theme->GetFontColor();
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+    // Simulate SetDefaultTextStyle having set the default theme color
+    textLayoutProperty->UpdateTextColor(themeColor);
+    pattern->totalItemCount_ = 1;
+    pattern->itemPosition_[0] = { 0.0f, 100.0f, nullptr };
+    pattern->selectedIndex_ = 0;
+
+    // Step 1: Set custom selectedTextStyle with color, fontSize, fontWeight
+    PickerTextStyle style;
+    style.textColor = Color::BLUE;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.fontWeight = FontWeight::BOLD;
+    pattern->SetSelectedTextStyleVal(style);
+    EXPECT_TRUE(pattern->HasSelectedTextStyle());
+
+    // Step 2: Apply — selected item gets custom style
+    pattern->SetSelectedTextStyle(false);
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), Color::BLUE);
+    EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 22.0);
+    EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::BOLD);
+    EXPECT_FALSE(pattern->originalItemStyle_.empty());
+
+    // Step 3: Clear selectedTextStyle
+    pattern->SetSelectedTextStyleVal(PickerTextStyle());
+    EXPECT_FALSE(pattern->HasSelectedTextStyle());
+
+    // Step 4: Call SetSelectedTextStyle(false) — must restore via RestoreItemOriginalStyle
+    pattern->SetSelectedTextStyle(false);
+
+    // Step 5: Verify item restored to default (cached original = themeColor)
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), themeColor);
+    // originalItemStyle_ preserved (not cleared) for future restoration
+    EXPECT_FALSE(pattern->originalItemStyle_.empty());
+}
 } // namespace OHOS::Ace::NG

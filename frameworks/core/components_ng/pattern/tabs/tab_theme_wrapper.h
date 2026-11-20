@@ -33,7 +33,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<TabThemeWrapper>();
-            auto theme = AceType::DynamicCast<TabTheme>(themeWrapper);
+            RefPtr<TabTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

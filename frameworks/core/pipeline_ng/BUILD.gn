@@ -20,6 +20,7 @@ template("ace_core_pipeline_ng_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     if (current_os == "ohos") {

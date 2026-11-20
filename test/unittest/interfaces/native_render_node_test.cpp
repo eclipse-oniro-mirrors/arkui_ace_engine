@@ -1788,9 +1788,9 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest013, TestSize.Level1)
     auto policy = OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN;
 
     EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(nullptr, childNode, policy),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
+        ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO);
     EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode, nullptr, policy),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
+        ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED);
     EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(
         parentNode, childNode, static_cast<OH_ArkUI_AdoptPolicy>(-1)), ARKUI_ERROR_CODE_PARAM_INVALID);
 

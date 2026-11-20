@@ -1694,7 +1694,7 @@ HWTEST_F(WebPatternTouchTestNg, OnDragFileNameStart_001, TestSize.Level1)
     auto mockUdmfClient = AceType::DynamicCast<MockUdmfClient>(UdmfClient::GetInstance());
     EXPECT_NE(mockUdmfClient, nullptr);
     EXPECT_CALL(
-        *mockUdmfClient, AddFileUriRecord(AceType::DynamicCast<UnifiedData>(aceUnifiedData),
+        *mockUdmfClient, AddFileUriRecord(RefPtr<UnifiedData>(aceUnifiedData),
                              ElementsAreArray({ "file:///data/storage/el2/base/haps/entry/temp/dragdrop/test.txt" })))
         .WillOnce(Return(false));
     webPattern->OnDragFileNameStart(aceUnifiedData, "test.txt");

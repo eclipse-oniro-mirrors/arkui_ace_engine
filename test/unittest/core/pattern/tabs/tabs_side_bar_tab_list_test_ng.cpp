@@ -287,7 +287,7 @@ HWTEST_F(TabsSideBarTabListTestNg, OnFontScaleConfigurationUpdate003, TestSize.L
 
 /**
  * @tc.name: SetCurrentIndex001
- * @tc.desc: Test SetCurrentIndex updates the current index
+ * @tc.desc: SetCurrentIndex is page-switch only and does NOT change the display index
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndex001, TestSize.Level1)
@@ -299,19 +299,19 @@ HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndex001, TestSize.Level1)
     ASSERT_NE(pattern, nullptr);
 
     /**
-     * @tc.steps: step2. Init to index 0 then set to index 2
-     * @tc.expected: GetCurrentIndex returns the new index
+     * @tc.steps: step2. Init to index 0 then call SetCurrentIndex(2)
+     * @tc.expected: GetCurrentIndex still returns 0; SetCurrentIndex no longer owns currentIndex_
      */
     pattern->InitCurrentIndex(0);
     EXPECT_EQ(pattern->GetCurrentIndex(), 0);
 
     pattern->SetCurrentIndex(2);
-    EXPECT_EQ(pattern->GetCurrentIndex(), 2);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 0);
 }
 
 /**
  * @tc.name: SetCurrentIndexSameValue001
- * @tc.desc: Test SetCurrentIndex with same value exercises early return
+ * @tc.desc: SetCurrentIndex with same value does not change the display index
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndexSameValue001, TestSize.Level1)
@@ -324,7 +324,7 @@ HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndexSameValue001, TestSize.Level1)
 
     /**
      * @tc.steps: step2. Init to index 1, then SetCurrentIndex to same value
-     * @tc.expected: Index remains 1 (early return path)
+     * @tc.expected: Index remains 1 (SetCurrentIndex never mutates currentIndex_)
      */
     pattern->InitCurrentIndex(1);
     EXPECT_EQ(pattern->GetCurrentIndex(), 1);
@@ -498,12 +498,13 @@ HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndexWithoutAnimation001, TestSize.
 
     /**
      * @tc.steps: step4. Init to 0 then SetCurrentIndex to 2
-     * @tc.expected: SwipeToWithoutAnimation called with 2; SwipeTo NOT called
+     * @tc.expected: SwipeToWithoutAnimation called with 2; SwipeTo NOT called;
+     *               currentIndex_ is NOT changed by SetCurrentIndex (page-switch only)
      */
     tree.tabListPattern->InitCurrentIndex(0);
     EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 0);
     tree.tabListPattern->SetCurrentIndex(2);
-    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 2);
+    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 0);
 
     EXPECT_EQ(swipeToWithoutAnimCallCount, 1);
     EXPECT_EQ(swipeToWithoutAnimIndex, 2);
@@ -556,16 +557,90 @@ HWTEST_F(TabsSideBarTabListTestNg, SetCurrentIndexWithCustomAnimation001, TestSi
 
     /**
      * @tc.steps: step4. Init to 0 then SetCurrentIndex to 2
-     * @tc.expected: SwipeTo called with 2; SwipeToWithoutAnimation NOT called
+     * @tc.expected: SwipeTo called with 2; SwipeToWithoutAnimation NOT called;
+     *               currentIndex_ is NOT changed by SetCurrentIndex (page-switch only)
      */
     tree.tabListPattern->InitCurrentIndex(0);
     EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 0);
     tree.tabListPattern->SetCurrentIndex(2);
-    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 2);
+    EXPECT_EQ(tree.tabListPattern->GetCurrentIndex(), 0);
 
     EXPECT_EQ(swipeToCallCount, 1);
     EXPECT_EQ(swipeToIndex, 2);
     EXPECT_EQ(swipeToWithoutAnimCallCount, 0);
+}
+
+/**
+ * @tc.name: SyncTabItemStyle001
+ * @tc.desc: SyncTabItemStyle owns currentIndex_ and updates it to the new index
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, SyncTabItemStyle001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a TabsSideBarTabListPattern directly (default index -1)
+     */
+    auto pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->GetCurrentIndex(), -1); // default value
+
+    /**
+     * @tc.steps: step2. SyncTabItemStyle to 2, then to 0
+     * @tc.expected: GetCurrentIndex reflects the latest synced index
+     */
+    pattern->SyncTabItemStyle(2);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 2);
+
+    pattern->SyncTabItemStyle(0);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 0);
+}
+
+/**
+ * @tc.name: SyncTabItemStyleSameValue001
+ * @tc.desc: SyncTabItemStyle with the same index exercises the early-return path and keeps the index
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, SyncTabItemStyleSameValue001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a TabsSideBarTabListPattern directly
+     */
+    auto pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Sync to 1, then Sync to the same value 1
+     * @tc.expected: Index remains 1 (early return on same value)
+     */
+    pattern->SyncTabItemStyle(1);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 1);
+
+    pattern->SyncTabItemStyle(1);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 1);
+}
+
+/**
+ * @tc.name: SyncTabItemStyleNegative001
+ * @tc.desc: SyncTabItemStyle records a negative index (no range clamp) when it differs from current
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, SyncTabItemStyleNegative001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a TabsSideBarTabListPattern directly
+     */
+    auto pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    /**
+     * @tc.steps: step2. Sync to 0, then sync to -1
+     * @tc.expected: GetCurrentIndex becomes -1 (SyncTabItemStyle does not clamp)
+     */
+    pattern->SyncTabItemStyle(0);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 0);
+
+    pattern->SyncTabItemStyle(-1);
+    EXPECT_EQ(pattern->GetCurrentIndex(), -1);
 }
 
 // Helper for section-related tests: builds a TabsNode tree with real TabContentNode

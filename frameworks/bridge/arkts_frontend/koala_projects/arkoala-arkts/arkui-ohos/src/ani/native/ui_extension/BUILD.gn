@@ -21,6 +21,7 @@ group("arkuiuiextension_group") {
 
 # build ani library
 ohos_shared_library("arkuiuiextension_ani") {
+  branch_protector_ret = "pac_ret"
   shlib_type = "ani"
   deps = [ "$ace_root/build:libace_compatible" ]
   defines = []

@@ -975,7 +975,7 @@ void PipelineContext::FlushPendingDeleteCustomNode()
         auto node = pendingStack.top();
         pendingStack.pop();
         if (AceType::InstanceOf<NG::CustomNode>(node)) {
-            auto customNode = AceType::DynamicCast<NG::CustomNode>(node);
+            auto customNode = node;
             // for ArkTs1.2
             if (customNode->FireOnCleanup()) {
                 continue;
@@ -1373,7 +1373,7 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
     FlushBuild();
     ReloadNodesResource();
     if (isFormRender_ && drawDelegate_ && rootNode_) {
-        auto renderContext = AceType::DynamicCast<NG::RenderContext>(rootNode_->GetRenderContext());
+        auto renderContext = rootNode_->GetRenderContext();
         drawDelegate_->DrawRSFrame(renderContext);
         drawDelegate_ = nullptr;
     }
@@ -4164,7 +4164,7 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNo
             }
         }
         for (const auto& weakContext : touchPluginPipelineContext_) {
-            auto pipelineContext = DynamicCast<OHOS::Ace::PipelineBase>(weakContext.Upgrade());
+            auto pipelineContext = weakContext.Upgrade();
             if (!pipelineContext) {
                 continue;
             }

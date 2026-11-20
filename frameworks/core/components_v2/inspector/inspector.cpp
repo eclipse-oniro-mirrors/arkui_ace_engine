@@ -151,12 +151,12 @@ std::string Inspector::GetInspectorTree(const RefPtr<PipelineContext>& context, 
     jsonRoot->Put(INSPECTOR_HEIGHT, std::to_string(rootHeight * scale).c_str());
     jsonRoot->Put(INSPECTOR_RESOLUTION, std::to_string(PipelineBase::GetCurrentDensity()).c_str());
 
-    auto root = AceType::DynamicCast<Element>(context->GetRootElement());
+    RefPtr<Element> root = context->GetRootElement();
     if (root == nullptr) {
         return jsonRoot->ToString();
     }
 
-    auto pageElement = AceType::DynamicCast<Element>(context->GetLastPage());
+    RefPtr<Element> pageElement = context->GetLastPage();
     if (pageElement == nullptr) {
         return jsonRoot->ToString();
     }

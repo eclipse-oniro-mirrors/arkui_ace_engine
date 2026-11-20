@@ -339,7 +339,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAttachTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(AceType::RawPtr(node), std::move(onAttachCallback));
@@ -373,7 +373,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnDetachTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onDetachCallback = []() {};
     ViewAbstract::SetOnDetach(AceType::RawPtr(node), std::move(onDetachCallback));
@@ -407,7 +407,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAttachByFrameNodeTest, TestSiz
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(AceType::RawPtr(node), std::move(onAttachCallback));
@@ -441,7 +441,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnDetachByFrameNodeTest, TestSiz
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onDetachCallback = []() {};
     ViewAbstract::SetOnDetach(AceType::RawPtr(node), std::move(onDetachCallback));
@@ -495,7 +495,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTouchIntercept002, TestSize.Level1)
     auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     TouchInterceptFunc touchInterceptFunc;
     ViewAbstract::SetOnTouchIntercept(AceType::RawPtr(node), std::move(touchInterceptFunc));
@@ -600,7 +600,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractFocusBoxStyle001, TestSize.Level1)
     auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     
     NG::FocusBoxStyle style;
@@ -752,7 +752,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnAttach001, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(AceType::RawPtr(node), std::move(onAttachCallback));
@@ -791,7 +791,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnDetach001, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onDetachCallback = []() {};
     ViewAbstract::SetOnDetach(std::move(onDetachCallback));
@@ -830,7 +830,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnAttach002, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(std::move(onAttachCallback));
@@ -943,7 +943,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractBgDynamicBrightness002, TestSize.Level1
      * @tc.expected: The foreground effect is not changed.
      */
     BrightnessOption brightnessOption;
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     ViewAbstract::SetBgDynamicBrightness(AceType::RawPtr(node), brightnessOption);
 
@@ -978,7 +978,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractFgDynamicBrightness002, TestSize.Level1
      * @tc.expected: The foreground effect is not changed.
      */
     BrightnessOption brightnessOption;
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     ViewAbstract::SetFgDynamicBrightness(AceType::RawPtr(node), brightnessOption);
 
@@ -1463,7 +1463,7 @@ HWTEST_F(ViewAbstractTestNg, SetOverlayNodeTest001, TestSize.Level1)
     ViewAbstract::SetOverlayNode(AceType::RawPtr(frameNode), AceType::RawPtr(overlayNode), options);
     auto overlayNodeWithFrameNode = frameNode->GetOverlayNode();
     EXPECT_EQ(overlayNode, overlayNodeWithFrameNode);
-    auto layoutProperty = AceType::DynamicCast<LayoutProperty>(overlayNodeWithFrameNode->GetLayoutProperty());
+    auto layoutProperty = overlayNodeWithFrameNode->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
     Dimension x;
     Dimension y;

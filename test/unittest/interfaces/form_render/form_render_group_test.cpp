@@ -674,4 +674,106 @@ HWTEST_F(FormRenderGroupTest, FormRenderGroupTest_SetUiContentParams_001, TestSi
     group->SetUiContentParams(want);
     GTEST_LOG_(INFO) << "FormRenderGroupTest_SetUiContentParams_001 end";
 }
+
+/**
+ * @tc.name: FormRenderGroupTest_AddForm_001
+ * @tc.desc: Test AddForm() keeps formRequests_ sorted by numeric compId.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderGroupTest, FormRenderGroupTest_AddForm_001, TestSize.Level1)
+{
+    GTEST_LOG_(INFO) << "FormRenderGroupTest_AddForm_001 start";
+    auto eventRunner = OHOS::AppExecFwk::EventRunner::Create("FormRenderGroupTest_AddForm_001");
+    ASSERT_TRUE(eventRunner);
+    auto eventHandler = std::make_shared<OHOS::AppExecFwk::EventHandler>(eventRunner);
+    auto group = FormRendererGroup::Create(nullptr, nullptr, eventHandler);
+    ASSERT_TRUE(group);
+    OHOS::AAFwk::Want want;
+    want.SetParam(FORM_RENDER_STATE, true);
+    OHOS::AppExecFwk::FormJsInfo formJsInfo;
+    formJsInfo.bundleName = "bundleName";
+    formJsInfo.moduleName = "moduleName";
+    std::string compIdFirst = "200";
+    want.SetParam(FORM_RENDERER_COMP_ID, compIdFirst);
+    group->AddForm(want, formJsInfo);
+    std::string compIdSecond = "100";
+    want.SetParam(FORM_RENDERER_COMP_ID, compIdSecond);
+    group->AddForm(want, formJsInfo);
+    std::string compIdThird = "300";
+    want.SetParam(FORM_RENDERER_COMP_ID, compIdThird);
+    group->AddForm(want, formJsInfo);
+    ASSERT_EQ(group->formRequests_.size(), 3UL);
+    EXPECT_EQ(group->formRequests_.front().compId, "100");
+    EXPECT_EQ(group->formRequests_[1].compId, "200");
+    EXPECT_EQ(group->formRequests_.back().compId, "300");
+    EXPECT_EQ(group->currentCompId_, "300");
+    GTEST_LOG_(INFO) << "FormRenderGroupTest_AddForm_001 end";
+}
+
+/**
+ * @tc.name: FormRenderGroupTest_AddForm_002
+ * @tc.desc: Test AddForm() with a smaller compId does not preempt the latest-created owner.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderGroupTest, FormRenderGroupTest_AddForm_002, TestSize.Level1)
+{
+    GTEST_LOG_(INFO) << "FormRenderGroupTest_AddForm_002 start";
+    auto eventRunner = OHOS::AppExecFwk::EventRunner::Create("FormRenderGroupTest_AddForm_002");
+    ASSERT_TRUE(eventRunner);
+    auto eventHandler = std::make_shared<OHOS::AppExecFwk::EventHandler>(eventRunner);
+    auto group = FormRendererGroup::Create(nullptr, nullptr, eventHandler);
+    ASSERT_TRUE(group);
+    group->formRenderer_ = std::make_shared<FormRenderer>(nullptr, nullptr, eventHandler);
+    ASSERT_TRUE(group->formRenderer_);
+    group->initState_ = FormRendererGroup::FormRendererInitState::INITIALIZED;
+    FormRequest earlyRequest;
+    earlyRequest.compId = "100";
+    group->formRequests_.push_back(earlyRequest);
+    FormRequest ownerRequest;
+    ownerRequest.compId = "300";
+    group->formRequests_.push_back(ownerRequest);
+    group->currentCompId_ = "300";
+    OHOS::AAFwk::Want want;
+    want.SetParam(FORM_RENDER_STATE, true);
+    std::string reAddCompId = "100";
+    want.SetParam(FORM_RENDERER_COMP_ID, reAddCompId);
+    OHOS::AppExecFwk::FormJsInfo formJsInfo;
+    formJsInfo.bundleName = "bundleName";
+    formJsInfo.moduleName = "moduleName";
+    group->AddForm(want, formJsInfo);
+    EXPECT_EQ(group->formRequests_.size(), 2UL);
+    EXPECT_EQ(group->currentCompId_, "300");
+    GTEST_LOG_(INFO) << "FormRenderGroupTest_AddForm_002 end";
+}
+
+/**
+ * @tc.name: FormRenderGroupTest_DeleteForm_001
+ * @tc.desc: Test DeleteForm() falls back to the latest-created compId.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderGroupTest, FormRenderGroupTest_DeleteForm_001, TestSize.Level1)
+{
+    GTEST_LOG_(INFO) << "FormRenderGroupTest_DeleteForm_001 start";
+    auto eventRunner = OHOS::AppExecFwk::EventRunner::Create("FormRenderGroupTest_DeleteForm_001");
+    ASSERT_TRUE(eventRunner);
+    auto eventHandler = std::make_shared<OHOS::AppExecFwk::EventHandler>(eventRunner);
+    auto group = FormRendererGroup::Create(nullptr, nullptr, eventHandler);
+    ASSERT_TRUE(group);
+    group->formRenderer_ = std::make_shared<FormRenderer>(nullptr, nullptr, eventHandler);
+    ASSERT_TRUE(group->formRenderer_);
+    FormRequest firstRequest;
+    firstRequest.compId = "100";
+    group->formRequests_.push_back(firstRequest);
+    FormRequest secondRequest;
+    secondRequest.compId = "200";
+    group->formRequests_.push_back(secondRequest);
+    FormRequest thirdRequest;
+    thirdRequest.compId = "300";
+    group->formRequests_.push_back(thirdRequest);
+    group->currentCompId_ = "300";
+    group->DeleteForm("300");
+    EXPECT_EQ(group->formRequests_.size(), 2UL);
+    EXPECT_EQ(group->currentCompId_, "200");
+    GTEST_LOG_(INFO) << "FormRenderGroupTest_DeleteForm_001 end";
+}
 }

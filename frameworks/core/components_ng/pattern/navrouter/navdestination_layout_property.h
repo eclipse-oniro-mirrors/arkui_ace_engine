@@ -38,7 +38,7 @@ public:
     {
         auto copy = MakeRefPtr<NavDestinationLayoutProperty>();
         copy->NavDestinationLayoutPropertyBase::UpdateBaseLayoutProperty(
-            DynamicCast<NavDestinationLayoutPropertyBase>(this));
+            this);
         copy->propNoPixMap_ = CloneNoPixMap();
         copy->propImageSource_ = CloneImageSource();
         copy->propPixelMap_ = ClonePixelMap();

@@ -471,7 +471,7 @@ void NavigationPattern::DoNavbarHideAnimation(const RefPtr<NavigationGroupNode>&
 
 void NavigationPattern::InitDragBarEvent()
 {
-    auto dragBarNode = AceType::DynamicCast<FrameNode>(GetDragBarNode());
+    auto dragBarNode = GetDragBarNode();
     CHECK_NULL_VOID(dragBarNode);
     auto dragGestureHub = dragBarNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(dragGestureHub);
@@ -499,7 +499,7 @@ void NavigationPattern::ClearDragBarEvent()
 {
     auto hostNode = AceType::DynamicCast<NavigationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
-    auto dragBarNode = AceType::DynamicCast<FrameNode>(GetDragBarNode());
+    auto dragBarNode = GetDragBarNode();
     CHECK_NULL_VOID(dragBarNode);
     auto dragGestureHub = dragBarNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(dragGestureHub);
@@ -522,7 +522,7 @@ void NavigationPattern::ClearForceSplitDragBarEvent()
 {
     auto hostNode = AceType::DynamicCast<NavigationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
-    auto dragBarNode = AceType::DynamicCast<FrameNode>(GetDragBarNode());
+    auto dragBarNode = GetDragBarNode();
     CHECK_NULL_VOID(dragBarNode);
     auto dragGestureHub = dragBarNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(dragGestureHub);
@@ -2334,7 +2334,7 @@ void NavigationPattern::CheckTopNavPathChange(
                 break;
             }
             auto navDestinationPattern = newTopNavDestination->GetPattern<NavDestinationPattern>();
-            auto navDestinationFocusView = AceType::DynamicCast<FocusView>(navDestinationPattern);
+            RefPtr<FocusView> navDestinationFocusView = navDestinationPattern;
             CHECK_NULL_VOID(navDestinationFocusView);
             if (Container::LessThanAPIVersion(PlatformVersion::VERSION_TWELVE)) {
                 navDestinationFocusView->SetIsViewRootScopeFocused(false);
@@ -2421,7 +2421,7 @@ RefPtr<NavDestinationGroupNode> NavigationPattern::GetNonTopForceSplitHomeDestin
     CHECK_NULL_RETURN(navigationStack_, nullptr);
     auto topDest = AceType::DynamicCast<NavDestinationGroupNode>(
         NavigationGroupNode::GetNavDestinationNode(navigationStack_->Get()));
-    auto forceSplitHomeDest = AceType::DynamicCast<NavDestinationGroupNode>(GetForceSplitHomeDestination());
+    auto forceSplitHomeDest = GetForceSplitHomeDestination();
     if (forceSplitHomeDest && topDest && forceSplitHomeDest != topDest) {
         return forceSplitHomeDest;
     }
@@ -2630,14 +2630,14 @@ void NavigationPattern::UpdateAdjustConstraintTypeForForceSplitAnimation(bool is
         return;
     }
     if (isSecondaryPushToPrimaryScene_) {
-        auto moveNode = AceType::DynamicCast<NavDestinationNodeBase>(splitPushMoveNode_.Upgrade());
+        auto moveNode = splitPushMoveNode_.Upgrade();
         CHECK_NULL_VOID(moveNode);
         moveNode->SetAdjustConstraintType(ForceSplitAdjustConstraintType::ADJUST_TO_SECONDARY);
         moveNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         return;
     }
     if (isPrimaryPopToSecondaryScene_) {
-        auto moveNode = AceType::DynamicCast<NavDestinationNodeBase>(splitPopMoveNode_.Upgrade());
+        auto moveNode = splitPopMoveNode_.Upgrade();
         CHECK_NULL_VOID(moveNode);
         moveNode->SetAdjustConstraintType(ForceSplitAdjustConstraintType::ADJUST_TO_PRIMARY);
         moveNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
@@ -4146,7 +4146,7 @@ void NavigationPattern::InitForceSplitDragEvent()
         return;
     }
 
-    auto dragBarNode = AceType::DynamicCast<FrameNode>(GetDragBarNode());
+    auto dragBarNode = GetDragBarNode();
     CHECK_NULL_VOID(dragBarNode);
     auto dragGestureHub = dragBarNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(dragGestureHub);
@@ -4275,7 +4275,7 @@ RefPtr<FrameNode> NavigationPattern::GetNavigationNode() const
 {
     auto host = GetHost();
     CHECK_NULL_RETURN(host, nullptr);
-    auto navigationNode = AceType::DynamicCast<FrameNode>(host);
+    auto navigationNode = host;
     CHECK_NULL_RETURN(navigationNode, nullptr);
     return host;
 }
@@ -4345,7 +4345,7 @@ void NavigationPattern::AddDividerHotZoneRect()
     }
     auto hostNode = AceType::DynamicCast<NavigationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
-    auto dividerFrameNode = AceType::DynamicCast<FrameNode>(GetDividerNode());
+    auto dividerFrameNode = GetDividerNode();
     CHECK_NULL_VOID(dividerFrameNode);
     auto geometryNode = dividerFrameNode->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
@@ -5539,7 +5539,7 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
                                      weakPreDestination = WeakPtr<NavDestinationGroupNode>(preDestination),
         weakTopDestination = WeakPtr<NavDestinationGroupNode>(topDestination),
         isPopPage, isNeedVisible, fromPath, isPopTransition]() {
-        auto navigationPattern = AceType::DynamicCast<NavigationPattern>(weakNavigation.Upgrade());
+        auto navigationPattern = weakNavigation.Upgrade();
         CHECK_NULL_VOID(navigationPattern);
         auto preDestination = weakPreDestination.Upgrade();
         auto topDestination = weakTopDestination.Upgrade();
@@ -6228,7 +6228,7 @@ bool NavigationPattern::ExecuteAddAnimation(RefPtr<NavDestinationGroupNode> preT
 bool NavigationPattern::GetIsFocusable(const RefPtr<FrameNode>& frameNode)
 {
     CHECK_NULL_RETURN(frameNode, false);
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_RETURN(hostNode, false);
     auto focusHub = hostNode->GetFocusHub();
     CHECK_NULL_RETURN(focusHub, false);
@@ -8308,7 +8308,7 @@ void NavigationPattern::CachePageLevelDisplaceHome(const RefPtr<ForceSplitManage
  
     auto home = navBarIsHome_
         ? AceType::DynamicCast<NavDestinationNodeBase>(host->GetNavBarNode())
-        : AceType::DynamicCast<NavDestinationNodeBase>(forceSplitHomeDest_.Upgrade());
+        : RefPtr<NavDestinationNodeBase>(forceSplitHomeDest_.Upgrade());
     if (!IsPageLevelDisplaceHomeValid(home)) {
         return;
     }

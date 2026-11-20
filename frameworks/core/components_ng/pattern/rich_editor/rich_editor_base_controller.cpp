@@ -75,7 +75,7 @@ bool RichEditorBaseController::SetCaretOffset(int32_t caretPosition)
 void RichEditorBaseController::SetTypingStyle(std::optional<struct UpdateSpanStyle> typingStyle,
     std::optional<TextStyle> textStyle)
 {
-    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
+    auto richEditorPattern = pattern_.Upgrade();
     CHECK_NULL_VOID(richEditorPattern);
     richEditorPattern->SetTypingStyle(typingStyle, textStyle);
     richEditorPattern->ForceTriggerAvoidOnCaretChange();
@@ -83,14 +83,14 @@ void RichEditorBaseController::SetTypingStyle(std::optional<struct UpdateSpanSty
 
 std::optional<struct UpdateSpanStyle> RichEditorBaseController::GetTypingStyle()
 {
-    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
+    auto richEditorPattern = pattern_.Upgrade();
     CHECK_NULL_RETURN(richEditorPattern, {});
     return richEditorPattern->GetTypingStyle();
 }
 
 void RichEditorBaseController::SetTypingParagraphStyle(std::optional<struct UpdateParagraphStyle> typingParagraphStyle)
 {
-    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
+    auto richEditorPattern = pattern_.Upgrade();
     CHECK_NULL_VOID(richEditorPattern);
     richEditorPattern->SetTypingParagraphStyle(typingParagraphStyle);
     richEditorPattern->ForceTriggerAvoidOnCaretChange();
@@ -98,7 +98,7 @@ void RichEditorBaseController::SetTypingParagraphStyle(std::optional<struct Upda
 
 void RichEditorBaseController::SetPlaceholderStyledString(const RefPtr<SpanStringBase>& value)
 {
-    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
+    auto richEditorPattern = pattern_.Upgrade();
     CHECK_NULL_VOID(richEditorPattern);
     auto spanString = AceType::DynamicCast<SpanString>(value);
     CHECK_NULL_VOID(spanString);

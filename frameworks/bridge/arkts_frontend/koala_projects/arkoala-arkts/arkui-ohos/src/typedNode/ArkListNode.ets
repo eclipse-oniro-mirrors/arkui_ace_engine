@@ -16,6 +16,7 @@
 import { int32 } from '@koalaui/common';
 import { RuntimeType, runtimeType } from '@koalaui/interop';
 import { ArkScrollableNode } from './ArkScrollableNode';
+import { ScrollSnapOffsetProvider } from '../component/scrollCommon';
 import {
   ListAttribute,
   ArkListPeer,
@@ -161,6 +162,11 @@ export class ArkListNode extends ArkScrollableNode implements ListAttribute {
     scrollSnapAlign(value: ScrollSnapAlign | undefined): this {
         const value_casted = value as (ScrollSnapAlign | undefined)
         this.getPeer()?.setScrollSnapAlignAttribute(value_casted)
+        this.markDirty()
+        return this
+    }
+    scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        this.getPeer()?.setScrollSnapStrategyAttribute(value)
         this.markDirty()
         return this
     }

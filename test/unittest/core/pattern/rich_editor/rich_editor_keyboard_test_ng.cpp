@@ -855,4 +855,401 @@ HWTEST_F(RichEditorKeyboardTestNg, StopBackPress001, TestSize.Level0)
     pattern->SetStopBackPress(false);
     EXPECT_FALSE(pattern->IsStopBackPress());
 }
+
+/**
+ * @tc.name: GetAutoFillKeyboardType001
+ * @tc.desc: Test that an explicit keyboard_ (single-line mode) takes priority
+ *           over the contentType/inputType-derived AutoFill keyboard mapping.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType001, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Get the rich editor pattern.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+ 
+    /**
+     * @tc.steps: step2. Force single-line mode and set an explicit keyboard_.
+     *            Also set a contentType that would otherwise resolve to
+     *            VISIBLE_PASSWORD, to prove the explicit keyboard wins.
+     */
+    pattern->isSingleLineMode_ = true;
+    pattern->keyboard_ = TextInputType::NUMBER;
+    RichEditorModelNG::SetContentType(AceType::RawPtr(richEditorNode_), TextContentType::VISIBLE_PASSWORD);
+ 
+    /**
+     * @tc.expected: GetAutoFillKeyboardType returns NUMBER (the explicit type),
+     *               not VISIBLE_PASSWORD (the contentType-derived type).
+     */
+    EXPECT_EQ(pattern->GetAutoFillKeyboardType(), TextInputType::NUMBER);
+ 
+    /**
+     * @tc.steps: step3. Cleanup: restore defaults so subsequent tests are isolated.
+     */
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+    pattern->isSingleLineMode_ = false;
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType002
+ * @tc.desc: Test multi-line default mode with no contentType/inputType returns
+ *           UNSPECIFIED (no AutoFill type resolves, map lookup misses).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType002, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in default (multi-line) mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+ 
+    /**
+     * @tc.steps: step2. Ensure no contentType/inputType is set (defaults).
+     */
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+    RichEditorModelNG::ResetInputType(AceType::RawPtr(richEditorNode_));
+ 
+    /**
+     * @tc.expected: GetAutoFillKeyboardType returns UNSPECIFIED.
+     */
+    EXPECT_EQ(pattern->GetAutoFillKeyboardType(), TextInputType::UNSPECIFIED);
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType003
+ * @tc.desc: Test multi-line mode with contentType=VISIBLE_PASSWORD resolves to
+ *           ACE_PASSWORD -> VISIBLE_PASSWORD (secure keyboard for IME).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType003, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+ 
+    /**
+     * @tc.steps: step2. Set contentType to VISIBLE_PASSWORD (maps to ACE_PASSWORD).
+     */
+    RichEditorModelNG::SetContentType(AceType::RawPtr(richEditorNode_), TextContentType::VISIBLE_PASSWORD);
+ 
+    /**
+     * @tc.expected: GetAutoFillKeyboardType returns VISIBLE_PASSWORD.
+     */
+    EXPECT_EQ(pattern->GetAutoFillKeyboardType(), TextInputType::VISIBLE_PASSWORD);
+ 
+    /**
+     * @tc.steps: step3. Cleanup.
+     */
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType004
+ * @tc.desc: Test multi-line mode with contentType=EMAIL_ADDRESS resolves to
+ *           ACE_EMAIL_ADDRESS -> EMAIL_ADDRESS (email keyboard for IME).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType004, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+ 
+    /**
+     * @tc.steps: step2. Set contentType to EMAIL_ADDRESS (maps to ACE_EMAIL_ADDRESS).
+     */
+    RichEditorModelNG::SetContentType(AceType::RawPtr(richEditorNode_), TextContentType::EMAIL_ADDRESS);
+ 
+    /**
+     * @tc.expected: GetAutoFillKeyboardType returns EMAIL_ADDRESS.
+     */
+    EXPECT_EQ(pattern->GetAutoFillKeyboardType(), TextInputType::EMAIL_ADDRESS);
+ 
+    /**
+     * @tc.steps: step3. Cleanup.
+     */
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType005
+ * @tc.desc: Test multi-line mode with inputType=NUMBER_PASSWORD resolves via
+ *           ConvertToAceAutoFillType to ACE_PASSWORD -> VISIBLE_PASSWORD.
+ *           Note: PHONE inputType does NOT map to any AceAutoFillType
+ *           (ConvertToAceAutoFillType only maps VISIBLE_PASSWORD/USER_NAME/
+ *           NEW_PASSWORD/NUMBER_PASSWORD), so NUMBER_PASSWORD is used here to
+ *           exercise the inputType-driven resolution path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType005, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+ 
+    /**
+     * @tc.steps: step2. Set inputType to NUMBER_PASSWORD (maps to ACE_PASSWORD).
+     *            SetInputType also updates keyboard_ via UpdateKeyboardType, so
+     *            GetKeyboard() would return NUMBER in single-line mode; in
+     *            multi-line mode GetKeyboard() returns UNSPECIFIED, leaving the
+     *            AutoFill path active.
+     */
+    RichEditorModelNG::SetInputType(AceType::RawPtr(richEditorNode_), TextInputType::NUMBER_PASSWORD);
+ 
+    /**
+     * @tc.expected: GetAutoFillKeyboardType returns VISIBLE_PASSWORD
+     *               (ACE_PASSWORD -> VISIBLE_PASSWORD via the shared map).
+     */
+    EXPECT_EQ(pattern->GetAutoFillKeyboardType(), TextInputType::VISIBLE_PASSWORD);
+ 
+    /**
+     * @tc.steps: step3. Cleanup.
+     */
+    RichEditorModelNG::ResetInputType(AceType::RawPtr(richEditorNode_));
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType006
+ * @tc.desc: Test multi-line mode with contentType=UNSPECIFIED resolves to
+ *           ACE_UNSPECIFIED, which is absent from the keyboard map, so
+ *           GetAutoFillKeyboardType returns UNSPECIFIED.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType006, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+ 
+    /**
+     * @tc.steps: step2. Set contentType to UNSPECIFIED (maps to ACE_UNSPECIFIED,
+     *            which is intentionally absent from the keyboard map).
+     */
+    RichEditorModelNG::SetContentType(AceType::RawPtr(richEditorNode_), TextContentType::UNSPECIFIED);
+ 
+    /**
+     * @tc.expected: GetAutoFillKeyboardType returns UNSPECIFIED.
+     */
+    EXPECT_EQ(pattern->GetAutoFillKeyboardType(), TextInputType::UNSPECIFIED);
+ 
+    /**
+     * @tc.steps: step3. Cleanup.
+     */
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType007
+ * @tc.desc: Test that GetMiscTextConfig propagates the contentType-derived
+ *           keyboard type into inputAttribute.inputPattern so the IME receives
+ *           the secure keyboard for a password contentType.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType007, TestSize.Level0)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+ 
+    /**
+     * @tc.steps: step2. Set contentType to VISIBLE_PASSWORD (maps to ACE_PASSWORD
+     *            -> VISIBLE_PASSWORD).
+     */
+    RichEditorModelNG::SetContentType(AceType::RawPtr(richEditorNode_), TextContentType::VISIBLE_PASSWORD);
+ 
+    /**
+     * @tc.steps: step3. Build the MiscServices::TextConfig and inspect the
+     *            inputPattern field.
+     */
+    auto miscTextConfig = pattern->GetMiscTextConfig();
+    ASSERT_TRUE(miscTextConfig.has_value());
+    auto textConfig = miscTextConfig.value();
+ 
+    /**
+     * @tc.expected: inputPattern equals (int32_t)VISIBLE_PASSWORD, proving the
+     *               contentType-driven keyboard type reaches the IME.
+     */
+    EXPECT_EQ(textConfig.inputAttribute.inputPattern, static_cast<int32_t>(TextInputType::VISIBLE_PASSWORD));
+ 
+    /**
+     * @tc.steps: step4. Cleanup.
+     */
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+#else
+    GTEST_SKIP() << "ENABLE_STANDARD_INPUT not defined, GetMiscTextConfig e2e verification skipped";
+#endif
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType008
+ * @tc.desc: Test that GetMiscTextConfig propagates the explicit keyboard_
+ *           (single-line mode, GetKeyboard() != UNSPECIFIED) into
+ *           inputAttribute.inputPattern so the IME receives the explicit type.
+ *           Covers GetAutoFillKeyboardType branch A (current != UNSPECIFIED)
+ *           at the GetMiscTextConfig exit point.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType008, TestSize.Level0)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    /**
+     * @tc.steps: step1. Get the rich editor pattern and force single-line mode
+     *            with an explicit keyboard_.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = true;
+    pattern->keyboard_ = TextInputType::NUMBER;
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+ 
+    /**
+     * @tc.steps: step2. Build the MiscServices::TextConfig and inspect the
+     *            inputPattern field.
+     */
+    auto miscTextConfig = pattern->GetMiscTextConfig();
+    ASSERT_TRUE(miscTextConfig.has_value());
+    auto textConfig = miscTextConfig.value();
+ 
+    /**
+     * @tc.expected: inputPattern equals (int32_t)NUMBER, proving the explicit
+     *               keyboard_ (branch A) reaches the IME via GetMiscTextConfig.
+     */
+    EXPECT_EQ(textConfig.inputAttribute.inputPattern, static_cast<int32_t>(TextInputType::NUMBER));
+ 
+    /**
+     * @tc.steps: step3. Cleanup.
+     */
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+    pattern->isSingleLineMode_ = false;
+#else
+    GTEST_SKIP() << "ENABLE_STANDARD_INPUT not defined, GetMiscTextConfig e2e verification skipped";
+#endif
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType009
+ * @tc.desc: Test that GetMiscTextConfig propagates the inputType-derived
+ *           keyboard type (NUMBER_PASSWORD -> ACE_PASSWORD -> VISIBLE_PASSWORD)
+ *           into inputAttribute.inputPattern when no contentType and no explicit
+ *           keyboard_ are set. Covers GetAutoFillKeyboardType branch B
+ *           (map hit via inputType) at the GetMiscTextConfig exit point.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType009, TestSize.Level0)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+ 
+    /**
+     * @tc.steps: step2. Set inputType to NUMBER_PASSWORD (maps to ACE_PASSWORD
+     *            -> VISIBLE_PASSWORD via the shared keyboard map).
+     */
+    RichEditorModelNG::SetInputType(AceType::RawPtr(richEditorNode_), TextInputType::NUMBER_PASSWORD);
+ 
+    /**
+     * @tc.steps: step3. Build the MiscServices::TextConfig and inspect the
+     *            inputPattern field.
+     */
+    auto miscTextConfig = pattern->GetMiscTextConfig();
+    ASSERT_TRUE(miscTextConfig.has_value());
+    auto textConfig = miscTextConfig.value();
+ 
+    /**
+     * @tc.expected: inputPattern equals (int32_t)VISIBLE_PASSWORD, proving the
+     *               inputType-driven map hit (branch B) reaches the IME.
+     */
+    EXPECT_EQ(textConfig.inputAttribute.inputPattern, static_cast<int32_t>(TextInputType::VISIBLE_PASSWORD));
+ 
+    /**
+     * @tc.steps: step4. Cleanup.
+     */
+    RichEditorModelNG::ResetInputType(AceType::RawPtr(richEditorNode_));
+#else
+    GTEST_SKIP() << "ENABLE_STANDARD_INPUT not defined, GetMiscTextConfig e2e verification skipped";
+#endif
+}
+ 
+/**
+ * @tc.name: GetAutoFillKeyboardType010
+ * @tc.desc: Test that GetMiscTextConfig falls back to inputPattern ==
+ *           (int32_t)UNSPECIFIED when contentType and inputType both resolve to
+ *           ACE_UNSPECIFIED (absent from the keyboard map). Covers
+ *           GetAutoFillKeyboardType branch B-false (map miss) at the
+ *           GetMiscTextConfig exit point.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorKeyboardTestNg, GetAutoFillKeyboardType010, TestSize.Level0)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    /**
+     * @tc.steps: step1. Get the rich editor pattern in multi-line mode with no
+     *            explicit keyboard_, no contentType, no inputType.
+     */
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isSingleLineMode_ = false;
+    pattern->keyboard_ = TextInputType::UNSPECIFIED;
+    RichEditorModelNG::ResetContentType(AceType::RawPtr(richEditorNode_));
+    RichEditorModelNG::ResetInputType(AceType::RawPtr(richEditorNode_));
+ 
+    /**
+     * @tc.steps: step2. Build the MiscServices::TextConfig and inspect the
+     *            inputPattern field.
+     */
+    auto miscTextConfig = pattern->GetMiscTextConfig();
+    ASSERT_TRUE(miscTextConfig.has_value());
+    auto textConfig = miscTextConfig.value();
+ 
+    /**
+     * @tc.expected: inputPattern equals (int32_t)UNSPECIFIED, proving the
+     *               map-miss fallback (branch B false) reaches the IME.
+     */
+    EXPECT_EQ(textConfig.inputAttribute.inputPattern, static_cast<int32_t>(TextInputType::UNSPECIFIED));
+#else
+    GTEST_SKIP() << "ENABLE_STANDARD_INPUT not defined, GetMiscTextConfig e2e verification skipped";
+#endif
+}
 }

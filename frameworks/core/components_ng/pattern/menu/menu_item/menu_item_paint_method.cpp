@@ -75,11 +75,59 @@ void MenuItemPaintMethod::DrawPathWithBrush(RSCanvas& canvas, const RSPath& path
     canvas.DetachBrush();
 }
 
+float MenuItemPaintMethod::GetLeftRowStartEdge(PaintWrapper* paintWrapper, bool isRtl)
+{
+    constexpr float INVALID_EDGE = -1.0f;
+    auto renderContext = paintWrapper->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, INVALID_EDGE);
+    auto host = renderContext->GetHost();
+    CHECK_NULL_RETURN(host, INVALID_EDGE);
+    // Custom builder (CustomMenuItemPattern) has unpredictable child structure;
+    // index 0/1 assumption breaks, return INVALID_EDGE to fall back to theme default.
+    auto pattern = host->GetPattern<MenuItemPattern>();
+    CHECK_NULL_RETURN(pattern, INVALID_EDGE);
+    if (pattern->IsCustomMenuItem()) {
+        return INVALID_EDGE;
+    }
+    // LTR: index 0 = leftRow; RTL: index 1 = rightRow (visually on left)
+    auto row = host->GetChildAtIndex(isRtl ? 1 : 0);
+    CHECK_NULL_RETURN(row, INVALID_EDGE);
+    auto frameNode = AceType::DynamicCast<FrameNode>(row);
+    CHECK_NULL_RETURN(frameNode, INVALID_EDGE);
+    auto geometry = frameNode->GetGeometryNode();
+    CHECK_NULL_RETURN(geometry, INVALID_EDGE);
+    return geometry->GetFrameRect().GetX();
+}
+
+float MenuItemPaintMethod::GetRightRowEndEdge(PaintWrapper* paintWrapper, bool isRtl)
+{
+    constexpr float INVALID_EDGE = -1.0f;
+    auto renderContext = paintWrapper->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, INVALID_EDGE);
+    auto host = renderContext->GetHost();
+    CHECK_NULL_RETURN(host, INVALID_EDGE);
+    // Custom builder (CustomMenuItemPattern) has unpredictable child structure;
+    // index 0/1 assumption breaks, return INVALID_EDGE to fall back to theme default.
+    auto pattern = host->GetPattern<MenuItemPattern>();
+    CHECK_NULL_RETURN(pattern, INVALID_EDGE);
+    if (pattern->IsCustomMenuItem()) {
+        return INVALID_EDGE;
+    }
+    // LTR: index 1 = rightRow; RTL: index 0 = leftRow (visually on right)
+    auto row = host->GetChildAtIndex(isRtl ? 0 : 1);
+    CHECK_NULL_RETURN(row, INVALID_EDGE);
+    auto frameNode = AceType::DynamicCast<FrameNode>(row);
+    CHECK_NULL_RETURN(frameNode, INVALID_EDGE);
+    auto geometry = frameNode->GetGeometryNode();
+    CHECK_NULL_RETURN(geometry, INVALID_EDGE);
+    auto rect = geometry->GetFrameRect();
+    return rect.GetX() + rect.Width();
+}
+
 void MenuItemPaintMethod::HandleMenuItem(PaintWrapper* paintWrapper, const RefPtr<MenuItemPaintProperty>& props,
     const RefPtr<SelectTheme>& selectTheme, RSPath& path, RSCanvas& canvas)
 {
     auto itemSize = paintWrapper->GetGeometryNode()->GetFrameSize();
-    auto horInterval = Dimension(0.0f, DimensionUnit::PX);
     auto strokeWidth = Dimension(1.0f, DimensionUnit::PX);
     Color dividerColor = Color::TRANSPARENT;
     if (selectTheme) {
@@ -90,10 +138,42 @@ void MenuItemPaintMethod::HandleMenuItem(PaintWrapper* paintWrapper, const RefPt
     ItemDividerInfo info;
     info.width = itemSize.Width();
     info.strokeWidth = props->GetStrokeWidth().value_or(strokeWidth).ConvertToPxWithSize(itemSize.Height());
-    info.startMargin = props->GetStartMargin().value_or(horInterval).ConvertToPxWithSize(itemSize.Width());
-    info.endMargin = props->GetEndMargin().value_or(horInterval).ConvertToPxWithSize(itemSize.Width());
     info.color = props->GetDividerColor().value_or(dividerColor);
-    // draw divider above content, length = content width
+    // Bridge sets Unit to INVALID on parse failure/unset; property always has a value,
+    // so check Unit != INVALID to determine if user set it explicitly, not has_value().
+    auto startMarginOpt = props->GetStartMargin();
+    auto endMarginOpt = props->GetEndMargin();
+    bool isStartMarginSet = startMarginOpt.has_value() && startMarginOpt->Unit() != DimensionUnit::INVALID;
+    bool isEndMarginSet = endMarginOpt.has_value() && endMarginOpt->Unit() != DimensionUnit::INVALID;
+    auto renderContext = paintWrapper->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto host = renderContext->GetHost();
+    CHECK_NULL_VOID(host);
+    auto layoutProperty = host->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+    bool isRtl = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    if (isRtl ? isEndMarginSet : isStartMarginSet) {
+        info.startMargin = (isRtl ? endMarginOpt : startMarginOpt)->ConvertToPxWithSize(itemSize.Width());
+    } else {
+        info.startMargin = GetLeftRowStartEdge(paintWrapper, isRtl);
+        if (info.startMargin < 0.0f || info.startMargin > itemSize.Width()) {
+            auto defaultStart =
+                selectTheme ? selectTheme->GetDefaultDividerStartMargin() : Dimension(0.0f, DimensionUnit::PX);
+            info.startMargin = defaultStart.ConvertToPxWithSize(itemSize.Width());
+        }
+    }
+    if (isRtl ? isStartMarginSet : isEndMarginSet) {
+        info.endMargin = (isRtl ? startMarginOpt : endMarginOpt)->ConvertToPxWithSize(itemSize.Width());
+    } else {
+        auto rightEdge = GetRightRowEndEdge(paintWrapper, isRtl);
+        if (rightEdge >= 0.0f && rightEdge <= itemSize.Width()) {
+            info.endMargin = itemSize.Width() - rightEdge;
+        } else {
+            auto defaultEnd =
+                selectTheme ? selectTheme->GetDefaultDividerEndMargin() : Dimension(0.0f, DimensionUnit::PX);
+            info.endMargin = defaultEnd.ConvertToPxWithSize(itemSize.Width());
+        }
+    }
     path.AddRect(info.startMargin, info.topMargin, info.width - info.endMargin, info.topMargin + info.strokeWidth);
     DrawPathWithBrush(canvas, path, info.color);
 }

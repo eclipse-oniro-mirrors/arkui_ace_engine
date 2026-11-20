@@ -790,7 +790,7 @@ HWTEST_F(ViewAbstractTestNg, SetClipEdge001, TestSize.Level1)
     auto topFrameNodeOne = ViewStackProcessor::GetInstance()->GetMainElementNode();
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     isClip = false;
     ViewAbstract::SetClipEdge(AceType::RawPtr(node), isClip);
     EXPECT_NE(node, nullptr);

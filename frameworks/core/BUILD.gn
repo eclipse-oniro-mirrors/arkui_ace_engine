@@ -29,9 +29,13 @@ config("container_scope_config") {
 }
 
 ohos_shared_library("ace_container_scope") {
+  branch_protector_ret = "pac_ret"
   public_configs = [ ":container_scope_config" ]
 
   configs = [ "$ace_root:ace_config" ]
+  if (is_ohos) {
+    version_script = "$ace_root/build/libace_container_scope.map"
+  }
   if (!build_ohos_sdk) {
     defines = [ "NAPI_SCOPE_ERROR_HIVEW_REPORT" ]
   }
@@ -55,6 +59,7 @@ ohos_shared_library("ace_container_scope") {
 }
 
 ohos_static_library("ace_container_scope_static") {
+  branch_protector_ret = "pac_ret"
   public_configs = [ ":container_scope_config" ]
 
   configs = [ "$ace_root:ace_config" ]
@@ -71,6 +76,7 @@ template("ace_core_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     if (current_os == "ohos") {
       sanitize = {
         integer_overflow = true
@@ -740,6 +746,7 @@ template("ace_core_ng_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     if (current_os == "ohos") {
       sanitize = {
         integer_overflow = true

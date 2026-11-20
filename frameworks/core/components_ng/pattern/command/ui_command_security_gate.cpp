@@ -49,7 +49,7 @@ void UiCommandSecurityGate::ReportDeniedCommand(
         return;
     }
     AgentInputResult result;
-    result.sessionId = security.tokenId;
+    result.sessionId = security.agentTokenId;
     result.nodeId = node->GetId();
     auto compId = node->GetInspectorId().value_or("");
     if (compId.empty()) {

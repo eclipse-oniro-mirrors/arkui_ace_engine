@@ -81,6 +81,7 @@ export class DatePickerComponent extends ViewPU {
         this.__displayMode = new ObservedPropertySimplePU(DisplayMode.DATE, this, "displayMode");
         this.__selectedYear = new ObservedPropertySimplePU(0, this, "selectedYear");
         this.__selectedMonth = new ObservedPropertySimplePU(0, this, "selectedMonth");
+        this.__selectedIsLeapMonth = new ObservedPropertySimplePU(false, this, "selectedIsLeapMonth");
         this.__selectedDay = new ObservedPropertySimplePU(0, this, "selectedDay");
         this.__selectedHour = new ObservedPropertySimplePU(0, this, "selectedHour");
         this.__selectedMinute = new ObservedPropertySimplePU(0, this, "selectedMinute");
@@ -144,6 +145,12 @@ export class DatePickerComponent extends ViewPU {
         this.hourFormatter = null;
         this.minuteFormatter = null;
         this.secondFormatter = null;
+        this.lunarLeapMonthCacheKey = -2;
+        this.lunarLeapMonthCacheValue = -1;
+        this.lunarDaysCacheKey = '';
+        this.lunarDaysCacheValue = 30;
+        this.convertResultCacheKey = '';
+        this.convertResultCacheValue = null;
         this.setInitiallyProvidedValue(params);
         this.declareWatch("options", this.onOptionsChange);
         this.declareWatch("hideYear", this.onHideYearChange);
@@ -159,6 +166,9 @@ export class DatePickerComponent extends ViewPU {
         }
         if (params.selectedMonth !== undefined) {
             this.selectedMonth = params.selectedMonth;
+        }
+        if (params.selectedIsLeapMonth !== undefined) {
+            this.selectedIsLeapMonth = params.selectedIsLeapMonth;
         }
         if (params.selectedDay !== undefined) {
             this.selectedDay = params.selectedDay;
@@ -364,6 +374,7 @@ export class DatePickerComponent extends ViewPU {
         this.__displayMode.purgeDependencyOnElmtId(rmElmtId);
         this.__selectedYear.purgeDependencyOnElmtId(rmElmtId);
         this.__selectedMonth.purgeDependencyOnElmtId(rmElmtId);
+        this.__selectedIsLeapMonth.purgeDependencyOnElmtId(rmElmtId);
         this.__selectedDay.purgeDependencyOnElmtId(rmElmtId);
         this.__selectedHour.purgeDependencyOnElmtId(rmElmtId);
         this.__selectedMinute.purgeDependencyOnElmtId(rmElmtId);
@@ -421,6 +432,7 @@ export class DatePickerComponent extends ViewPU {
         this.__displayMode.aboutToBeDeleted();
         this.__selectedYear.aboutToBeDeleted();
         this.__selectedMonth.aboutToBeDeleted();
+        this.__selectedIsLeapMonth.aboutToBeDeleted();
         this.__selectedDay.aboutToBeDeleted();
         this.__selectedHour.aboutToBeDeleted();
         this.__selectedMinute.aboutToBeDeleted();
@@ -513,6 +525,12 @@ export class DatePickerComponent extends ViewPU {
     }
     set selectedMonth(newValue) {
         this.__selectedMonth.set(newValue);
+    }
+    get selectedIsLeapMonth() {
+        return this.__selectedIsLeapMonth.get();
+    }
+    set selectedIsLeapMonth(newValue) {
+        this.__selectedIsLeapMonth.set(newValue);
     }
     get selectedDay() {
         return this.__selectedDay.get();
@@ -919,20 +937,41 @@ export class DatePickerComponent extends ViewPU {
         if (prevLunar !== this.lunar) {
             if (!prevLunar && this.lunar && this.lunarCalendar !== null) {
                 // Switching from gregorian to lunar: convert gregorian date to lunar date
-                const gregorianDate = this.createDateFromParams(this.selectedYear, this.selectedMonth, this.selectedDay);
+                const gregorianDate = this.createDateFromParams(
+                    this.selectedYear, this.selectedMonth, this.selectedDay
+                );
                 this.lunarCalendar.setTime(gregorianDate);
                 this.selectedMonth = this.lunarCalendar.get('month');
                 this.selectedDay = this.lunarCalendar.get('date');
+                // Use Gregorian year with lunar year boundary adjustment.
+                // lunarCalendar.get('year') returns sexagenary cycle (1-60), not Gregorian year.
+                this.selectedYear = gregorianDate.getFullYear();
+                if (this.selectedMonth >= 11 && gregorianDate.getMonth() <= 1) {
+                    this.selectedYear -= 1;
+                }
+                if (this.selectedYear < this.startYear) {
+                    this.selectedYear = this.startYear;
+                }
+                if (this.selectedYear > this.endYear) {
+                    this.selectedYear = this.endYear;
+                }
+                // Detect if the date falls in a leap month
+                this.selectedIsLeapMonth = this.isDateInLeapMonth(
+                    gregorianDate, this.selectedYear, this.selectedMonth
+                );
             }
             else if (prevLunar && !this.lunar && prevLunarCalendar !== null) {
                 // Switching from lunar to gregorian: convert lunar date to gregorian date
                 // Use prevLunarCalendar for conversion since current lunarCalendar is null
-                const gregorianDate = this.convertLunarToGregorianWithCalendar(prevLunarCalendar, this.selectedYear, this.selectedMonth, this.selectedDay);
+                const gregorianDate = this.convertLunarToGregorianWithCalendar(
+                    prevLunarCalendar, this.selectedYear, this.selectedMonth, this.selectedDay, this.selectedIsLeapMonth
+                );
                 if (gregorianDate !== null) {
                     this.selectedYear = gregorianDate.getFullYear();
                     this.selectedMonth = gregorianDate.getMonth();
                     this.selectedDay = gregorianDate.getDate();
                 }
+                this.selectedIsLeapMonth = false;
             }
         }
         this.initArrays();
@@ -958,7 +997,6 @@ export class DatePickerComponent extends ViewPU {
         if (this.hideYear) {
             this.yearArray.push(DatePickerConstant.HIDE_YEAR_TEXT);
         }
-        this.monthArray = [];
         let startLunarMonthIndex = DatePickerConstant.MIN_MONTH;
         let endLunarMonthIndex = DatePickerConstant.MAX_MONTH;
         if (this.selectedYear === this.startYear) {
@@ -967,115 +1005,250 @@ export class DatePickerComponent extends ViewPU {
         if (this.selectedYear === this.endYear) {
             endLunarMonthIndex = this.lunarEndMonth;
         }
+        // Build month array with leap months inserted
+        this.monthArray = [];
+        const leapMonth = this.getLunarLeapMonth(this.selectedYear);
         for (let i = startLunarMonthIndex; i <= endLunarMonthIndex; i++) {
             this.monthArray.push(this.formatLunarMonth(i, false));
+            if (leapMonth >= 0 && i === leapMonth) {
+                this.monthArray.push(this.formatLunarMonth(i, true));
+            }
         }
         this.initLunarDayArray();
     }
     initLunarDayArray() {
         this.dayArray = [];
-        const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth);
+        const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth, this.selectedIsLeapMonth);
         let startLunarDayIndex = DatePickerConstant.MIN_DAY;
         let endLunarDayIndex = lunarDays;
-        if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth) {
+        if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+            !this.selectedIsLeapMonth) {
             startLunarDayIndex = this.lunarStartDay;
         }
-        if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth) {
+        if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+            !this.selectedIsLeapMonth) {
             endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays);
         }
         for (let i = startLunarDayIndex; i <= endLunarDayIndex; i++) {
             this.dayArray.push(this.formatLunarDay(i));
         }
     }
-    getLunarDaysInMonth(gregorianYear, lunarMonth) {
+    /**
+     * Detects which lunar month (0-11) has a leap month in the given lunar year.
+     * A leap month shares the same month index as its preceding regular month;
+     * it's detected by finding a lunar month whose start (date==1) appears twice.
+     * Returns the leap month index or -1 if no leap month exists.
+     */
+    getLunarLeapMonth(gregorianYear) {
+        if (gregorianYear === DatePickerConstant.HIDE_YEAR_SENTINEL || this.lunarCalendar === null) {
+            return -1;
+        }
+        if (gregorianYear === this.lunarLeapMonthCacheKey) {
+            return this.lunarLeapMonthCacheValue;
+        }
+        try {
+            // Use mid-year reference to determine the lunar year
+            const refDate = this.createDateFromParams(gregorianYear, 6, 1);
+            this.lunarCalendar.setTime(refDate);
+            const expectedLunarYear = this.lunarCalendar.get('year');
+            // Track how many times each lunar month starts (date == 1)
+            const monthStartCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            let leapMonth = -1;
+            // Scan through the Gregorian year (~384 days covers a full lunar year)
+            const startDate = this.createDateFromParams(gregorianYear, 0, 1);
+            for (let dayOffset = 0; dayOffset < 470; dayOffset++) {
+                const testDate = new Date(startDate.getTime() + dayOffset * 86400000);
+                this.lunarCalendar.setTime(testDate);
+                if (this.lunarCalendar.get('year') !== expectedLunarYear) {
+                    if (leapMonth >= 0) {
+                        break;
+                    }
+                    continue;
+                }
+                if (this.lunarCalendar.get('date') === 1) {
+                    const m = this.lunarCalendar.get('month');
+                    monthStartCounts[m]++;
+                    if (monthStartCounts[m] === 2) {
+                        leapMonth = m;
+                    }
+                }
+            }
+            this.lunarLeapMonthCacheKey = gregorianYear;
+            this.lunarLeapMonthCacheValue = leapMonth;
+            return leapMonth;
+        }
+        catch (e) {
+            return -1;
+        }
+    }
+    /**
+     * Determines whether a Gregorian date falls in the leap month (2nd occurrence)
+     * of the given lunar month. Returns false if the month has no leap month or
+     * the date is in the regular (1st) occurrence.
+     */
+    isDateInLeapMonth(date, gregorianYear, lunarMonth) {
+        const leapMonth = this.getLunarLeapMonth(gregorianYear);
+        if (leapMonth < 0 || leapMonth !== lunarMonth || this.lunarCalendar === null) {
+            return false;
+        }
+        // Find the start of the regular month (1st occurrence) and leap month (2nd occurrence)
+        const regularStart = this.findLunarMonthStart(gregorianYear, lunarMonth, 1);
+        if (regularStart === null) {
+            return false;
+        }
+        // If the date is before the end of the regular month, it's not in the leap month.
+        // The regular month typically has 29 or 30 days; we check if the date is past
+        // the regular month by comparing with the leap month start.
+        const leapStart = this.findLunarMonthStart(gregorianYear, lunarMonth, 2);
+        if (leapStart === null) {
+            return false;
+        }
+        return date.getTime() >= leapStart.getTime();
+    }
+    /**
+     * Finds the Gregorian date for the start (lunar day==1) of the Nth occurrence
+     * (1=regular, 2=leap) of the given lunar month in the given lunar year.
+     */
+    findLunarMonthStart(gregorianYear, lunarMonth, occurrence) {
+        if (this.lunarCalendar === null) {
+            return null;
+        }
+        try {
+            const refDate = this.createDateFromParams(gregorianYear, 6, 1);
+            this.lunarCalendar.setTime(refDate);
+            const expectedLunarYear = this.lunarCalendar.get('year');
+            let count = 0;
+            const startDate = this.createDateFromParams(gregorianYear, 0, 1);
+            for (let dayOffset = 0; dayOffset < 470; dayOffset++) {
+                const testDate = new Date(startDate.getTime() + dayOffset * 86400000);
+                this.lunarCalendar.setTime(testDate);
+                if (this.lunarCalendar.get('year') !== expectedLunarYear) {
+                    continue;
+                }
+                if (this.lunarCalendar.get('month') === lunarMonth && this.lunarCalendar.get('date') === 1) {
+                    count++;
+                    if (count === occurrence) {
+                        return testDate;
+                    }
+                }
+            }
+        }
+        catch (e) {
+            // fall through
+        }
+        return null;
+    }
+    getLunarDaysInMonth(gregorianYear, lunarMonth, isLeap) {
         if (gregorianYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
             return 30;
         }
         if (this.lunarCalendar === null) {
             return 30;
         }
+        const cacheKey = `${gregorianYear}_${lunarMonth}_${isLeap}`;
+        if (cacheKey === this.lunarDaysCacheKey) {
+            return this.lunarDaysCacheValue;
+        }
         try {
-            let month1Start = null;
-            let month2Start = null;
-            for (let month = 0; month < 12; month++) {
-                for (let day = 1; day <= 31; day++) {
-                    const testDate = this.createDateFromParams(gregorianYear, month, day);
-                    this.lunarCalendar.setTime(testDate);
-                    const currentLunarMonth = this.lunarCalendar.get('month');
-                    const currentLunarDay = this.lunarCalendar.get('date');
-                    if (currentLunarMonth === lunarMonth && currentLunarDay === 1 && month1Start === null) {
-                        month1Start = testDate;
+            // Determine the lunar year from a mid-year reference date
+            const refDate = this.createDateFromParams(gregorianYear, 6, 1);
+            this.lunarCalendar.setTime(refDate);
+            const expectedLunarYear = this.lunarCalendar.get('year');
+            // For isLeap=true, we need the 2nd occurrence of (lunarMonth, date=1);
+            // for isLeap=false, we need the 1st occurrence.
+            const targetOccurrence = isLeap ? 2 : 1;
+            let occurrenceCount = 0;
+            let monthStart = null;
+            let nextMonthStart = null;
+            // Scan through ~400 days to find the target month start and the next month start.
+            // The expectedLunarYear check only applies when searching for monthStart;
+            // nextMonthStart can be in the next lunar year (e.g., 腊月 → 正月 of next year).
+            const startDate = this.createDateFromParams(gregorianYear, 0, 1);
+            for (let dayOffset = 0; dayOffset < 470 && nextMonthStart === null; dayOffset++) {
+                const testDate = new Date(startDate.getTime() + dayOffset * 86400000);
+                this.lunarCalendar.setTime(testDate);
+                const currentLunarDay = this.lunarCalendar.get('date');
+                if (currentLunarDay === 1) {
+                    if (monthStart === null) {
+                        // Haven't found the target month start yet — must be in the expected lunar year
+                        if (this.lunarCalendar.get('year') === expectedLunarYear) {
+                            const currentLunarMonth = this.lunarCalendar.get('month');
+                            if (currentLunarMonth === lunarMonth) {
+                                occurrenceCount++;
+                                if (occurrenceCount === targetOccurrence) {
+                                    monthStart = testDate;
+                                }
+                            }
+                        }
                     }
-                    if (month1Start !== null && month2Start === null) {
-                        if (currentLunarMonth === lunarMonth + 1 && currentLunarDay === 1) {
-                            month2Start = testDate;
-                            break;
-                        }
-                        if (currentLunarMonth === 0 && lunarMonth === 11 && currentLunarDay === 1) {
-                            month2Start = testDate;
-                            break;
-                        }
+                    else {
+                        // Found the target month start, now look for the next month start (any lunar year)
+                        nextMonthStart = testDate;
                     }
                 }
-                if (month1Start !== null && month2Start !== null) {
-                    break;
-                }
             }
-            if (month1Start !== null && month2Start !== null) {
-                const daysDiff = Math.round((month2Start.getTime() - month1Start.getTime()) / (24 * 60 * 60 * 1000));
-                return daysDiff;
+            let result = 30;
+            if (monthStart !== null && nextMonthStart !== null) {
+                result = Math.round((nextMonthStart.getTime() - monthStart.getTime()) / 86400000);
             }
-            return 30;
+            this.lunarDaysCacheKey = cacheKey;
+            this.lunarDaysCacheValue = result;
+            return result;
         }
         catch (e) {
             return 30;
         }
     }
-    convertLunarToGregorian(gregorianYear, lunarMonth, lunarDay) {
-        return this.convertLunarToGregorianWithCalendar(this.lunarCalendar, gregorianYear, lunarMonth, lunarDay);
+    convertLunarToGregorian(gregorianYear, lunarMonth, lunarDay, isLeap) {
+        return this.convertLunarToGregorianWithCalendar(
+            this.lunarCalendar, gregorianYear, lunarMonth, lunarDay, isLeap
+        );
     }
-    convertLunarToGregorianWithCalendar(calendar, gregorianYear, lunarMonth, lunarDay) {
+    convertLunarToGregorianWithCalendar(calendar, gregorianYear, lunarMonth, lunarDay, isLeap) {
         if (calendar === null) {
             return null;
         }
+        const cacheKey = `${gregorianYear}_${lunarMonth}_${lunarDay}_${isLeap}`;
+        if (cacheKey === this.convertResultCacheKey) {
+            return this.convertResultCacheValue;
+        }
         try {
-            // Find the gregorian date for the given lunar date
-            // First search in gregorianYear (most likely match)
-            // Then expand to neighboring years if needed
-            // Priority 1: Search in gregorianYear
-            for (let month = 0; month < 12; month++) {
-                for (let day = 1; day <= 31; day++) {
-                    const testDate = this.createDateFromParams(gregorianYear, month, day);
-                    calendar.setTime(testDate);
-                    const currentLunarYear = calendar.get('year');
-                    const currentLunarMonth = calendar.get('month');
-                    const currentLunarDay = calendar.get('date');
-                    // Match lunar month and day, prefer dates in the same lunar year context
-                    if (currentLunarMonth === lunarMonth && currentLunarDay === lunarDay) {
-                        return testDate;
+            // Determine the lunar year from a mid-year reference date
+            const refDate = this.createDateFromParams(gregorianYear, 6, 1);
+            calendar.setTime(refDate);
+            const expectedLunarYear = calendar.get('year');
+            // Find the start of the target month occurrence (1st = regular, 2nd = leap)
+            const targetOccurrence = isLeap ? 2 : 1;
+            let occurrenceCount = 0;
+            let monthStart = null;
+            const startDate = this.createDateFromParams(gregorianYear, 0, 1);
+            for (let dayOffset = 0; dayOffset < 470; dayOffset++) {
+                const testDate = new Date(startDate.getTime() + dayOffset * 86400000);
+                calendar.setTime(testDate);
+                if (calendar.get('year') !== expectedLunarYear) {
+                    continue;
+                }
+                if (calendar.get('month') === lunarMonth && calendar.get('date') === 1) {
+                    occurrenceCount++;
+                    if (occurrenceCount === targetOccurrence) {
+                        monthStart = testDate;
+                        break;
                     }
                 }
             }
-            // Priority 2: Search in gregorianYear-1 and gregorianYear+1
-            for (let yearOffset = -1; yearOffset <= 1; yearOffset += 2) {
-                const year = gregorianYear + yearOffset;
-                for (let month = 0; month < 12; month++) {
-                    for (let day = 1; day <= 31; day++) {
-                        const testDate = this.createDateFromParams(year, month, day);
-                        calendar.setTime(testDate);
-                        const currentLunarMonth = calendar.get('month');
-                        const currentLunarDay = calendar.get('date');
-                        if (currentLunarMonth === lunarMonth && currentLunarDay === lunarDay) {
-                            // Verify this date is within our valid range
-                            const testYear = testDate.getFullYear();
-                            if (testYear >= this.startYear && testYear <= this.endYear) {
-                                return testDate;
-                            }
-                        }
-                    }
+            let resultDate = null;
+            if (monthStart !== null) {
+                // Add (lunarDay - 1) days to reach the target date
+                const candidate = new Date(monthStart.getTime() + (lunarDay - 1) * 86400000);
+                // Verify the result is still in the correct lunar month
+                calendar.setTime(candidate);
+                if (calendar.get('month') === lunarMonth && calendar.get('date') === lunarDay) {
+                    resultDate = candidate;
                 }
             }
-            return null;
+            this.convertResultCacheKey = cacheKey;
+            this.convertResultCacheValue = resultDate;
+            return resultDate;
         }
         catch (e) {
             return null;
@@ -1993,13 +2166,17 @@ export class DatePickerComponent extends ViewPU {
                     // hideYear is enabled and year is omitted: select the hidden year column
                     // ("----") only when (month, day) form a valid sentinel date; otherwise
                     // (e.g. Feb 30) fall back to the system default date.
+                    // In lunar mode, validate against lunar days; in gregorian mode, gregorian days.
+                    const maxDay = this.lunar
+                        ? this.getLunarDaysInMonth(DatePickerConstant.HIDE_YEAR_SENTINEL, m, false)
+                        : this.getDaysInMonth(DatePickerConstant.HIDE_YEAR_SENTINEL, m);
                     if (m >= DatePickerConstant.MIN_MONTH && m <= DatePickerConstant.MAX_MONTH &&
-                        d >= DatePickerConstant.MIN_DAY &&
-                        d <= this.getDaysInMonth(DatePickerConstant.HIDE_YEAR_SENTINEL, m)) {
+                        d >= DatePickerConstant.MIN_DAY && d <= maxDay) {
                         selectedIsResult = true;
                         this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
                         this.selectedMonth = m;
                         this.selectedDay = d;
+                        this.selectedIsLeapMonth = false;
                     }
                 }
                 else {
@@ -2037,25 +2214,44 @@ export class DatePickerComponent extends ViewPU {
             // Extract year, month, day from adjusted date
             if (this.lunar && this.lunarCalendar !== null) {
                 this.lunarCalendar.setTime(targetDate);
-                this.selectedYear = targetDate.getFullYear();
                 this.selectedMonth = this.lunarCalendar.get('month');
                 this.selectedDay = this.lunarCalendar.get('date');
+                // Use Gregorian year with lunar year boundary adjustment.
+                // lunarCalendar.get('year') returns sexagenary cycle (1-60), not Gregorian year.
+                this.selectedYear = targetDate.getFullYear();
+                if (this.selectedMonth >= 11 && targetDate.getMonth() <= 1) {
+                    this.selectedYear -= 1;
+                }
+                if (this.selectedYear < this.startYear) {
+                    this.selectedYear = this.startYear;
+                }
+                if (this.selectedYear > this.endYear) {
+                    this.selectedYear = this.endYear;
+                }
+                // Detect if the target date falls in a leap month
+                this.selectedIsLeapMonth = this.isDateInLeapMonth(
+                    targetDate, this.selectedYear, this.selectedMonth
+                );
                 // Ensure selected date is within lunar range based on gregorian year
                 if (this.selectedYear === this.startYear) {
                     if (this.selectedMonth < this.lunarStartMonth) {
                         this.selectedMonth = this.lunarStartMonth;
+                        this.selectedIsLeapMonth = false;
                         this.selectedDay = this.lunarStartDay;
                     }
-                    else if (this.selectedMonth === this.lunarStartMonth && this.selectedDay < this.lunarStartDay) {
+                    else if (this.selectedMonth === this.lunarStartMonth && this.selectedDay < this.lunarStartDay &&
+                             !this.selectedIsLeapMonth) {
                         this.selectedDay = this.lunarStartDay;
                     }
                 }
                 if (this.selectedYear === this.endYear) {
                     if (this.selectedMonth > this.lunarEndMonth) {
                         this.selectedMonth = this.lunarEndMonth;
+                        this.selectedIsLeapMonth = false;
                         this.selectedDay = this.lunarEndDay;
                     }
-                    else if (this.selectedMonth === this.lunarEndMonth && this.selectedDay > this.lunarEndDay) {
+                    else if (this.selectedMonth === this.lunarEndMonth && this.selectedDay > this.lunarEndDay &&
+                             !this.selectedIsLeapMonth) {
                         this.selectedDay = this.lunarEndDay;
                     }
                 }
@@ -2241,7 +2437,9 @@ export class DatePickerComponent extends ViewPU {
             result.day = this.selectedDay;
         }
         else if (this.lunar && this.lunarCalendar !== null) {
-            const gregorianDate = this.convertLunarToGregorian(this.selectedYear, this.selectedMonth, this.selectedDay);
+            const gregorianDate = this.convertLunarToGregorian(
+                this.selectedYear, this.selectedMonth, this.selectedDay, this.selectedIsLeapMonth
+            );
             if (gregorianDate !== null) {
                 result.year = gregorianDate.getFullYear();
                 result.month = gregorianDate.getMonth();
@@ -2264,12 +2462,13 @@ export class DatePickerComponent extends ViewPU {
         return result;
     }
     onYearChange(selectedIndex) {
-        if (this.hideYear && selectedIndex === this.yearArray.length - 1) {
-            this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
+        const newYear = this.hideYear && selectedIndex === this.yearArray.length - 1
+            ? DatePickerConstant.HIDE_YEAR_SENTINEL
+            : this.startYear + selectedIndex;
+        if (newYear === this.selectedYear) {
+            return;
         }
-        else {
-            this.selectedYear = this.startYear + selectedIndex;
-        }
+        this.selectedYear = newYear;
         if (this.lunar) {
             // Calculate valid month range first
             let startLunarMonthIndex = DatePickerConstant.MIN_MONTH;
@@ -2283,23 +2482,36 @@ export class DatePickerComponent extends ViewPU {
             // Adjust selectedMonth BEFORE changing monthArray
             if (this.selectedMonth < startLunarMonthIndex) {
                 this.selectedMonth = startLunarMonthIndex;
+                this.selectedIsLeapMonth = false;
             }
             if (this.selectedMonth > endLunarMonthIndex) {
                 this.selectedMonth = endLunarMonthIndex;
+                this.selectedIsLeapMonth = false;
             }
-            // Now update month array
+            // The new year may not have a leap month for the currently selected month.
+            // Reset leap flag if the selected month doesn't match the new year's leap month.
+            const newLeapMonth = this.getLunarLeapMonth(this.selectedYear);
+            if (this.selectedIsLeapMonth && (newLeapMonth < 0 || this.selectedMonth !== newLeapMonth)) {
+                this.selectedIsLeapMonth = false;
+            }
+            // Build month array with leap months
             this.monthArray = [];
             for (let i = startLunarMonthIndex; i <= endLunarMonthIndex; i++) {
                 this.monthArray.push(this.formatLunarMonth(i, false));
+                if (newLeapMonth >= 0 && i === newLeapMonth) {
+                    this.monthArray.push(this.formatLunarMonth(i, true));
+                }
             }
             // Adjust selectedDay BEFORE generating day array
-            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth);
+            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth, this.selectedIsLeapMonth);
             let startLunarDayIndex = DatePickerConstant.MIN_DAY;
             let endLunarDayIndex = lunarDays;
-            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth) {
+            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+                !this.selectedIsLeapMonth) {
                 startLunarDayIndex = this.lunarStartDay;
             }
-            if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth) {
+            if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+                !this.selectedIsLeapMonth) {
                 endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays);
             }
             if (this.selectedDay < startLunarDayIndex) {
@@ -2336,7 +2548,11 @@ export class DatePickerComponent extends ViewPU {
             this.updateDaysArray();
         }
         this.updateDateColumnLoopState();
-        this.dateOnChange?.(this.getResult());
+        if (this.lunar) {
+            setTimeout(() => { this.dateOnChange?.(this.getResult()); }, 0);
+        } else {
+            this.dateOnChange?.(this.getResult());
+        }
     }
     onMonthChange(selectedIndex) {
         if (this.lunar) {
@@ -2344,15 +2560,41 @@ export class DatePickerComponent extends ViewPU {
             if (this.selectedYear === this.startYear) {
                 startLunarMonthIndex = this.lunarStartMonth;
             }
-            this.selectedMonth = startLunarMonthIndex + selectedIndex;
+            // Decode selectedIndex into (month, isLeap) accounting for leap month insertion
+            const leapMonth = this.getLunarLeapMonth(this.selectedYear);
+            let newMonth;
+            let newIsLeap = false;
+            if (leapMonth >= 0 && leapMonth >= startLunarMonthIndex) {
+                const leapArrayIndex = leapMonth - startLunarMonthIndex; // index of regular leap month
+                if (selectedIndex === leapArrayIndex + 1) {
+                    newMonth = leapMonth;
+                    newIsLeap = true;
+                }
+                else if (selectedIndex <= leapArrayIndex) {
+                    newMonth = startLunarMonthIndex + selectedIndex;
+                }
+                else {
+                    newMonth = startLunarMonthIndex + selectedIndex - 1;
+                }
+            }
+            else {
+                newMonth = startLunarMonthIndex + selectedIndex;
+            }
+            if (newMonth === this.selectedMonth && newIsLeap === this.selectedIsLeapMonth) {
+                return;
+            }
+            this.selectedMonth = newMonth;
+            this.selectedIsLeapMonth = newIsLeap;
             // Adjust selectedDay BEFORE generating day array
-            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth);
+            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth, this.selectedIsLeapMonth);
             let startLunarDayIndex = DatePickerConstant.MIN_DAY;
             let endLunarDayIndex = lunarDays;
-            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth) {
+            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+                !this.selectedIsLeapMonth) {
                 startLunarDayIndex = this.lunarStartDay;
             }
-            if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth) {
+            if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+                !this.selectedIsLeapMonth) {
                 endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays);
             }
             if (this.selectedDay < startLunarDayIndex) {
@@ -2376,17 +2618,26 @@ export class DatePickerComponent extends ViewPU {
             this.updateDaysArray();
         }
         this.updateDateColumnLoopState();
-        this.dateOnChange?.(this.getResult());
+        if (this.lunar) {
+            setTimeout(() => { this.dateOnChange?.(this.getResult()); }, 0);
+        } else {
+            this.dateOnChange?.(this.getResult());
+        }
     }
     onDayChange(selectedIndex) {
         if (this.lunar) {
             let startLunarDayIndex = DatePickerConstant.MIN_DAY;
-            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth) {
+            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+                !this.selectedIsLeapMonth) {
                 startLunarDayIndex = this.lunarStartDay;
             }
-            this.selectedDay = startLunarDayIndex + selectedIndex;
+            const newDay = startLunarDayIndex + selectedIndex;
+            if (newDay === this.selectedDay) {
+                return;
+            }
+            this.selectedDay = newDay;
             // Ensure selectedDay doesn't exceed lunar days in month
-            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth);
+            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth, this.selectedIsLeapMonth);
             if (this.selectedDay > lunarDays) {
                 this.selectedDay = lunarDays;
             }
@@ -2398,7 +2649,11 @@ export class DatePickerComponent extends ViewPU {
             }
             this.selectedDay = startDayIndex + selectedIndex;
         }
-        this.dateOnChange?.(this.getResult());
+        if (this.lunar) {
+            setTimeout(() => { this.dateOnChange?.(this.getResult()); }, 0);
+        } else {
+            this.dateOnChange?.(this.getResult());
+        }
     }
     onHourChange(selectedIndex) {
         if (this.useMilitaryTime) {
@@ -2583,13 +2838,15 @@ export class DatePickerComponent extends ViewPU {
     }
     updateDaysArray() {
         if (this.lunar) {
-            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth);
+            const lunarDays = this.getLunarDaysInMonth(this.selectedYear, this.selectedMonth, this.selectedIsLeapMonth);
             let startLunarDayIndex = DatePickerConstant.MIN_DAY;
             let endLunarDayIndex = lunarDays;
-            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth) {
+            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+                !this.selectedIsLeapMonth) {
                 startLunarDayIndex = this.lunarStartDay;
             }
-            if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth) {
+            if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+                !this.selectedIsLeapMonth) {
                 endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays);
             }
             if (this.selectedDay < startLunarDayIndex) {
@@ -2633,7 +2890,20 @@ export class DatePickerComponent extends ViewPU {
             if (this.selectedYear === this.startYear) {
                 startLunarMonthIndex = this.lunarStartMonth;
             }
-            return this.selectedMonth - startLunarMonthIndex;
+            // Encode (month, isLeap) to array index, accounting for leap month insertion
+            const leapMonth = this.getLunarLeapMonth(this.selectedYear);
+            let index = this.selectedMonth - startLunarMonthIndex;
+            if (leapMonth >= 0 && leapMonth >= startLunarMonthIndex) {
+                if (this.selectedIsLeapMonth && this.selectedMonth === leapMonth) {
+                    // Leap month is right after the regular month
+                    index = (leapMonth - startLunarMonthIndex) + 1;
+                }
+                else if (this.selectedMonth > leapMonth) {
+                    // After the leap month insertion, add 1 to skip the extra entry
+                    index += 1;
+                }
+            }
+            return index;
         }
         else {
             let startMonthIndex = DatePickerConstant.MIN_MONTH;
@@ -2646,7 +2916,8 @@ export class DatePickerComponent extends ViewPU {
     getDaySelectedIndex() {
         if (this.lunar) {
             let startLunarDayIndex = DatePickerConstant.MIN_DAY;
-            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth) {
+            if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+                !this.selectedIsLeapMonth) {
                 startLunarDayIndex = this.lunarStartDay;
             }
             return this.selectedDay - startLunarDayIndex;
@@ -2765,9 +3036,16 @@ export class DatePickerComponent extends ViewPU {
         const atStartYear = this.selectedYear === this.startYear;
         const atEndYear = this.selectedYear === this.endYear;
         this.monthColumnCanLoop = !atStartYear && !atEndYear;
-        const atStartMonth = atStartYear && this.selectedMonth === this.startMonth;
-        const atEndMonth = atEndYear && this.selectedMonth === this.endMonth;
-        this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
+        if (this.lunar) {
+            const atStartMonth = atStartYear && this.selectedMonth === this.lunarStartMonth &&
+                                 !this.selectedIsLeapMonth;
+            const atEndMonth = atEndYear && this.selectedMonth === this.lunarEndMonth && !this.selectedIsLeapMonth;
+            this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
+        } else {
+            const atStartMonth = atStartYear && this.selectedMonth === this.startMonth;
+            const atEndMonth = atEndYear && this.selectedMonth === this.endMonth;
+            this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
+        }
     }
     updateTimeColumnLoopState() {
         if (!this.timeStartEndSet || !this.timeCanLoop) {
@@ -3187,6 +3465,303 @@ export class DatePickerComponent extends ViewPU {
             backgroundColor: indicator.backgroundColor
         };
     }
+
+    DateModeDateColumns() {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(0));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.yearColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(0));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onYearChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+            UIPickerComponent.onAreaChange((oldValue, newValue) => {
+                const newWidth = newValue.width;
+                if (this.firstColumnWidth !== newWidth) {
+                    this.firstColumnWidth = newWidth;
+                }
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.yearArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(1));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.monthColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(1));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onMonthChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.monthArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getDaySelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(2));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.dayColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(2));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onDayChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+            UIPickerComponent.onAreaChange((oldValue, newValue) => {
+                if (this.displayMode !== DisplayMode.DATE_TIME) {
+                    const newWidth = newValue.width;
+                    if (this.lastColumnWidth !== newWidth) {
+                        this.lastColumnWidth = newWidth;
+                    }
+                }
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.dayArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+    }
+
+    DateModeYearMonthColumns() {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(0));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.yearColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(0));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onYearChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+            UIPickerComponent.onAreaChange((oldValue, newValue) => {
+                const newWidth = newValue.width;
+                if (this.firstColumnWidth !== newWidth) {
+                    this.firstColumnWidth = newWidth;
+                }
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.yearArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(1));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.monthColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(1));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onMonthChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+            UIPickerComponent.onAreaChange((oldValue, newValue) => {
+                if (this.displayMode !== DisplayMode.DATE_TIME) {
+                    const newWidth = newValue.width;
+                    if (this.lastColumnWidth !== newWidth) {
+                        this.lastColumnWidth = newWidth;
+                    }
+                }
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.monthArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+    }
+
+    DateModeMonthDayColumns() {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(0));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.monthColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(0));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onMonthChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+            UIPickerComponent.onAreaChange((oldValue, newValue) => {
+                const newWidth = newValue.width;
+                if (this.firstColumnWidth !== newWidth) {
+                    this.firstColumnWidth = newWidth;
+                }
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.monthArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            UIPickerComponent.create({ selectedIndex: this.getDaySelectedIndex() });
+            UIPickerComponent.width(this.getDateColumnWidth(1));
+            UIPickerComponent.height(200);
+            UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
+            UIPickerComponent.canLoop(this.dayColumnCanLoop);
+            UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
+            UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(1));
+            UIPickerComponent.onChange((selectedIndex) => {
+                this.onDayChange(selectedIndex);
+            });
+            UIPickerComponent.onScrollStop((selectedIndex) => {
+                this.dateOnScrollStop?.(this.getResult());
+            });
+            UIPickerComponent.onAreaChange((oldValue, newValue) => {
+                if (this.displayMode !== DisplayMode.DATE_TIME) {
+                    const newWidth = newValue.width;
+                    if (this.lastColumnWidth !== newWidth) {
+                        this.lastColumnWidth = newWidth;
+                    }
+                }
+            });
+        }, UIPickerComponent);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = _item => {
+                const item = _item;
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item);
+                    Text.maxLines(1);
+                    Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
+                    Text.fontColor(this.itemTextStyle?.color);
+                    Text.fontWeight(this.itemTextStyle?.font?.weight);
+                    Text.minFontSize(this.itemTextStyle?.minFontSize);
+                    Text.maxFontSize(this.itemTextStyle?.maxFontSize);
+                    Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
+                }, Text);
+                Text.pop();
+            };
+            this.forEachUpdateFunction(elmtId, this.dayArray, forEachItemGenFunction);
+        }, ForEach);
+        ForEach.pop();
+        UIPickerComponent.pop();
+    }
+
     initialRender() {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Row.create();
@@ -3201,300 +3776,55 @@ export class DatePickerComponent extends ViewPU {
                         if (this.dateMode === DateMode.DATE) {
                             this.ifElseBranchUpdateFunction(0, () => {
                                 this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(0));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.yearColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(0));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onYearChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                    UIPickerComponent.onAreaChange((oldValue, newValue) => {
-                                        const newWidth = newValue.width;
-                                        if (this.firstColumnWidth !== newWidth) {
-                                            this.firstColumnWidth = newWidth;
-                                        }
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.yearArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(1));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.monthColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(1));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onMonthChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.monthArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getDaySelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(2));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.dayColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(2));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onDayChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                    UIPickerComponent.onAreaChange((oldValue, newValue) => {
-                                        if (this.displayMode !== DisplayMode.DATE_TIME) {
-                                            const newWidth = newValue.width;
-                                            if (this.lastColumnWidth !== newWidth) {
-                                                this.lastColumnWidth = newWidth;
-                                            }
-                                        }
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.dayArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
+                                    If.create();
+                                    if (this.lunar) {
+                                        this.ifElseBranchUpdateFunction(0, () => {
+                                            this.DateModeDateColumns();
+                                        });
+                                    }
+                                    else {
+                                        this.ifElseBranchUpdateFunction(1, () => {
+                                            this.DateModeDateColumns();
+                                        });
+                                    }
+                                }, If);
+                                If.pop();
                             });
                         }
                         else if (this.dateMode === DateMode.YEAR_AND_MONTH) {
                             this.ifElseBranchUpdateFunction(1, () => {
                                 this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(0));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.yearColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(0));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onYearChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                    UIPickerComponent.onAreaChange((oldValue, newValue) => {
-                                        const newWidth = newValue.width;
-                                        if (this.firstColumnWidth !== newWidth) {
-                                            this.firstColumnWidth = newWidth;
-                                        }
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.yearArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(1));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.monthColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(1));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onMonthChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                    UIPickerComponent.onAreaChange((oldValue, newValue) => {
-                                        if (this.displayMode !== DisplayMode.DATE_TIME) {
-                                            const newWidth = newValue.width;
-                                            if (this.lastColumnWidth !== newWidth) {
-                                                this.lastColumnWidth = newWidth;
-                                            }
-                                        }
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.monthArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
+                                    If.create();
+                                    if (this.lunar) {
+                                        this.ifElseBranchUpdateFunction(0, () => {
+                                            this.DateModeYearMonthColumns();
+                                        });
+                                    }
+                                    else {
+                                        this.ifElseBranchUpdateFunction(1, () => {
+                                            this.DateModeYearMonthColumns();
+                                        });
+                                    }
+                                }, If);
+                                If.pop();
                             });
                         }
                         else if (this.dateMode === DateMode.MONTH_AND_DAY) {
                             this.ifElseBranchUpdateFunction(2, () => {
                                 this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(0));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.monthColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(0));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onMonthChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                    UIPickerComponent.onAreaChange((oldValue, newValue) => {
-                                        const newWidth = newValue.width;
-                                        if (this.firstColumnWidth !== newWidth) {
-                                            this.firstColumnWidth = newWidth;
-                                        }
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.monthArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    UIPickerComponent.create({ selectedIndex: this.getDaySelectedIndex() });
-                                    UIPickerComponent.width(this.getDateColumnWidth(1));
-                                    UIPickerComponent.height(200);
-                                    UIPickerComponent.selectedTextStyle(ObservedObject.GetRawObject(this.selectedTextStyle));
-                                    UIPickerComponent.canLoop(this.dayColumnCanLoop);
-                                    UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
-                                    UIPickerComponent.selectionIndicator(this.adjustSelectionIndicatorForPosition(1));
-                                    UIPickerComponent.onChange((selectedIndex) => {
-                                        this.onDayChange(selectedIndex);
-                                    });
-                                    UIPickerComponent.onScrollStop((selectedIndex) => {
-                                        this.dateOnScrollStop?.(this.getResult());
-                                    });
-                                    UIPickerComponent.onAreaChange((oldValue, newValue) => {
-                                        if (this.displayMode !== DisplayMode.DATE_TIME) {
-                                            const newWidth = newValue.width;
-                                            if (this.lastColumnWidth !== newWidth) {
-                                                this.lastColumnWidth = newWidth;
-                                            }
-                                        }
-                                    });
-                                }, UIPickerComponent);
-                                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                    ForEach.create();
-                                    const forEachItemGenFunction = _item => {
-                                        const item = _item;
-                                        this.observeComponentCreation2((elmtId, isInitialRender) => {
-                                            Text.create(item);
-                                            Text.maxLines(1);
-                                            Text.fontSize(this.itemTextStyle?.font?.size ?? this.getFontSize());
-                                            Text.fontColor(this.itemTextStyle?.color);
-                                            Text.fontWeight(this.itemTextStyle?.font?.weight);
-                                            Text.minFontSize(this.itemTextStyle?.minFontSize);
-                                            Text.maxFontSize(this.itemTextStyle?.maxFontSize);
-                                            Text.textOverflow({ overflow: this.itemTextStyle?.overflow ?? TextOverflow.Clip });
-                                        }, Text);
-                                        Text.pop();
-                                    };
-                                    this.forEachUpdateFunction(elmtId, this.dayArray, forEachItemGenFunction);
-                                }, ForEach);
-                                ForEach.pop();
-                                UIPickerComponent.pop();
+                                    If.create();
+                                    if (this.lunar) {
+                                        this.ifElseBranchUpdateFunction(0, () => {
+                                            this.DateModeMonthDayColumns();
+                                        });
+                                    }
+                                    else {
+                                        this.ifElseBranchUpdateFunction(1, () => {
+                                            this.DateModeMonthDayColumns();
+                                        });
+                                    }
+                                }, If);
+                                If.pop();
                             });
                         }
                         else {

@@ -39,6 +39,7 @@ gen_obj("arkui_arcscrollbar_abc") {
 }
 
 ohos_shared_library("arcscrollbar") {
+  branch_protector_ret = "pac_ret"
   defines = [ "USE_ARK_ENGINE" ]
   sources = [
     "${component_ext_path}/arc_scroll_bar/arc_scroll_bar_napi.cpp",
@@ -96,6 +97,7 @@ ohos_shared_library("arcscrollbar") {
 if (is_arkui_x) {
   foreach(item, ace_platforms) {
     ohos_shared_library("arkui_arcscrollbar_" + item.name) {
+      branch_protector_ret = "pac_ret"
       output_name = "arkui_arcscrollbar"
       defines = [ "USE_ARK_ENGINE" ]
       sources = [

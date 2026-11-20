@@ -95,6 +95,8 @@ private:
         INITIALIZED
     };
     void InnerAddForm(const FormRequest& formRequest);
+    int32_t AttachOwnerRequest(const std::string& compId, const OHOS::AAFwk::Want& want,
+        const AppExecFwk::FormJsInfo& formJsInfo);
     void PreInitAddForm(const FormRequest& formRequest);
     std::shared_ptr<OHOS::AbilityRuntime::Context> context_;
     std::shared_ptr<OHOS::AbilityRuntime::Runtime> runtime_;

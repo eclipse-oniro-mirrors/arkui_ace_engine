@@ -1792,7 +1792,7 @@ RefPtr<OverlengthDotIndicatorPaintMethod> SwiperIndicatorPattern::CreateOverlong
     auto swiperLayoutProperty = swiperPattern->GetLayoutProperty<SwiperLayoutProperty>();
     CHECK_NULL_RETURN(swiperLayoutProperty, nullptr);
     auto overlongPaintMethod = MakeRefPtr<OverlengthDotIndicatorPaintMethod>(overlongDotIndicatorModifier_);
-    auto paintMethodTemp = DynamicCast<DotIndicatorPaintMethod>(overlongPaintMethod);
+    RefPtr<DotIndicatorPaintMethod> paintMethodTemp = overlongPaintMethod;
     SetDotIndicatorPaintMethodInfo(swiperPattern, paintMethodTemp, swiperLayoutProperty);
     UpdateOverlongPaintMethod(swiperPattern, overlongPaintMethod);
 
@@ -1898,7 +1898,7 @@ void SwiperIndicatorPattern::UpdateOverlongPaintMethod(
     auto animationStartIndex = swiperPattern->GetLoopIndex(swiperPattern->GetCurrentIndex());
     auto animationEndIndex = swiperPattern->GetLoopIndex(swiperPattern->GetCurrentFirstIndex());
 
-    auto paintMethodTemp = DynamicCast<DotIndicatorPaintMethod>(overlongPaintMethod);
+    RefPtr<DotIndicatorPaintMethod> paintMethodTemp = overlongPaintMethod;
     bool keepStatus = false;
     bool isSwiperTouchDown = false;
     if (isInFast_ && isInFast_.value()) {

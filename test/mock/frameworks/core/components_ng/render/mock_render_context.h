@@ -50,6 +50,7 @@ public:
     MOCK_METHOD0(ResetContentClip, void());
     MOCK_METHOD1(SetTransparentLayer, void(bool));
     MOCK_METHOD1(SetClipToBounds, void(bool));
+    MOCK_METHOD1(SetClipToFrame, void(bool));
     MOCK_METHOD1(RemoveOverlayModifier, void(const RefPtr<OverlayModifier>&));
     MOCK_METHOD0(UpdateCustomBackground, void());
     MOCK_METHOD1(SetSurfaceBufferOpaque, void(bool));

@@ -17,6 +17,7 @@
 
 #include "base/json/json_util.h"
 #include "base/log/log.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/relaxed_interaction/base_command_parser.h"
 #include "core/components_ng/relaxed_interaction/executor_choreographer.h"
 #include "core/components_ng/relaxed_interaction/executor_generator.h"
@@ -91,9 +92,11 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
 
     WorkflowDumper::GetInstance().AddLog("Parsed executors: " + ExecutorsToString(executors));
     size_t executorCount = executors.size();
+    auto securityContext = UiCommandSecurityGate::GetContext();
     choreographer_->Enqueue(std::move(executors));
     workflowStates_.push_back({ executorCount, finishCallback, preserveLegacySemantics,
-        interruptibleByUser ? InterruptionPolicy::INTERRUPTIBLE : InterruptionPolicy::IGNORE_USER_INPUT });
+        interruptibleByUser ? InterruptionPolicy::INTERRUPTIBLE : InterruptionPolicy::IGNORE_USER_INPUT,
+        securityContext.needSecurityAuth, securityContext.agentTokenId });
     return ProcessResult::SUCCESS;
 }
 
@@ -111,7 +114,14 @@ ExecutionState RelaxedInteractionManager::ExecuteNextStep()
         completion(ExecutionState::INTERRUPTED_BY_USER);
     }
     if (!choreographer_->HasCurrent() && !choreographer_->HasNext()) {
+        UiCommandSecurityGate::ClearContext();
         return ExecutionState::FAILED;
+    }
+
+    if (!workflowStates_.empty()) {
+        const auto& workflow = workflowStates_.front();
+        UiCommandSecurityGate::SetContext(
+            CommandSecurityContext { workflow.needSecurityAuth, workflow.agentTokenId });
     }
 
     std::function<void(ExecutionState)> finishCallback;
@@ -119,6 +129,9 @@ ExecutionState RelaxedInteractionManager::ExecuteNextStep()
     WorkflowDumper::GetInstance().AddLog("Current workflow state changed to: " + ExecutionStateToString(state));
     if (finishCallback) {
         finishCallback(state);
+    }
+    if (state != ExecutionState::RUNNING && workflowStates_.empty() && !HasPendingWorkflow()) {
+        UiCommandSecurityGate::ClearContext();
     }
     return state;
 }
@@ -277,6 +290,7 @@ void RelaxedInteractionManager::Clear(ExecutionState reason)
     if (choreographer_) {
         choreographer_->Clear();
     }
+    UiCommandSecurityGate::ClearContext();
     for (auto& completion : completions) {
         completion(ExecutionState::INTERRUPTED_BY_USER);
     }
@@ -309,6 +323,9 @@ void RelaxedInteractionManager::ClearInterruptedWorkflows(bool currentStepFinish
     auto cancelledExecutors = choreographer_->ExtractExecutors(removeExecutors);
     for (auto& executor : cancelledExecutors) {
         executor->Cancel();
+    }
+    if (workflowStates_.empty()) {
+        UiCommandSecurityGate::ClearContext();
     }
     auto context = context_.Upgrade();
     if (!pendingUserCompletions_.empty() && context && !context->IsDestroyed()) {

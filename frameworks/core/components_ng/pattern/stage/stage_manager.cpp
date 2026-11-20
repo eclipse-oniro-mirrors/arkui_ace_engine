@@ -362,7 +362,7 @@ bool StageManager::PopPage(const RefPtr<FrameNode>& inPage, bool needShowNext, b
     if (needTransition) {
         pipeline->FlushPipelineImmediately();
     }
-    auto outPageNode = AceType::DynamicCast<FrameNode>(pageNode);
+    auto outPageNode = pageNode;
     auto inPageNode = needShowNext ? inPage : nullptr;
     pipeline->GetMemoryManager()->RebuildImageByPage(inPageNode);
     FireAutoSave(outPageNode, inPageNode);
@@ -412,7 +412,7 @@ bool StageManager::PopPageToIndex(int32_t index, bool needShowNext, bool needTra
         pipeline->FlushPipelineImmediately();
     }
     bool firstPageTransition = true;
-    auto outPageNode = AceType::DynamicCast<FrameNode>(srcPageNode_.Upgrade());
+    auto outPageNode = srcPageNode_.Upgrade();
     auto iter = children.rbegin();
     for (int32_t current = 0; current < popSize; ++current) {
         auto pageNode = *iter;
@@ -517,7 +517,7 @@ bool StageManager::MovePageToFront(const RefPtr<FrameNode>& node, bool needHideL
     FirePageShow(node, needTransition ? PageTransitionType::ENTER_PUSH : PageTransitionType::NONE);
 
     stageNode_->RebuildRenderContextTree();
-    auto outPageNode = AceType::DynamicCast<FrameNode>(lastPage);
+    auto outPageNode = lastPage;
     AddPageTransitionTrace(outPageNode, node);
     FireAutoSave(outPageNode, node);
     if (needTransition) {
@@ -663,7 +663,7 @@ RefPtr<FrameNode> StageManager::GetLastPageWithTransition() const
     CHECK_NULL_RETURN(lastChildFrame, nullptr);
     auto pagePattern = lastChildFrame->GetPattern<PagePattern>();
     if (pagePattern && pagePattern->GetPageInTransition()) {
-        return DynamicCast<FrameNode>(destPageNode_.Upgrade());
+        return destPageNode_.Upgrade();
     }
     return lastChildFrame;
 }
@@ -676,7 +676,7 @@ RefPtr<FrameNode> StageManager::GetPrevPageWithTransition() const
         return nullptr;
     }
     if (stageInTrasition_) {
-        return DynamicCast<FrameNode>(srcPageNode_.Upgrade());
+        return srcPageNode_.Upgrade();
     }
     return DynamicCast<FrameNode>(children.front());
 }

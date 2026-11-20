@@ -466,7 +466,7 @@ void NavDestinationModelNG::Create(std::function<void()>&& deepRenderFunc, RefPt
     ACE_UINODE_TRACE(nodeId);
     auto deepRender = [nodeId, deepRenderFunc = std::move(deepRenderFunc)]() -> RefPtr<UINode> {
         CHECK_NULL_RETURN(deepRenderFunc, nullptr);
-        auto parent = AceType::DynamicCast<UINode>(FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, nodeId));
+        RefPtr<UINode> parent = FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, nodeId);
         auto navDestinationNode = AceType::DynamicCast<NavDestinationGroupNode>(parent);
         if (navDestinationNode && navDestinationNode->GetContentNode()) {
             parent = navDestinationNode->GetContentNode();
@@ -2005,7 +2005,7 @@ void NavDestinationModelNG::SetCustomBackButtonNode(FrameNode* frameNode, FrameN
     CHECK_NULL_VOID(navDestinationGroupNode);
     auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navDestinationGroupNode->GetTitleBarNode());
     CHECK_NULL_VOID(titleBarNode);
-    auto backButton = AceType::DynamicCast<UINode>(Referenced::Claim<FrameNode>(backButtonNode));
+    RefPtr<UINode> backButton = Referenced::Claim<FrameNode>(backButtonNode);
     titleBarNode->SetCustomBackButton(backButton);
 }
 

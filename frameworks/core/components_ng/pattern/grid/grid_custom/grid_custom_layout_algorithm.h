@@ -39,11 +39,6 @@ public:
     // Apply the prepared target during the relocation layout batch.
     void SetFastScrollTargetForLayout(const GridFastScrollTarget& target);
 
-    void SetScrollSource(int32_t scrollSource)
-    {
-        scrollSource_ = scrollSource;
-    }
-
 private:
     void PrepareFastScroll(float mainSize);
     std::optional<RectF> GetFastScrollTargetRect(int32_t targetIndex);
@@ -134,11 +129,6 @@ private:
      */
     std::pair<int32_t, int32_t> LayoutChildren(float mainOffset, int32_t cacheLine);
 
-    bool IsScrollBarDrag() const
-    {
-        return scrollSource_ == SCROLL_FROM_BAR || scrollSource_ == SCROLL_FROM_BAR_OVER_DRAG;
-    }
-
     LayoutWrapper* wrapper_ = nullptr;
 
     std::vector<float> crossLens_; /**< The column widths of the GridItems. */
@@ -158,7 +148,6 @@ private:
 
     SizeF frameSize_;
     double originalWidth_ = 0.0;
-    int32_t scrollSource_ = SCROLL_FROM_NONE;
 
     ACE_DISALLOW_COPY_AND_MOVE(GridCustomLayoutAlgorithm);
 };

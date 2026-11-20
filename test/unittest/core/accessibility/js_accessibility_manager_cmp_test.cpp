@@ -877,7 +877,7 @@ public:
         binding.subAM = subAM_;
         binding.exportedRoot = root_;
         CmpAccessibility::CmpAccessibilityRegistry::RegisterSubAM(
-            root_.GetRawPtr(), AceType::DynamicCast<AceType>(subAM_));
+            root_.GetRawPtr(), subAM_);
     }
 
     void TearDown() override

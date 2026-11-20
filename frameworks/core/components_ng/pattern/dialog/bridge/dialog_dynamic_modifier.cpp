@@ -312,7 +312,6 @@ const ArkUIDialogAPI* GetDialogAPI()
         .setLevelMode = SetDialogLevelMode,
         .setLevelUniqueId = SetDialogLevelUniqueId,
         .setImmersiveMode = SetDialogImmersiveMode,
-        .setAdaptToHandedness = SetDialogAdaptToHandedness,
         .setLevelOrder = SetLevelOrder,
         .registerOnWillAppear = RegisterOnWillAppear,
         .registerOnDidAppear = RegisterOnDidAppear,
@@ -339,6 +338,7 @@ const ArkUIDialogAPI* GetDialogAPI()
         .setBackgroundBlurStyleOptions = SetBackgroundBlurStyleOptions,
         .setBackgroundEffect = SetBackgroundEffect,
         .openCustomDialogWithErrorCallback = OpenCustomDialogWithErrorCallback,
+        .setAdaptToHandedness = SetDialogAdaptToHandedness,
     };
     CHECK_INITIALIZED_FIELDS_END(dialogImpl, 0, 0, 0); // don't move this line
     return &dialogImpl;

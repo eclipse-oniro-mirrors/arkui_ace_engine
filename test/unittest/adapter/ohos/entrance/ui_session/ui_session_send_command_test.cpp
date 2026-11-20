@@ -322,8 +322,8 @@ TEST_F(SendCommandTest, DeathNotificationReleasesProxyAndPendingCallback)
 TEST_F(SendCommandTest, SecurityAuthFlagIsAppendedToEveryEntryParcel)
 {
     constexpr const char* command = R"({"cmd":"click"})";
-    constexpr uint64_t tokenId = 0x1234567890ABCDEFULL;
-    const SecurityAuthInfo authRequest { true, tokenId };
+    constexpr uint64_t agentTokenId = 0x1234567890ABCDEFULL;
+    const SecurityAuthInfo authRequest { true, agentTokenId };
     std::map<uint32_t, std::pair<bool, uint64_t>> observed;
     remote->send = [&](uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption&) {
         EXPECT_EQ(data.ReadInterfaceToken(), IUiContentService::GetDescriptor());
@@ -363,7 +363,7 @@ TEST_F(SendCommandTest, SecurityAuthFlagIsAppendedToEveryEntryParcel)
     EXPECT_EQ(observed.size(), 5u);
     for (const auto& [code, fields] : observed) {
         EXPECT_TRUE(fields.first) << "code " << code;
-        EXPECT_EQ(fields.second, tokenId) << "code " << code;
+        EXPECT_EQ(fields.second, agentTokenId) << "code " << code;
     }
     EXPECT_EQ(finishCount, EXPECTED_FINISH_CALLBACKS);
     remote->send = {};

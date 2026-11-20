@@ -52,7 +52,7 @@ void InputManager::ReportAgentInputDecision(const NG::AgentInputResult& decision
     const auto sessionId = decision.sessionId;
     const bool posted = executor->PostTask(
         [sessionId, result]() {
-            // SAF routes the fence notification by the caller-relayed sessionId (tokenId).
+            // SAF routes the fence notification by the caller-relayed sessionId (agentTokenId).
             TAG_LOGI(AceLogTag::ACE_INPUTTRACKING, "SendCommand notify security fence.");
             auto ret = OHOS::Security::SAF::SafGuiFence::ReportComponentClickDecision(sessionId, result);
             if (ret != 0) {

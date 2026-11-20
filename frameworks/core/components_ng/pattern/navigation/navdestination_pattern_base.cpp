@@ -595,7 +595,7 @@ void NavDestinationPatternBase::InitOnTouchEvent(const RefPtr<FrameNode>& host)
 
 void NavDestinationPatternBase::OnTouchEvent()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto navNode = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
     CHECK_NULL_VOID(navNode);

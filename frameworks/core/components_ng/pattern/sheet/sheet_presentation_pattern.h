@@ -57,6 +57,7 @@ enum class SheetMiniDefaultShowPosition {
     RightBottom,
 };
 class ScrollablePaintProperty;
+enum class PopupSide;
 
 class ACE_EXPORT SheetPresentationPattern : public LinearLayoutPattern,
                                             public PopupBasePattern,
@@ -639,6 +640,36 @@ public:
     void SetWindowChanged(bool change)
     {
         windowChanged_ = change;
+    }
+
+    int32_t GetHandednessAnchorNodeId() const
+    {
+        return handednessAnchorNodeId_;
+    }
+
+    void SetHandednessAnchorNodeId(int32_t nodeId)
+    {
+        handednessAnchorNodeId_ = nodeId;
+    }
+
+    bool IsHandednessPopupSideCaptured() const
+    {
+        return handednessPopupSideCaptured_;
+    }
+
+    void MarkHandednessPopupSideCaptured()
+    {
+        handednessPopupSideCaptured_ = true;
+    }
+
+    PopupSide GetHandednessPopupSide() const
+    {
+        return static_cast<PopupSide>(handednessPopupSideValue_);
+    }
+
+    void SetHandednessPopupSide(PopupSide side)
+    {
+        handednessPopupSideValue_ = static_cast<int32_t>(side);
     }
 
     float GetHeight() const
@@ -1351,6 +1382,9 @@ private:
     bool isDismissProcess_ = false;
     SheetType sheetType_ = SheetType::SHEET_BOTTOM;
     bool windowChanged_ = false;
+    int32_t handednessAnchorNodeId_ = -1;
+    int32_t handednessPopupSideValue_ = 1; // PopupSide::CENTER
+    bool handednessPopupSideCaptured_ = false;
     bool isDirectionUp_ = true;
     bool topSafeAreaChanged_ = false;
     bool typeChanged_ = false;

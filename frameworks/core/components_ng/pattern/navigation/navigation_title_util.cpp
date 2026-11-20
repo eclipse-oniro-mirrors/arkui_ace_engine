@@ -778,9 +778,6 @@ void NavigationTitleUtil::CreateOrUpdateSubtitle(const RefPtr<TitleBarNode>& tit
         auto textLayoutProperty = subTitle->GetLayoutProperty<TextLayoutProperty>();
         CHECK_NULL_VOID(textLayoutProperty);
         textLayoutProperty->UpdateContent(titleInfo.subtitle);
-        auto renderContext = subTitle->GetRenderContext();
-        CHECK_NULL_VOID(renderContext);
-        renderContext->UpdateOpacity(1.0);
         return;
     }
     // create and init subtitle

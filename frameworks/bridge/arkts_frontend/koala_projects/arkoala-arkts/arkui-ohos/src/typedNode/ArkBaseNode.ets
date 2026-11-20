@@ -42,7 +42,7 @@ import { CircleShape, EllipseShape, PathShape, RectShape } from "@ohos.arkui.sha
 import { FocusBoxStyle, FocusPriority } from "../component/focus"
 import { GestureInfo, BaseGestureEvent, GestureJudgeResult, GestureType, GestureMask } from "../component/gesture"
 import { ComponentContent } from 'arkui/ComponentContent'
-import { BlendMode, Blender, Matrix4Transit } from "../component/common"
+import { BlendMode, Blender, BlenderBase, Matrix4Transit } from '../component/common'
 import { InteropNativeModule } from '@koalaui/interop';
 import { ArkUIAniModule } from 'arkui.ani';
 import { hookCustomPropertyImpl, hookAllowDrop, hookDragPreviewOptions, hookStateStyleImpl } from '#handwritten';
@@ -816,7 +816,11 @@ export class ArkBaseNode extends ComponentBase implements CommonAttribute {
         return this
     }
     public advancedBlendMode(effect: BlendMode | BrightnessBlender | undefined, type?: BlendApplyType): this {
-        this.getPeer().setAdvancedBlendModeAttribute(effect as (BlendMode | Blender | undefined), type);
+        this.getPeer().setAdvancedBlendMode0Attribute(effect as (BlendMode | Blender | undefined), type);
+        return this
+    }
+    public advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this {
+        this.getPeer().setAdvancedBlendMode1Attribute(effect, type);
         return this
     }
     public bindTips(message: TipsMessageType | undefined, options?: TipsOptions): this {

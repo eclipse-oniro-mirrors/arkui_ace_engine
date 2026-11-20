@@ -56,6 +56,7 @@ gen_obj("formmenu_abc_preview") {
 }
 
 ohos_shared_library("formmenu") {
+  branch_protector_ret = "pac_ret"
   if (use_mingw_win || use_mac || use_linux) {
     deps = [ ":gen_obj_src_formmenu_abc_preview" ]
     sources = [ "formmenu_preview.cpp" ]

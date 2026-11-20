@@ -1314,7 +1314,7 @@ void JSNavigationStack::FireNavigationInterceptionBeforeLifeCycle(const RefPtr<N
     }
     constexpr uint8_t argsNum = 5; // 5: number of parameters.
     JSRef<JSVal> params[argsNum];
-    auto fromDestination = AceType::DynamicCast<NG::NavDestinationContext>(from);
+    auto fromDestination = from;
     if (!fromDestination) {
         params[0] = JSRef<JSVal>::Make(ToJSValue("navBar"));
     } else if (fromDestination->GetIsEmpty()) {
@@ -1363,7 +1363,7 @@ void JSNavigationStack::FireNavigationInterception(bool isBefore, const RefPtr<N
     }
     const uint8_t argsNum = 4;
     JSRef<JSVal> params[argsNum];
-    auto preDestination = AceType::DynamicCast<NG::NavDestinationContext>(from);
+    auto preDestination = from;
     if (!preDestination) {
         params[0] = JSRef<JSVal>::Make(ToJSValue("navBar"));
     } else if (preDestination->GetIsEmpty()) {
@@ -1375,7 +1375,7 @@ void JSNavigationStack::FireNavigationInterception(bool isBefore, const RefPtr<N
         params[0] = preObj;
     }
 
-    auto topDestination = AceType::DynamicCast<NG::NavDestinationContext>(to);
+    auto topDestination = to;
     if (!topDestination) {
         params[1] = JSRef<JSVal>::Make(ToJSValue("navBar"));
     } else if (topDestination->GetIsEmpty()) {

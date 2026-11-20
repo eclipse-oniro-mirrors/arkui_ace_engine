@@ -843,7 +843,7 @@ public:
     {
         auto refUINode = indicatorNode_.Upgrade();
         CHECK_NULL_RETURN(refUINode, nullptr);
-        auto frameNode = DynamicCast<FrameNode>(refUINode);
+        auto frameNode = refUINode;
         CHECK_NULL_RETURN(frameNode, nullptr);
         return frameNode;
     }

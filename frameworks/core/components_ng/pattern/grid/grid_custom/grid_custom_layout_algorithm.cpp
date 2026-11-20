@@ -358,8 +358,7 @@ void GridCustomLayoutAlgorithm::MeasureForward(float mainSize)
 
 void GridCustomLayoutAlgorithm::MeasureBackward(float mainSize)
 {
-    if (IsScrollBarDrag() || NeedJump(mainSize) || reloadFlag_ ||
-        (fastScrollLayout_ && !NearZero(info_.currentDelta_))) {
+    if (NeedJump(mainSize) || reloadFlag_ || (fastScrollLayout_ && !NearZero(info_.currentDelta_))) {
         JumpToTargetOffset(mainSize);
         return;
     }

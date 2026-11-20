@@ -2564,7 +2564,7 @@ void PageRouterManager::ReplacePageInNewLifecycle(const RouterPageInfo& info)
     auto iter = pageRouterStack_.begin();
     std::advance(iter, popIndex);
     auto lastIter = pageRouterStack_.erase(iter);
-    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(AceType::DynamicCast<FrameNode>(popNode)));
+    pageRouterStack_.emplace_back(WeakPtr<FrameNode>(popNode));
     popNode->MovePosition(GetLastPageIndex());
     stageManager->OnStageNodeStructureChanged();
     for (auto iter = lastIter; iter != pageRouterStack_.end(); ++iter, ++popIndex) {
@@ -2617,7 +2617,7 @@ void PageRouterManager::RestoreOhmUrl(const RouterPageInfo& target, std::functio
 
 void PageRouterManager::InsertPageBellowTop(RefPtr<FrameNode>& pageNode, std::function<void()>&& finishCallback)
 {
-    auto context = DynamicCast<NG::PipelineContext>(PipelineContext::GetCurrentContext());
+    auto context = PipelineContext::GetCurrentContext();
     auto stageManager = context ? context->GetStageManager() : nullptr;
     if (!stageManager) {
         return;
@@ -2660,7 +2660,7 @@ void PageRouterManager::PushPageToTop(
 
 void PageRouterManager::InsertPageToBottom(RefPtr<FrameNode>& pageNode, std::function<void()>&& finishCallback)
 {
-    auto context = DynamicCast<NG::PipelineContext>(PipelineContext::GetCurrentContext());
+    auto context = PipelineContext::GetCurrentContext();
     auto stageManager = context ? context->GetStageManager() : nullptr;
     if (!stageManager) {
         return;

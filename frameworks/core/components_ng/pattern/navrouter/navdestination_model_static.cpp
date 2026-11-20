@@ -338,7 +338,7 @@ RefPtr<FrameNode> NavDestinationModelStatic::CreateFrameNode(
     ACE_UINODE_TRACE(nodeId);
     auto deepRender = [nodeId, deepRenderFunc = std::move(deepRenderFunc)]() -> RefPtr<UINode> {
         CHECK_NULL_RETURN(deepRenderFunc, nullptr);
-        auto parent = AceType::DynamicCast<UINode>(FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, nodeId));
+        RefPtr<UINode> parent = FrameNode::GetFrameNode(V2::NAVDESTINATION_VIEW_ETS_TAG, nodeId);
         auto navDestinationNode = AceType::DynamicCast<NavDestinationGroupNode>(parent);
         if (navDestinationNode && navDestinationNode->GetContentNode()) {
             parent = navDestinationNode->GetContentNode();

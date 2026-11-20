@@ -323,6 +323,13 @@ export namespace extractors {
     throw new Error("fromUiEffectBrightnessBlenderPtr is not implemented.")
   }
 
+  export function toUiEffectBlenderBasePtr(value: uiEffect.BlenderBase): KPointer {
+    return ArkUIAniModule._Extractors_ToUiEffectBlenderBasePtr(value);
+  }
+  export function fromUiEffectBlenderBasePtr(ptr: KPointer): uiEffect.BlenderBase {
+    throw new Error('fromUiEffectBlenderBasePtr is not implemented.')
+  }
+
   export function toUiMaterialMaterialPtr(value: uiMaterial.Material): KPointer {
     return ArkUIAniModule._Extractors_ToUiMaterialMaterialPtr(value);
   }
@@ -885,7 +892,7 @@ export namespace extractors {
     throw new Error("Not implemented")
   }
   export function toUiEffectHdrBrightnessBlenderPtr(value: uiEffect.HdrBrightnessBlender): KPointer {
-    throw new Error("Not implemented")
+    return ArkUIAniModule._Extractors_ToUiEffectHdrBrightnessBlenderPtr(value);
   }
   export function fromUiEffectHdrBrightnessBlenderPtr(ptr: KPointer): uiEffect.HdrBrightnessBlender {
     throw new Error("Not implemented")

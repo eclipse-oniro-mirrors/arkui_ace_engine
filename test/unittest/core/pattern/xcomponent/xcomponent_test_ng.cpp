@@ -1064,7 +1064,7 @@ HWTEST_F(XComponentTestNg, XComponentTouchEventTest009, TestSize.Level1)
 
     RefPtr<LayoutProperty> layoutPropertyTest = frameNode->GetLayoutProperty<LayoutProperty>();
     ASSERT_TRUE(layoutPropertyTest);
-    RefPtr<Property> propertyTest = frameNode->GetPaintProperty<Property>();
+    RefPtr<PaintProperty> propertyTest = frameNode->GetPaintProperty<PaintProperty>();
     ASSERT_TRUE(propertyTest);
 }
 

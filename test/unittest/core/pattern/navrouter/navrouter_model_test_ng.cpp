@@ -1279,7 +1279,7 @@ HWTEST_F(NavrouterModelTestNg, NavrouterTestNg0039, TestSize.Level1)
     textLayoutWrapper->GetLayoutProperty()->contentConstraint_ = LayoutConstraintF();
     layoutWrapper->GetLayoutProperty()->layoutConstraint_ = LayoutConstraintF();
 
-    auto barItemLayoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto barItemLayoutProperty = layoutWrapper->GetLayoutProperty();
     barItemLayoutProperty->layoutConstraint_ = LayoutConstraintF();
     barItemLayoutProperty->contentConstraint_ = LayoutConstraintF();
     ASSERT_EQ(barItemLayoutProperty, layoutWrapper->GetLayoutProperty());
@@ -1361,7 +1361,7 @@ HWTEST_F(NavrouterModelTestNg, NavrouterTestNg0040, TestSize.Level1)
     auto iconLayoutWrapper = iconNode->CreateLayoutWrapper();
     iconLayoutWrapper->GetLayoutProperty()->contentConstraint_ = LayoutConstraintF();
 
-    auto barItemLayoutProperty = AceType::DynamicCast<LayoutProperty>(layoutWrapper->GetLayoutProperty());
+    auto barItemLayoutProperty = layoutWrapper->GetLayoutProperty();
     barItemLayoutProperty->layoutConstraint_ = LayoutConstraintF();
     barItemLayoutProperty->contentConstraint_ = LayoutConstraintF();
     ASSERT_EQ(barItemLayoutProperty, layoutWrapper->GetLayoutProperty());

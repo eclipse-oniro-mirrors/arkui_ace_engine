@@ -40,6 +40,7 @@ gen_obj("progressbuttonv2_abc_preview") {
 }
 
 ohos_shared_library("progressbuttonv2") {
+  branch_protector_ret = "pac_ret"
   sources = [ "progressbuttonv2.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

@@ -825,7 +825,7 @@ RefPtr<OverlengthDotIndicatorPaintMethod> IndicatorPattern::CreateOverlongDotInd
     GetOverlengthDotIndicatorModifier()->SetIsLoop(IsLoop());
 
     auto overlongPaintMethod = MakeRefPtr<OverlengthDotIndicatorPaintMethod>(GetOverlengthDotIndicatorModifier());
-    auto paintMethodTemp = DynamicCast<DotIndicatorPaintMethod>(overlongPaintMethod);
+    RefPtr<DotIndicatorPaintMethod> paintMethodTemp = overlongPaintMethod;
     SetOverlongDotIndicatorPaintMethodInfoInSingleMode(paintMethodTemp);
     UpdateOverlongPaintMethodInSingleMode(overlongPaintMethod);
 

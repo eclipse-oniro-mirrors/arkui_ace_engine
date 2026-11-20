@@ -1457,7 +1457,7 @@ HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow001, TestSize.Level1)
     auto appBar = AceType::MakeRefPtr<AppBarView>();
     auto menubarRow = appBar->BuildMenuBarRow();
     ASSERT_TRUE(menubarRow);
-    auto menubarRowNode = AceType::DynamicCast<FrameNode>(menubarRow);
+    auto menubarRowNode = menubarRow;
     ASSERT_TRUE(menubarRowNode);
     auto container = MockContainer::Current();
     ASSERT_TRUE(container);

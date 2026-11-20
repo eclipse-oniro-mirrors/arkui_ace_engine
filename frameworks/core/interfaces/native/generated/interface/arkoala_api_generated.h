@@ -1000,6 +1000,9 @@ typedef struct Opt_UICommonEvent Opt_UICommonEvent;
 typedef struct UIContextPeer UIContextPeer;
 typedef struct UIContextPeer* Ark_UIContext;
 typedef struct Opt_UIContext Opt_UIContext;
+typedef struct uiEffect_BlenderBasePeer uiEffect_BlenderBasePeer;
+typedef struct uiEffect_BlenderBasePeer* Ark_uiEffect_BlenderBase;
+typedef struct Opt_uiEffect_BlenderBase Opt_uiEffect_BlenderBase;
 typedef struct uiEffect_BrightnessBlenderPeer uiEffect_BrightnessBlenderPeer;
 typedef struct uiEffect_BrightnessBlenderPeer* Ark_uiEffect_BrightnessBlender;
 typedef struct Opt_uiEffect_BrightnessBlender Opt_uiEffect_BrightnessBlender;
@@ -9894,6 +9897,10 @@ typedef struct Opt_UIContext {
     Ark_Tag tag;
     Ark_UIContext value;
 } Opt_UIContext;
+typedef struct Opt_uiEffect_BlenderBase {
+    Ark_Tag tag;
+    Ark_uiEffect_BlenderBase value;
+} Opt_uiEffect_BlenderBase;
 typedef struct Opt_uiEffect_BrightnessBlender {
     Ark_Tag tag;
     Ark_uiEffect_BrightnessBlender value;
@@ -25900,9 +25907,12 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
     void (*setBlendMode)(Ark_NativePointer node,
                          const Opt_BlendMode* value,
                          const Opt_BlendApplyType* type);
-    void (*setAdvancedBlendMode)(Ark_NativePointer node,
-                                 const Opt_Union_BlendMode_Blender* effect,
-                                 const Opt_BlendApplyType* type);
+    void (*setAdvancedBlendMode0)(Ark_NativePointer node,
+                                  const Opt_Union_BlendMode_Blender* effect,
+                                  const Opt_BlendApplyType* type);
+    void (*setAdvancedBlendMode1)(Ark_NativePointer node,
+                                  const Opt_uiEffect_BlenderBase* effect,
+                                  const Opt_BlendApplyType* type);
     void (*setGeometryTransition)(Ark_NativePointer node,
                                   const Opt_String* id,
                                   const Opt_GeometryTransitionOptions* options);
@@ -26637,6 +26647,8 @@ typedef struct GENERATED_ArkUIListModifier {
                       const Opt_StickyStyle* value);
     void (*setScrollSnapAlign)(Ark_NativePointer node,
                                const Opt_ScrollSnapAlign* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setMaintainVisibleContentPosition)(Ark_NativePointer node,
                                               const Opt_Boolean* value);
     void (*setSupportEmptyBranchInLazyLoading)(Ark_NativePointer node,

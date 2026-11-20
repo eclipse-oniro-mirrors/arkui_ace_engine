@@ -60,7 +60,7 @@ public:
         if (isFirstCreate) {
             isFirstCreate = false;
         } else {
-            auto hostNode = DynamicCast<FrameNode>(GetHost());
+            auto hostNode = GetHost();
             CHECK_NULL_VOID(hostNode);
             auto swiperNode = DynamicCast<FrameNode>(hostNode->GetParent());
             auto stepperNode = DynamicCast<StepperNode>(swiperNode->GetParent());
@@ -76,7 +76,7 @@ public:
     // This function is now for fast previews
     void OnMountToParentDone() override
     {
-        auto hostNode = DynamicCast<FrameNode>(GetHost());
+        auto hostNode = GetHost();
         CHECK_NULL_VOID(hostNode);
         auto swiperNode = DynamicCast<FrameNode>(hostNode->GetParent());
         CHECK_NULL_VOID(swiperNode);

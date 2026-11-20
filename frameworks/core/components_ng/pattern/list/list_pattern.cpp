@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/list/list_pattern.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 
 #include <cmath>
 #include <limits>
@@ -41,6 +43,7 @@
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_ng/pattern/list/list_layout_property.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline/base/element_register.h"
 #include "base/log/ace_trace.h"
@@ -1951,6 +1954,17 @@ bool ListPattern::NeedScrollSnapAlignEffect() const
     return snapAlign != ScrollSnapAlign::NONE;
 }
 
+SnapType ListPattern::GetSnapType()
+{
+    // scrollSnapStrategy takes precedence; without a strategy the legacy scrollSnapAlign
+    // value decides (the attribute layer keeps the two mutually exclusive, last setter wins).
+    if (GetScrollSnapStrategy().IsEnabled()) {
+        return SnapType::LIST_SNAP;
+    }
+    auto snapAlign = GetScrollSnapAlign();
+    return snapAlign != ScrollSnapAlign::NONE ? SnapType::LIST_SNAP : SnapType::NONE_SNAP;
+}
+
 ScrollSnapAlign ListPattern::GetScrollSnapAlign() const
 {
     auto host = GetHost();
@@ -2307,6 +2321,12 @@ bool ListPattern::OnScrollCallback(float offset, int32_t source)
 
 bool ListPattern::StartSnapAnimation(SnapAnimationOptions snapAnimationOptions)
 {
+    // The scrollSnapStrategy capability (built-in align or custom provider)
+    // runs on the shared item snap chain; the legacy scrollSnapAlign path below only applies when
+    // no strategy is configured (the attribute layer keeps the two mutually exclusive).
+    if (GetScrollSnapStrategy().IsEnabled()) {
+        return StartItemSnapAnimation(snapAnimationOptions);
+    }
     auto snapDirection = snapAnimationOptions.snapDirection;
     auto listProperty = GetLayoutProperty<ListLayoutProperty>();
     CHECK_NULL_RETURN(listProperty, false);
@@ -2387,6 +2407,149 @@ bool ListPattern::ScrollToSnapIndex(SnapDirection snapDirection, ScrollSnapAlign
     lastSnapTargetIndex_ = std::min(lastSnapTargetIndex_.value(), maxListItemIndex_);
     ScrollToIndex(lastSnapTargetIndex_.value(), true, align);
     return true;
+}
+
+ScrollSnapStrategy ListPattern::GetScrollSnapStrategy() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, ScrollSnapStrategy());
+    auto layoutProperty = host->GetLayoutProperty<ListLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, ScrollSnapStrategy());
+    return layoutProperty->GetScrollSnapStrategy().value_or(ScrollSnapStrategy());
+}
+
+// Shared snap anchor math: the alignment formula turning a content-frame
+// item start into the scroll offset that aligns it (START edge / center / end edge).
+float ListPattern::GetSnapAnchorOffset(ScrollSnapAlign align, float itemStartContent, float itemMainSize,
+    float viewportMainSize)
+{
+    if (align == ScrollSnapAlign::CENTER) {
+        return itemStartContent + itemMainSize / 2.0f - viewportMainSize / 2.0f;
+    }
+    if (align == ScrollSnapAlign::END) {
+        return itemStartContent + itemMainSize - viewportMainSize;
+    }
+    return itemStartContent;
+}
+
+std::vector<SnapCandidate> ListPattern::BuildItemSnapCandidates(ScrollSnapAlign align)
+{
+    std::vector<SnapCandidate> candidates;
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, candidates);
+    if (align == ScrollSnapAlign::NONE || !isScrollable_) {
+        return candidates;
+    }
+    const float viewportMainSize = GetMainContentSize();
+    // itemPosition_ holds VIEWPORT-relative positions captured at the last layout pass; shift
+    // them back into scroll-invariant content coordinates with the offset of that same pass
+    // (startMainPos_ is synced from the layout algorithm's currentOffset). Lanes layouts put
+    // several items at the same main-axis position; the duplicates collapse in
+    // NormalizeCandidates and ties resolve by direction / smaller index in the shared selector.
+    if (itemPosition_.empty()) {
+        return candidates;
+    }
+    const float layoutOffset = static_cast<float>(GetTotalOffset());
+    for (const auto& [index, pos] : itemPosition_) {
+        const float itemMainSize = pos.endPos - pos.startPos;
+        if (LessOrEqual(itemMainSize, 0.0f)) {
+            continue;
+        }
+        candidates.push_back(
+            { GetSnapAnchorOffset(align, pos.startPos + layoutOffset, itemMainSize, viewportMainSize), index });
+    }
+    ScrollSnapUtils::NormalizeCandidates(candidates);
+    return candidates;
+}
+
+std::vector<SnapCandidate> ListPattern::BuildTrackedItemSnapCandidates(ScrollSnapAlign align)
+{
+    // Tracked selection compares anchors against drag-frame positions (-GetCurrentPos() /
+    // -GetFinalPosition()) while BuildItemSnapCandidates returns content-space anchors. During
+    // the fling the two frames advance in lockstep (currentPos_ = K - contentOffset for one
+    // constant K), so shifting by -(totalOffset + currentPos) maps the anchors onto the fling
+    // frame; the constant is sampled at one instant and stays invariant across frames.
+    auto candidates = BuildItemSnapCandidates(align);
+    auto scrollable = GetScrollable();
+    if (scrollable && scrollable->IsItemSnapTracking()) {
+        const float shift = -static_cast<float>(GetTotalOffset() + scrollable->GetCurrentPos());
+        for (auto& candidate : candidates) {
+            candidate.offset += shift;
+        }
+    }
+    return candidates;
+}
+
+// Axis / wheel stepping falls back to the neighbor anchor one item beyond the materialized
+// window: extrapolate from the window edge by the adjacent item pitch (or the edge item's own
+// size when only one item is materialized).
+std::optional<float> ListPattern::GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller)
+{
+    if (itemPosition_.empty()) {
+        return std::nullopt;
+    }
+    const float viewportMainSize = GetMainContentSize();
+    const float layoutOffset = static_cast<float>(GetTotalOffset());
+    auto anchorOf = [this, align, viewportMainSize, layoutOffset](float startPos, float endPos) -> float {
+        return GetSnapAnchorOffset(align, startPos + layoutOffset, endPos - startPos, viewportMainSize);
+    };
+    if (towardSmaller) {
+        auto first = itemPosition_.begin();
+        if (first->first <= 0) {
+            return std::nullopt;
+        }
+        float pitch = first->second.endPos - first->second.startPos;
+        if (itemPosition_.size() > 1) {
+            auto second = std::next(first);
+            const float secondSize = second->second.endPos - second->second.startPos;
+            const float gap = std::max(0.0f, second->second.startPos - first->second.endPos);
+            pitch = std::max(pitch, secondSize + gap);
+        }
+        return anchorOf(first->second.startPos - pitch, first->second.startPos);
+    }
+    auto last = itemPosition_.rbegin();
+    if (last->first >= maxListItemIndex_) {
+        return std::nullopt;
+    }
+    float pitch = last->second.endPos - last->second.startPos;
+    return anchorOf(last->second.endPos, last->second.endPos + pitch);
+}
+
+float ListPattern::GetItemSnapMinOffset() const
+{
+    // With contentStartOffset the snap lower bound is the first-item alignment position: the
+    // snap never rests inside the leading gap.
+    return contentStartOffset_;
+}
+
+float ListPattern::GetItemSnapMaxOffset() const
+{
+    // itemPosition_ is a lazy viewport window (only nearby items are laid out), so bounds must
+    // come from the estimated full content height, not from the last laid-out endPos.
+    auto maxOffset = GetTotalHeight() - GetMainContentSize();
+    // Lazy content height can be underestimated before the end is reached; never clamp below the
+    // current position so that snap targets stay reachable.
+    return std::max(maxOffset, static_cast<float>(GetTotalOffset()));
+}
+
+float ListPattern::GetItemSnapCalibrationMargin() const
+{
+    // One average materialized item of headroom: the margin gates the mid-fling calibration
+    // start and scales the natural-landing bracket search. Lanes layouts share main-axis
+    // positions, so duplicate rows only pull the average toward the row pitch.
+    if (itemPosition_.empty()) {
+        return 0.0f;
+    }
+    double total = 0.0;
+    int32_t count = 0;
+    for (const auto& item : itemPosition_) {
+        const float itemMainSize = item.second.endPos - item.second.startPos;
+        if (std::isfinite(itemMainSize) && GreatNotEqual(itemMainSize, 0.0f)) {
+            total += itemMainSize;
+            ++count;
+        }
+    }
+    return count > 0 ? static_cast<float>(total / count) : 0.0f;
 }
 
 int32_t ListPattern::GetEndIndexExcludeEndOffset() const

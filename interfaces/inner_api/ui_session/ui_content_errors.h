@@ -29,12 +29,12 @@ enum ErrorCode { NO_ERROR = 0, NOT_CONNECTED, FAILED, REPLY_ERROR, PARAM_INVALID
 // needSecurityAuth: caller-declared auth flag; when true and the target node declares
 //   AgentControlMode::DENY, the command is authenticated before execution and a
 //   successful auth refuses the injection. Default false keeps the legacy behavior.
-// tokenId: access token id identifying the originating controller relayed by the
+// agentTokenId: access token id identifying the originating controller relayed by the
 //   UISession caller; used to route the security-fence notification for refused
 //   commands. UINT64_MAX means unset.
 struct SecurityAuthInfo {
     bool needSecurityAuth = false;
-    uint64_t tokenId = UINT64_MAX;
+    uint64_t agentTokenId = UINT64_MAX;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_ERRORS_H

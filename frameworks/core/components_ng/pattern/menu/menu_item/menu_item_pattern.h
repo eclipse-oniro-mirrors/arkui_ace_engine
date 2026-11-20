@@ -504,6 +504,11 @@ public:
 
     void ReportEvent();
 
+    virtual bool IsCustomMenuItem()
+    {
+        return false;
+    }
+
 protected:
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void RegisterOnKeyEvent();
@@ -528,10 +533,6 @@ friend class ServiceCollaborationMenuAceHelper;
     void SendSubMenuOpenToAccessibility(RefPtr<FrameNode>& subMenu, ShowSubMenuType type);
     virtual void OnTouch(const TouchEventInfo& info);
     virtual bool OnKeyEvent(const KeyEvent& event);
-    virtual bool IsCustomMenuItem()
-    {
-        return false;
-    }
 
     void RegisterWrapperMouseEvent();
 

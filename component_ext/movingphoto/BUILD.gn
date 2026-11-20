@@ -42,6 +42,7 @@ gen_obj("multimedia_movingphotoview_abc") {
 }
 
 ohos_shared_library("movingphotoview") {
+  branch_protector_ret = "pac_ret"
   defines = [ "USE_ARK_ENGINE" ]
   sources = [
     "$ace_root/frameworks/core/components_ng/base/inspector_filter.cpp",
