@@ -98,6 +98,9 @@ protected:
     void CheckFastScrollInvalidIndex(FastScrollMode mode, int32_t index, bool running);
     void ContinueFastScrollPreparation(int32_t from, const RectF& initialRect, float initialOffset,
         const int32_t& created, const int32_t& starts);
+    void RunLegacyStaticMixedModeStep(int32_t target, FastScrollMode mode, int32_t& starts, int32_t& stops,
+        int32_t& created);
+    void ExpectLegacyStaticMixedLanding(int32_t target, FastScrollMode mode);
 #endif
 
     RectF FastScrollItemRect(int32_t index)
@@ -112,8 +115,8 @@ protected:
     void FinishFastScroll()
     {
         for (int32_t tick = 0;
-             tick < MAX_FAST_SCROLL_TICKS && (pattern_->legacyScrollTarget_ || pattern_->targetIndex_ ||
-                 !MockAnimationManager::GetInstance().AllFinished()); ++tick) {
+             tick < MAX_FAST_SCROLL_TICKS &&
+                 (pattern_->targetIndex_ || !MockAnimationManager::GetInstance().AllFinished()); ++tick) {
             MockAnimationManager::GetInstance().Tick();
             FlushUITasks();
         }
@@ -121,7 +124,6 @@ protected:
         EXPECT_FALSE(pattern_->GetFastScrollRequest());
         EXPECT_FALSE(pattern_->fastScrollState_);
         EXPECT_FALSE(pattern_->AnimateRunning());
-        EXPECT_FALSE(pattern_->legacyScrollTarget_);
         EXPECT_FALSE(pattern_->targetIndex_);
         // Observe queued layout/finish work before resetting mock bookkeeping. A
         // late production callback must not restart an already completed request.
@@ -133,7 +135,6 @@ protected:
             EXPECT_FALSE(pattern_->GetFastScrollRequest());
             EXPECT_FALSE(pattern_->fastScrollState_);
             EXPECT_FALSE(pattern_->AnimateRunning());
-            EXPECT_FALSE(pattern_->legacyScrollTarget_);
             EXPECT_FALSE(pattern_->targetIndex_);
             EXPECT_NEAR(pattern_->GetTotalOffset(), settledOffset, 0.2f);
         }
