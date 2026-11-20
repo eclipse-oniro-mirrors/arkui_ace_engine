@@ -634,6 +634,31 @@ HWTEST_F(ScrollableTestNg, HandleEdgeEffectAnimateOverScrollEnd004, TestSize.Lev
 }
 
 /**
+ * @tc.name: HandleEdgeEffect_005
+ * @tc.desc: Test HandleEdgeEffect clears stale animation over-scroll flags for non-controller sources
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, HandleEdgeEffect_005, TestSize.Level1)
+{
+    auto scrollPn = scroll_->GetPattern<PartiallyMockedScrollable>();
+    ASSERT_NE(scrollPn, nullptr);
+    EXPECT_CALL(*scrollPn, IsAtTop()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*scrollPn, IsAtBottom(_)).WillRepeatedly(Return(false));
+    scrollPn->scrollEffect_ = AceType::MakeRefPtr<ScrollEdgeEffect>(EdgeEffect::SPRING);
+    scrollPn->SetEdgeEffect(EdgeEffect::SPRING, false, EffectEdge::ALL);
+    scrollPn->animateCanOverScroll_ = true;
+    scrollPn->animateOverScrollStart_ = true;
+    scrollPn->animateOverScrollEnd_ = true;
+
+    auto ret = scrollPn->HandleEdgeEffect(10.0f, SCROLL_FROM_UPDATE, SizeF(100.0f, 100.0f));
+
+    EXPECT_TRUE(ret);
+    EXPECT_FALSE(scrollPn->animateOverScrollStart_);
+    EXPECT_FALSE(scrollPn->animateOverScrollEnd_);
+    EXPECT_FALSE(scrollPn->isAnimateOverScroll_);
+}
+
+/**
  * @tc.name: HandleScrollVelocity007
  * @tc.desc: Test nested HandleScrollVelocity for IsAtBottom
  * @tc.type: FUNC

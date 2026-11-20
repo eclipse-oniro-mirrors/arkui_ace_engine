@@ -171,8 +171,7 @@ public:
                 // registry bookkeeping; the detached root stays until the UIContext
                 // dies, which is the pre-contract behavior for this product.
                 TAG_LOGW(AceLogTag::ACE_SCROLL,
-                    "ScrollPH release: callback failed (ani status=%{public}d), ptr=%{public}p",
-                    status, reinterpret_cast<void*>(productPtr));
+                    "ScrollPH release: callback failed (ani status=%{public}d)", status);
                 env->ResetError();
             }
         } while (false);
@@ -251,8 +250,8 @@ ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandlePtr& 
                 "(pending product ptr is 0 or claim failed)");
         } else {
             TAG_LOGI(AceLogTag::ACE_SCROLL,
-                "ScrollPlaceholder product claimed: ptr=%{public}p, tag=%{public}s, id=%{public}d",
-                AceType::RawPtr(product), product->GetTag().c_str(), product->GetId());
+                "ScrollPlaceholder product claimed: tag=%{public}s, id=%{public}d",
+                product->GetTag().c_str(), product->GetId());
         }
         g_pendingProduct = 0;
         if (probe.Admitted() && product) {
@@ -273,8 +272,9 @@ ani_int RegisterTemplate(ani_env* env, const std::string& templateId, ani_object
     ani_object executionArg, ani_object releaseArg)
 {
     TAG_LOGI(AceLogTag::ACE_SCROLL,
-        "PlaceholderRegister.register: enter, id=%{public}s, builderObj=%{public}p, executionObj=%{public}p",
-        templateId.c_str(), builderArg, executionArg);
+        "PlaceholderRegister.register: enter, id=%{public}s, hasBuilder=%{public}d, hasExecution=%{public}d",
+        templateId.c_str(), static_cast<int32_t>(builderArg != nullptr),
+        static_cast<int32_t>(executionArg != nullptr));
     ani_ref builderProp = nullptr;
     ani_object builderObj = static_cast<ani_object>(builderArg);
     if (templateId.empty()) {
@@ -428,8 +428,7 @@ ani_boolean IsTemplateRegistered(const std::string& templateId)
 // Product hand-off of one isolated execution; see g_pendingProduct.
 void PublishProduct(ani_long productPtr)
 {
-    TAG_LOGI(AceLogTag::ACE_SCROLL, "PlaceholderRegister publish product: ptr=%{public}p",
-        reinterpret_cast<void*>(static_cast<intptr_t>(productPtr)));
+    TAG_LOGI(AceLogTag::ACE_SCROLL, "PlaceholderRegister publish product");
     g_pendingProduct = static_cast<intptr_t>(productPtr);
 }
 
