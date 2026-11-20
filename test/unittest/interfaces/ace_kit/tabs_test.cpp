@@ -39,6 +39,14 @@ const int32_t TEST_NODE_ID = 10001;
 
 namespace OHOS::Ace::Kit {
 
+/**
+ * @tc.desc: Fixture for Tabs Kit resObj overloads. Each setter accepting ResourceObject is
+ *   verified under a three-case matrix (arrange: build Tabs via TabsModelNG with mocked pipeline;
+ *   act: call the resObj overload; assert: check layout property and pattern resourceMgr_):
+ *   - Register: config change enabled and valid resObj -> property applied and resObj registered.
+ *   - Disabled: config change disabled -> property applied but resObj not registered.
+ *   - NullResObj: nullptr resObj -> resObj not registered.
+ */
 class TabsResObjTest : public testing::Test {
 protected:
     void SetUp() override
@@ -93,6 +101,12 @@ protected:
 
 // ===== SetTabBarWidth resObj overload =====
 
+/**
+ * @tc.name: SetTabBarWidthResObj_Register
+ * @tc.desc: Test SetTabBarWidth with resObj when config change is enabled: barWidth is applied and resObj is
+ *   registered to pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetTabBarWidthResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -108,6 +122,12 @@ HWTEST_F(TabsResObjTest, SetTabBarWidthResObj_Register, TestSize.Level1)
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetTabBarWidthResObj_Disabled
+ * @tc.desc: Test SetTabBarWidth with resObj when config change is disabled: barWidth is applied but resObj is
+ *   not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetTabBarWidthResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -124,6 +144,11 @@ HWTEST_F(TabsResObjTest, SetTabBarWidthResObj_Disabled, TestSize.Level1)
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetTabBarWidthResObj_NullResObj
+ * @tc.desc: Test SetTabBarWidth with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetTabBarWidthResObj_NullResObj, TestSize.Level1)
 {
     tabs_->SetTabBarWidth(TEST_TAB_BAR_WIDTH, nullptr);
@@ -134,6 +159,12 @@ HWTEST_F(TabsResObjTest, SetTabBarWidthResObj_NullResObj, TestSize.Level1)
 
 // ===== SetTabBarHeight resObj overload =====
 
+/**
+ * @tc.name: SetTabBarHeightResObj_Register
+ * @tc.desc: Test SetTabBarHeight with resObj when config change is enabled: barHeight is applied and resObj
+ *   is registered to pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetTabBarHeightResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -149,6 +180,12 @@ HWTEST_F(TabsResObjTest, SetTabBarHeightResObj_Register, TestSize.Level1)
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetTabBarHeightResObj_Disabled
+ * @tc.desc: Test SetTabBarHeight with resObj when config change is disabled: barHeight is applied but resObj
+ *   is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetTabBarHeightResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -164,6 +201,11 @@ HWTEST_F(TabsResObjTest, SetTabBarHeightResObj_Disabled, TestSize.Level1)
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetTabBarHeightResObj_NullResObj
+ * @tc.desc: Test SetTabBarHeight with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetTabBarHeightResObj_NullResObj, TestSize.Level1)
 {
     tabs_->SetTabBarHeight(TEST_TAB_BAR_HEIGHT, nullptr);
@@ -174,6 +216,12 @@ HWTEST_F(TabsResObjTest, SetTabBarHeightResObj_NullResObj, TestSize.Level1)
 
 // ===== SetDivider resObj overload =====
 
+/**
+ * @tc.name: SetDividerResObj_Register
+ * @tc.desc: Test SetDivider with resObjs when config change is enabled: divider is applied and resObjs are
+ *   registered to pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetDividerResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -192,6 +240,12 @@ HWTEST_F(TabsResObjTest, SetDividerResObj_Register, TestSize.Level1)
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetDividerResObj_Disabled
+ * @tc.desc: Test SetDivider with resObjs when config change is disabled: divider is applied but resObjs are
+ *   not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetDividerResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -210,6 +264,11 @@ HWTEST_F(TabsResObjTest, SetDividerResObj_Disabled, TestSize.Level1)
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetDividerResObj_NullResObj
+ * @tc.desc: Test SetDivider with nullptr resObjs: resObjs are not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetDividerResObj_NullResObj, TestSize.Level1)
 {
     TabsItemDivider divider;
@@ -223,6 +282,12 @@ HWTEST_F(TabsResObjTest, SetDividerResObj_NullResObj, TestSize.Level1)
 
 // ===== SetScrollableBarModeOptions resObj overload =====
 
+/**
+ * @tc.name: SetScrollableBarModeOptionsResObj_Register
+ * @tc.desc: Test SetScrollableBarModeOptions with resObj when config change is enabled: resObj is registered
+ *   to pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetScrollableBarModeOptionsResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -234,6 +299,11 @@ HWTEST_F(TabsResObjTest, SetScrollableBarModeOptionsResObj_Register, TestSize.Le
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetScrollableBarModeOptionsResObj_Disabled
+ * @tc.desc: Test SetScrollableBarModeOptions with resObj when config change is disabled: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetScrollableBarModeOptionsResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -245,6 +315,11 @@ HWTEST_F(TabsResObjTest, SetScrollableBarModeOptionsResObj_Disabled, TestSize.Le
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetScrollableBarModeOptionsResObj_NullResObj
+ * @tc.desc: Test SetScrollableBarModeOptions with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetScrollableBarModeOptionsResObj_NullResObj, TestSize.Level1)
 {
     ScrollableBarModeOptions option;
@@ -256,6 +331,12 @@ HWTEST_F(TabsResObjTest, SetScrollableBarModeOptionsResObj_NullResObj, TestSize.
 
 // ===== SetEffectNodeOption resObj overload =====
 
+/**
+ * @tc.name: SetEffectNodeOptionResObj_Register
+ * @tc.desc: Test SetEffectNodeOption with resObj when config change is enabled: resObj is registered to
+ *   pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetEffectNodeOptionResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -266,6 +347,11 @@ HWTEST_F(TabsResObjTest, SetEffectNodeOptionResObj_Register, TestSize.Level1)
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetEffectNodeOptionResObj_Disabled
+ * @tc.desc: Test SetEffectNodeOption with resObj when config change is disabled: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetEffectNodeOptionResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -277,6 +363,11 @@ HWTEST_F(TabsResObjTest, SetEffectNodeOptionResObj_Disabled, TestSize.Level1)
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetEffectNodeOptionResObj_NullResObj
+ * @tc.desc: Test SetEffectNodeOption with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetEffectNodeOptionResObj_NullResObj, TestSize.Level1)
 {
     TabsEffectNodeOption option;
@@ -288,6 +379,12 @@ HWTEST_F(TabsResObjTest, SetEffectNodeOptionResObj_NullResObj, TestSize.Level1)
 
 // ===== SetBarBackgroundBlurStyle resObj overload =====
 
+/**
+ * @tc.name: SetBarBackgroundBlurStyleResObj_Register
+ * @tc.desc: Test SetBarBackgroundBlurStyle with resObj when config change is enabled: resObj is registered to
+ *   pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundBlurStyleResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -298,6 +395,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundBlurStyleResObj_Register, TestSize.Leve
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetBarBackgroundBlurStyleResObj_Disabled
+ * @tc.desc: Test SetBarBackgroundBlurStyle with resObj when config change is disabled: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundBlurStyleResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -309,6 +411,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundBlurStyleResObj_Disabled, TestSize.Leve
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetBarBackgroundBlurStyleResObj_NullResObj
+ * @tc.desc: Test SetBarBackgroundBlurStyle with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundBlurStyleResObj_NullResObj, TestSize.Level1)
 {
     BlurStyleOption styleOption;
@@ -320,6 +427,12 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundBlurStyleResObj_NullResObj, TestSize.Le
 
 // ===== SetBarBackgroundColor resObj overload =====
 
+/**
+ * @tc.name: SetBarBackgroundColorResObj_Register
+ * @tc.desc: Test SetBarBackgroundColor with resObj when config change is enabled: resObj is registered to
+ *   pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundColorResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -329,6 +442,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundColorResObj_Register, TestSize.Level1)
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetBarBackgroundColorResObj_Disabled
+ * @tc.desc: Test SetBarBackgroundColor with resObj when config change is disabled: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundColorResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -339,6 +457,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundColorResObj_Disabled, TestSize.Level1)
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetBarBackgroundColorResObj_NullResObj
+ * @tc.desc: Test SetBarBackgroundColor with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundColorResObj_NullResObj, TestSize.Level1)
 {
     tabs_->SetBarBackgroundColor(TEST_BG_COLOR, nullptr);
@@ -349,6 +472,12 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundColorResObj_NullResObj, TestSize.Level1
 
 // ===== SetBarBackgroundEffect resObj overload =====
 
+/**
+ * @tc.name: SetBarBackgroundEffectResObj_Register
+ * @tc.desc: Test SetBarBackgroundEffect with resObj when config change is enabled: resObj is registered to
+ *   pattern resourceMgr
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundEffectResObj_Register, TestSize.Level1)
 {
     auto resObj = MakeResObj();
@@ -359,6 +488,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundEffectResObj_Register, TestSize.Level1)
     EXPECT_NE(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetBarBackgroundEffectResObj_Disabled
+ * @tc.desc: Test SetBarBackgroundEffect with resObj when config change is disabled: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundEffectResObj_Disabled, TestSize.Level1)
 {
     g_isConfigChangePerform = false;
@@ -370,6 +504,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundEffectResObj_Disabled, TestSize.Level1)
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetBarBackgroundEffectResObj_NullResObj
+ * @tc.desc: Test SetBarBackgroundEffect with nullptr resObj: resObj is not registered
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetBarBackgroundEffectResObj_NullResObj, TestSize.Level1)
 {
     EffectOption effectOption;
@@ -379,6 +518,11 @@ HWTEST_F(TabsResObjTest, SetBarBackgroundEffectResObj_NullResObj, TestSize.Level
     EXPECT_EQ(pattern->resourceMgr_, nullptr);
 }
 
+/**
+ * @tc.name: SetDividerColorByUser
+ * @tc.desc: Test SetDividerColorByUser: dividerColorSetByUser flag is set to true in layout property
+ * @tc.type: FUNC
+ */
 HWTEST_F(TabsResObjTest, SetDividerColorByUser, TestSize.Level1)
 {
     tabs_->SetDividerColorByUser(true);

@@ -71,7 +71,7 @@ void JsNavigationTransitionProxy::GetToContentInfo(const JSCallbackInfo& args)
 void JsNavigationTransitionProxy::FinishTransition(const JSCallbackInfo& info)
 {
     if (proxy_) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "fire custom animation finish");
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "finishTransition");
         proxy_->FireFinishCallback();
     } else {
         TAG_LOGE(AceLogTag::ACE_NAVIGATION, "finish interactive animation failed");

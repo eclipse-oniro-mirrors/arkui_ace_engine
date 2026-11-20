@@ -5368,7 +5368,7 @@ bool AceContainer::SetSystemBarEnabled(const sptr<OHOS::Rosen::Window>& window, 
             "Set page-level SystemBar: type:%{public}d, enable:%{public}d, animation:%{public}d",
             static_cast<int32_t>(winType), enable.value(), animation.value_or(false));
     } else {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "Clear page-level SystemBar type:%{public}d",
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "Clear page-level SystemBar type:%{public}d",
             static_cast<int32_t>(winType));
     }
     if (Rosen::WMError::WM_OK != window->SetSystemBarPropertyForPage(winType, newProperty)) {

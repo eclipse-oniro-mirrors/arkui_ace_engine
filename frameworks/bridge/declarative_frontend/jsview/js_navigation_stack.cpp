@@ -802,7 +802,7 @@ bool JSNavigationStack::GetNavDestinationNodeInUINode(
     while (node) {
         if (node->GetTag() == V2::JS_VIEW_ETS_TAG) {
             customNode = AceType::DynamicCast<NG::CustomNode>(node);
-            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "render current custom node: %{public}s",
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "render custom node: %{public}s",
                 customNode->GetCustomTag().c_str());
             // record parent navigationNode before customNode is rendered in case of navDestinationNode
             auto navigationNode = GetNavigationNode();
@@ -1011,7 +1011,7 @@ void JSNavigationStack::UpdateOnStateChangedCallback(JSRef<JSObject> obj, std::f
     CHECK_NULL_VOID(stack);
     stack->SetOnStateChangedCallback(callback);
     // When switching the navigation stack, it is necessary to immediately trigger a refresh
-    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navigation necessary to immediately trigger a refresh");
+    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "stack changed, trigger refresh");
     stack->OnStateChanged();
     stack->SetOnPopCallback([weakStack = AceType::WeakClaim(this)](const JSRef<JSVal>& param) {
         auto navigationStack = weakStack.Upgrade();
@@ -1453,7 +1453,7 @@ int32_t JSNavigationStack::LoadDestination(const std::string& name, const JSRef<
     NG::ScopedViewStackProcessor scopedViewStackProcessor;
     // execute navdestination attribute builder
     if (LoadDestinationByBuilder(name, param, node, desNode)) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "load destination by buildermap");
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "loadByBuilderMap");
         return ERROR_CODE_NO_ERROR;
     }
     // deal route config and execute route config builder
@@ -1706,10 +1706,9 @@ std::string JSNavigationStack::GetSerializedParamSafely(int32_t index) const
     JSRef<JSVal> arg[1] = { JSRef<JSVal>::Make(ToJSValue(index)) };
     auto serializedParam = JSRef<JSFunc>::Cast(getSerializedParamSafelyFunc)->Call(dataSourceObj_, 1, arg);
     if (!serializedParam->IsString() || serializedParam->ToString().empty()) {
-        TAG_LOGW(AceLogTag::ACE_NAVIGATION,
-            "current navDestination(index: %{public}d)'s param can't be serialized or is empty!", index);
+        TAG_LOGW(AceLogTag::ACE_NAVIGATION, "param(index: %{public}d) can't be serialized or empty!", index);
     } else {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "serialize navDestination param success! its index: %{public}d", index);
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "serialize navDestination param success! its index: %{public}d", index);
     }
     return serializedParam->ToString();
 }
@@ -1720,16 +1719,14 @@ std::string JSNavigationStack::GetSerializedParamForRecovery(int32_t index) cons
     JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, serializedEmpty);
     auto param = GetParamByIndex(index);
     if (param.IsEmpty() || param->IsUndefined() || param->IsNull()) {
-        TAG_LOGW(AceLogTag::ACE_NAVIGATION,
-            "current navDestination(index: %{public}d)'s param is undefined or null!", index);
+        TAG_LOGW(AceLogTag::ACE_NAVIGATION, "param(index: %{public}d) is undefined or null!", index);
         return serializedEmpty;
     }
     auto serializedParam = JsNavParamFlatSerializer::Serialize(param);
     if (serializedParam == "undefined" || serializedParam.empty()) {
-        TAG_LOGW(AceLogTag::ACE_NAVIGATION,
-            "current navDestination(index: %{public}d)'s param can't be serialized or is empty!", index);
+        TAG_LOGW(AceLogTag::ACE_NAVIGATION, "param(index: %{public}d) can't be serialized or empty!", index);
     } else {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "serialize navDestination param success! its index: %{public}d", index);
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "serialize navDestination param success! its index: %{public}d", index);
     }
     return serializedParam;
 }

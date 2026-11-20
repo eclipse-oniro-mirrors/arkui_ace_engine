@@ -315,7 +315,7 @@ void NavigationGroupNode::UpdateNavDestinationNodeWithoutMarkDirty(const RefPtr<
         CHECK_NULL_VOID(overlayNode);
         hasChanged = true;
     }
-    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "last standard page index is %{public}d", lastStandardIndex_);
+    TAG_LOGD(AceLogTag::ACE_NAVIGATION, "last standard page index is %{public}d", lastStandardIndex_);
     if (!ReorderNavDestination(navDestinationNodes, navigationContentNode, slot, overlaySlot, hasChanged)) {
         return;
     }
@@ -659,7 +659,7 @@ void NavigationGroupNode::SetBackButtonEvent(const RefPtr<NavDestinationGroupNod
             result = eventHub->FireOnBackPressedEvent();
         }
         if (result) {
-            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navigation user onBackPress return true");
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "user onBackPress returns true");
             return true;
         }
         auto navigation = navigationWeak.Upgrade();
@@ -771,7 +771,7 @@ bool NavigationGroupNode::CheckCanHandleBack(bool& isEntry)
         isEntry = true;
         return false;
     }
-    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navDestination consume back button event: %{public}s",
+    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navDest consume back: %{public}s",
         navDestinationPattern->GetName().c_str());
     GestureEvent gestureEvent;
     auto backEvent = navDestination->GetNavDestinationBackButtonEvent();

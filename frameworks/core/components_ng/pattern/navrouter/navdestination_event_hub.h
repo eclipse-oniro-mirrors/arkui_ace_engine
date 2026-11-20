@@ -106,7 +106,7 @@ public:
     void FireOnReady(RefPtr<NavDestinationContext> context)
     {
         if (onReadyEvent_) {
-            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navDestination context is ready.");
+            TAG_LOGD(AceLogTag::ACE_NAVIGATION, "navDestination context is ready.");
             onReadyEvent_(context);
         }
     }
