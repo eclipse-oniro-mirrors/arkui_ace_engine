@@ -13,6 +13,12 @@
  * limitations under the License.
  */
 
+#define protected public
+#define private public
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
+#include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
+#undef protected
+#undef private
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -941,4 +947,220 @@ HWTEST_F(WaterFlowTestNg, SyncCacheLayoutSegmented001, TestSize.Level1)
     EXPECT_FALSE(pattern_->preloadItems_.empty());
 }
 #endif // TEST_SEGMENTED_WATER_FLOW
+
+/**
+ * @tc.name: UpdateWaterFlowDecodeCacheWindow001
+ * @tc.desc: Test UpdateWaterFlowDecodeCacheWindow guard conditions do not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateWaterFlowDecodeCacheWindow001, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateWaterFlowDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateWaterFlowDecodeCacheWindow002
+ * @tc.desc: Test UpdateWaterFlowDecodeCacheWindow with cacheCount=0 skips gracefully.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateWaterFlowDecodeCacheWindow002, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(0);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateWaterFlowDecodeCacheWindow(AceType::RawPtr(wrapper), 0);
+}
+
+/**
+ * @tc.name: UpdateWaterFlowDecodeCacheWindow003
+ * @tc.desc: Test UpdateWaterFlowDecodeCacheWindow does not crash after scrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateWaterFlowDecodeCacheWindow003, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    UpdateCurrentOffset(-500.0f); // 500 : scroll offset
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateWaterFlowDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateWaterFlowDecodeCacheWindow004
+ * @tc.desc: Test B1 — layoutWrapper == nullptr does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateWaterFlowDecodeCacheWindow004, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->UpdateWaterFlowDecodeCacheWindow(nullptr, 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateDecodeCacheWindowInternal001
+ * @tc.desc: Test B6 — showCachedItems == true early return via internal method.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateDecodeCacheWindowInternal001, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    WaterFlowModelNG::SetShowCached(AceType::RawPtr(frameNode_), true);
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateDecodeCacheWindowInternal002
+ * @tc.desc: Test B7 — cacheCount <= 0 early return via internal method.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateDecodeCacheWindowInternal002, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 0);
+}
+
+/**
+ * @tc.name: UpdateDecodeCacheWindowInternal003
+ * @tc.desc: Test B8 — startIndex < 0 early return via internal method.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateDecodeCacheWindowInternal003, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto info = layoutAlgorithm->LayoutInfo();
+    ASSERT_NE(info, nullptr);
+    info->startIndex_ = -1;
+    info->endIndex_ = -1;
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateDecodeCacheWindowInternal004
+ * @tc.desc: Test B10/B11/B13/B14/B16 — normal path, non-segmented (footerIndex_ <= 0).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateDecodeCacheWindowInternal004, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto info = layoutAlgorithm->LayoutInfo();
+    ASSERT_NE(info, nullptr);
+    ASSERT_GE(info->startIndex_, 0);
+    ASSERT_GE(info->endIndex_, 0);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateDecodeCacheWindowInternal005
+ * @tc.desc: Test B12 — footerIndex_ > 0 (segmented path: childIdx = idx).
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateDecodeCacheWindowInternal005, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto info = layoutAlgorithm->LayoutInfo();
+    ASSERT_NE(info, nullptr);
+    ASSERT_GE(info->startIndex_, 0);
+    ASSERT_GE(info->endIndex_, 0);
+    info->footerIndex_ = 49; // 49 : simulate segmented footer at last child
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateDecodeCacheWindowInternal006
+ * @tc.desc: Test I10 — unbuilt items (wrapper null) are skipped gracefully.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, UpdateDecodeCacheWindowInternal006, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return ITEM_MAIN_SIZE; });
+    model.SetCachedCount(5);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<WaterFlowLayoutBase>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto info = layoutAlgorithm->LayoutInfo();
+    ASSERT_NE(info, nullptr);
+    ASSERT_GE(info->startIndex_, 0);
+    ASSERT_GE(info->endIndex_, 0);
+    const int32_t originStart = info->startIndex_;
+    const int32_t originEnd = info->endIndex_;
+    // Increase totalItemCount beyond built items to simulate unbuilt items
+    info->firstRepeatCount_ = 0;
+    info->childrenCount_ = 200; // 200 : simulate 200 items, only 50 built
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+    // Unbuilt items (idx 50..199) silently skipped, info state unchanged
+    EXPECT_EQ(info->startIndex_, originStart);
+    EXPECT_EQ(info->endIndex_, originEnd);
+}
+
 } // namespace OHOS::Ace::NG

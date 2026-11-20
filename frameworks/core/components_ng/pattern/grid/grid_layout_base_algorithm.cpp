@@ -374,13 +374,17 @@ RefPtr<LayoutWrapper> GridLayoutBaseAlgorithm::GetGridItem(
     return wrapper;
 }
 
-void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(
-    LayoutWrapper* layoutWrapper, int32_t cacheCount, bool expandToFullMatrix)
+void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
 {
     CHECK_NULL_VOID(layoutWrapper);
     if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
         return;
     }
+    UpdateGridDecodeCacheWindowInternal(layoutWrapper, cacheCount);
+}
+
+void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindowInternal(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+{
     auto host = layoutWrapper->GetHostNode();
     CHECK_NULL_VOID(host);
     auto props = host->GetLayoutProperty<GridLayoutProperty>();
@@ -404,13 +408,7 @@ void GridLayoutBaseAlgorithm::UpdateGridDecodeCacheWindow(
         startLine - decodeWindow, endLine + decodeWindow,
         startLine - cacheCount, endLine + cacheCount);
     auto decodeItems = CollectDecodeItems(startLine - decodeWindow, endLine + decodeWindow);
-    int32_t cacheStartLine = startLine - cacheCount;
-    int32_t cacheEndLine = endLine + cacheCount;
-    if (expandToFullMatrix) {
-        cacheStartLine = std::min(cacheStartLine, info_.gridMatrix_.begin()->first);
-        cacheEndLine = std::max(cacheEndLine, info_.gridMatrix_.rbegin()->first);
-    }
-    ApplyItemDecodeState(host, cacheStartLine, cacheEndLine, decodeItems);
+    ApplyItemDecodeState(host, decodeItems);
 }
 
 std::set<int32_t> GridLayoutBaseAlgorithm::CollectDecodeItems(int32_t decodeStartLine, int32_t decodeEndLine) const
@@ -427,28 +425,19 @@ std::set<int32_t> GridLayoutBaseAlgorithm::CollectDecodeItems(int32_t decodeStar
 }
 
 void GridLayoutBaseAlgorithm::ApplyItemDecodeState(
-    const RefPtr<FrameNode>& host, int32_t cacheStartLine, int32_t cacheEndLine, const std::set<int32_t>& decodeItems)
+    const RefPtr<FrameNode>& host, const std::set<int32_t>& decodeItems)
 {
     CHECK_NULL_VOID(host);
-    std::set<int32_t> processed;
     std::set<int32_t> processedNodeIds;
-    for (auto lineIt = info_.gridMatrix_.lower_bound(cacheStartLine);
-         lineIt != info_.gridMatrix_.end() && lineIt->first <= cacheEndLine; ++lineIt) {
-        for (const auto& entry : lineIt->second) {
-            int32_t itemIdx = entry.second;
-            itemIdx = itemIdx < 0 ? -itemIdx : itemIdx;
-            if (processed.count(itemIdx) > 0) {
-                continue;
-            }
-            processed.insert(itemIdx);
-            bool active = decodeItems.count(itemIdx) > 0;
-            auto itemFrameNode = AceType::Claim(host->GetFrameNodeChildByIndexWithoutBuild(itemIdx));
-            CHECK_NULL_CONTINUE(itemFrameNode);
-            if (!processedNodeIds.insert(itemFrameNode->GetId()).second) {
-                continue;
-            }
-            ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+    const int32_t totalItemCount = info_.GetChildrenCount();
+    for (int32_t idx = 0; idx < totalItemCount; ++idx) {
+        auto itemFrameNode = AceType::Claim(host->GetFrameNodeChildByIndexWithoutBuild(idx));
+        CHECK_NULL_CONTINUE(itemFrameNode);
+        if (!processedNodeIds.insert(itemFrameNode->GetId()).second) {
+            continue;
         }
+        bool active = decodeItems.count(idx) > 0;
+        ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
     }
 }
 } // namespace OHOS::Ace::NG

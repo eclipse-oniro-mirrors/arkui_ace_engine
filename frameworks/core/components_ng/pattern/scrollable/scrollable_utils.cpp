@@ -351,15 +351,18 @@ int32_t ScrollableUtils::CalcDecodeWindowCount(int32_t cacheCount)
     return window;
 }
 
-void ScrollableUtils::UpdateCachedItemDecodeState(const RefPtr<FrameNode>& root, bool active)
+void ScrollableUtils::UpdateCachedItemDecodeState(const RefPtr<UINode>& root, bool active)
 {
     CHECK_NULL_VOID(root);
-    auto pattern = root->GetPattern<ImagePattern>();
-    if (pattern) {
-        pattern->SetDecodeCacheActive(active);
+    auto frameNode = AceType::DynamicCast<FrameNode>(root);
+    if (frameNode) {
+        auto pattern = frameNode->GetPattern<ImagePattern>();
+        if (pattern) {
+            pattern->SetDecodeCacheActive(active);
+        }
     }
     for (const auto& child : root->GetChildren()) {
-        UpdateCachedItemDecodeState(AceType::DynamicCast<FrameNode>(child), active);
+        UpdateCachedItemDecodeState(child, active);
     }
 }
 } // namespace OHOS::Ace::NG

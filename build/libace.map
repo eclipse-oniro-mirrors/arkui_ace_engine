@@ -2405,7 +2405,7 @@
       "OHOS::Ace::NG::ScrollableUtils::IsLowMemoryDeviceRuntime()";
       "OHOS::Ace::NG::ScrollableUtils::RecycleItemsOutOfBoundary(OHOS::Ace::Axis, float, int, int, OHOS::Ace::NG::LayoutWrapper*)";
       "OHOS::Ace::NG::ScrollableUtils::ResolveEffectiveDefaultContentClip(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::NG::ScrollablePaintProperty const*)";
-      "OHOS::Ace::NG::ScrollableUtils::UpdateCachedItemDecodeState(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
+      "OHOS::Ace::NG::ScrollableUtils::UpdateCachedItemDecodeState(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, bool)";
       "OHOS::Ace::NG::ScrollAdjustmanager::AdjustCachedCount(int)";
       "OHOS::Ace::NG::ScrollAdjustmanager::AdjustEndIndex(int)";
       "OHOS::Ace::NG::ScrollAdjustmanager::GetInstance()";

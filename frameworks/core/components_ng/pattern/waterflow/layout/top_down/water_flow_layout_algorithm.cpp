@@ -393,6 +393,7 @@ void WaterFlowLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     } else {
         LayoutFooter(layoutWrapper, childFrameOffset, layoutProperty->IsReverse());
     }
+    UpdateWaterFlowDecodeCacheWindow(layoutWrapper, cachedCount);
     UpdateOverlay(layoutWrapper);
 
     ClearUnlayoutedItems(layoutWrapper);

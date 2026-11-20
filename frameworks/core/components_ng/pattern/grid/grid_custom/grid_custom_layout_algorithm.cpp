@@ -136,7 +136,7 @@ void GridCustomLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     wrapper_->SetActiveChildRange(
         startIndex, endIndex, cachedItemCnt.first, cachedItemCnt.second, props->GetShowCachedItemsValue(false));
     wrapper_->SetCacheCount(cachedItemCnt.first);
-    UpdateGridDecodeCacheWindow(wrapper_, cacheLines, true);
+    UpdateGridDecodeCacheWindow(wrapper_, cacheLines);
     UpdateOverlay(wrapper_);
 }
 

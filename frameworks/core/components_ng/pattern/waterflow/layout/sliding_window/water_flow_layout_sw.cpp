@@ -417,6 +417,7 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         DeactivateFooter();
     }
 
+    UpdateWaterFlowDecodeCacheWindow(wrapper_, cacheCount);
     UpdateOverlay(wrapper_);
     isLayouted_ = true;
 }
