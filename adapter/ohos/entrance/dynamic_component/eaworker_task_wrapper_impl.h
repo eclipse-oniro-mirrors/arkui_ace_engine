@@ -41,8 +41,8 @@ public:
 private:
     void DumpWorker();
     bool HasAttachCurrentThread(pthread_t tid);
-    void AttachThread(pthread_t tid);
-    void DetachThread(pthread_t tid);
+    void AddAttachedThread(pthread_t tid);
+    void RemoveAttachedThread(pthread_t tid);
 
     pthread_t threadId_ = 0;
     int32_t hostInstanceId_ = -1;
