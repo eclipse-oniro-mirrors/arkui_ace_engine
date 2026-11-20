@@ -21,7 +21,7 @@
  *   只演示 draggable 开关; 本页首次把 copyOption 与 draggable 组成 3×2 组合矩阵,
  *   并在同一页面内完成"拖出源 + 落点区 + 结果回传"的闭环.
  * - onDragStart 返回 DragItemInfo(自定义拖拽预览图 + extraInfo), 而非仅返回预览图,
- *   该写法以 master 文档 onDragStart 回调签名 CustomBuilder | DragItemInfo 为准.
+ *   该写法以 OpenHarmony 官方文档 onDragStart 回调签名 CustomBuilder | DragItemInfo 为准.
  *
  * 文档依据 (ts-basic-components-image.md):
  * - copyOption(value: CopyOptions): 非 CopyOptions.None 时支持长按/右击/CTRL+C 复制; SVG图片不支持复制; 默认 None.

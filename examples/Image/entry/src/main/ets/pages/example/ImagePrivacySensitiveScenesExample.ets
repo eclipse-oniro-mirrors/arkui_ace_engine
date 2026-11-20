@@ -269,8 +269,8 @@ struct ImagePrivacySensitiveScenesExample {
                 })
             }, (preset: BlurPreset) => preset.radius.toString())
           }
-          Text('当前父容器模糊: ' + this.blurLabel() + ' · 对比卡右侧列 privacySensitive = '
-            + (this.privacyRightOn ? 'true' : 'false'))
+          Text('当前父容器模糊: ' + this.blurLabel() + ' · 对比卡右侧列 privacySensitive = ' +
+            (this.privacyRightOn ? 'true' : 'false'))
             .fontSize(13)
             .fontColor(Color.Gray)
         }
@@ -424,8 +424,8 @@ struct ImagePrivacySensitiveScenesExample {
         .backgroundColor('#F5F5F5')
         .borderRadius(10)
 
-        Text('对比卡总数: ' + this.cardConfigs.length + ' / 计划 ' + COMPARE_CARD_TOTAL
-          + ' · PixelMap就绪: ' + (this.pixelMapsReady ? '是' : '否'))
+        Text('对比卡总数: ' + this.cardConfigs.length + ' / 计划 ' + COMPARE_CARD_TOTAL +
+          ' · PixelMap就绪: ' + (this.pixelMapsReady ? '是' : '否'))
           .fontSize(13)
         Text('privacySensitive 不改变正常模式显示; 半透明底板样式仅在系统隐私模式(需卡片框架支持)下生效')
           .fontSize(12)
