@@ -236,12 +236,12 @@ ArkUINativeModuleValue TextTimerBridge::SetFontWeight(ArkUIRuntimeCallInfo* runt
         } else if (fontWeightArg->IsUndefined() && ArkTSUtils::IsJsView(nodeArg, vm)) {
             auto textTheme = ArkTSUtils::GetTheme<TextTheme>();
             CHECK_NULL_RETURN(textTheme, panda::JSValueRef::Undefined(vm));
-            fontWeight = V2::ConvertWrapFontWeightToStirng(textTheme->GetTextStyle().GetFontWeight());
+            fontWeight = StringUtils::FontWeightToString(textTheme->GetTextStyle().GetFontWeight());
         }
     } else if (ArkTSUtils::IsJsView(nodeArg, vm)) {
         auto textTheme = ArkTSUtils::GetTheme<TextTheme>();
         CHECK_NULL_RETURN(textTheme, panda::JSValueRef::Undefined(vm));
-        fontWeight = V2::ConvertWrapFontWeightToStirng(textTheme->GetTextStyle().GetFontWeight());
+        fontWeight = StringUtils::FontWeightToString(textTheme->GetTextStyle().GetFontWeight());
     }
     auto nodeModifiers = GetArkUINodeModifiers();
     CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));

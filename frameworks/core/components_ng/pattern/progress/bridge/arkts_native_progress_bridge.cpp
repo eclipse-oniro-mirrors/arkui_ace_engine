@@ -171,7 +171,7 @@ ArkUINativeModuleValue ProgressBridge::SetProgressValue(ArkUIRuntimeCallInfo* ru
     bool isJsView = ArkTSUtils::IsJsView(vm, firstArg);
     auto nodeModifiers = GetArkUINodeModifiers();
     CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));
-    if (secondArg->IsNumber()) {
+    if (secondArg->IsNumber() || (isJsView && secondArg->IsString(vm))) {
         ArkUI_Float32 value = secondArg->ToNumber(vm)->Value();
         if (std::isnan(value)) {
             if (!isJsView) {
