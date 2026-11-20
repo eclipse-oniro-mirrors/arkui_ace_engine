@@ -315,6 +315,22 @@ struct Index {
             console.log('router ImageBase64SvgExample');
             router.pushUrl({ url: 'pages/example/ImageBase64SvgExample' })
           })
+          Button('router ImageMatrixPipelineExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageMatrixPipelineExample' })
+          })
+
+          Button('router ImageOrientationFlipExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageOrientationFlipExample' })
+          })
+
+          Button('router ImageHdrDynamicRangeExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageHdrDynamicRangeExample' })
+          })
+
+          Button('router ImageMatrixAntialiasedExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageMatrixAntialiasedExample' })
+          })
+
 
           Button('router ImageContentDetectionExample').onClick(() => {
             console.log('router ImageContentDetectionExample');
