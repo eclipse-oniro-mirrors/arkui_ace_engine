@@ -237,8 +237,8 @@ struct ImageRetryReloadKeyExample {
       timeText: new Date().toLocaleTimeString() + '.' + (Date.now() % 1000).toString()
     };
     this.eventSeq.unshift(entry);
-    console.info('ImageRetrySeq#' + entry.seq + ' ' + name + ' src=' + srcName
-      + ' detail=' + detail);
+    console.info('ImageRetrySeq#' + entry.seq + ' ' + name + ' src=' + srcName +
+      ' detail=' + detail);
   }
 
   /**
@@ -301,9 +301,9 @@ struct ImageRetryReloadKeyExample {
                 this.bumpStat(this.srcIndex, 'decode');
                 this.recovered = true;
                 this.pushEvent('onComplete',
-                  'loadingStatus=1 解码成功 ' + event.width.toString() + 'x'
-                    + event.height.toString() + ' 绘制' + event.contentWidth.toString() + 'x'
-                    + event.contentHeight.toString(), this.currentLabel());
+                  'loadingStatus=1 解码成功 ' + event.width.toString() + 'x' +
+                    event.height.toString() + ' 绘制' + event.contentWidth.toString() + 'x' +
+                    event.contentHeight.toString(), this.currentLabel());
               } else {
                 this.pushEvent('onComplete',
                   event !== undefined ? 'loadingStatus=0 数据加载成功' : 'onComplete(无参数)',
@@ -315,8 +315,8 @@ struct ImageRetryReloadKeyExample {
               this.bumpStat(this.srcIndex, 'fail');
               this.recovered = false;
               this.pushEvent('onError',
-                'message=' + (e.message !== undefined ? e.message : '(API<10无message)')
-                  + ' errCode=' + (e.error !== undefined ? e.error.code.toString() : '(API<20无error)'),
+                'message=' + (e.message !== undefined ? e.message : '(API<10无message)') +
+                  ' errCode=' + (e.error !== undefined ? e.error.code.toString() : '(API<20无error)'),
                 this.currentLabel());
             })
             .onFinish(() => {
@@ -360,8 +360,8 @@ struct ImageRetryReloadKeyExample {
               .fontColor(this.recovered ? Color.Green : Color.Red)
               .layoutWeight(1)
           }.width('100%')
-          Text('提示：连续点击"切换图源并重载"，坏图源使 failCount 增长，'
-            + '切回好图源后 successCount/decodeCount 增长且状态恢复。')
+          Text('提示：连续点击"切换图源并重载"，坏图源使 failCount 增长，' +
+            '切回好图源后 successCount/decodeCount 增长且状态恢复。')
             .fontSize(12).fontColor('#888888')
         }
         .width('100%')
@@ -384,8 +384,8 @@ struct ImageRetryReloadKeyExample {
             Text(this.autoOn ? '运行中…' : '已停止').fontSize(14)
               .fontColor(this.autoOn ? Color.Green : '#999999')
           }
-          Text('自动模式下坏图源持续推高 failCount，好图源使 decodeCount 回升，'
-            + '直观呈现"错误计数—重试—恢复"闭环。').fontSize(12).fontColor('#888888')
+          Text('自动模式下坏图源持续推高 failCount，好图源使 decodeCount 回升，' +
+            '直观呈现"错误计数—重试—恢复"闭环。').fontSize(12).fontColor('#888888')
         }
         .width('100%')
         .padding(15)
@@ -441,8 +441,8 @@ struct ImageRetryReloadKeyExample {
         // 事件顺序观测卡
         Column({ space: 8 }) {
           Text('onComplete/onError 触发顺序观测（最新在前）').fontSize(16).fontColor(Color.Gray)
-          Text('观测点：切换图源瞬间，旧一轮的迟到事件可能先于新一轮事件到达；'
-            + '成功加载的 onComplete 会先后到达两条（loadingStatus 0 → 1）。')
+          Text('观测点：切换图源瞬间，旧一轮的迟到事件可能先于新一轮事件到达；' +
+            '成功加载的 onComplete 会先后到达两条（loadingStatus 0 → 1）。')
             .fontSize(12).fontColor('#888888')
           ForEach(this.eventSeq, (e: RetryEventEntry, index: number) => {
             Row({ space: 8 }) {
@@ -473,13 +473,13 @@ struct ImageRetryReloadKeyExample {
         // reloadKey 语义卡
         Column({ space: 8 }) {
           Text('reloadKey 语义速查（摘自官方文档）').fontSize(16).fontColor(Color.Gray)
-          Text('接口: Image(src: PixelMap | ResourceStr | DrawableDescriptor | ImageContent,'
-            + ' reloadKey?: string)').fontSize(12).fontFamily('monospace')
-          Text('当reloadKey值发生变化时，即使使用相同的图片，也会重新加载图片。'
-            + '适用于图片源地址不变但图片内容已更新的场景（例如本地图片内容被覆写）。'
-            + '默认值：空字符串。').fontSize(12)
-          Text('本页面用法：状态变量驱动构造参数重算，"仅改reloadKey重载"按钮演示同址强刷；'
-            + '属性直通式(updateConstructorParams)见 ImageReloadKeyScenarioExample 页面，两页互补不重复。')
+          Text('接口: Image(src: PixelMap | ResourceStr | DrawableDescriptor | ImageContent,' +
+            ' reloadKey?: string)').fontSize(12).fontFamily('monospace')
+          Text('当reloadKey值发生变化时，即使使用相同的图片，也会重新加载图片。' +
+            '适用于图片源地址不变但图片内容已更新的场景（例如本地图片内容被覆写）。' +
+            '默认值：空字符串。').fontSize(12)
+          Text('本页面用法：状态变量驱动构造参数重算，"仅改reloadKey重载"按钮演示同址强刷；' +
+            '属性直通式(updateConstructorParams)见 ImageReloadKeyScenarioExample 页面，两页互补不重复。')
             .fontSize(12).fontColor('#888888')
         }
         .width('100%')
@@ -487,9 +487,9 @@ struct ImageRetryReloadKeyExample {
         .backgroundColor('#F5F5F5')
         .borderRadius(10)
         // 约束脚注
-        Text('约束：onComplete/onError/onFinish 在图源为 AnimatedDrawableDescriptor 时不触发；'
-            + 'onError 的 error 字段(BusinessError<void>)自API20、message自API10；'
-            + 'contentWidth等绘制字段仅在loadingStatus=1时有效(API10+)。')
+        Text('约束：onComplete/onError/onFinish 在图源为 AnimatedDrawableDescriptor 时不触发；' +
+            'onError 的 error 字段(BusinessError<void>)自API20、message自API10；' +
+            'contentWidth等绘制字段仅在loadingStatus=1时有效(API10+)。')
           .fontSize(12).fontColor(Color.Blue).margin({ bottom: 20 })
       }.width('100%').padding({ left: 20, right: 20 })
     }.width('100%').height('100%').backgroundColor(Color.White)

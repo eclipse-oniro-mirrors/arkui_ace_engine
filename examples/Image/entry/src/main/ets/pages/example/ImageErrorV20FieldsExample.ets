@@ -209,11 +209,11 @@ struct ImageErrorV20FieldsExample {
       timeText: new Date().toLocaleTimeString()
     };
     this.captures.unshift(cap);
-    this.triggerRows[index] = 'error.code(20+) = ' + cap.errCode.toString() + '\n'
-      + 'error.message(20+) = ' + cap.errMsg + '\n'
-      + 'message(10+) = ' + cap.message10 + '\n'
-      + 'downloadInfo(23+) = '
-      + (cap.downloadInfoText.indexOf('null(') === 0 ? 'null' : cap.downloadInfoText);
+    this.triggerRows[index] = 'error.code(20+) = ' + cap.errCode.toString() + '\n' +
+      'error.message(20+) = ' + cap.errMsg + '\n' +
+      'message(10+) = ' + cap.message10 + '\n' +
+      'downloadInfo(23+) = ' +
+      (cap.downloadInfoText.indexOf('null(') === 0 ? 'null' : cap.downloadInfoText);
     console.warn('ImageErrorV20Fields captured: ' + cap.rawJson);
   }
 
@@ -232,8 +232,8 @@ struct ImageErrorV20FieldsExample {
         // 版本演进总览卡
         Column({ space: 8 }) {
           Text('ImageError 三代字段形态总览').fontSize(16).fontColor(Color.Gray)
-          Text('onError(callback: ImageErrorCallback)，'
-            + 'ImageErrorCallback = (error: ImageError) => void。').fontSize(12)
+          Text('onError(callback: ImageErrorCallback)，' +
+            'ImageErrorCallback = (error: ImageError) => void。').fontSize(12)
           Text('API9 : componentWidth/componentHeight 基础组件尺寸字段').fontSize(12)
           Text('API10: message 报错信息字符串').fontSize(12)
           Text('API20: error: BusinessError<void>，默认{ code : -1, message : "" }').fontSize(12)
@@ -327,10 +327,10 @@ struct ImageErrorV20FieldsExample {
         // BusinessError<20+> 形态卡
         Column({ space: 8 }) {
           Text('BusinessError<20+> 形态速查').fontSize(16).fontColor(Color.Gray)
-          Text("type BusinessError<T = void> = import('../api/@ohos.base').BusinessError<T>")
+          Text('type BusinessError<T = void> = import(\'../api/@ohos.base\').BusinessError<T>')
             .fontSize(11).fontFamily('monospace')
-          Text('ImageError.error 即该类型实例：code为错误码、message为错误信息；'
-            + '默认值 { code : -1, message : "" }。').fontSize(12)
+          Text('ImageError.error 即该类型实例：code为错误码、message为错误信息；' +
+            '默认值 { code : -1, message : "" }。').fontSize(12)
           Text('网络文件相关错误码（文档错误信息表摘录）：').fontSize(12).fontColor('#666666')
           Text('102010 sync http task of uri cancelled. —— 同步网络请求被取消').fontSize(11)
           Text('102011 sync http task of uri failed. —— 同步加载失败(网络异常/地址不可达/无INTERNET权限)')
@@ -376,8 +376,8 @@ struct ImageErrorV20FieldsExample {
         // RequestDownloadInfo<23+> 字段解读卡
         Column({ space: 8 }) {
           Text('RequestDownloadInfo<23+> 字段解读').fontSize(16).fontColor(Color.Gray)
-          Text("type RequestDownloadInfo = import('../api/@ohos.request.cacheDownload')"
-            + ".default.DownloadInfo")
+          Text('type RequestDownloadInfo = import(\'../api/@ohos.request.cacheDownload\')' +
+            '.default.DownloadInfo')
             .fontSize(11).fontFamily('monospace')
           Button(this.showDlTable ? '收起字段表' : '展开字段表').fontSize(13).onClick(() => {
             this.showDlTable = !this.showDlTable;
@@ -397,9 +397,9 @@ struct ImageErrorV20FieldsExample {
               .border({ width: { bottom: 1 }, color: '#ECECEC' })
             }, (row: DlFieldRow, index: number) => 'dlf_' + index.toString())
           }
-          Text('说明：downloadInfo 仅在"图片来源为网络图片且下载失败"时携带；'
-            + '本页刻意不发起真实请求，捕获值预期为 null。'
-            + '真实网络图加载需申请 ohos.permission.INTERNET，可对照文档示例29观察非空形态。')
+          Text('说明：downloadInfo 仅在"图片来源为网络图片且下载失败"时携带；' +
+            '本页刻意不发起真实请求，捕获值预期为 null。' +
+            '真实网络图加载需申请 ohos.permission.INTERNET，可对照文档示例29观察非空形态。')
             .fontSize(11).fontColor('#888888')
         }
         .width('100%')
@@ -418,8 +418,8 @@ struct ImageErrorV20FieldsExample {
               }.width('100%')
               Text('message(10+) = ' + cap.message10).fontSize(11).maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text('error(20+) = ' + (cap.hasErrorField ? '存在' : '缺失')
-                + '，message = ' + cap.errMsg).fontSize(11).maxLines(2)
+              Text('error(20+) = ' + (cap.hasErrorField ? '存在' : '缺失') +
+                '，message = ' + cap.errMsg).fontSize(11).maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
               Text('downloadInfo(23+) = ' + cap.downloadInfoText).fontSize(11)
                 .fontColor('#6A1B9A').maxLines(2)
@@ -463,9 +463,9 @@ struct ImageErrorV20FieldsExample {
         .backgroundColor('#F5F5F5')
         .borderRadius(10)
         // 约束脚注
-        Text('约束：error字段自API20、downloadInfo字段自API23（卡片能力/原子化服务同步放开）；'
-          + '两者仅Stage模型可用；低版本运行环境读取不到高版本字段时本页已按"缺失"标注，'
-          + '未引用任何文档不存在的字段名。')
+        Text('约束：error字段自API20、downloadInfo字段自API23（卡片能力/原子化服务同步放开）；' +
+          '两者仅Stage模型可用；低版本运行环境读取不到高版本字段时本页已按"缺失"标注，' +
+          '未引用任何文档不存在的字段名。')
           .fontSize(12).fontColor(Color.Blue).margin({ bottom: 20 })
       }.width('100%').padding({ left: 20, right: 20 })
     }.width('100%').height('100%').backgroundColor(Color.White)

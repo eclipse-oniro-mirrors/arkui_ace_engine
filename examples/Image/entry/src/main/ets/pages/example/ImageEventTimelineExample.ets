@@ -148,8 +148,8 @@ struct ImageEventTimelineExample {
     };
     this.lastEventTs = now;
     this.timeline.unshift(entry);
-    console.info('[ImageTimeline] #' + entry.seq.toString() + ' +' + entry.relMs.toString()
-      + 'ms (gap ' + entry.gapMs.toString() + 'ms) ' + tag + ' [' + src + '] ' + detail);
+    console.info('[ImageTimeline] #' + entry.seq.toString() + ' +' + entry.relMs.toString() +
+      'ms (gap ' + entry.gapMs.toString() + 'ms) ' + tag + ' [' + src + '] ' + detail);
   }
 
   /**
@@ -205,10 +205,10 @@ struct ImageEventTimelineExample {
     if (event.loadingStatus === 1) {
       this.lastComplete = event;
       this.push('onComplete(1)', srcLabel,
-        '解码成功 图片' + event.width.toString() + 'x' + event.height.toString()
-          + ' 组件' + event.componentWidth.toString() + 'x' + event.componentHeight.toString()
-          + ' 绘制' + event.contentWidth.toString() + 'x' + event.contentHeight.toString()
-          + ' 偏移(' + event.contentOffsetX.toString() + ',' + event.contentOffsetY.toString() + ')');
+        '解码成功 图片' + event.width.toString() + 'x' + event.height.toString() +
+          ' 组件' + event.componentWidth.toString() + 'x' + event.componentHeight.toString() +
+          ' 绘制' + event.contentWidth.toString() + 'x' + event.contentHeight.toString() +
+          ' 偏移(' + event.contentOffsetX.toString() + ',' + event.contentOffsetY.toString() + ')');
     } else {
       this.push('onComplete(0)', srcLabel,
         '数据加载成功 图片' + event.width.toString() + 'x' + event.height.toString());
@@ -220,9 +220,9 @@ struct ImageEventTimelineExample {
    */
   private onImgError(srcLabel: string, e: ImageError): void {
     this.push('onError', srcLabel,
-      'message=' + (e.message !== undefined ? e.message : '(API<10)')
-        + ' code=' + (e.error !== undefined ? e.error.code.toString() : '(API<20)')
-        + ' 组件=' + e.componentWidth.toFixed(1) + 'x' + e.componentHeight.toFixed(1));
+      'message=' + (e.message !== undefined ? e.message : '(API<10)') +
+        ' code=' + (e.error !== undefined ? e.error.code.toString() : '(API<20)') +
+        ' 组件=' + e.componentWidth.toFixed(1) + 'x' + e.componentHeight.toFixed(1));
   }
 
   /**
@@ -482,9 +482,9 @@ struct ImageEventTimelineExample {
         .backgroundColor('#F5F5F5')
         .borderRadius(10)
         // 约束脚注
-        Text('约束：onFinish 仅对带动效SVG生效且无限循环动效不触发；AnimatedDrawableDescriptor'
-          + '图源不触发onComplete/onError/onFinish；contentWidth等绘制字段(10+)仅在'
-          + 'loadingStatus=1时有效。')
+        Text('约束：onFinish 仅对带动效SVG生效且无限循环动效不触发；AnimatedDrawableDescriptor' +
+          '图源不触发onComplete/onError/onFinish；contentWidth等绘制字段(10+)仅在' +
+          'loadingStatus=1时有效。')
           .fontSize(12).fontColor(Color.Blue).margin({ bottom: 20 })
       }.width('100%').padding({ left: 20, right: 20 })
     }.width('100%').height('100%').backgroundColor(Color.White)
