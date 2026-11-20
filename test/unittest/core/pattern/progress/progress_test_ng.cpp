@@ -2388,12 +2388,20 @@ HWTEST_F(ProgressTestNg, ProgressModelNGSetCapsuleStyle, TestSize.Level0)
  */
 HWTEST_F(ProgressTestNg, ProgressModelStaticSetPrivacySensitive, TestSize.Level0)
 {
+    /**
+     * @tc.step: step1. create instance and update property.
+     */
     CreateProgress(VALUE_OF_PROGRESS, MAX_VALUE_OF_PROGRESS, PROGRESS_TYPE_LINEAR);
     std::optional<bool> flag = true;
     ProgressModelStatic::SetPrivacySensitive(AceType::RawPtr(frameNode_), flag);
     ASSERT_NE(paintProperty_, nullptr);
     auto ret = paintProperty_->GetIsSensitiveValue(false);
     EXPECT_TRUE(ret);
+
+    /**
+     * @tc.case: case1 call to static function SetPrivacySensitive after reset.
+     * @tc.expected: it should be no value after reset.
+     */
     flag.reset();
     ProgressModelStatic::SetPrivacySensitive(AceType::RawPtr(frameNode_), flag);
     EXPECT_FALSE(paintProperty_->GetIsSensitive().has_value());
@@ -2406,6 +2414,9 @@ HWTEST_F(ProgressTestNg, ProgressModelStaticSetPrivacySensitive, TestSize.Level0
  */
 HWTEST_F(ProgressTestNg, ProgressModelStaticSetValue, TestSize.Level0)
 {
+    /**
+     * @tc.step: step1. create instance and update property.
+     */
     CreateProgress(VALUE_OF_PROGRESS, MAX_VALUE_OF_PROGRESS, PROGRESS_TYPE_LINEAR);
     std::optional<double> value = 1.0;
     ASSERT_NE(pattern_, nullptr);
@@ -2415,6 +2426,10 @@ HWTEST_F(ProgressTestNg, ProgressModelStaticSetValue, TestSize.Level0)
     auto ret = paintProperty_->GetValueValue(0.0);
     EXPECT_EQ(ret, value.value());
 
+    /**
+     * @tc.case: case1 call to static function SetValue after reset.
+     * @tc.expected: it should be no value after reset.
+     */
     value.reset();
     pattern_->SetTextFromUser(false);
     ProgressModelStatic::SetValue(AceType::RawPtr(frameNode_), value);
