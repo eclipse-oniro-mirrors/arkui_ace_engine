@@ -1454,18 +1454,13 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
             FlushFocusScroll();
         }
     }
-    if (SystemProperties::GetContainerDeleteFlag()) {
-        if (isNeedCallbackAreaChange_) {
-            isNeedCallbackAreaChange_ = false;
-            RenderContext::SetNeedCallbackNodeChange(true);
-            HandleOnAreaChangeEvent(nanoTimestamp);
-            HandleVisibleAreaChangeEvent(nanoTimestamp);
-        } else {
-            ACE_SCOPED_TRACE("SkipAreaChangeEvent");
-        }
-    } else {
+    if (isNeedCallbackAreaChange_) {
+        isNeedCallbackAreaChange_ = false;
+        RenderContext::SetNeedCallbackNodeChange(true);
         HandleOnAreaChangeEvent(nanoTimestamp);
         HandleVisibleAreaChangeEvent(nanoTimestamp);
+    } else {
+        ACE_SCOPED_TRACE("SkipAreaChangeEvent");
     }
     UpdateFormLinkInfos();
     FlushDragEventVoluntarily();
