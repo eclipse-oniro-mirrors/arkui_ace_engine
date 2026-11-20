@@ -17,6 +17,8 @@
 
 #define private public
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_algorithm.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
+#include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h"
 #undef private
 
 #include <limits>
@@ -28,13 +30,11 @@
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/refresh/refresh_pattern.h"
-#include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/base/scroll_viewport_coordinator.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
-#include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h"
 
 namespace OHOS::Ace::NG {
 namespace {
