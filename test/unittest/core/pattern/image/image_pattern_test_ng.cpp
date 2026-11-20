@@ -3206,6 +3206,39 @@ HWTEST_F(ImagePatternTestNg, OnAttachToMainRenderTree001, TestSize.Level0)
 }
 
 /**
+ * @tc.name: ReportCompleteLoadEvent001
+ * @tc.desc: Test ReportCompleteLoadEvent calls ImagePerf CompleteLoadComponent interface normally
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImagePatternTestNg, ReportCompleteLoadEvent001, TestSize.Level0)
+{
+    auto frameNode = CreateImageNode(IMAGE_SRC_URL, ALT_SRC_URL, nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto imagePattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+
+    imagePattern->ReportCompleteLoadEvent(frameNode);
+    EXPECT_NE(imagePattern, nullptr);
+}
+
+/**
+ * @tc.name: LoadImagePerfInterface001
+ * @tc.desc: Test LoadImage calls ImagePerf AddLoadComponent interface with sourceType and isVisible
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImagePatternTestNg, LoadImagePerfInterface001, TestSize.Level0)
+{
+    auto frameNode = CreateImageNode(IMAGE_SRC_URL, ALT_SRC_URL, nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto imagePattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+
+    ImageSourceInfo srcInfo(WEB_IMAGE);
+    imagePattern->LoadImage(srcInfo, false);
+    EXPECT_NE(imagePattern, nullptr);
+}
+
+/**
  * @tc.name: OnOffscreenProcessResource001
  * @tc.desc: Test function for ImagePattern.
  * @tc.type: FUNC

@@ -25,9 +25,10 @@ public:
     void StartRecordImageLoadStat(int64_t id) override;
     void EndRecordImageLoadStat(
         int64_t id, const std::string& imageType, std::pair<int32_t, int32_t> size, int32_t state) override;
-    void AddLoadComponent(int32_t nodeId) override;
+    void AddLoadComponent(int32_t nodeId, int32_t sourceType = 0, bool isVisible = false) override;
     void DeleteLoadComponent(int32_t nodeId) override;
-    void CompleteLoadComponent(int32_t nodeId) override;
+    void CompleteLoadComponent(int32_t nodeId, bool isVisible = false) override;
+    void AttachComponent(int32_t nodeId) override;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_ADAPTER_OHOS_OSAL_IMAGE_PERF_OHOS_H
