@@ -16,13 +16,26 @@
 #ifndef FOUNDATION_ACE_TEST_MOCK_OHOS_MOCK_IMAGE_PIXEL_MAP_H
 #define FOUNDATION_ACE_TEST_MOCK_OHOS_MOCK_IMAGE_PIXEL_MAP_H
 
+#include <cstdint>
+
 namespace OHOS {
 class MessageParcel;
 
 namespace Media {
 class PixelMap {
 public:
-    bool Marshalling(MessageParcel&) const { return true; }
+    int32_t GetWidth() const
+    {
+        return 0;
+    }
+    int32_t GetHeight() const
+    {
+        return 0;
+    }
+    bool Marshalling(MessageParcel&) const
+    {
+        return true;
+    }
 
     static PixelMap* Unmarshalling(MessageParcel& data)
     {
