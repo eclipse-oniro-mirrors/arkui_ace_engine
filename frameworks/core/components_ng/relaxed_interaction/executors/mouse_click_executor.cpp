@@ -4,6 +4,8 @@
  */
 #include "core/components_ng/relaxed_interaction/executors/mouse_click_executor.h"
 
+#include <algorithm>
+
 #include "core/components_ng/relaxed_interaction/utils/relaxed_event_factory.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -42,15 +44,28 @@ std::vector<KeyCode> ToModifierKeys(const std::vector<std::string>& modifiers)
 }
 } // namespace
 
+// Injection contract: SUCCESS means every synthesized event was handed to the pipeline
+// (mirrors real mouse dispatch, where a click on a blank window area is still delivered);
+// it does not imply a hit on an interactive component. Coordinates are clipped into the
+// window rect so off-window input lands on the nearest in-window point.
 MouseClickExecutor::MouseClickExecutor(WeakPtr<PipelineContext> context, const ClickInput& input)
     : BaseExecutor(context)
 {
+    auto coordinates = input.coordinates;
+    auto contextRef = context_.Upgrade();
+    if (contextRef) {
+        auto root = contextRef->GetRootRect();
+        if (root.IsValid() && !root.IsEmpty()) {
+            coordinates.SetX(std::clamp(coordinates.GetX(), root.Left(), root.Right()));
+            coordinates.SetY(std::clamp(coordinates.GetY(), root.Top(), root.Bottom()));
+        }
+    }
     auto button = ToMouseButton(input.button);
     auto pressedKeys = ToModifierKeys(input.modifiers);
     for (int32_t index = 0; index < input.clickCount; ++index) {
-        events_.emplace_back(RelaxedEventFactory::CreateMouseEvent(input.coordinates, MouseAction::PRESS, button,
+        events_.emplace_back(RelaxedEventFactory::CreateMouseEvent(coordinates, MouseAction::PRESS, button,
             static_cast<int32_t>(button), pressedKeys));
-        events_.emplace_back(RelaxedEventFactory::CreateMouseEvent(input.coordinates, MouseAction::RELEASE, button,
+        events_.emplace_back(RelaxedEventFactory::CreateMouseEvent(coordinates, MouseAction::RELEASE, button,
             0, pressedKeys));
     }
 }

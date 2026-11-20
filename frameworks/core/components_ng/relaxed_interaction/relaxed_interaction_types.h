@@ -86,10 +86,6 @@ inline constexpr char PRESS_KEY[] = "press_key";
 inline constexpr char WHEEL_SCROLL[] = "wheel_scroll";
 inline constexpr char PRESS_AND_MOVE[] = "press_and_move";
 
-// Marker key attached to injected key events so the event pipeline can
-// distinguish injected input from real user input.
-inline constexpr char RELAXED_INJECTED_KEY_MESSAGE[] = "__relaxed_interaction_injected";
-
 // Return status of ExecuteNextStep.
 enum class ExecutionState {
     NONE,

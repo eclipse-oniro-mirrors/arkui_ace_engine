@@ -615,6 +615,41 @@ HWTEST_F(PcInputInjectionParserTest, WheelFactory_PreservesLegacyVerticalOverloa
     EXPECT_DOUBLE_EQ(event.screenY, 20.0);
 }
 
+HWTEST_F(PcInputInjectionParserTest, KeyFactory_AlignsFieldsWithRealKeyboardPipeline, TestSize.Level1)
+{
+    // msg must stay empty: KeyEvent::msg doubles as the IME paste payload, and ctrl+v would
+    // otherwise type the marker string into a focused text box. Injection is marked by isInjected.
+    auto esc = RelaxedEventFactory::CreateKeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN, { KeyCode::KEY_ESCAPE });
+    EXPECT_TRUE(esc.isInjected);
+    EXPECT_TRUE(esc.msg.empty());
+    EXPECT_EQ(esc.keyIntention, KeyIntention::INTENTION_ESCAPE);
+    EXPECT_EQ(esc.key, "KEYCODE_ESCAPE");
+    EXPECT_EQ(esc.unicode, 0U);
+
+    auto letter = RelaxedEventFactory::CreateKeyEvent(KeyCode::KEY_A, KeyAction::DOWN, { KeyCode::KEY_A });
+    EXPECT_TRUE(letter.msg.empty());
+    EXPECT_EQ(letter.keyIntention, KeyIntention::INTENTION_UNKNOWN);
+    EXPECT_EQ(letter.unicode, static_cast<uint32_t>('a'));
+
+    auto digit = RelaxedEventFactory::CreateKeyEvent(KeyCode::KEY_5, KeyAction::DOWN, { KeyCode::KEY_5 });
+    EXPECT_EQ(digit.unicode, static_cast<uint32_t>('5'));
+}
+
+HWTEST_F(PcInputInjectionParserTest, MouseFactory_FillsPressedTimeAndButtonsArray, TestSize.Level1)
+{
+    auto press = RelaxedEventFactory::CreateMouseEvent(PointF(1.0f, 2.0f), MouseAction::PRESS,
+        MouseButton::LEFT_BUTTON, static_cast<int32_t>(MouseButton::LEFT_BUTTON), {});
+    EXPECT_NE(press.pressedTime.time_since_epoch().count(), 0);
+    ASSERT_EQ(press.pressedButtonsArray.size(), 1U);
+    EXPECT_EQ(press.pressedButtonsArray.front(), MouseButton::LEFT_BUTTON);
+
+    // RELEASE carries an empty pressed set: the button is no longer held.
+    auto release = RelaxedEventFactory::CreateMouseEvent(PointF(1.0f, 2.0f), MouseAction::RELEASE,
+        MouseButton::LEFT_BUTTON, 0, {});
+    EXPECT_NE(release.pressedTime.time_since_epoch().count(), 0);
+    EXPECT_TRUE(release.pressedButtonsArray.empty());
+}
+
 class PcWheelCoordinateTest : public testing::Test {
 protected:
     void SetUp() override
@@ -663,8 +698,9 @@ HWTEST_F(PcWheelCoordinateTest, WheelExecutor_UsesRootCenterOnlyWhenCoordinatesO
     explicitPoint.front()->SetDenyCallback(deny, {});
     EXPECT_EQ(explicitPoint.front()->ExecuteStep(), ExecutorResult::FAILED);
     EXPECT_EQ(checked, 2U);
-    EXPECT_FLOAT_EQ(observed.GetX(), 0.0f);
-    EXPECT_FLOAT_EQ(observed.GetY(), 0.0f);
+    // Off-window coordinates are clipped into the root rect (root spans [10, 610] x [20, 420]).
+    EXPECT_FLOAT_EQ(observed.GetX(), 10.0f);
+    EXPECT_FLOAT_EQ(observed.GetY(), 20.0f);
 
     auto mixedPoint = parser.Parse(Parse(
         R"({"action_info":{"delta":120, "coordinates":{"x1":42, "y1":64}}})"));
@@ -691,6 +727,26 @@ HWTEST_F(PcWheelCoordinateTest, WheelExecutor_RejectsMissingTargetForImplicitPoi
     EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::FAILED);
     EXPECT_EQ(executor.GetFailureState(), ExecutionState::TARGET_NOT_FOUND);
     EXPECT_EQ(checked, 0U);
+}
+
+HWTEST_F(PcWheelCoordinateTest, MouseClick_ClipsOffWindowCoordinatesIntoWindowRect, TestSize.Level1)
+{
+    ClickInput input;
+    input.coordinates = PointF(-5.0f, -5.0f);
+    MouseClickExecutor executor(WeakPtr<PipelineContext>(context_), input);
+    PointF observed;
+    size_t checked = 0;
+    executor.SetDenyCallback([&observed, &checked](const PointF& point, const RelaxedCommandIdentity&) {
+        observed = point;
+        ++checked;
+        return true;
+    }, {});
+    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::FAILED);
+    EXPECT_EQ(executor.GetFailureState(), ExecutionState::CONTROL_DENIED);
+    EXPECT_EQ(checked, 1U);
+    // The injected press lands on the nearest in-window point, not the raw off-window one.
+    EXPECT_FLOAT_EQ(observed.GetX(), 10.0f);
+    EXPECT_FLOAT_EQ(observed.GetY(), 20.0f);
 }
 
 HWTEST_F(PcInputInjectionParserTest, WheelExecutor_DistinguishesMissingContext, TestSize.Level1)
@@ -743,13 +799,15 @@ public:
         if (onKey) {
             onKey(key);
         }
-        return true;
+        return keyHandled;
     }
 
     std::vector<TouchEvent> touches;
     std::vector<MouseEvent> mice;
     std::vector<AxisEvent> axes;
     std::vector<KeyEvent> keys;
+    // Toggle to emulate a pipeline that swallows every key event (no focus / custom dispatcher).
+    bool keyHandled = true;
     std::function<void(const TouchEvent&)> onTouch;
     std::function<void(const MouseEvent&)> onMouse;
     std::function<void(const AxisEvent&)> onAxis;
@@ -1026,6 +1084,21 @@ HWTEST_F(PcInputInjectionParserTest, PressKey_NormalCompletionClearsPressedCodes
     EXPECT_TRUE(context->keys[3].pressedCodes.empty());
     EXPECT_FALSE(eventManager->IsKeyInPressed(KeyCode::KEY_CTRL_LEFT));
     EXPECT_FALSE(eventManager->IsKeyInPressed(KeyCode::KEY_A));
+}
+
+HWTEST_F(PcInputInjectionParserTest, PressKey_ReportsFailureWhenNoEventHandled, TestSize.Level1)
+{
+    // Emulate a pipeline that swallows every key event: the sequence must report failure
+    // instead of a silent success (key_executor uses the same handled-based semantics).
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    context->keyHandled = false;
+    KeyInput input {{KeyCode::KEY_A}, 0};
+    PressKeyExecutor executor(context, input);
+    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::FAILED);
+    EXPECT_EQ(executor.GetFailureState(), ExecutionState::FAILED);
+    ASSERT_EQ(context->keys.size(), 2U);
+    EXPECT_EQ(context->keys.front().action, KeyAction::DOWN);
+    EXPECT_TRUE(context->keys.front().msg.empty());
 }
 
 HWTEST_F(PcInputInjectionParserTest, PressKey_ReentrantCancelDuringUpReleasesRemainingKeysOnce, TestSize.Level1)

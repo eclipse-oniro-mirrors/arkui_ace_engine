@@ -90,7 +90,7 @@ ExecutorResult PressKeyExecutor::ExecuteStep()
     if (nextEvent_ == 0 && !holdStarted_) {
         holdStarted_ = true;
         holdStart_ = std::chrono::steady_clock::now();
-        DispatchKeyEvent(context, events_[nextEvent_++]);
+        anyHandled_ |= DispatchKeyEvent(context, events_[nextEvent_++]);
         if (completed_) {
             return ExecutorResult::SUCCESS;
         }
@@ -98,7 +98,7 @@ ExecutorResult PressKeyExecutor::ExecuteStep()
             return ExecutorResult::PENDING;
         }
     } else if (holdMs_ > 0 && nextEvent_ < keyCount_) {
-        DispatchKeyEvent(context, events_[nextEvent_++]);
+        anyHandled_ |= DispatchKeyEvent(context, events_[nextEvent_++]);
     }
     if (completed_) {
         return ExecutorResult::SUCCESS;
@@ -117,13 +117,18 @@ ExecutorResult PressKeyExecutor::FinishSequence(const RefPtr<PipelineContext>& c
             Cancel();
             return SetFailureState(ExecutionState::CONTEXT_UNAVAILABLE);
         }
-        DispatchKeyEvent(context, events_[nextEvent_++]);
+        anyHandled_ |= DispatchKeyEvent(context, events_[nextEvent_++]);
     }
     completed_ = true;
+    if (!anyHandled_) {
+        // Every DOWN/UP was swallowed (no focus or a custom dispatcher); report the
+        // sequence as failed instead of a silent no-op success.
+        return SetFailureState(ExecutionState::FAILED);
+    }
     return ExecutorResult::SUCCESS;
 }
 
-void PressKeyExecutor::DispatchKeyEvent(const RefPtr<PipelineContext>& context, KeyEvent event)
+bool PressKeyExecutor::DispatchKeyEvent(const RefPtr<PipelineContext>& context, KeyEvent event)
 {
     if (event.action == KeyAction::DOWN) {
         if (std::find(pressedKeys_.begin(), pressedKeys_.end(), event.code) == pressedKeys_.end()) {
@@ -133,6 +138,6 @@ void PressKeyExecutor::DispatchKeyEvent(const RefPtr<PipelineContext>& context, 
         pressedKeys_.erase(std::remove(pressedKeys_.begin(), pressedKeys_.end(), event.code), pressedKeys_.end());
     }
     event.pressedCodes = pressedKeys_;
-    context->OnNonPointerEvent(event);
+    return context->OnNonPointerEvent(event);
 }
 } // namespace OHOS::Ace::NG

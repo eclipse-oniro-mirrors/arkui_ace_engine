@@ -18,6 +18,7 @@
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
+#include "core/event/key_event_recognizer.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -25,6 +26,36 @@ namespace OHOS::Ace::NG {
 namespace {
 // Touch event constants to avoid magic numbers
 constexpr float HALF = 2.0f;
+
+// Bitmap order of MouseButton as consumed by applications via pressedButtonsArray.
+constexpr MouseButton MOUSE_BUTTONS[] = { MouseButton::LEFT_BUTTON, MouseButton::RIGHT_BUTTON,
+    MouseButton::MIDDLE_BUTTON, MouseButton::BACK_BUTTON, MouseButton::FORWARD_BUTTON };
+
+// Minimal code-to-character mapping for injected keys; mirrors what a real keyboard
+// reports for the alphanumeric block. Modifiers are not applied (base layer).
+uint32_t ResolveUnicode(KeyCode code)
+{
+    if (code >= KeyCode::KEY_A && code <= KeyCode::KEY_Z) {
+        return static_cast<uint32_t>('a') + static_cast<uint32_t>(code) - static_cast<uint32_t>(KeyCode::KEY_A);
+    }
+    if (code >= KeyCode::KEY_0 && code <= KeyCode::KEY_9) {
+        return static_cast<uint32_t>('0') + static_cast<uint32_t>(code) - static_cast<uint32_t>(KeyCode::KEY_0);
+    }
+    if (code >= KeyCode::KEY_NUMPAD_0 && code <= KeyCode::KEY_NUMPAD_9) {
+        return static_cast<uint32_t>('0') + static_cast<uint32_t>(code) - static_cast<uint32_t>(KeyCode::KEY_NUMPAD_0);
+    }
+    switch (code) {
+        case KeyCode::KEY_SPACE:
+            return static_cast<uint32_t>(' ');
+        case KeyCode::KEY_ENTER:
+        case KeyCode::KEY_NUMPAD_ENTER:
+            return static_cast<uint32_t>('\n');
+        case KeyCode::KEY_TAB:
+            return static_cast<uint32_t>('\t');
+        default:
+            return 0;
+    }
+}
 
 TouchPoint CreateTouchPoint(const PointF& coordinates, TouchType touchType)
 {
@@ -116,9 +147,15 @@ MouseEvent RelaxedEventFactory::CreateMouseEvent(const PointF& coordinates, Mous
     event.globalDisplayX = coordinates.GetX();
     event.globalDisplayY = coordinates.GetY();
     event.time = now;
+    event.pressedTime = now;
     event.action = action;
     event.button = button;
     event.pressedButtons = pressedButtons;
+    for (const auto& mouseButton : MOUSE_BUTTONS) {
+        if (pressedButtons & static_cast<int32_t>(mouseButton)) {
+            event.pressedButtonsArray.emplace_back(mouseButton);
+        }
+    }
     event.pressedKeyCodes_ = pressedKeyCodes;
     event.sourceType = SourceType::MOUSE;
     event.sourceTool = SourceTool::MOUSE;
@@ -168,7 +205,12 @@ KeyEvent RelaxedEventFactory::CreateKeyEvent(KeyCode code, KeyAction action,
     KeyEvent event(code, action, pressedCodes, repeatTime, std::chrono::high_resolution_clock::now(), 0, 0,
         SourceType::KEYBOARD, {});
     event.isInjected = true;
-    event.msg = RELAXED_INJECTED_KEY_MESSAGE;
+    // Keep injected key events consistent with the real keyboard pipeline: `msg` must stay
+    // empty because KeyEvent::msg doubles as the IME paste payload (text_input_client inserts
+    // it verbatim on ctrl+v), and the injection marker is `isInjected`.
+    event.keyIntention = keyItemsTransKeyIntention(event.pressedCodes);
+    event.key = KeyCodeToString(static_cast<int32_t>(code));
+    event.unicode = ResolveUnicode(code);
     return event;
 }
 

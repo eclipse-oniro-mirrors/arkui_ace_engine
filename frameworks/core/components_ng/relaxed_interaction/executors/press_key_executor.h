@@ -24,7 +24,7 @@ public:
 
 private:
     ExecutorResult FinishSequence(const RefPtr<PipelineContext>& context);
-    void DispatchKeyEvent(const RefPtr<PipelineContext>& context, KeyEvent event);
+    bool DispatchKeyEvent(const RefPtr<PipelineContext>& context, KeyEvent event);
 
     std::vector<KeyEvent> events_;
     std::vector<KeyCode> pressedKeys_;
@@ -35,6 +35,9 @@ private:
     bool holdStarted_ = false;
     bool completed_ = false;
     bool denyChecked_ = false;
+    // Mirrors key_executor semantics: the sequence succeeds only when the pipeline
+    // handled at least one of the dispatched DOWN/UP events.
+    bool anyHandled_ = false;
 };
 } // namespace OHOS::Ace::NG
 #endif
