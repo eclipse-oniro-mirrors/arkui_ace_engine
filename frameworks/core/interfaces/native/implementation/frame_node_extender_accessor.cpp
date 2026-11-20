@@ -229,7 +229,40 @@ Ark_Boolean IsModifiableImpl(Ark_NativePointer peer)
     auto isModifiable = peerNode->GetTag() == "CustomFrameNode";
     return Converter::ArkValue<Ark_Boolean>(isModifiable);
 }
-Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
+static bool DispatchTouchEvent(const Ark_TouchEventProxy& proxy, const RefPtr<NG::UINode>& node,
+                               const RefPtr<PostEventManager>& postEventManager, bool useCompetition)
+{
+    TouchEvent touchEvent;
+    BuilderNodeOpsAccessor::GetTouchEventFromProxy(proxy, touchEvent, false);
+    touchEvent.isNewReferee = useCompetition ? false : true;
+    return postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent));
+}
+
+static bool DispatchMouseEvent(Ark_MouseEvent mouseEventProxy, const RefPtr<NG::UINode>& node,
+                               const RefPtr<PostEventManager>& postEventManager, float density, bool useCompetition)
+{
+    CHECK_NULL_RETURN(mouseEventProxy, false);
+    auto mouseEventInfo = mouseEventProxy->GetEventInfo();
+    CHECK_NULL_RETURN(mouseEventInfo, false);
+    auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
+    mouseEvent.time = mouseEventInfo->GetTimeStamp();
+    mouseEvent.isNewReferee = useCompetition ? false : true;
+    return postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent));
+}
+
+static bool DispatchAxisEvent(Ark_AxisEvent axisEventProxy, const RefPtr<NG::UINode>& node,
+                              const RefPtr<PostEventManager>& postEventManager, float density, bool useCompetition)
+{
+    CHECK_NULL_RETURN(axisEventProxy, false);
+    auto axisEventInfo = axisEventProxy->GetEventInfo();
+    CHECK_NULL_RETURN(axisEventInfo, false);
+    auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
+    axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
+    axisEvent.isNewReferee = useCompetition ? false : true;
+    return postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent));
+}
+
+Ark_Boolean DispatchInputEventImpl(Ark_VMContext vmContext, Ark_FrameNode peer,
                                    const Ark_InputEventType* event,
                                    const Opt_CompetitionStrategy* competitionStrategy)
 {
@@ -251,37 +284,18 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
     const bool useCompetition =
         competitionStrategy->tag != InteropTag::INTEROP_TAG_UNDEFINED &&
         competitionStrategy->value == Ark_CompetitionStrategy::ARK_COMPETITION_STRATEGY_COMPETITION;
+    const float density = static_cast<float>(pipelineContext->GetDensity());
     bool result = false;
     switch (event->selector) {
-        case SELECTOR_ID_0: {
-            TouchEvent touchEvent;
-            BuilderNodeOpsAccessor::GetTouchEventFromProxy(event->value0, touchEvent, false);
-            touchEvent.isNewReferee = useCompetition ? false : true;
-            result = postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent));
+        case SELECTOR_ID_0:
+            result = DispatchTouchEvent(event->value0, node, postEventManager, useCompetition);
             break;
-        }
-        case SELECTOR_ID_1: {
-            CHECK_NULL_RETURN(event->value1, Converter::ArkValue<Ark_Boolean>(false));
-            auto mouseEventInfo = event->value1->GetEventInfo();
-            CHECK_NULL_RETURN(mouseEventInfo, Converter::ArkValue<Ark_Boolean>(false));
-            auto density = static_cast<float>(pipelineContext->GetDensity());
-            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
-            mouseEvent.time = mouseEventInfo->GetTimeStamp();
-            mouseEvent.isNewReferee = useCompetition ? false : true;
-            result = postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent));
+        case SELECTOR_ID_1:
+            result = DispatchMouseEvent(event->value1, node, postEventManager, density, useCompetition);
             break;
-        }
-        case SELECTOR_ID_2: {
-            CHECK_NULL_RETURN(event->value2, Converter::ArkValue<Ark_Boolean>(false));
-            auto axisEventInfo = event->value2->GetEventInfo();
-            CHECK_NULL_RETURN(axisEventInfo, Converter::ArkValue<Ark_Boolean>(false));
-            auto density = static_cast<float>(pipelineContext->GetDensity());
-            auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
-            axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
-            axisEvent.isNewReferee = useCompetition ? false : true;
-            result = postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent));
+        case SELECTOR_ID_2:
+            result = DispatchAxisEvent(event->value2, node, postEventManager, density, useCompetition);
             break;
-        }
         default:
             result = false;
             break;
