@@ -300,6 +300,22 @@ struct Index {
             console.log('router ImageReloadKeyExample');
             router.pushUrl({ url: 'pages/example/ImageReloadKeyExample' })
           })
+          Button('router ImagePrivacySensitiveScenesExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImagePrivacySensitiveScenesExample' })
+          })
+
+          Button('router ImageCopyDragCombinedExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageCopyDragCombinedExample' })
+          })
+
+          Button('router ImageAnalyzerOptionsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageAnalyzerOptionsExample' })
+          })
+
+          Button('router ImageAltV22Example').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageAltV22Example' })
+          })
+
 
           Button('router ImageReloadKeyScenarioExample').onClick(() => {
             console.log('router ImageReloadKeyScenarioExample');
