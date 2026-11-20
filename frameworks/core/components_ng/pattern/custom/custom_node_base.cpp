@@ -153,6 +153,13 @@ constexpr int64_t DEFAULT_ASYNC_LOAD_TIMEOUT_MS = 1000;
 
 bool CustomNodeBase::TryStartAsyncLoad()
 {
+    // Deferred by an earlier call: nothing to engage here, but the caller must
+    // keep deferring — a hammering synchronous caller (e.g. Render() re-entry)
+    // can never build a deferred node. Idle-slicing LOADING and backstop FORCED
+    // re-entries do not take this branch and still pass through to build.
+    if (asyncLoadState_ == AsyncLoadState::PENDING) {
+        return true;
+    }
     auto host = GetAsyncLoadHost();
     CHECK_NULL_RETURN(host, false);
     // Single evaluation point of the first-build gate: callers may invoke this

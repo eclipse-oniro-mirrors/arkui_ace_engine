@@ -45,7 +45,6 @@
 #include "core/components_ng/property/safe_area_insets.h"
 #include "core/pipeline/pipeline_base.h"
 #include "core/pipeline_ng/compatible_manager.h"
-#include "core/pipeline_ng/async_load_scheduler.h"
 namespace OHOS::Ace::Kit {
 class UIContext;
 class UIContextImpl;
@@ -57,6 +56,7 @@ class RSUIDirector;
 }
 
 namespace OHOS::Ace::NG {
+    class AsyncLoadScheduler;
     class RecycleManager;
     class RenderContext;
     struct UITreeRequestState;

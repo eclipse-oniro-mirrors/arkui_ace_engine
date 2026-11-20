@@ -156,6 +156,10 @@ public:
     // AsyncLoadScheduler (the driver side); suppression is checked there.
 
     // --- Lifecycle shared by both hosts (single implementation) ---
+    // Returns true when the caller must defer its synchronous build pass: the
+    // deferral engaged just now, or an earlier call already engaged it (a
+    // hammering synchronous caller can never build a deferred node). Returns
+    // false when the node keeps synchronous semantics this pass.
     bool TryStartAsyncLoad();
     void RunAsyncLoadOnIdle(int64_t deadline);
     void ForceLoad();
