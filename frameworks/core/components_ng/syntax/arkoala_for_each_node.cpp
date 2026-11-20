@@ -21,6 +21,7 @@
 
 #include "base/log/dump_log.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_ng/syntax/lazy_for_each_utils.h"
 #include "core/interfaces/native/node/grid_item_modifier.h"
 #include "core/pipeline_ng/pipeline_context.h"
 namespace OHOS::Ace::NG {
@@ -42,6 +43,39 @@ void ArkoalaForEachNode::FlushUpdateAndMarkDirty()
     // mark parent dirty to flush measure.
     MarkNeedSyncRenderTree(true);
     MarkNeedFrameFlushDirty(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT | PROPERTY_UPDATE_BY_CHILD_REQUEST);
+}
+
+void ArkoalaForEachNode::OnAttachToMainTree(bool recursive)
+{
+    ForEachBaseNode::OnAttachToMainTree(recursive);
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), true, isAllowReuseInAnimation_, isRepeat_, syncCacheHost_);
+}
+
+void ArkoalaForEachNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
+{
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), false, isAllowReuseInAnimation_, isRepeat_, syncCacheHost_);
+    ForEachBaseNode::OnDetachFromMainTree(recursive, context);
+}
+
+void ArkoalaForEachNode::SetAllowReuseInAnimation(std::optional<bool> allow)
+{
+    if (isAllowReuseInAnimation_ == allow) {
+        return;
+    }
+    // The option can arrive after the node is already attached: NodeAttach
+    // attaches the full-load Repeat (virtualScroll({ disableVirtualScroll: true }))
+    // and the ani modifier forwards the option afterwards, so the attach-time
+    // toggle above may have run with the previous value (unset). Re-run the
+    // toggle for the transition while attached: release the reference held for
+    // the old value, register for the new one when it now qualifies.
+    if (IsOnMainTree()) {
+        LazyForEachUtils::ToggleParentSyncCacheLayout(
+            Claim(this), false, isAllowReuseInAnimation_, isRepeat_, syncCacheHost_);
+        LazyForEachUtils::ToggleParentSyncCacheLayout(Claim(this), true, allow, isRepeat_, syncCacheHost_);
+    }
+    isAllowReuseInAnimation_ = allow;
 }
 
 bool ArkoalaForEachNode::AddOrMoveChildBefore(const RefPtr<UINode>& child, const RefPtr<UINode>& siblingNode)

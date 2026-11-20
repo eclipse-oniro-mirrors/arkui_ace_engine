@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <list>
+#include <optional>
 #include <string>
 #include <type_traits>
 
@@ -80,6 +81,17 @@ public:
     void DoSetActiveChildRange(
         int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool showCache = false) override;
 
+    void OnAttachToMainTree(bool recursive) override;
+    void OnDetachFromMainTree(bool recursive, PipelineContext* context = nullptr) override;
+
+    /**
+     * tri-state reuse-in-animation permission. Explicitly false opts this node out of
+     * reuse during implicit animations and switches the direct Grid / WaterFlow parent
+     * to the sync-cache-in-layout mode while attached; nullopt / true keep the default
+     * behavior. See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void SetAllowReuseInAnimation(std::optional<bool> allow);
+
 private:
     std::list<std::string> ids_;
     int32_t from_ = -1;
@@ -87,6 +99,12 @@ private:
 
     int32_t activeRangeStart_ = -1;
     int32_t activeRangeEnd_ = -1;
+
+    // tri-state reuse-in-animation permission; explicitly false switches the direct
+    // Grid / WaterFlow parent to the sync-cache-in-layout mode while attached
+    std::optional<bool> isAllowReuseInAnimation_;
+    // Grid / WaterFlow frame node holding this node's sync-cache-in-layout reference
+    WeakPtr<FrameNode> syncCacheHost_;
 
     // temp items use to compare each update.
     std::list<std::string> tempIds_;

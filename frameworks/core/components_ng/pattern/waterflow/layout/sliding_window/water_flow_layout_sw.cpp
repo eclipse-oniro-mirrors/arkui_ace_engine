@@ -95,17 +95,37 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
         return;
     }
 
-    const int32_t cacheCount = props_->GetCachedCountValue(info_->defCachedCount_);
-    PreloadFixOffsetCacheIfNeeded(cacheCount);
-    if (props_->GetShowCachedItemsValue(false)) {
-        SyncPreloadItems(wrapper_, info_, cacheCount);
-    } else {
-        PreloadItems(wrapper_, info_, cacheCount);
-    }
+    FillCacheRange(props_->GetCachedCountValue(info_->defCachedCount_));
 
     measuredStartIndex_ = info_->StartIndex();
     measuredEndIndex_ = info_->EndIndex();
     isLayouted_ = false;
+}
+
+void WaterFlowLayoutSW::FillCacheRange(int32_t cacheCount)
+{
+    const bool showCache = props_->GetShowCachedItemsValue(false);
+    const bool syncCacheLayout = !showCache && IsSyncCacheLayoutEnabled(wrapper_);
+    // PreloadFixOffsetCacheIfNeeded fills the one clip-extended side up to the same cache
+    // bounds SyncLayoutCacheItems fills on both sides right below. Running both in one
+    // frame is redundant work: every item the fix-offset pass layouts is re-measured by
+    // the sync-cache pass (RecoverBack / RecoverFront re-measure under a cache deadline),
+    // so skip the first fill while the sync-cache strategy covers the range.
+    // needFixOffsetCache_ is left set and is honored on the first frame that runs
+    // without the sync-cache strategy.
+    if (!syncCacheLayout) {
+        PreloadFixOffsetCacheIfNeeded(cacheCount);
+    }
+    if (showCache) {
+        SyncPreloadItems(wrapper_, info_, cacheCount);
+    } else if (syncCacheLayout) {
+        // Sync-cache-in-layout strategy: fill the cache range in the current frame instead
+        // of posting the idle predict task; Layout positions and deactivates the items in
+        // the same frame (RecoverCacheItems / LayoutSection / SetActiveChildRange).
+        SyncLayoutCacheItems(cacheCount);
+    } else {
+        PreloadItems(wrapper_, info_, cacheCount);
+    }
 }
 
 void WaterFlowLayoutSW::CleanupTargetPreparation()
@@ -1313,6 +1333,30 @@ void WaterFlowLayoutSW::SyncPreloadFixOffsetCache(int32_t cacheCount)
 
     const int32_t startBound = std::max(0, info_->startIndex_ - cacheCount);
     if (!NearZero(info_->startFixOffset_) && info_->startIndex_ > startBound) {
+        FillFront(-FLT_MAX, info_->StartIndex() - 1, startBound);
+    }
+    EndCacheLayout();
+}
+
+void WaterFlowLayoutSW::SyncLayoutCacheItems(int32_t cacheCount)
+{
+    if (cacheCount <= 0 || info_->startIndex_ > info_->endIndex_) {
+        return;
+    }
+    // Non-expiring deadline (same as SyncPreloadFixOffsetCache): keeps builds on the cache
+    // path — not attached to the render tree, with MeasureChild performing the per-item
+    // Layout + SetActive(false) — and OverDue never fires, so the whole cache window on
+    // both sides fills within this frame. Items already recorded in idxToLane_ are merely
+    // re-placed by RecoverBack / RecoverFront, so repeated calls are idempotent.
+    cacheDeadline_ = INT64_MAX;
+    StartCacheLayout();
+    const int32_t endBound = std::min(itemCnt_ - 1, info_->endIndex_ + cacheCount);
+    if (info_->endIndex_ < endBound) {
+        FillBack(FLT_MAX, info_->EndIndex() + 1, endBound);
+    }
+
+    const int32_t startBound = std::max(0, info_->startIndex_ - cacheCount);
+    if (info_->startIndex_ > startBound) {
         FillFront(-FLT_MAX, info_->StartIndex() - 1, startBound);
     }
     EndCacheLayout();

@@ -15,7 +15,10 @@
 
 #include "base/utils/string_utils.h"
 #include "core/components_ng/syntax/lazy_for_each_utils.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/custom/custom_node_base.h"
+#include "core/components_ng/pattern/grid/grid_pattern.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/syntax/lazy_for_each_builder.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 
@@ -97,6 +100,54 @@ void LazyForEachUtils::ParseMetaData(const std::string& name, const std::string&
         SetLazyForEachMemOptStrategy(value);
     } else if (name == "reusableMemoryOptimizationStrategy") {
         SetReusableMemOptStrategy(value);
+    }
+}
+
+void LazyForEachUtils::ToggleParentSyncCacheLayout(const RefPtr<UINode>& node, bool enable,
+    const std::optional<bool>& allowReuseInAnimation, bool isRepeat, WeakPtr<FrameNode>& host)
+{
+    if (!enable) {
+        // detach: release the reference recorded on attach, even when the parent
+        // link is already gone at this point
+        auto parent = host.Upgrade();
+        host.Reset();
+        if (!parent) {
+            return;
+        }
+        auto gridPattern = parent->GetPattern<GridPattern>();
+        if (gridPattern) {
+            gridPattern->RemoveSyncCacheLayoutChild();
+            return;
+        }
+        auto waterFlowPattern = parent->GetPattern<WaterFlowPattern>();
+        if (waterFlowPattern) {
+            waterFlowPattern->RemoveSyncCacheLayoutChild();
+        }
+        return;
+    }
+    // attach: already holding a reference, nothing to do
+    if (!host.Invalid()) {
+        return;
+    }
+    // qualified only when reuse during implicit animations is explicitly disallowed
+    if (!node || !isRepeat || !allowReuseInAnimation.has_value() || *allowReuseInAnimation) {
+        return;
+    }
+    // only a direct Grid / WaterFlow parent runs the sync-cache-in-layout strategy
+    auto parent = AceType::DynamicCast<FrameNode>(node->GetParent());
+    if (!parent) {
+        return;
+    }
+    auto gridPattern = parent->GetPattern<GridPattern>();
+    if (gridPattern) {
+        gridPattern->AddSyncCacheLayoutChild();
+        host = parent;
+        return;
+    }
+    auto waterFlowPattern = parent->GetPattern<WaterFlowPattern>();
+    if (waterFlowPattern) {
+        waterFlowPattern->AddSyncCacheLayoutChild();
+        host = parent;
     }
 }
 

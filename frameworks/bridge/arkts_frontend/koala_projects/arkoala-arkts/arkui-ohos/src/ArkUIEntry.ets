@@ -42,7 +42,7 @@ import { StateMgmtDFX, StateUpdateLoop } from './stateManagement'
 import { AceTrace } from 'arkui/base/AceTrace'
 import { flushBuilderRootNode } from './BuilderNode'
 import { EnvDecoratedVariable } from './stateManagement/decoratorImpl/decoratorEnv';
-import { isNeedDestroyImmediately } from './base/SyntaxNodeBase'
+import { isNeedDestroyImmediately, unregisterDetachedRootPtrNeedDestroyImmediately } from './base/SyntaxNodeBase'
 
 setCustomEventsChecker(checkArkoalaCallbacks)
 
@@ -348,6 +348,10 @@ export class Application {
                 result = true
                 if (isNeedDestroyImmediately(ptr)) {
                     destroyUiDetachedRoot(ptr, this.instanceId)
+                    // fallback cleanup: the registered root is destroyed, drop the
+                    // registration so a later reuse of the same pointer value is not
+                    // destroyed immediately by mistake
+                    unregisterDetachedRootPtrNeedDestroyImmediately(ptr)
                 } else {
                     scheduleCallback(() => {
                         destroyUiDetachedRoot(ptr, this.instanceId)

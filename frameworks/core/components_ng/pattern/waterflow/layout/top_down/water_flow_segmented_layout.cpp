@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
 
+#include <limits>
+
 #include "base/geometry/dimension.h"
 #include "base/geometry/ng/offset_t.h"
 #include "base/log/event_report.h"
@@ -34,6 +36,11 @@
 #include "core/components_ng/property/templates_parser.h"
 
 namespace OHOS::Ace::NG {
+// Sync-cache-in-layout runs inside the current frame's Layout pass: a non-expiring
+// deadline keeps every cache build on the cache path (not attached to the render tree)
+// and lets MeasureToTarget finish the whole cache range in one go.
+constexpr int64_t SYNC_CACHE_LAYOUT_DEADLINE = std::numeric_limits<int64_t>::max();
+
 bool WaterFlowSegmentLayoutBase::IsSectionValid(const RefPtr<WaterFlowLayoutInfoBase>& info, int32_t childrenCnt)
 {
     if (info->segmentTails_.empty()) {
@@ -115,7 +122,8 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
     }
     if (props_->GetShowCachedItemsValue(false)) {
         SyncPreloadItems(wrapper_, info_, cacheCnt);
-    } else {
+    } else if (!IsSyncCacheLayoutEnabled(wrapper_)) {
+        // Sync-cache-in-layout strategy handles cache items inside Layout; skip async preload.
         PreloadItems(wrapper_, info_, cacheCnt);
     }
 
@@ -158,6 +166,14 @@ void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
     if (!props_->HasCachedCount()) {
         info_->UpdateDefaultCachedCount();
     }
+    // Sync-cache-in-layout strategy: fill the cache range before the positioning loop so
+    // cache items are placed in the same frame (List-style synchronous cache layout),
+    // replacing the delayed preload task skipped by Measure.
+    const bool syncCacheLayout =
+        !props_->GetShowCachedItemsValue(false) && IsSyncCacheLayoutEnabled(wrapper_);
+    if (syncCacheLayout) {
+        SyncLayoutCacheItems(cacheCount);
+    }
     const int32_t maxIdx = std::min(info_->endIndex_ + cacheCount, static_cast<int32_t>(info_->itemInfos_.size() - 1));
     for (int32_t i = std::max(0, info_->startIndex_ - cacheCount); i <= maxIdx; ++i) {
         auto seg = info_->GetSegment(i);
@@ -166,7 +182,7 @@ void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
             crossIdx < 0 || crossIdx >= static_cast<int32_t>(crossPos[seg].size())) {
             continue;
         }
-        LayoutItem(i, crossPos[seg][crossIdx], initialOffset, isReverse);
+        LayoutItem(i, crossPos[seg][crossIdx], initialOffset, isReverse, syncCacheLayout);
     }
     wrapper_->SetActiveChildRange(info_->NodeIdx(info_->startIndex_), info_->NodeIdx(info_->endIndex_), cacheCount,
         cacheCount, props_->GetShowCachedItemsValue(false));
@@ -665,7 +681,8 @@ void WaterFlowSegmentedLayout::PostMeasureSelf(SizeF size)
     wrapper_->GetGeometryNode()->SetFrameSize(size);
 }
 
-void WaterFlowSegmentedLayout::LayoutItem(int32_t idx, float crossPos, const OffsetF& padding, bool isReverse)
+void WaterFlowSegmentedLayout::LayoutItem(
+    int32_t idx, float crossPos, const OffsetF& padding, bool isReverse, bool syncCacheLayout)
 {
     const bool isCache = IsCache(info_, idx);
     const auto& item = info_->itemInfos_[idx];
@@ -682,6 +699,11 @@ void WaterFlowSegmentedLayout::LayoutItem(int32_t idx, float crossPos, const Off
         wrapper_, info_->edgeSlots_ ? info_->NodeIdx(idx) : idx, isCache);
     CHECK_NULL_VOID(wrapper);
     wrapper->GetGeometryNode()->SetMarginFrameOffset(offset + padding);
+    if (isCache && syncCacheLayout) {
+        // Sync-cache-in-layout: deactivate cache items explicitly in the same frame,
+        // mirroring List's per-item SetActive(show) during cached item layout.
+        wrapper->SetActive(false);
+    }
     if (CheckNeedLayout(wrapper, isCache)) {
         wrapper->Layout();
     } else {
@@ -716,6 +738,76 @@ void WaterFlowSegmentedLayout::SyncPreloadItem(LayoutWrapper* host, int32_t item
         int32_t seg = info_->GetSegment(itemIdx);
         MeasureItem(itemIdx, { info_->itemInfos_[itemIdx].crossIdx, info_->itemInfos_[itemIdx].mainOffset },
             WaterFlowLayoutUtils::GetUserDefHeight(sections_, seg, itemIdx), std::nullopt);
+    }
+}
+
+void WaterFlowSegmentedLayout::SyncLayoutCacheItems(int32_t cachedCount)
+{
+    if (cachedCount <= 0 || info_->measureInNextFrame_ || info_->startIndex_ > info_->endIndex_) {
+        return;
+    }
+    // The footer shares the FlowItem numbering as the last segment's tail; the cache range
+    // covers regular FlowItems only.
+    const int32_t itemCnt = info_->GetChildrenCount() - (info_->footerIndex_ >= 0 ? 1 : 0);
+    // Tail: MeasureToTarget starts from the first unrecorded item on its own (records grow
+    // contiguously from index 0) and never re-measures recorded items, so unlike TOP_DOWN no
+    // anchor re-activation is needed here. With a non-expiring deadline it builds each new
+    // item on the cache path (not attached to the render tree), measures, records and
+    // deactivates it — the same steps the delayed preload task performs through PreloadItem.
+    const int32_t endBound = std::min(itemCnt - 1, info_->endIndex_ + cachedCount);
+    if (endBound >= static_cast<int32_t>(info_->itemInfos_.size())) {
+        MeasureToTarget(endBound, SYNC_CACHE_LAYOUT_DEADLINE, true);
+    }
+    // Recorded tail items: an existing node still needs the in-frame subtree layout. After
+    // an insert above the preload area a fast scroll away and back re-measures the tail
+    // items on the main fill path (jump / MeasureToTarget with no deadline), which never
+    // lays items out, and the positioning loop only syncs geometry for clean-flag cache
+    // items (CheckNeedLayout gates on !isCache) — without this Layout the tail preload
+    // items keep stale subtree layouts. The measure is not repeated here: re-running
+    // MeasureItem's cache branch would re-apply the lazy-child offset adjustment to
+    // info_->currentOffset_ (AdjustLazyChildOffset). A node evicted from the lazy
+    // builder's caches (cache-built nodes can be reclaimed off-frame) is rebuilt through
+    // the cache path and measured with the recorded position / user-defined size, so it
+    // enters the cache fully laid out instead of mirroring the async build-only branch.
+    for (int32_t idx = info_->endIndex_ + 1; idx <= endBound; ++idx) {
+        if (idx >= static_cast<int32_t>(info_->itemInfos_.size())) {
+            continue;
+        }
+        const auto& existing = wrapper_->GetChildByIndex(idx, true);
+        if (existing) {
+            existing->Layout();
+            existing->SetActive(false);
+            continue;
+        }
+        MeasureItem(idx, { info_->itemInfos_[idx].crossIdx, info_->itemInfos_[idx].mainOffset },
+            WaterFlowLayoutUtils::GetUserDefHeight(sections_, info_->GetSegment(idx), idx),
+            SYNC_CACHE_LAYOUT_DEADLINE);
+    }
+    // Head: records above the viewport always exist (positions are recorded sequentially
+    // from index 0), so only nodes can be missing. Missing nodes are rebuilt through the
+    // cache path and measured with the recorded position / user-defined size; MeasureItem's
+    // cache branch lays out and deactivates each rebuilt item. Existing nodes still need the
+    // in-frame subtree layout: after an insert above the preload area the jump / MeasureToTarget
+    // re-measures the head items on the main fill path, which never lays items out, and the
+    // positioning loop only syncs geometry for clean-flag cache items (CheckNeedLayout gates
+    // on !isCache) — without this Layout the head preload items keep stale subtree layouts.
+    // The measure is not repeated here: re-running MeasureItem's cache branch would re-apply
+    // the lazy-child offset adjustment to info_->currentOffset_ (AdjustLazyChildOffset), so
+    // only the missing layout step mirrors it.
+    const int32_t startBound = std::max(0, info_->startIndex_ - cachedCount);
+    for (int32_t idx = info_->startIndex_ - 1; idx >= startBound; --idx) {
+        if (idx >= static_cast<int32_t>(info_->itemInfos_.size())) {
+            continue;
+        }
+        const auto& existing = wrapper_->GetChildByIndex(idx, true);
+        if (existing) {
+            existing->Layout();
+            existing->SetActive(false);
+            continue;
+        }
+        MeasureItem(idx, { info_->itemInfos_[idx].crossIdx, info_->itemInfos_[idx].mainOffset },
+            WaterFlowLayoutUtils::GetUserDefHeight(sections_, info_->GetSegment(idx), idx),
+            SYNC_CACHE_LAYOUT_DEADLINE);
     }
 }
 

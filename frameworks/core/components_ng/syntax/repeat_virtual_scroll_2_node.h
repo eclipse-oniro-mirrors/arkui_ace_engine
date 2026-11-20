@@ -233,6 +233,9 @@ public:
 
     void OnConfigurationUpdate(const ConfigurationChange& configurationChange) override;
 
+    void OnAttachToMainTree(bool recursive) override;
+    void OnDetachFromMainTree(bool recursive, PipelineContext* context = nullptr) override;
+
     void NotifyColorModeChange(uint32_t colorMode) override;
 
     void SetJSViewActive(bool active = true, bool isLazyForEachNode = false,
@@ -262,6 +265,12 @@ public:
         caches_.SetInvalid(rid);
     }
 
+    //  records the pre-rerender L1 index -> RID mapping, called by ModelNG
+    // before UpdateTotalCount / UpdateL1Rid4Index of a Repeat.rerender so a
+    // DoSetActiveChildRange run within the same rerender still resolves the
+    // old L1 index of a node
+    void RecordPrevL1Rid4Index();
+
     //  TS call JS to update caches.l1Rid4Index_
     // and invalidate container layout following a
     // Repeat.rerender
@@ -272,7 +281,15 @@ public:
         isLoop_ = isLoop;
     }
 
-    void fireOnUpdateDirty();
+    /**
+     * tri-state reuse-in-animation permission. Explicitly false opts this node out of
+     * reuse during implicit animations and switches the direct Grid / WaterFlow parent
+     * to the sync-cache-in-layout mode while attached; nullopt / true keep the default
+     * behavior. See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void SetAllowReuseInAnimation(std::optional<bool> allow);
+
+    void FireOnUpdateDirty();
 
     RepeatMemOptStrategy GetMemOptStrategy();
     void OnWindowShow() override;
@@ -311,6 +328,33 @@ private:
     bool RebuildL1(int32_t start, int32_t end, int32_t nStart, int32_t nEnd);
     bool ProcessActiveL2Nodes();
 
+    // Set the frame node inactive. SetActive(false) is deferred via
+    // NeedSetInActiveAfterTransitionOut only when all conditions hold:
+    // 1. an implicit animation is currently running;
+    // 2. the node is about to be removed from the render tree, i.e. the caller
+    //    calls OnRemoveFromParent on it right after;
+    // 3. the old L1 index of the node (recorded by RecordPrevL1Rid4Index before
+    //    a rerender replaces the mapping) is inside the previous active range
+    //    (prevActiveRangeStart_ / prevActiveRangeEnd_), the range in effect
+    //    while the node was last on screen, so removing the node runs a
+    //    transition out that finishes and calls SetInActiveAfterTransitionOut.
+    // Otherwise SetActive(false) is applied immediately.
+    // A pending deferred flag is cancelled when the node is reactivated or returns
+    // to the render tree (RebuildL1 / GetFrameChild), so a transition out finishing
+    // later cannot deactivate a node that is visible again.
+    void SetFrameNodeInactive(
+        const RefPtr<FrameNode>& frameNode, bool removeFromTree, const std::optional<IndexType>& oldIndex);
+
+    // Cancel a deferred SetActive(false) armed by SetFrameNodeInactive when the node
+    // returns to the render tree (GetFrameChildByIndexImpl with addToRenderTree), so a
+    // transition out finishing later cannot deactivate a node that is visible again.
+    void CancelPendingInactiveAfterTransitionOut(const RefPtr<UINode>& node);
+
+    // Puts the cache item's node back on the render tree: fixes depth / parent, attaches it
+    // to the main tree (dropping it from disappearing children) and schedules the children
+    // re-assembly (GetFrameChildByIndexImpl).
+    void AttachChildToRenderTree(RepeatVirtualScroll2Caches::CacheItem& cacheItem);
+
     void RequestSyncTree();
     void PostIdleTask();
 
@@ -340,7 +384,13 @@ private:
 
     // loop property of the parent container
     bool isLoop_ = false;
-    
+
+    // tri-state reuse-in-animation permission; explicitly false switches the direct
+    // Grid / WaterFlow parent to the sync-cache-in-layout mode while attached
+    std::optional<bool> isAllowReuseInAnimation_;
+    // Grid / WaterFlow frame node holding this node's sync-cache-in-layout reference
+    WeakPtr<FrameNode> syncCacheHost_;
+
     // caches:
     mutable RepeatVirtualScroll2Caches caches_;
 

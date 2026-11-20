@@ -88,6 +88,15 @@ export class RepeatController {
 
 export interface RepeatOptions {
     controller?: RepeatController;
+    /**
+     * Whether node reuse is allowed while an implicit animation is running.
+     * Explicitly false opts the Repeat out of reuse during implicit animations and
+     * switches its direct Grid / WaterFlow parent to the sync-cache-in-layout
+     * strategy. Defaults: false when the parent container is a List, true otherwise;
+     * leaving it unset keeps each container's default behavior (no value is
+     * forwarded to the native side).
+     */
+    allowReuseInAnimation?: boolean;
 }
 
 export interface RepeatAttribute<T> extends DynamicNode {
@@ -112,14 +121,17 @@ export interface RepeatAttribute<T> extends DynamicNode {
 export class ArkRepeatComponent<T> implements RepeatAttribute<T> {
     public arr: RepeatArray<T> = [];
     public controller?: RepeatController = undefined;
+    public allowReuseInAnimation?: boolean = undefined;
     public setRepeatOptions(arr: RepeatArray<T>): this {
         this.arr = arr;
         this.controller = undefined;
+        this.allowReuseInAnimation = undefined;
         return this;
     }
     public setRepeatOptions(arr: RepeatArray<T>, options?: RepeatOptions): this {
         this.arr = arr;
         this.controller = options?.controller;
+        this.allowReuseInAnimation = options?.allowReuseInAnimation;
         return this;
     }
     public each(itemGenerator: RepeatItemBuilder<T>): RepeatAttribute<T> {
@@ -160,7 +172,7 @@ export function RepeatImpl<T>(
         return new ArkRepeatComponent<T>()
     })
     style?.(receiver)
-    RepeatImplForOptions<T>(style, receiver.arr, receiver.controller);
+    RepeatImplForOptions<T>(style, receiver.arr, receiver.controller, receiver.allowReuseInAnimation);
 }
 
 /** @memo */
@@ -172,5 +184,5 @@ export function Repeat<T>(
         return new ArkRepeatComponent<T>()
     })
     style?.(receiver)
-    RepeatImplForOptions<T>(style, receiver.arr, receiver.controller);
+    RepeatImplForOptions<T>(style, receiver.arr, receiver.controller, receiver.allowReuseInAnimation);
 }

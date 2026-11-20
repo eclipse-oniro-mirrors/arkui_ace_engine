@@ -58,6 +58,7 @@ public:
     virtual bool IsImplicitAnimationOpen() override;
     virtual bool IsChildInAnimation(int32_t repeatElmtId, uint32_t rid) override;
     virtual bool IsChildOnMainTree(int32_t repeatElmtId, uint32_t rid) override;
+    void SetAllowReuseInAnimation(int32_t repeatElmtId, std::optional<bool> allowReuseInAnimation) override;
 };
 
 } // namespace OHOS::Ace::NG

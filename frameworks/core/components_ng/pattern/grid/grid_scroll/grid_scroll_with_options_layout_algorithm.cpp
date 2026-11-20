@@ -612,6 +612,25 @@ LayoutConstraintF GenerateCacheItemConstraint(
 }
 } // namespace
 
+LayoutConstraintF GridScrollWithOptionsLayoutAlgorithm::GenerateSyncCacheItemConstraint(
+    const GridItemLayoutProperty& /*itemProperty*/, LayoutWrapper* layoutWrapper, int32_t itemIndex)
+{
+    // WithOptions algorithm: the cross span comes from GridLayoutOptions (irregularIndexes /
+    // onGetIrregularSizeByIndex), not from GridItemLayoutProperty — the same source
+    // PreloadItems / PredictBuildItem use on the async predict path. Measuring with the base
+    // property-based constraint would size an irregular sync-built cache item as regular, and
+    // it would only re-measure with its irregular size once it scrolls into the viewport.
+    auto layoutProperty = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_RETURN(layoutProperty, cachedChildConstraint_);
+    const auto& options = layoutProperty->GetLayoutOptions();
+    if (!options.has_value()) {
+        return cachedChildConstraint_;
+    }
+    auto cross = GetCrossStartAndSpan(*options, itemIndex);
+    return GenerateCacheItemConstraint(
+        cross, info_.axis_, GridPredictLayoutParam { cachedChildConstraint_, itemsCrossSize_, crossGap_ });
+}
+
 bool GridScrollWithOptionsLayoutAlgorithm::PredictBuildItem(FrameNode& host, int32_t itemIdx,
     const GridPredictLayoutParam& param, std::map<int32_t, std::pair<int32_t, int32_t>> itemCrossMap)
 {

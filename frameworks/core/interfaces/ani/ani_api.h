@@ -776,6 +776,8 @@ struct ArkUIAniLazyForEachNodeModifier {
     ani_boolean (*isChildOnMainTree)(ani_long, ani_int);
     ani_boolean (*isAllowAnimation)(ani_long);
     ani_boolean (*isImplicitAnimationOpen)(ani_long);
+    void (*setAllowReuseInAnimation)(ani_long, ani_boolean);
+    ani_boolean (*hasCustomComponent)(ani_long);
 };
 struct ArkUIAniWaterFlowModifier {
     void (*setWaterFlowSection)(
