@@ -264,6 +264,22 @@ struct Index {
             console.log('router ImageExample090');
             router.pushUrl({ url: 'pages/example/ImageExample090' })
           })
+          Button('router ImageOnErrorDetailExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageOnErrorDetailExample' })
+          })
+
+          Button('router ImageRetryReloadKeyExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageRetryReloadKeyExample' })
+          })
+
+          Button('router ImageEventTimelineExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageEventTimelineExample' })
+          })
+
+          Button('router ImageErrorV20FieldsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageErrorV20FieldsExample' })
+          })
+
 
           Button('router ImageExample091').onClick(() => {
             console.log('router ImageExample091');
