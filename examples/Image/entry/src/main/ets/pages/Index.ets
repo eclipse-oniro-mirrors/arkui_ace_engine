@@ -38,6 +38,22 @@ struct Index {
             console.log('router ImageExample003');
             router.pushUrl({ url: 'pages/example/ImageExample003' })
           })
+          Button('router ImageDecodeQualityMatrixExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageDecodeQualityMatrixExample' })
+          })
+
+          Button('router ImageOnCompleteFieldsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageOnCompleteFieldsExample' })
+          })
+
+          Button('router ImageAutoResizeDynamicExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageAutoResizeDynamicExample' })
+          })
+
+          Button('router ImageSourceSizeDownsampleExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageSourceSizeDownsampleExample' })
+          })
+
 
           Button('router ImageExample004').onClick(() => {
             console.log('router ImageExample004');
