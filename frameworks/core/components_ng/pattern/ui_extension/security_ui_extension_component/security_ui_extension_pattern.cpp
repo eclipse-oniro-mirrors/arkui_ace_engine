@@ -922,7 +922,11 @@ void SecurityUIExtensionPattern::DispatchOriginAvoidArea(
 void SecurityUIExtensionPattern::SetWantWrap(
     const RefPtr<OHOS::Ace::WantWrap>& wantWrap)
 {
-    curWant_ = wantWrap;
+    if (hasAttachContext_) {
+        UpdateWant(wantWrap);
+    } else {
+        curWant_ = wantWrap;
+    }
 }
 
 RefPtr<OHOS::Ace::WantWrap> SecurityUIExtensionPattern::GetWantWrap()
