@@ -370,9 +370,9 @@ void ExecuteInternal(const EcmaVM* vm, const std::unique_ptr<JsonValue>& value, 
         }
     } else if (value->IsArray()) {
         auto valueArray = panda::ArrayRef::New(vm);
-        uint32_t length = value->GetArraySize();
+        uint32_t length = static_cast<uint32_t>(value->GetArraySize());
         for (uint32_t index = 0; index < length; index++) {
-            auto item = value->GetArrayItem(index);
+            auto item = value->GetArrayItem(static_cast<int32_t>(index));
             if (item && item->IsString()) {
                 panda::ArrayRef::SetValueAt(vm, valueArray, index, ArkTSUtils::ToJSValueWithVM(vm, item->GetString()));
             }
