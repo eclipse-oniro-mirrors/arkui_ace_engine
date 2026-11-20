@@ -45,6 +45,14 @@ export function ArkComponentRoot(
     NodeAttach<ArkCustomComponentRootPeer>(
         () => {
             const node = ArkCustomComponentRootPeer.create(component);
+            if (component instanceof CustomDelegate) {
+                // Push a previously requested asynchronous-loading configuration to
+                // the freshly created native node. Ordered before the first build is
+                // driven; no-op unless enableAsyncLoad was effectively requested in
+                // the construction window.
+                (component as Any as CustomDelegate<ExtendableComponent, Object>).getInstance()
+                    .__deliverAsyncLoadConfig__Internal(node);
+            }
             const func = CallbackTransformer.transformFromCustomBuilder(@memo (): void => {
                 rememberDisposable(() => {
                     ObserveSingleton.instance.applyTaskDelayMutableStateChange(() => {

@@ -38,7 +38,8 @@ import { ArkThemeScopeManager } from '../theme/ArkThemeScopeManager';
 import { transferTypeName } from '../stateManagement/storage/persistenceV2';
 import { ArkCustomComponentRootPeer } from './staticComponents';
 import { ArkUIObjectFinalizationRegisterProxy } from '../base/ArkUIObjectFinalizationRegisterProxy';
-import { ActiveAndInactiveCallbackType, CustomComponentContext, IDefaultReusePool, IReusePool } from '../stateManagement/utils';
+import { ActiveAndInactiveCallbackType, CustomComponentAsyncLoadOptions, CustomComponentContext,
+    IDefaultReusePool, IReusePool } from '../stateManagement/utils';
 import { IVariableOwner } from '../stateManagement/decorator';
 import { GlobalReusePool } from '../stateManagement/tools/globalReusePool';
 import { ReusablePool } from '../ReusablePool';
@@ -1121,6 +1122,16 @@ export class CustomComponentContextImpl implements CustomComponentContext {
 
     registerActiveAndInactiveCallback(active?: ActiveAndInactiveCallbackType, inactive?: ActiveAndInactiveCallbackType): void {
         this.customComponent.__registerActiveAndInactiveCallback__Internal(active, inactive);
+    }
+
+    /**
+     * Enables asynchronous loading of the wrapped component. Window, idempotency
+     * and option resolution rules are enforced on the component itself
+     * so the rules hold regardless of how many context objects are created for it.
+     */
+    enableAsyncLoad(options?: CustomComponentAsyncLoadOptions): void {
+        const comp = this.customComponent as Object as ExtendableComponent;
+        comp.__enableAsyncLoad__Internal(options);
     }
 
     /**

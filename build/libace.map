@@ -4520,6 +4520,11 @@
       "OHOS::Ace::NG::CustomNodeBase::ResetRecycle()";
       "OHOS::Ace::NG::CustomNodeBase::SetRecycleRenderFunc(std::__h::function<void ()>&&)";
       "OHOS::Ace::NG::CustomNodeBase::SetReuseId(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::NG::CustomNodeBase::SetAsyncLoadConfig(std::__h::shared_ptr<OHOS::Ace::AsyncLoadConfig>&&)";
+      "OHOS::Ace::NG::CustomNodeBase::ParseAsyncLoadConfigJson(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::NG::AsyncLoadScheduler::EnterBuildScope()";
+      "OHOS::Ace::NG::AsyncLoadScheduler::ExitBuildScope()";
+      "OHOS::Ace::NG::AsyncLoadScheduler::InBuildScope()";
       "OHOS::Ace::NG::CustomNodeStatic::ConstructCustomNode(int, std::__h::function<void (OHOS::Ace::NG::LayoutWrapper*)>&&, std::__h::function<void (OHOS::Ace::NG::LayoutWrapper*)>&&, std::__h::function<void (OHOS::Ace::NG::LayoutWrapper*)>&&)";
       "OHOS::Ace::NG::CustomNodeStatic::DidDefaultLayout(OHOS::Ace::RefPtr<OHOS::Ace::NG::CustomMeasureLayoutNode> const&)";
       "OHOS::Ace::NG::CustomNodeStatic::DidDefaultMeasure(OHOS::Ace::RefPtr<OHOS::Ace::NG::CustomMeasureLayoutNode> const&)";
