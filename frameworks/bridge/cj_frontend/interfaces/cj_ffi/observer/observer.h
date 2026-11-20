@@ -16,6 +16,7 @@
 #ifndef OHOS_OBSERVER_H
 #define OHOS_OBSERVER_H
 
+#include <mutex>
 #include <list>
 #include <memory>
 #include <optional>
@@ -50,6 +51,7 @@ public:
     static void HandleTabContentUpdateStateChange(const Ace::NG::TabContentInfo& tabContentInfo);
 
 private:
+    static std::mutex listenerMutex_;
     static std::unordered_map<int64_t, std::shared_ptr<CJObserverListener>> scrollEventListeners_;
     static std::unordered_map<std::string, std::unordered_map<int64_t, std::shared_ptr<CJObserverListener>>>
         specifiedScrollEventListeners_;

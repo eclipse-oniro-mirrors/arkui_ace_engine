@@ -148,7 +148,7 @@ bool DOMPopup::AddSpecializedEvent(int32_t pageId, const std::string& event)
 
 void DOMPopup::CallSpecializedMethod(const std::string& method, const std::string& args)
 {
-    auto popup = AceType::DynamicCast<PopupComponent>(popupChild_);
+    auto popup = popupChild_;
     if (!popup) {
         return;
     }

@@ -1508,7 +1508,7 @@ void MenuManager::DeleteMenu(int32_t targetId, const RefPtr<OverlayManager>& ove
         return;
     }
     TAG_LOGI(AceLogTag::ACE_OVERLAY, "delete menu enter");
-    auto node = AceType::DynamicCast<FrameNode>(it->second);
+    auto node = it->second;
     CHECK_NULL_VOID(node);
     CHECK_NULL_VOID(overlayManager);
     auto context = node->GetContext();

@@ -28,6 +28,7 @@
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/interfaces/native/node/node_arc_list_modifier.h"
 #include "core/components_ng/pattern/list/list_position_controller.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/manager/scroll_adjust/scroll_adjust_manager.h"
 
@@ -368,7 +369,40 @@ void ListModelNG::SetScrollSnapAlign(ScrollSnapAlign scrollSnapAlign)
         CHECK_NULL_VOID(pattern);
         pattern->ResetLastSnapTargetIndex();
     }
+    // Last-set-wins: configuring the legacy align attribute clears the scrollSnapStrategy capability.
+    if (layoutProperty->GetScrollSnapStrategy().has_value()) {
+        ACE_RESET_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy);
+    }
     ACE_UPDATE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign, scrollSnapAlign);
+}
+
+void ListModelNG::SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    // NONE, out-of-range aligns and a provider without calculateSnapOffset clear the configuration.
+    const bool validAlign = scrollSnapStrategy.align == ScrollSnapAlign::START ||
+                            scrollSnapStrategy.align == ScrollSnapAlign::CENTER ||
+                            scrollSnapStrategy.align == ScrollSnapAlign::END;
+    if (scrollSnapStrategy.hasProvider ? !scrollSnapStrategy.calculateSnapOffset : !validAlign) {
+        ResetScrollSnapStrategy();
+        return;
+    }
+    auto layoutProperty = frameNode->GetLayoutProperty<ListLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto pattern = frameNode->GetPattern<ListPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ResetLastSnapTargetIndex();
+    // Last-set-wins: configuring scrollSnapStrategy clears the legacy align attribute.
+    if (layoutProperty->GetScrollSnapAlign().has_value()) {
+        ACE_RESET_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign);
+    }
+    ACE_UPDATE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, scrollSnapStrategy);
+}
+
+void ListModelNG::ResetScrollSnapStrategy()
+{
+    ACE_RESET_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy);
 }
 
 void ListModelNG::SetNestedScroll(const NestedScrollOptions& nestedOpt)
@@ -1275,7 +1309,37 @@ void ListModelNG::SetScrollSnapAlign(FrameNode* frameNode, ScrollSnapAlign scrol
     ACE_ENGINE_HISTOGRAM_ENUMERATION(SCROLLABLE_LIST_ATTRIBUTE "SetScrollSnapAlign",
         static_cast<int32_t>(scrollSnapAlign) + static_cast<int32_t>(ScrollableErrorCode::SCROLL_SNAP_ALIGN_NONE),
         static_cast<int32_t>(ScrollableErrorCode::SCROLL_SNAP_ALIGN_END));
+    CHECK_NULL_VOID(frameNode);
+    // Last-set-wins: configuring the legacy align attribute clears the scrollSnapStrategy capability.
+    auto layoutProperty = frameNode->GetLayoutProperty<ListLayoutProperty>();
+    if (layoutProperty && layoutProperty->GetScrollSnapStrategy().has_value()) {
+        ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, frameNode);
+    }
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign, scrollSnapAlign, frameNode);
+}
+
+void ListModelNG::SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& scrollSnapStrategy)
+{
+    CHECK_NULL_VOID(frameNode);
+    // NONE, out-of-range aligns and a provider without calculateSnapOffset clear the configuration.
+    const bool validAlign = scrollSnapStrategy.align == ScrollSnapAlign::START ||
+                            scrollSnapStrategy.align == ScrollSnapAlign::CENTER ||
+                            scrollSnapStrategy.align == ScrollSnapAlign::END;
+    if (scrollSnapStrategy.hasProvider ? !scrollSnapStrategy.calculateSnapOffset : !validAlign) {
+        ResetScrollSnapStrategy(frameNode);
+        return;
+    }
+    // Last-set-wins: configuring scrollSnapStrategy clears the legacy align attribute.
+    auto layoutProperty = frameNode->GetLayoutProperty<ListLayoutProperty>();
+    if (layoutProperty && layoutProperty->GetScrollSnapAlign().has_value()) {
+        ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign, frameNode);
+    }
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, scrollSnapStrategy, frameNode);
+}
+
+void ListModelNG::ResetScrollSnapStrategy(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, frameNode);
 }
 
 int32_t ListModelNG::GetScrollSnapAlign(FrameNode* frameNode)

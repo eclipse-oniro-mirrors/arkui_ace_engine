@@ -4495,6 +4495,26 @@ void AssignCast(std::optional<OHOS::Rosen::Blender*>& dst, const Ark_uiEffect_Br
 }
 
 template<>
+void AssignCast(std::optional<OHOS::Rosen::Blender*>& dst, const Ark_uiEffect_HdrBrightnessBlender& src)
+{
+    if (!src) {
+        dst = std::nullopt;
+        return;
+    }
+    dst = reinterpret_cast<OHOS::Rosen::Blender*>(src);
+}
+
+template<>
+void AssignCast(std::optional<OHOS::Rosen::Blender*>& dst, const Ark_uiEffect_BlenderBase& src)
+{
+    if (!src) {
+        dst = std::nullopt;
+        return;
+    }
+    dst = reinterpret_cast<OHOS::Rosen::Blender*>(src);
+}
+
+template<>
 ACE_FORCE_EXPORT void AssignCast(std::optional<UiMaterial*>& dst, uiMaterial_MaterialPeer* const& src)
 {
     if (!src) {
@@ -4626,6 +4646,12 @@ void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptions
     auto lightEffectOptions = Converter::OptConvert<LightEffectOptions>(src.lightEffect);
     if (lightEffectOptions.has_value()) {
         immersiveOptions.lightEffectOptions = lightEffectOptions;
+    }
+    auto colorBlendMode = Converter::OptConvert<int32_t>(src.colorBlendMode);
+    if (colorBlendMode.has_value() &&
+        colorBlendMode.value() >= static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) &&
+        colorBlendMode.value() <= static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS)) {
+        immersiveOptions.colorBlendMode = static_cast<MaterialColorBlendMode>(colorBlendMode.value());
     }
 
     dst = immersiveOptions;

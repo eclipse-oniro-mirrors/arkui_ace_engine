@@ -38,7 +38,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<TabsLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propTabBarPosition_ = CloneTabBarPosition();
         value->propAxis_ = CloneAxis();
         value->propTabBarMode_ = CloneTabBarMode();
@@ -51,6 +51,7 @@ public:
         value->propIndex_ = CloneIndex();
         value->propIndexSetByUser_ = CloneIndexSetByUser();
         value->propBarOverlap_ = CloneBarOverlap();
+        value->propBarOverlapMode_ = CloneBarOverlapMode();
         value->propWidthAuto_ = CloneWidthAuto();
         value->propHeightAuto_ = CloneHeightAuto();
         value->propCachedMaxCount_ = CloneCachedMaxCount();
@@ -96,6 +97,7 @@ public:
         ResetIndex();
         ResetIndexSetByUser();
         ResetBarOverlap();
+        ResetBarOverlapMode();
         ResetCachedMaxCount();
         ResetCacheMode();
         ResetSidebarDisplayStyle();
@@ -162,6 +164,14 @@ public:
             json->PutExtAttr("divider", divider, filter);
         }
         json->PutExtAttr("barOverlap", propBarOverlap_.value_or(false) ? "true" : "false", filter);
+        auto effectiveMode = GetEffectiveBarOverlapMode();
+        std::string modeStr = "BarOverlapMode.STANDARD";
+        if (effectiveMode == BarOverlapMode::STACK) {
+            modeStr = "BarOverlapMode.STACK";
+        } else if (effectiveMode == BarOverlapMode::SAFE_AREA_PADDING) {
+            modeStr = "BarOverlapMode.SAFE_AREA_PADDING";
+        }
+        json->PutExtAttr("barOverlapMode", modeStr.c_str(), filter);
         json->PutExtAttr("keepTabBarInSideBar", propKeepTabBarInSideBar_.value_or(false) ? "true" : "false", filter);
         if (propCachedMaxCount_.has_value()) {
             auto cacheInfo = JsonUtil::Create(true);
@@ -175,6 +185,17 @@ public:
 
         ToJsonValueWithBarFloatingStyle(json, filter);
         ToJsonValueWithBarTopFloatingStyle(json, filter);
+    }
+
+    BarOverlapMode GetEffectiveBarOverlapMode() const
+    {
+        if (propBarOverlapMode_.has_value()) {
+            return propBarOverlapMode_.value();
+        }
+        if (propBarOverlap_.value_or(false)) {
+            return BarOverlapMode::STACK;
+        }
+        return BarOverlapMode::STANDARD;
     }
 
     void ToJsonValueWithBarFloatingStyle(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
@@ -277,6 +298,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(Index, int32_t, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(IndexSetByUser, int32_t, PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarOverlap, bool, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarOverlapMode, BarOverlapMode, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(WidthAuto, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(HeightAuto, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(CachedMaxCount, int32_t, PROPERTY_UPDATE_MEASURE_SELF);

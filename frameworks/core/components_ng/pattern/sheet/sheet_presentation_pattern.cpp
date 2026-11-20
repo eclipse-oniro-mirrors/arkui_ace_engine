@@ -50,6 +50,7 @@
 #include "core/components_ng/pattern/scroll/scroll_layout_algorithm.h"
 #include "core/components_ng/pattern/scroll/scroll_layout_property.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
+#include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/pattern/sheet/minimize/sheet_minimize_object.h"
 #include "core/components_ng/pattern/sheet/minimize/sheet_presentation_minimize_layout_algorithm.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
@@ -303,7 +304,7 @@ bool SheetPresentationPattern::OnDirtyLayoutWrapperSwap(
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     InitPageHeight();
     sheetObject_->DirtyLayoutProcess(layoutAlgorithmWrapper);
@@ -321,6 +322,40 @@ bool SheetPresentationPattern::OnDirtyLayoutWrapperSwap(
         MarkSheetPageNeedRender();
     }
     return true;
+}
+
+void SheetPresentationPattern::UpdateSafeAreaPaddingClip(
+    const RefPtr<ScrollablePaintProperty>& scrollPaintProps, SheetTitleBarHoverMode hoverMode, float top)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    CHECK_NULL_VOID(scrollPaintProps);
+    auto hostLayoutProperty = host->GetLayoutProperty();
+    CHECK_NULL_VOID(hostLayoutProperty);
+    if (hoverMode == SheetTitleBarHoverMode::SAFE_AREA_PADDING) {
+        const auto& existing = hostLayoutProperty->GetSafeAreaPaddingProperty();
+        bool needUpdate =
+            !existing || !existing->top.has_value() || !NearEqual(existing->top->GetDimension().Value(), top);
+        if (needUpdate) {
+            PaddingProperty safeAreaPadding;
+            safeAreaPadding.left = CalcLength(0.0);
+            safeAreaPadding.right = CalcLength(0.0);
+            safeAreaPadding.top = CalcLength(top);
+            safeAreaPadding.bottom = std::nullopt;
+            hostLayoutProperty->UpdateSafeAreaPadding(safeAreaPadding);
+            host->ResetSafeAreaPadding();
+        }
+        const auto& clip = scrollPaintProps->GetContentClip();
+        if (!clip.has_value() || clip->first != ContentClipMode::SAFE_AREA) {
+            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::SAFE_AREA, nullptr));
+        }
+    } else if (hostLayoutProperty->GetSafeAreaPaddingProperty()) {
+        hostLayoutProperty->ResetSafeAreaPadding();
+        host->ResetSafeAreaPadding();
+        if (scrollPaintProps->GetContentClip().has_value()) {
+            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::BOUNDARY, nullptr));
+        }
+    }
 }
 
 void SheetPresentationPattern::SetBottomStyleHotAreaInSubwindow()
@@ -2014,7 +2049,7 @@ float SheetPresentationPattern::GetWrapperHeight()
     CHECK_NULL_RETURN(host, 0.0f);
     auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
     CHECK_NULL_RETURN(sheetWrapper, 0.0f);
-    auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+    auto sheetWrapperNode = sheetWrapper;
     CHECK_NULL_RETURN(sheetWrapperNode, 0.0f);
     auto sheetWrapperGeometryNode = sheetWrapperNode->GetGeometryNode();
     CHECK_NULL_RETURN(sheetWrapperGeometryNode, 0.0f);
@@ -2027,7 +2062,7 @@ float SheetPresentationPattern::GetWrapperWidth()
     CHECK_NULL_RETURN(host, 0.0f);
     auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
     CHECK_NULL_RETURN(sheetWrapper, 0.0f);
-    auto sheetWrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+    auto sheetWrapperNode = sheetWrapper;
     CHECK_NULL_RETURN(sheetWrapperNode, 0.0f);
     auto sheetWrapperGeometryNode = sheetWrapperNode->GetGeometryNode();
     CHECK_NULL_RETURN(sheetWrapperGeometryNode, 0.0f);
@@ -2309,7 +2344,7 @@ int32_t SheetPresentationPattern::GetSubWindowId() const
     CHECK_NULL_RETURN(host, INVALID_SUBWINDOW_ID);
     auto sheetWrapper = SheetPresentationPattern::GetParentSkipEffectComponent(host);
     CHECK_NULL_RETURN(sheetWrapper, INVALID_SUBWINDOW_ID);
-    auto wrapperNode = AceType::DynamicCast<FrameNode>(sheetWrapper);
+    auto wrapperNode = sheetWrapper;
     auto sheetWrapperPattern = wrapperNode->GetPattern<SheetWrapperPattern>();
     CHECK_NULL_RETURN(sheetWrapperPattern, INVALID_SUBWINDOW_ID);
     return sheetWrapperPattern->GetSubWindowId();

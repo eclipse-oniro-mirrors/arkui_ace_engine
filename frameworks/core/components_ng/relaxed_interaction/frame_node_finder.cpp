@@ -217,7 +217,7 @@ FrameNodeMatch FrameNodeFinder::FindLeaf(
     }
 
     for (const auto& childRecognizer : recognizerGroup->GetGroupRecognizer()) {
-        auto childGestureRecognirozer = AceType::DynamicCast<NGGestureRecognizer>(childRecognizer);
+        auto childGestureRecognirozer = childRecognizer;
         if (!childGestureRecognirozer) {
             continue;
         }

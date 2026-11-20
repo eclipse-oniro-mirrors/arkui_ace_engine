@@ -1,0 +1,55 @@
+# Copyright (c) 2026 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{
+  global:
+    _init;
+    _fini;
+    __cfi_check*;
+    extern "C++" {
+      OHOS::Ace::UIServiceMgrClient::*;
+      OHOS::Ace::UIServiceMgrClientIdl::*;
+      OHOS::Ace::UIServiceStub::*;
+      non-virtual?thunk?to?OHOS::Ace::UIServiceStub::*;
+      virtual?thunk?to?OHOS::Ace::UIServiceStub::*;
+      OHOS::Ace::AppInfoParcel::*;
+      OHOS::Ace::StatisticEventInfoParcel::*;
+      OHOS::Ace::MaterialStatisticEventInfoParcel::*;
+      "vtable for OHOS::Ace::UIServiceMgrClient";
+      "typeinfo for OHOS::Ace::UIServiceMgrClient";
+      "typeinfo name for OHOS::Ace::UIServiceMgrClient";
+      "VTT for OHOS::Ace::UIServiceMgrClient";
+      "vtable for OHOS::Ace::UIServiceMgrClientIdl";
+      "typeinfo for OHOS::Ace::UIServiceMgrClientIdl";
+      "typeinfo name for OHOS::Ace::UIServiceMgrClientIdl";
+      "VTT for OHOS::Ace::UIServiceMgrClientIdl";
+      "vtable for OHOS::Ace::UIServiceStub";
+      "typeinfo for OHOS::Ace::UIServiceStub";
+      "typeinfo name for OHOS::Ace::UIServiceStub";
+      "VTT for OHOS::Ace::UIServiceStub";
+      "vtable for OHOS::Ace::AppInfoParcel";
+      "typeinfo for OHOS::Ace::AppInfoParcel";
+      "typeinfo name for OHOS::Ace::AppInfoParcel";
+      "vtable for OHOS::Ace::StatisticEventInfoParcel";
+      "typeinfo for OHOS::Ace::StatisticEventInfoParcel";
+      "typeinfo name for OHOS::Ace::StatisticEventInfoParcel";
+      "vtable for OHOS::Ace::MaterialStatisticEventInfoParcel";
+      "typeinfo for OHOS::Ace::MaterialStatisticEventInfoParcel";
+      "typeinfo name for OHOS::Ace::MaterialStatisticEventInfoParcel";
+      "VTT for OHOS::Ace::AppInfoParcel";
+      "VTT for OHOS::Ace::StatisticEventInfoParcel";
+      "VTT for OHOS::Ace::MaterialStatisticEventInfoParcel";
+    };
+  local:
+    *;
+};

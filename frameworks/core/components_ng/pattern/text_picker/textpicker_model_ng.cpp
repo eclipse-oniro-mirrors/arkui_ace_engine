@@ -981,7 +981,7 @@ void TextPickerDialogModelNG::SetTextPickerDialogShow(RefPtr<AceType>& PickerTex
     DialogProperties properties;
     SetDialogProperties(properties, textPickerDialog, theme);
 
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     executor->PostTask(
         [properties, settingData, dialogEvent, dialogCancelEvent, dialogLifeCycleEvent, buttonInfos,

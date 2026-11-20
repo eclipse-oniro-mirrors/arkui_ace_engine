@@ -40,6 +40,7 @@ gen_obj("composelistitemv2_abc_preview") {
 }
 
 ohos_shared_library("composelistitemv2") {
+  branch_protector_ret = "pac_ret"
   sources = [ "composelistitemv2.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

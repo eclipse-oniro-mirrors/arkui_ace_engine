@@ -10309,6 +10309,32 @@ typedef enum {
     NODE_PICKER_ITEM_HEIGHT = 1018005,
 
     /**
+     * @brief Text style of the selected item in the picker component. This attribute can be set, reset, and
+     * obtained as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.object: text style of the selected item. The parameter type is {@link ArkUI_PickerComponentTextStyle}.
+     * Use {@link OH_ArkUI_PickerComponentTextStyle_Create} to create the instance, set properties through
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetColor}, {@link OH_ArkUI_PickerComponentTextStyle_SetFontSize},
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetFontWeight}, {@link OH_ArkUI_PickerComponentTextStyle_SetMinFontSize},
+     * {@link OH_ArkUI_PickerComponentTextStyle_SetMaxFontSize}, and {@link OH_ArkUI_PickerComponentTextStyle_SetOverflow},
+     * and then pass the pointer to **.object**. After the setting is complete, call
+     * {@link OH_ArkUI_PickerComponentTextStyle_Dispose} to dispose of the instance. When not set, the system default
+     * style is used.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.object: text style of the selected item. The parameter type is {@link ArkUI_PickerComponentTextStyle}.</li>
+     * </ul>
+     *
+     * @ingroup Picker
+     * @since 26.1.0
+     */
+    NODE_PICKER_SELECTED_TEXT_STYLE = 1018007,
+
+    /**
      * @brief Sets the digital crown sensitivity of the ArcList component. This attribute can be set, reset, and obtained as
      * required through APIs.
      *
@@ -14485,45 +14511,48 @@ int32_t OH_ArkUI_NodeUtils_GetNodeUniqueId(ArkUI_NodeHandle node, int32_t* uniqu
 int32_t OH_ArkUI_NativeModule_AdoptChild(ArkUI_NodeHandle node, ArkUI_NodeHandle child);
 
 /**
- * @brief Adopts the target child node and enables compensated window-position calculation across the adoption
- * boundary. The adopted node must not have an existing parent node. Use
- * {@link OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation} to provide the aggregate position
- * compensation of intermediate render-only nodes.
+ * @brief The current node accepts the target node as the auxiliary node. An admitted node cannot have a parent node.
+ * Calling this interface does not actually add it as a child node,
+ * Instead, it is only allowed to receive lifecycle callbacks for the corresponding child nodes. Configure the floating
+ * layer node rendering position of the admitted node through the policy.
  *
- * @param node ArkUI_NodeHandle pointer, the parent node that will adopt the child node.
- * @param child ArkUI_NodeHandle pointer, the target node being adopted.
- * @param policy The policy to set. Valid values correspond to {@link OH_ArkUI_AdoptPolicy}.
- * @return Error code.
- *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
- *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid or the policy is invalid.
- *         {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} The CAPI init error.
- *         {@link ARKUI_ERROR_CODE_NODE_HAS_PARENT} The child already has a parent node.
- *         {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED} The child can not be adopted.
- *         {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO} The node can not adopt children.
- * @since 26.2.0
+ * @param node [in] **ArkUI_NodeHandle** pointer, which specifies the parent node of the node to be adopted.
+ * @param child [in] **ArkUI_NodeHandle** pointer, which specifies the child node to be adopted.
+ * @param policy [in] Rendering position policy of overlay nodes of adopted node.
+ *     Valid values correspond to {@link OH_ArkUI_AdoptPolicy}.
+ * @return Result code.
+ *     <ul><li>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *     <li>If the parameter is abnormal, {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned. </li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} if C API initialization failed.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_NODE_HAS_PARENT} if the adopted node already has a parent node.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED} if the node cannot be
+ *     adopted as an affiliated node.</li>
+ *     <li>Returns {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO} if the node cannot adopt
+ *     other affiliated nodes.</li></ul>
+ * @since 26.1.0
  */
 int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
     ArkUI_NodeHandle node, ArkUI_NodeHandle child, OH_ArkUI_AdoptPolicy policy);
 
 /**
- * @brief Sets the overlay position compensation from an adopted child to its adopt parent. The compensation
- * represents the aggregate effect of the render-only nodes between them. @p compensationOffset is the aggregate
- * layout offset used by calculations that do not apply transforms. @p compensationTransform is the complete
- * transform, including that layout offset, used by transform-aware calculations. A calculation uses only the
- * representation appropriate to its coordinate semantics. The child must have been adopted with
+ * @brief Sets the position compensation from the accepted child node to the accepted parent node. This compensation
+ * represents the overall impact of the tree of pure render nodes between them.
+ * CompensationOffset is the accumulated offset compensation of pure rendering nodes, including only the offset of each
+ * node. The compensationTransform is the accumulative transformation compensation matrix of the pure render node,
+ * Contains transformations such as offset, rotation, and scaling for each node. Compensation takes effect only when the
+ * child node has been admitted through the following policies:
  * {@link OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN}.
  *
- * @param adoptedChild The adopted child node on which the compensation is stored.
- * @param compensationOffset The aggregate untransformed x/y layout offset, in px, of the intermediate render-only
- * nodes.
- * @param compensationTransform The complete aggregate transform of the intermediate render-only nodes, including
- * their layout offset. The matrix is copied by this call.
- * @return Error code.
- *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
- *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid.
- *         {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} The CAPI init error.
- *         {@link ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN} The child is not adopted with the required policy.
- * @since 26.2.0
+ * @param adoptedChild [in] The adopted node that require location compensation.
+ * @param compensationOffset [in] x/y compensation offset (in pixels).
+ * @param compensationTransform [in] Aggregate transform compensation matrix.
+ * @return Return value.
+ *     <ul><li>if the operation is successful, {@link ARKUI_ERROR_CODE_NO_ERROR} is returned.</li>
+ *     <li>if C API initialization fails, {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} is returned.</li>
+ *     <li>if the parameter is abnormal, {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.</li>
+ *     <li>if the node is not admitted according to the required policy,
+ *     {@link ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN} is returned.</li></ul>
+ * @since 26.1.0
  */
 int32_t OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(ArkUI_NodeHandle adoptedChild,
     const ArkUI_PointF* compensationOffset, const ArkUI_Matrix4* compensationTransform);

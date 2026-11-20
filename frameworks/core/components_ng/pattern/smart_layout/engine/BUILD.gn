@@ -21,6 +21,7 @@ config("smartlayout_config") {
 }
 
 ohos_shared_library("smartlayout") {
+  branch_protector_ret = "pac_ret"
   subsystem_name = ace_engine_subsystem
   part_name = ace_engine_part
 
@@ -49,6 +50,10 @@ ohos_shared_library("smartlayout") {
   configs = [ "$ace_root:ace_config" ]
 
   public_configs = [ ":smartlayout_config" ]
+
+  if (is_ohos) {
+    version_script = "libsmartlayout.map"
+  }
 
   external_deps = [
     "bounds_checking_function:libsec_shared",

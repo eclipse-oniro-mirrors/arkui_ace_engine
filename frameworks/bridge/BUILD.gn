@@ -19,6 +19,7 @@ template("framework_bridge") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     if (current_os == "ohos") {
       sanitize = {
         integer_overflow = true
@@ -61,6 +62,7 @@ template("framework_bridge_ng") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     if (current_os == "ohos") {
       sanitize = {
         integer_overflow = true

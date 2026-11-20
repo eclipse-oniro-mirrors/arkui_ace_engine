@@ -1405,7 +1405,7 @@ HWTEST_F(SheetPresentationTestFourNg, DirtyLayoutProcess001, TestSize.Level1)
 
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
 
     auto object = AceType::DynamicCast<SheetSideObject>(sheetPattern->GetSheetObject());
@@ -1435,7 +1435,7 @@ HWTEST_F(SheetPresentationTestFourNg, DirtyLayoutProcess002, TestSize.Level1)
 
     auto dirty = sheetNode->CreateLayoutWrapper();
     ASSERT_NE(dirty, nullptr);
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     ASSERT_NE(layoutAlgorithmWrapper, nullptr);
 
     auto object = AceType::DynamicCast<SheetSideObject>(sheetPattern->GetSheetObject());

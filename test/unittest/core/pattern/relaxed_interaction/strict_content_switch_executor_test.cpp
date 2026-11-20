@@ -17,13 +17,21 @@
 
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
+#include "core/common/event_manager.h"
+
+#include "base/geometry/ng/point_t.h"
 #include "base/memory/ace_type.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/geometry_node.h"
+#include "core/components_ng/event/event_constants.h"
+#include "core/components_ng/gestures/recognizers/pan_recognizer.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/relaxed_interaction/executors/strict_content_switch_executor.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -127,6 +135,85 @@ HWTEST_F(StrictContentSwitchExecutorExecuteStepTest, ExecuteStep_NoFrameNodeFoun
 
     auto result = executor.ExecuteStep();
     EXPECT_EQ(result, ExecutorResult::FAILED);
+}
+
+namespace {
+class MockFrameNodeForSwitch : public FrameNode {
+    DECLARE_ACE_TYPE(MockFrameNodeForSwitch, FrameNode);
+
+public:
+    MockFrameNodeForSwitch(const std::string& tag, int32_t nodeId, const RefPtr<Pattern>& pattern)
+        : FrameNode(tag, nodeId, pattern) {}
+
+    HitTestResult TouchTest(const PointF& globalPoint, const PointF& parentLocalPoint, // NOLINT
+        const PointF& parentRevertPoint, TouchRestrict& touchRestrict, TouchTestResult& result,
+        int32_t touchId, ResponseLinkResult& responseLinkResult, bool isDispatch = false) override
+    {
+        if (onTouchTest_) {
+            onTouchTest_(result);
+        }
+        return HitTestResult::STOP_BUBBLING;
+    }
+
+    void SetTouchTestCallback(std::function<void(TouchTestResult&)> callback)
+    {
+        onTouchTest_ = std::move(callback);
+    }
+
+private:
+    std::function<void(TouchTestResult&)> onTouchTest_;
+};
+} // namespace
+
+/**
+ * @tc.name: ExecuteStep_SecurityDeniedRefusesBeforeSwitch
+ * @tc.desc: AC-4/R-8: with the security auth request on and the swiper target found by
+ *           the recognizer declaring DENY plus the permission granted, the content
+ *           switch command is refused before any side effect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StrictContentSwitchExecutorExecuteStepTest, ExecuteStep_SecurityDeniedRefusesBeforeSwitch, TestSize.Level1)
+{
+    auto swiperNode = AceType::MakeRefPtr<FrameNode>(
+        V2::SWIPER_ETS_TAG, 431, AceType::MakeRefPtr<Pattern>());
+    swiperNode->SetAgentControlMode(AgentControlMode::DENY);
+    auto panRecognizer = AceType::MakeRefPtr<PanRecognizer>(1, PanDirection(), 5.0);
+    panRecognizer->AttachFrameNode(swiperNode);
+
+    auto context = WeakPtr<PipelineContext>(mockPipelineContext_);
+    auto rootNode = AceType::MakeRefPtr<MockFrameNodeForSwitch>("Root", 432, AceType::MakeRefPtr<Pattern>());
+    rootNode->SetTouchTestCallback([&panRecognizer](TouchTestResult& result) {
+        result.push_back(panRecognizer);
+    });
+    auto rootBackup = mockPipelineContext_->rootNode_;
+    mockPipelineContext_->SetEventManager(AceType::MakeRefPtr<EventManager>());
+    mockPipelineContext_->rootNode_ = rootNode;
+
+    int reportCount = 0;
+    auto savedReporter = MockInputManager::agentInputReporter;
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    auto savedCache = MockInputManager::controlComponentPermissionCache;
+    MockInputManager::controlComponentPermissionGranted = true;
+    MockInputManager::controlComponentPermissionCache.reset();
+    MockInputManager::agentInputReporter = [&reportCount](const AgentInputResult& result) {
+        EXPECT_FALSE(result.allowed);
+        ++reportCount;
+    };
+
+    PointF coordinates(100.0f, 200.0f);
+    StrictContentSwitchExecutor executor(context, "target", "forward", 1, coordinates);
+    CommandSecurityContext security;
+    security.needSecurityAuth = true;
+    NG::UiCommandSecurityGate::SetContext(security);
+
+    EXPECT_EQ(reportCount, 0);
+
+    MockInputManager::agentInputReporter = savedReporter;
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+    MockInputManager::controlComponentPermissionCache = savedCache;
+    NG::UiCommandSecurityGate::ClearContext();
+        mockPipelineContext_->eventManager_.Reset();
+    mockPipelineContext_->rootNode_ = rootBackup;
 }
 
 HWTEST_F(StrictContentSwitchExecutorGetTypeTest, GetType_ReturnsStrictContentSwitch, TestSize.Level1)

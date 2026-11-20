@@ -19,6 +19,7 @@ template("ace_ohos_standard_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     defines += invoker.defines
@@ -68,6 +69,7 @@ template("ace_ohos_standard_source_set") {
       "$ace_root/adapter/ohos/entrance/ui_session/page_scene_split_adapter.cpp",
       "$ace_root/adapter/ohos/entrance/ui_session/ui_session_batch_command.cpp",
       "$ace_root/adapter/ohos/entrance/ui_session/ui_session_command_result.cpp",
+      "$ace_root/adapter/ohos/entrance/ui_session/ui_session_accessibility_command.cpp",
       "$ace_root/adapter/ohos/entrance/utils.cpp",
 
       # drag window

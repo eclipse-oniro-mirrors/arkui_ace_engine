@@ -24,6 +24,17 @@ using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
+// Mock-driven tests for the autofill entry points exposed by Container:
+// RequestAutoFill, UpdatePopupUIExtension and ClosePopupUIExtension.
+// SetUpTestSuite installs a MockPipelineContext together with a
+// MockContainer and bridges the container's pipelineContext_ to the
+// current pipeline context, so the autofill calls below run against a
+// fully mocked pipeline; TearDownTestSuite clears that bridge and tears
+// both mocks down. The two test cases cover the native-component path
+// (isNative = true) and the web-component path (isNative = false) of
+// RequestAutoFill. With no popup UI extension actually created, the
+// request still returns ACE_AUTO_FILL_SUCCESS, while the follow-up
+// Update/ClosePopupUIExtension calls are expected to report failure.
 class ContainerTest : public testing::Test {
 public:
     static void SetUpTestSuite()

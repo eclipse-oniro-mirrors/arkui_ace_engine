@@ -16,12 +16,15 @@
 #include "test/unittest/core/event/event_manager_test_ng.h"
 
 #include <array>
+#include <chrono>
+#include <string>
 
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/base/node_sensitive_input.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/components_ng/gestures/recognizers/parallel_recognizer.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 
 using namespace testing::ext;
@@ -76,7 +79,6 @@ public:
             EXPECT_EQ(reports[index].tag, node->GetTag());
             EXPECT_EQ(reports[index].allowed, allowed);
             EXPECT_EQ(reports[index].sessionId, session);
-            EXPECT_EQ(reports[index].callingUid, CALLING_UID);
         }
     }
     std::vector<AgentInputResult> reports;
@@ -98,6 +100,31 @@ RefPtr<FrameNode> MakeNode(AgentControlMode mode = ALLOW)
         AceType::MakeRefPtr<Pattern>());
     node->SetAgentControlMode(mode);
     return node;
+}
+
+constexpr int32_t GATE_PERF_ITERATIONS = 100000;
+
+int64_t MeasureGateLatencyNs(const RefPtr<FrameNode>& node, bool needSecurityAuth, int32_t iterations,
+    bool& lastResult)
+{
+    const auto started = std::chrono::steady_clock::now();
+    for (int32_t i = 0; i < iterations; ++i) {
+        lastResult = UiCommandSecurityGate::IsCommandDenied(node, needSecurityAuth);
+    }
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - started).count();
+}
+
+int64_t MeasureAuthGateLatencyNs(const RefPtr<FrameNode>& node, bool needSecurityAuth, int32_t iterations,
+    bool& lastResult)
+{
+    const auto started = std::chrono::steady_clock::now();
+    for (int32_t i = 0; i < iterations; ++i) {
+        MockInputManager::controlComponentPermissionCache.reset();
+        lastResult = UiCommandSecurityGate::IsCommandDenied(node, needSecurityAuth);
+    }
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - started).count();
 }
 
 class AgentTouchTarget final : public MockTouchEventTarget {
@@ -374,5 +401,187 @@ HWTEST_F(EventManagerTestNg, AgentKeyCancel001, TestSize.Level1)
     EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, 1);
     event.action = KeyAction::CANCEL;
     EXPECT_TRUE(focus->HandleEvent(event));
+}
+
+/**
+ * @tc.name: CommandSecurityGateMatrix001
+ * @tc.desc: AC-1/AC-2: SendCommand security gate refuses only when the caller declared auth, the target
+ *           itself is DENY and the control-component permission is granted; the fence report
+ *           fires exactly once per refused command and never on the legacy path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGateMatrix001, TestSize.Level1)
+{
+    auto deniedNode = MakeNode(DENY);
+    auto allowNode = MakeNode(ALLOW);
+    auto unsetNode = FrameNode::CreateFrameNode("unsetMode",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(unsetNode);
+    EXPECT_FALSE(unsetNode->HasAgentControlMode());
+
+    // Legacy path: auth flag false never triggers the permission check or a fence report.
+    {
+        AgentInputProbe probe;
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(deniedNode, false));
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(allowNode, false));
+        EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, 0);
+        EXPECT_TRUE(probe.reports.empty());
+    }
+
+    // Auth flag true but target is ALLOW (explicit or unset default): proceed.
+    {
+        AgentInputProbe probe;
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(allowNode, true));
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(unsetNode, true));
+        EXPECT_TRUE(probe.reports.empty());
+    }
+
+    // Auth flag true and target DENY but the permission check fails: auth fails, proceed.
+    {
+        AgentInputProbe probe;
+        MockInputManager::controlComponentPermissionGranted = false;
+        MockInputManager::controlComponentPermissionCache.reset();
+        EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(deniedNode, true));
+        EXPECT_TRUE(probe.reports.empty());
+    }
+
+    // Auth flag true, target DENY and permission granted: refuse and report to the fence.
+    // The caller-relayed agentTokenId routes the notification when present.
+    {
+        AgentInputProbe probe;
+        EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(deniedNode, true));
+        CommandSecurityContext security;
+        security.needSecurityAuth = true;
+        security.agentTokenId = SESSION_ID;
+        UiCommandSecurityGate::ReportDeniedCommand(deniedNode, security);
+        ASSERT_EQ(probe.reports.size(), 1u);
+        const auto& result = probe.reports.front();
+        EXPECT_EQ(result.nodeId, deniedNode->GetId());
+        EXPECT_EQ(result.compId, std::to_string(deniedNode->GetId()));
+        EXPECT_EQ(result.tag, deniedNode->GetTag());
+        EXPECT_FALSE(result.allowed);
+        EXPECT_EQ(result.sessionId, SESSION_ID);
+    }
+
+    // A null target never triggers the gate.
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(nullptr, true));
+}
+
+/**
+ * @tc.name: CommandSecurityGateParentChildAndDynamic001
+ * @tc.desc: AC-3/R-4: the gate reads only the target's own AgentControlMode; a parent's
+ *           DENY/ALLOW is never inherited, and a dynamic mode change applies from the
+ *           next command check on.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGateParentChildAndDynamic001, TestSize.Level1)
+{
+    AgentInputProbe probe;
+    auto parent = MakeNode(DENY);
+    auto child = MakeNode(ALLOW);
+    parent->AddChild(child);
+    // Parent DENY, child ALLOW: the child command is not denied.
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(child, true));
+
+    auto allowParent = MakeNode(ALLOW);
+    auto denyChild = MakeNode(DENY);
+    allowParent->AddChild(denyChild);
+    // Parent ALLOW, child DENY: the child command is denied by its own policy.
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(denyChild, true));
+
+    // Dynamic update: the same node flips DENY -> ALLOW -> DENY and each check reads
+    // the current value (changes apply from the next command).
+    auto node = MakeNode(DENY);
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    node->SetAgentControlMode(ALLOW);
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    node->SetAgentControlMode(DENY);
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    // Unsetting keeps the ALLOW default.
+    node->SetAgentControlMode(std::nullopt);
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(node, true));
+    EXPECT_TRUE(probe.reports.empty());
+}
+
+/**
+ * @tc.name: CommandSecurityGateInternalPopupTarget001
+ * @tc.desc: AC-5/R-14: an internal popup target (e.g. a Menu node reached by nodeId)
+ *           follows the same gate rule as a normal target within the same instance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGateInternalPopupTarget001, TestSize.Level1)
+{
+    AgentInputProbe probe;
+    auto popupItem = FrameNode::CreateFrameNode(
+        "Menu", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(popupItem);
+    popupItem->SetAgentControlMode(DENY);
+    // Same rule as a normal DENY target: refused with the auth request on.
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(popupItem, true));
+    // And same rule when the popup target is ALLOW: proceeds.
+    popupItem->SetAgentControlMode(ALLOW);
+    EXPECT_FALSE(UiCommandSecurityGate::IsCommandDenied(popupItem, true));
+    // A normal node in the same instance behaves identically.
+    auto normal = MakeNode(DENY);
+    EXPECT_TRUE(UiCommandSecurityGate::IsCommandDenied(normal, true));
+    EXPECT_TRUE(probe.reports.empty());
+}
+
+/**
+ * @tc.name: CommandSecurityGatePerformance001
+ * @tc.desc: AC-12: the default (no security auth) gate check stays within the 1ms local budget and
+ *           the kicked auth gate check stays within the 5ms candidate budget. The non-trigger and
+ *           auth combinations are sampled separately; the auth samples reset the InputManager
+ *           permission cache per iteration so every sample exercises the permission check.
+ * @tc.type: PERF
+ */
+HWTEST_F(EventManagerTestNg, CommandSecurityGatePerformance001, TestSize.Level1)
+{
+    AgentInputProbe probe;
+    constexpr int64_t DEFAULT_PATH_BUDGET_NS = 1000000;
+    constexpr int64_t AUTH_PATH_BUDGET_NS = 5000000;
+    auto denyNode = MakeNode(DENY);
+    auto allowNode = MakeNode(ALLOW);
+    bool result = true;
+    volatile bool authOff = false;
+    volatile bool authOn = true;
+
+    // Non-trigger combination: auth flag off on a DENY target (default path).
+    MockInputManager::controlComponentPermissionCheckCount = 0;
+    auto elapsedNs = MeasureGateLatencyNs(denyNode, authOff, GATE_PERF_ITERATIONS, result);
+    EXPECT_FALSE(result);
+    EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, 0);
+    auto averageNs = elapsedNs / GATE_PERF_ITERATIONS;
+    testing::Test::RecordProperty("gate_default_total_ns", std::to_string(elapsedNs));
+    testing::Test::RecordProperty("gate_default_avg_ns", std::to_string(averageNs));
+    EXPECT_LT(averageNs, DEFAULT_PATH_BUDGET_NS);
+
+    // Non-trigger combination: auth flag on but the target allows injection.
+    MockInputManager::controlComponentPermissionCheckCount = 0;
+    elapsedNs = MeasureGateLatencyNs(allowNode, authOn, GATE_PERF_ITERATIONS, result);
+    EXPECT_FALSE(result);
+    EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, 0);
+    testing::Test::RecordProperty("gate_allow_avg_ns",
+        std::to_string(elapsedNs / GATE_PERF_ITERATIONS));
+
+    // Triggered and released: the permission check fails, so injection proceeds.
+    MockInputManager::controlComponentPermissionGranted = false;
+    MockInputManager::controlComponentPermissionCheckCount = 0;
+    elapsedNs = MeasureAuthGateLatencyNs(denyNode, authOn, GATE_PERF_ITERATIONS, result);
+    EXPECT_FALSE(result);
+    EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, GATE_PERF_ITERATIONS);
+    auto authFailAvgNs = elapsedNs / GATE_PERF_ITERATIONS;
+    testing::Test::RecordProperty("gate_auth_fail_avg_ns", std::to_string(authFailAvgNs));
+    EXPECT_LT(authFailAvgNs, AUTH_PATH_BUDGET_NS);
+
+    // Triggered and refused: the permission check succeeds.
+    MockInputManager::controlComponentPermissionGranted = true;
+    MockInputManager::controlComponentPermissionCheckCount = 0;
+    elapsedNs = MeasureAuthGateLatencyNs(denyNode, authOn, GATE_PERF_ITERATIONS, result);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(MockInputManager::controlComponentPermissionCheckCount, GATE_PERF_ITERATIONS);
+    auto authDenyAvgNs = elapsedNs / GATE_PERF_ITERATIONS;
+    testing::Test::RecordProperty("gate_auth_deny_avg_ns", std::to_string(authDenyAvgNs));
+    EXPECT_LT(authDenyAvgNs, AUTH_PATH_BUDGET_NS);
 }
 } // namespace OHOS::Ace::NG

@@ -1541,8 +1541,8 @@ HWTEST_F(SvgManagerTestNg, SvgTransform002, TestSize.Level1)
     ASSERT_EQ(static_cast<int>(transformVec.size()), 1);
     EXPECT_EQ(transformVec[0].funcType, "translate");
     ASSERT_EQ(static_cast<int>(transformVec[0].paramVec.size()), 2);
-    EXPECT_EQ(transformVec[0].paramVec[0], "20");
-    EXPECT_EQ(transformVec[0].paramVec[1], "20");
+    EXPECT_DOUBLE_EQ(transformVec[0].paramVec[0], 20.0);
+    EXPECT_DOUBLE_EQ(transformVec[0].paramVec[1], 20.0);
     SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
     Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
     EXPECT_NEAR(matrix.Get(0, 3), 20.0, 1e-6);
@@ -1569,7 +1569,7 @@ HWTEST_F(SvgManagerTestNg, SvgTransform003, TestSize.Level1)
     ASSERT_EQ(static_cast<int>(transformVec.size()), 1);
     EXPECT_EQ(transformVec[0].funcType, "rotate");
     ASSERT_EQ(static_cast<int>(transformVec[0].paramVec.size()), 1);
-    EXPECT_EQ(transformVec[0].paramVec[0], "45");
+    EXPECT_DOUBLE_EQ(transformVec[0].paramVec[0], 45.0);
     SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
     Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
     EXPECT_NEAR(matrix.Get(0, 0), 0.70710678, 1e-6);
@@ -1596,7 +1596,7 @@ HWTEST_F(SvgManagerTestNg, SvgTransform004, TestSize.Level1)
     ASSERT_EQ(static_cast<int>(transformVec.size()), 1);
     EXPECT_EQ(transformVec[0].funcType, "scale");
     ASSERT_EQ(static_cast<int>(transformVec[0].paramVec.size()), 1);
-    EXPECT_EQ(transformVec[0].paramVec[0], "2");
+    EXPECT_DOUBLE_EQ(transformVec[0].paramVec[0], 2.0);
     SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
     Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
     EXPECT_NEAR(matrix.GetScaleX(), 2.0, 1e-6);
@@ -1623,7 +1623,7 @@ HWTEST_F(SvgManagerTestNg, SvgTransform005, TestSize.Level1)
     EXPECT_EQ(transformVec[0].funcType, "translate");
     EXPECT_EQ(transformVec[1].funcType, "rotate");
     EXPECT_EQ(transformVec[2].funcType, "scale");
-    EXPECT_EQ(transformVec[2].paramVec[0], "1.5");
+    EXPECT_DOUBLE_EQ(transformVec[2].paramVec[0], 1.5);
     SvgLengthScaleRule rule(Rect(0, 0, 200, 200), Size(200, 200), SvgLengthScaleUnit::USER_SPACE_ON_USE);
     Matrix4 matrix = NGSvgTransform::CreateMatrix4(transformVec, Offset(0, 0), rule);
     EXPECT_NEAR(matrix.Get(0, 3), 10.0, 1e-5);

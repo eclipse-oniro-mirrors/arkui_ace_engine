@@ -187,11 +187,11 @@ void ParseMenuDividerStartMargin(EcmaVM* vm, std::vector<Local<JSValueRef>>& arg
         } else {
             if (!ArkTSUtils::ParseJsLengthMetrics(vm, args[NUM_2], startMargin)) {
                 startMargin.Reset();
-                startMargin.SetUnit(dividerOptions.mode == 1 ? DimensionUnit::INVALID : DimensionUnit::PX);
+                startMargin.SetUnit(DimensionUnit::INVALID);
             }
             if (startMargin.IsNegative()) {
                 startMargin.Reset();
-                startMargin.SetUnit(dividerOptions.mode == 1 ? DimensionUnit::INVALID : DimensionUnit::PX);
+                startMargin.SetUnit(DimensionUnit::INVALID);
             }
         }
     } else {
@@ -221,11 +221,11 @@ void ParseMenuDividerEndMargin(EcmaVM* vm, std::vector<Local<JSValueRef>>& args,
         } else {
             if (!ArkTSUtils::ParseJsLengthMetrics(vm, args[NUM_3], endMargin)) {
                 endMargin.Reset();
-                endMargin.SetUnit(dividerOptions.mode == 1 ? DimensionUnit::INVALID : DimensionUnit::PX);
+                endMargin.SetUnit(DimensionUnit::INVALID);
             }
             if (endMargin.IsNegative()) {
                 endMargin.Reset();
-                endMargin.SetUnit(dividerOptions.mode == 1 ? DimensionUnit::INVALID : DimensionUnit::PX);
+                endMargin.SetUnit(DimensionUnit::INVALID);
             }
         }
     } else {

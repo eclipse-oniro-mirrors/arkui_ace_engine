@@ -161,6 +161,7 @@ constexpr int32_t MIN_IDLE_TIME = 1000;
 constexpr uint8_t SINGLECOLOR_UPDATE_ALPHA = 75;
 constexpr int8_t RENDERING_SINGLE_COLOR = 1;
 constexpr int32_t DELAY_TIME = 500;
+constexpr int32_t RELOAD_TRANSITION_DURATION = 400;
 constexpr int32_t PARAM_NUM = 2;
 constexpr int64_t MAX_MISS_COUNT = 3;
 constexpr int32_t MAX_FLUSH_COUNT = 2;
@@ -974,7 +975,7 @@ void PipelineContext::FlushPendingDeleteCustomNode()
         auto node = pendingStack.top();
         pendingStack.pop();
         if (AceType::InstanceOf<NG::CustomNode>(node)) {
-            auto customNode = AceType::DynamicCast<NG::CustomNode>(node);
+            auto customNode = node;
             // for ArkTs1.2
             if (customNode->FireOnCleanup()) {
                 continue;
@@ -1372,7 +1373,7 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
     FlushBuild();
     ReloadNodesResource();
     if (isFormRender_ && drawDelegate_ && rootNode_) {
-        auto renderContext = AceType::DynamicCast<NG::RenderContext>(rootNode_->GetRenderContext());
+        auto renderContext = rootNode_->GetRenderContext();
         drawDelegate_->DrawRSFrame(renderContext);
         drawDelegate_ = nullptr;
     }
@@ -3954,6 +3955,16 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, bool isSubPipe)
     OnTouchEvent(point, rootNode_, isSubPipe);
 }
 
+void PipelineContext::SetTouchPadEventEnabled(bool enabled)
+{
+    if (touchPadRawEventEnableCallback_) {
+        touchPadRawEventEnableCallback_(enabled);
+    }
+    if (!enabled && eventManager_) {
+        eventManager_->ClearTouchPadEvents();
+    }
+}
+
 void PipelineContext::OnMouseEvent(const MouseEvent& event)
 {
     OnMouseEvent(event, rootNode_);
@@ -4153,7 +4164,7 @@ void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNo
             }
         }
         for (const auto& weakContext : touchPluginPipelineContext_) {
-            auto pipelineContext = DynamicCast<OHOS::Ace::PipelineBase>(weakContext.Upgrade());
+            auto pipelineContext = weakContext.Upgrade();
             if (!pipelineContext) {
                 continue;
             }
@@ -4809,7 +4820,7 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
         OnDumpInjection(params);
     } else if (params[0] == "-injectionkeycode" && params.size() > PARAM_NUM) {
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->SendCommand(params[1]);
+        UiSessionManager::GetInstance()->SendCommand(params[1], SecurityAuthInfo {});
 #endif
 #endif
     } else if (params[0] == "-forcedark") {
@@ -4869,7 +4880,7 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
 #ifdef RELAXED_INTERACTION_SUPPORT
     } else if (params[0] == "-relaxedinteractioncmd" && params.size() >= PARAM_NUM) {
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->SendCommand(params[1]);
+        UiSessionManager::GetInstance()->SendCommand(params[1], SecurityAuthInfo {});
 #endif
     } else if (params[0] == "-relaxedinteractionlog") {
         DumpLog::GetInstance().Print(WorkflowDumper::GetInstance().Dump());
@@ -6211,10 +6222,13 @@ void PipelineContext::FlushReload(const ConfigurationChange& configurationChange
     };
     if (!onShow_) {
         changeTask();
+    } else if (!configurationChange.fontAnimationEnabled && configurationChange.OnlyFontChange()) {
+        // Safe to skip OnFlushReloadFinish: only fontScale, excluded by OnlyFontChange, registers after-reload tasks.
+        RecycleManager::Notify(configurationChange);
+        changeTask();
     } else {
         AnimationOption option;
-        const int32_t duration = 400;
-        option.SetDuration(duration);
+        option.SetDuration(RELOAD_TRANSITION_DURATION);
         option.SetCurve(Curves::FRICTION);
         RecycleManager::Notify(configurationChange);
         AnimationUtils::Animate(
@@ -6325,6 +6339,41 @@ void PipelineContext::AddWindowStateChangedCallback(int32_t nodeId)
         LOGW("AddWindowStateChangedCallback doesn't run on UI thread!");
     }
     onWindowStateChangedCallbacks_.emplace(nodeId);
+}
+
+void PipelineContext::AddWindowVisibilityChangedCallback(int32_t nodeId, const std::function<void(bool)>& callback)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("AddWindowVisibilityChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    onWindowVisibilityChangedCallbacks_.emplace(nodeId, callback);
+}
+
+void PipelineContext::RemoveWindowVisibilityChangedCallback(int32_t nodeId)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("RemoveWindowVisibilityChangedCallback doesn't run on UI thread!");
+        return;
+    }
+    onWindowVisibilityChangedCallbacks_.erase(nodeId);
+}
+
+void PipelineContext::OnWindowVisibilityChanged(bool isVisible)
+{
+    if (!CheckThreadSafe()) {
+        LOGE("OnWindowVisibilityChanged doesn't run on UI thread!");
+        return;
+    }
+    // iterate over a copy: a callback may re-enter and add/remove callbacks
+    // (e.g. XComponent detached during visibility change), which would
+    // otherwise invalidate iterators of onWindowVisibilityChangedCallbacks_
+    auto onWindowVisibilityChangedCallbacks = onWindowVisibilityChangedCallbacks_;
+    for (const auto& entry : onWindowVisibilityChangedCallbacks) {
+        if (entry.second) {
+            entry.second(isVisible);
+        }
+    }
 }
 
 void PipelineContext::RemoveWindowStateChangedCallback(int32_t nodeId)

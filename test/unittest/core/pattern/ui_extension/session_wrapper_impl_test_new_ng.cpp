@@ -28,6 +28,7 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
+#include "core/interfaces/native/generated/interface/arkoala_api_generated.h"
 #include "core/event/ace_events.h"
 #include "core/event/mouse_event.h"
 #include "core/event/touch_event.h"
@@ -829,6 +830,40 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewDpiWhitelist001, Test
 }
 
 /**
+ * @tc.name: CreateSessionWithStaticDpiFollowStrategy_001
+ * @tc.desc: Test static frontend unset and explicit DPI strategies reach the session without losing inheritance.
+ * @tc.type: FUNC
+ * @tc.require: SR20260921873329
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, CreateSessionWithStaticDpiFollowStrategy_001, TestSize.Level1)
+{
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    const auto previousStrategy = pipeline->GetUIExtensionDensityFollowHost();
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    const int32_t rawStrategies[] = { DTS_DPI_FOLLOW_STRATEGY_UNSET, DTS_FOLLOW_HOST_DPI,
+        DTS_FOLLOW_UI_EXTENSION_ABILITY_DPI, DTS_FOLLOW_HOST_DPI_ALL };
+    AAFwk::Want want;
+    SessionConfig config;
+    for (const auto rawStrategy : rawStrategies) {
+        SCOPED_TRACE(rawStrategy);
+        // Match the ANI bridge: -1 is unset, while 0/1/2 are explicit choices.
+        pattern->SetDpiFollowStrategy(ParseDpiFollowStrategy(rawStrategy), IsValidDtsDpiFollowStrategy(rawStrategy));
+        sessionWrapper->CreateSession(want, config);
+        EXPECT_EQ(pattern->IsDpiFollowStrategySet(), rawStrategy != DTS_DPI_FOLLOW_STRATEGY_UNSET);
+        const auto expectedStrategy = rawStrategy == DTS_DPI_FOLLOW_STRATEGY_UNSET
+            ? DpiFollowStrategy::FOLLOW_HOST_DPI_ALL : static_cast<DpiFollowStrategy>(rawStrategy);
+        EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), expectedStrategy);
+        EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, expectedStrategy);
+    }
+    pipeline->SetUIExtensionDensityFollowHost(previousStrategy);
+}
+
+/**
  * @tc.name: SessionWrapperImplNewParseDpiFollowStrategy001
  * @tc.desc: Test ParseDpiFollowStrategy maps raw strategy values to enum with default fallback.
  * @tc.type: FUNC
@@ -878,6 +913,28 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewConvertFromRosenDpiFo
      */
     EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_ALL + 1)),
         DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewExportedDpiFollowAll001
+ * @tc.desc: Exported UIExtension and Embedded enum values reach the Rosen follow-all strategy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewExportedDpiFollowAll001, TestSize.Level1)
+{
+    const int32_t exportedValues[] = {
+        ARK_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI_ALL,
+        ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI_ALL,
+    };
+    for (const auto value : exportedValues) {
+        EXPECT_EQ(value, 2);
+        EXPECT_TRUE(IsValidDtsDpiFollowStrategy(value));
+        auto strategy = ParseDpiFollowStrategy(value);
+        EXPECT_EQ(strategy, DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+        auto rosenStrategy = ConvertToRosenDpiFollowStrategy(strategy);
+        EXPECT_EQ(rosenStrategy, Rosen::DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+        EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(rosenStrategy), strategy);
+    }
 }
 
 /**

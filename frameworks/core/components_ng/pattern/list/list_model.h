@@ -32,6 +32,8 @@
 
 namespace OHOS::Ace {
 
+struct ScrollSnapStrategy;
+
 class ACE_FORCE_EXPORT ListModel {
 public:
     static ListModel* GetInstance();
@@ -69,6 +71,10 @@ public:
     virtual void SetContentStartOffset(float startOffset) = 0;
     virtual void SetContentEndOffset(float endOffset) = 0;
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) = 0;
+    // Two-stage item scroll snap strategy (built-in align or custom offset provider).
+    // Mutually exclusive with the legacy scrollSnapAlign attribute: the last setter wins.
+    virtual void SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy) {}
+    virtual void ResetScrollSnapStrategy() {}
     virtual void SetScrollEnabled(bool scrollEnabled) = 0;
     virtual void SetFriction(double friction) = 0;
     virtual void SetFocusWrapMode(FocusWrapMode focusWrapMode) = 0;

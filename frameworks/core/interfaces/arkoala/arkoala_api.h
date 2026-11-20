@@ -33,6 +33,7 @@ struct SymbolGradient;
 struct SelectParam;
 struct SelectResObjParam;
 struct ArkUIMaterialKeyParams;
+struct ExtraGlassParam;
 }
 
 namespace OHOS::Ace::NG {
@@ -171,14 +172,17 @@ struct ArkUIMaterialFuncRegistry {
 };
 typedef const ArkUIMaterialFuncRegistry* ArkUIMaterialFuncHandle;
 
-typedef void* (*ArkUICreateMaterialFilterFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
+typedef void* (*ArkUICreateMaterialFilterFunc)(
+    const OHOS::Ace::ArkUIMaterialKeyParams*, const OHOS::Ace::ExtraGlassParam*);
 typedef void (*ArkUIReleaseMaterialFilterFunc)(void*);
-typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*, bool);
+typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(
+    const OHOS::Ace::ArkUIMaterialKeyParams*, bool, const OHOS::Ace::ExtraGlassParam*);
+typedef void* (*ArkUICreateMaterialFilterECFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
 typedef int32_t (*ArkUIGetEnableColorInvertFunc)(int32_t, int32_t);
 struct ArkUIMaterialFilterFuncRegistry {
     ArkUICreateMaterialFilterFunc createUiMaterialFilter;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilter;
-    ArkUICreateMaterialFilterFunc createUiMaterialFilterEC;
+    ArkUICreateMaterialFilterECFunc createUiMaterialFilterEC;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilterEC;
     ArkUICreateMaterialFilterWithSplitFunc createUiMaterialShaderECSub;
     ArkUIReleaseMaterialFilterFunc releaseUiMaterialShaderECSub;
@@ -1422,6 +1426,21 @@ struct ArkUI_PickerIndicatorStyle {
     ArkUI_Uint32 dividerColor;
     ArkUI_Float32 startMargin;
     ArkUI_Float32 endMargin;
+};
+
+struct ArkUI_PickerComponentTextStyle {
+    ArkUI_Bool hasColor;
+    ArkUI_Uint32 color;
+    ArkUI_Bool hasFontSize;
+    ArkUI_Float32 fontSize;
+    ArkUI_Bool hasFontWeight;
+    ArkUI_Int32 fontWeight;
+    ArkUI_Bool hasMinFontSize;
+    ArkUI_Float32 minFontSize;
+    ArkUI_Bool hasMaxFontSize;
+    ArkUI_Float32 maxFontSize;
+    ArkUI_Bool hasOverflow;
+    ArkUI_Int32 overflow;
 };
 
 struct OH_ArkUI_FontWeightConfigs {
@@ -3948,6 +3967,9 @@ struct ArkUICommonModifier {
     ArkUI_Int32 (*registerApplicationShortcut)(const std::string& value, uint8_t keys,
         std::function<void(ArkUI_Int32)>&& callback);
     void (*unregisterApplicationShortcut)(ArkUI_Int32 registrationId);
+    void (*registerNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys,
+        std::function<void()>&& callback);
+    void (*unregisterNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys);
 };
 
 struct ArkUICommonShapeModifier {
@@ -5760,6 +5782,7 @@ struct ArkUITabsModifier {
     void (*setBarBackgroundBlurStyle)(ArkUINodeHandle node, ArkUITabBarBackgroundBlurStyle* styleOption);
     void (*setBarBackgroundBlurStyleWithStyleOption)(ArkUINodeHandle node, void* styleOption);
     void (*setBarOverlap)(ArkUINodeHandle node, ArkUI_Bool overlap);
+    void (*setBarOverlapMode)(ArkUINodeHandle node, ArkUI_Int32 mode);
     void (*setIsVertical)(ArkUINodeHandle node, ArkUI_Bool isVertical);
     void (*setTabBarPosition)(ArkUINodeHandle node, ArkUI_Int32 barVal);
     void (*setTabsOptionsIndex)(ArkUINodeHandle node, ArkUI_Int32 indexVal);
@@ -5782,6 +5805,7 @@ struct ArkUITabsModifier {
     void (*resetBarBackgroundColor)(ArkUINodeHandle node);
     void (*resetBarBackgroundBlurStyle)(ArkUINodeHandle node);
     void (*resetBarOverlap)(ArkUINodeHandle node);
+    void (*resetBarOverlapMode)(ArkUINodeHandle node);
     void (*resetIsVertical)(ArkUINodeHandle node);
     void (*resetTabBarPosition)(ArkUINodeHandle node);
     void (*resetTabsOptionsIndex)(ArkUINodeHandle node);
@@ -5981,6 +6005,10 @@ struct ArkUIContainerPickerModifier {
     void (*resetContainerPickerDisplayedItemCount)(ArkUINodeHandle node);
     void (*setContainerPickerItemHeight)(ArkUINodeHandle node, ArkUI_Float32 itemHeight);
     void (*resetContainerPickerItemHeight)(ArkUINodeHandle node);
+    void (*setContainerPickerSelectedTextStyle)(
+        ArkUINodeHandle node, const struct ArkUI_PickerComponentTextStyle* textStyle);
+    void (*resetContainerPickerSelectedTextStyle)(ArkUINodeHandle node);
+    ArkUI_PickerComponentTextStyle (*getContainerPickerSelectedTextStyle)(ArkUINodeHandle node);
     int32_t (*getContainerPickerSelectedIndex)(ArkUINodeHandle node);
     ArkUI_Bool (*getContainerPickerEnableHapticFeedback)(ArkUINodeHandle node);
     ArkUI_Bool (*getContainerPickerCanLoop)(ArkUINodeHandle node);
@@ -9892,6 +9920,8 @@ struct ArkUIXComponentModifier {
     void (*setXComponentExtraFlag)(ArkUINodeHandle node, ArkUI_Uint32 flag);
     void (*setXComponentEnableTransparentLayer)(ArkUINodeHandle node, ArkUI_Bool enable);
     void (*resetXComponentEnableTransparentLayer)(ArkUINodeHandle node);
+    void (*setXComponentSurfaceVisibilityLifecycle)(ArkUINodeHandle node, ArkUI_Bool isVisibilityLifecycle);
+    void (*resetXComponentSurfaceVisibilityLifecycle)(ArkUINodeHandle node);
     void (*setXComponentBufferQueueCount)(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount);
     void (*resetXComponentBufferQueueCount)(ArkUINodeHandle node);
     ArkUI_Int32 (*getXComponentBufferQueueCount)(ArkUINodeHandle node);
@@ -10740,6 +10770,7 @@ struct ArkUIBasicAPI {
     ArkUI_Bool (*isCurrentThreadSafe)();
     ArkUI_Bool (*isDebugForParallel)();
     ArkUI_Bool (*isDebugForParallelSet)();
+    ArkUI_Int32 (*enableTouchPadEvent)(ArkUI_Bool enabled);
 };
 
 struct ArkUIMultiThreadManagerAPI {

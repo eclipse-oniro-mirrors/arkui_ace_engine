@@ -92,8 +92,10 @@ public:
     void SaveForSendCommandFunction(NotifySendCommandFunction&& function) override;
     void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) override;
     void NotifyAllWebPattern(bool isRegister) override;
-    void NotifySendCommandPattern(int32_t id, const std::string& command) override;
-    int32_t NotifySendCommandSyncPattern(int32_t id, const std::string& command) override;
+    void NotifySendCommandPattern(
+        int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth) override;
+    int32_t NotifySendCommandSyncPattern(
+        int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth) override;
     void SaveRegisterForWebFunction(NotifyAllWebFunction&& function) override;
     void SaveGetHitTestInfoCallback(GetHitTestInfoFunction&& function) override;
     void GetLatestHitTestNodeInfosForTouch(InteractionParamConfig config) override;
@@ -144,7 +146,7 @@ public:
     void SendArkWebImagesById(int32_t windowId, const std::map<int32_t, std::map<int32_t,
         std::shared_ptr<Media::PixelMap>>>& webImages, MultiImageQueryErrorCode arkWebErrorCode) override;
     void GetVisibleInspectorTree(ParamConfig config = ParamConfig()) override;
-    void SendCommand(const std::string& command) override;
+    void SendCommand(const std::string& command, const SecurityAuthInfo& securityAuth) override;
     void SaveSendCommandFunction(SendCommandFunction&& function) override;
     void SaveRelaxedCommandFunction(RelaxedCommandFunction&& function) override;
     void RegisterPipeLineExeAppAIFunction(ExeAppAIFunctionFunction&& callback) override;
@@ -193,12 +195,12 @@ public:
     ACE_FORCE_EXPORT bool IsSearchPageSceneRuleCurrent(
         int32_t processId, const std::string& ruleSetId, const std::string& generation) override;
     void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) override;
-    void NotifySendCommandPatternWithResult(
-        int32_t id, const std::string& command, const CommandResultCallback& finishCallback) override;
+    void NotifySendCommandPatternWithResult(int32_t id, const std::string& command,
+        const CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth) override;
     void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
     void SaveRelaxedCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
-    void SendCommandWithResult(
-        const std::string& command, const CommandResultCallback& finishCallback) override;
+    void SendCommandWithResult(const std::string& command, const CommandResultCallback& finishCallback,
+        const SecurityAuthInfo& securityAuth) override;
     CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) override;
 
 private:
@@ -228,6 +230,10 @@ private:
         bool arkuiEnabled = true;
         bool webEnabled = false;
         bool includeUnfocusableTextInput = false;
+        // A rule declared for the RESPONSE scene failed schema validation: an empty or invalid
+        // ruleId, or a rule without a page/customControls condition. The whole ruleSet must be
+        // rejected with PARAM_INVALID instead of being silently dropped (AC-1.12).
+        bool invalidResponseRule = false;
         std::vector<PageSceneRuleInfo> rules;
     };
 
@@ -303,6 +309,8 @@ private:
     int32_t ExtractRuleJsonAndWebEnabled(int32_t processId, const std::string& ruleJsonOrRuleSetId,
         std::string& ruleJson, bool& webEnabled, std::string* splitRuleJson = nullptr);
     int32_t RegisterResponsePageSceneRules(int32_t processId, const std::string& ruleJson);
+    int32_t RegisterLegacyPageSceneRules(
+        int32_t processId, const PageSceneRuleSetInfo& ruleSetInfo, const std::string& ruleJson);
     void UnregisterLegacyPageSceneRules(int32_t processId, const std::string& ruleSetId, bool hasSearchRules);
     struct PageSceneQueryPlan {
         std::string legacyJson;

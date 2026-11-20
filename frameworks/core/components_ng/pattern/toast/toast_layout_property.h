@@ -54,7 +54,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto props = MakeRefPtr<ToastLayoutProperty>();
-        props->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        props->LayoutProperty::UpdateLayoutProperty(this);
         props->propBottom_ = CloneBottom();
         props->propShowMode_ = CloneShowMode();
         props->propEnableHoverMode_ = CloneEnableHoverMode();

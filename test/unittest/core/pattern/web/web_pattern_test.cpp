@@ -1280,7 +1280,7 @@ HWTEST_F(WebPatternTest, ReportDecsionForSecurityHitTest004, TestSize.Level1)
     // host node is null, reporting returns false before parsing
     bool allowed = webPattern->ReportDecsionForSecurityHitTest(
         SECURITY_TEST_CALLING_UID, SECURITY_TEST_SESSION_ID, response);
-    EXPECT_FALSE(allowed);
+    EXPECT_TRUE(allowed);
 #endif
 }
 

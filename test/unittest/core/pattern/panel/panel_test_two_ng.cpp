@@ -1187,7 +1187,7 @@ HWTEST_F(PanelTestTwoNg, PanelTestTwoNg0044, TestSize.Level1)
     DirtySwapConfig config;
     config.skipLayout = false;
     config.skipMeasure = true;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(layoutWrapper->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = layoutWrapper->GetLayoutAlgorithm();
     EXPECT_FALSE(layoutAlgorithmWrapper == nullptr);
     auto slidingPanelLayoutAlgorithm =
         AceType::DynamicCast<SlidingPanelLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

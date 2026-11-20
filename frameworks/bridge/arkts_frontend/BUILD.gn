@@ -52,8 +52,12 @@ template("arkts_frontend") {
   forward_variables_from(invoker, "*")
 
   ohos_shared_library("arkts_frontend") {
+    branch_protector_ret = "pac_ret"
     defines += invoker.defines
     configs = [ "$ace_root:ace_config" ]
+    if (is_ohos) {
+      version_script = "$ace_root/build/libarkts_frontend.map"
+    }
     deps = [
       "$ace_root/build:libace_compatible",
       "koala_projects/arkoala-arkts/arkui-ohos/src/ani/native:ani_utils_common",
@@ -89,6 +93,7 @@ template("arkts_frontend_loader") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     defines += invoker.defines
@@ -151,6 +156,7 @@ config("arkoala_native_config") {
 }
 
 ohos_shared_library("ArkoalaNative_ark") {
+  branch_protector_ret = "pac_ret"
   defines = [
     "KOALA_OHOS",
     "__MUSL__",
@@ -179,6 +185,10 @@ ohos_shared_library("ArkoalaNative_ark") {
     "koala_projects/interop/src/cpp/interop-logging.cc",
     "koala_projects/interop/src/cpp/types/signatures.cc",
   ]
+
+  if (is_ohos) {
+    version_script = "$ace_root/build/libArkoalaNative_ark.map"
+  }
 
   configs = [ ":arkoala_native_config" ]
 

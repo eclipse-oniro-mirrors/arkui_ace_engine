@@ -26,6 +26,7 @@
 #include "core/components_ng/svg/base/svg_bounding_box_context.h"
 #include "core/components_ng/svg/parse/svg_attributes_parser.h"
 #include "frameworks/core/components_ng/svg/svg_utils.h"
+#include "base/geometry/matrix4.h"
 
 namespace OHOS::Ace::NG {
 
@@ -209,6 +210,7 @@ protected:
     void OnFilter(RSCanvas& canvas, const SvgCoordinateSystemContext& svgCoordinateSystemContext);
     void OnMask(RSCanvas& canvas, const SvgCoordinateSystemContext& svgCoordinateSystemContext);
     void OnTransform(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule);
+    const Matrix4& GetTransformVecMatrix(const SvgLengthScaleRule& lengthRule);
     double ConvertDimensionToPx(const Dimension& value, const Size& viewPort, SvgLengthType type) const;
     double ConvertDimensionToPx(const Dimension& value, double baseValue) const;
 
@@ -246,6 +248,13 @@ protected:
     std::vector<RefPtr<SvgNode>> children_;
     std::string nodeId_;
     std::string transform_;
+    Matrix4 cachedTransformMatrix_;
+    bool transformMatrixCached_ = false;
+    // <animate attributeName="transform"> mutates transformVec via UpdateAttr -> SetAttr,
+    // which bumps renderCacheVersion, so the cache is keyed by (lengthRule, version)
+    std::optional<Matrix4> transformVecMatrixCache_;
+    std::optional<SvgLengthScaleRule> transformVecCacheKey_;
+    uint32_t transformVecCacheVersion_ = 0;
     std::map<std::string, std::vector<float>> animateTransform_;
 
     SvgBaseAttribute attributes_;

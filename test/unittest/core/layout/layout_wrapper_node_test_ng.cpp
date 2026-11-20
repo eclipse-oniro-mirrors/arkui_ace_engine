@@ -111,7 +111,7 @@ HWTEST_F(LayoutWrapperNodeTestNg, AceTypeRootTypeInfo, TestSize.Level0)
     auto root = AceType::MakeRefPtr<AceType>();
     EXPECT_EQ(AceType::TypeId(root), AceType::TypeId<AceType>());
     EXPECT_STREQ(AceType::TypeName(root), "AceType");
-    EXPECT_EQ(AceType::DynamicCast<AceType>(root), root);
+    EXPECT_TRUE(AceType::InstanceOf<AceType>(root));
     EXPECT_FALSE(AceType::InstanceOf<TypeInfoBase>(root));
     EXPECT_EQ(AceType::DynamicCast<TypeInfoBase>(root.GetRawPtr()), nullptr);
     EXPECT_EQ(AceType::DynamicCast<FrameNode>(root), nullptr);
@@ -403,7 +403,7 @@ HWTEST_F(LayoutWrapperNodeTestNg, LayoutWrapperRef_001, TestSize.Level1)
     EXPECT_EQ(view, rawNode);
     EXPECT_EQ(node, view.GetRawPtr());
     EXPECT_EQ(AceType::DynamicCast<FrameNode>(view), node);
-    EXPECT_EQ(AceType::DynamicCast<LayoutWrapper>(node), view);
+    EXPECT_EQ(RefPtr<LayoutWrapper>(node), view);
     EXPECT_EQ(AceType::DynamicCast<LayoutWrapperNode>(view), nullptr);
     EXPECT_TRUE(AceType::InstanceOf<FrameNode>(view));
     auto claimed = AceType::Claim(view.GetRawPtr());

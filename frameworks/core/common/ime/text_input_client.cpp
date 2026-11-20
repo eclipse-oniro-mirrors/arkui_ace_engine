@@ -21,8 +21,8 @@
 namespace OHOS::Ace {
 namespace {
 using tic = TextInputClient; // give it a shorter name to maintain a good code layout
-}
-
+} // namespace
+ 
 // Here declares function keys which can be handled by TextInputClient.
 std::map<KeyComb, std::function<bool(TextInputClient*)>> TextInputClient::functionKeys_ = {
     { KeyComb(KeyCode::KEY_ESCAPE), &tic::HandleOnEscape },

@@ -127,7 +127,7 @@ private:
 
 WeakPtr<PageTranslateNode> MakeWeakPageTranslateNode(const RefPtr<TestPageTranslateNode>& node)
 {
-    return WeakPtr<PageTranslateNode>(AceType::DynamicCast<PageTranslateNode>(node));
+    return WeakPtr<PageTranslateNode>(node);
 }
 
 struct TranslateVersionTestData {

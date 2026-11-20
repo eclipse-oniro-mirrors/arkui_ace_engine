@@ -17,6 +17,7 @@
 
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -54,6 +55,12 @@ ExecutorResult FallbackExecutor::ExecuteStep()
     if (!frameNode) {
         TAG_LOGW(AceLogTag::ACE_UIEVENT, "FrameNode is null");
         return ExecutorResult::FAILED;
+    }
+
+    if (UiCommandSecurityGate::IsCommandDenied(frameNode, UiCommandSecurityGate::GetContext().needSecurityAuth)) {
+        UiCommandSecurityGate::ReportDeniedCommand(frameNode, UiCommandSecurityGate::GetContext());
+        TAG_LOGW(AceLogTag::ACE_UIEVENT, "FallbackExecutor refused by security gate");
+        return SetFailureState(ExecutionState::SECURITY_DENIED);
     }
 
     frameNode->OnRecvCommand(body_);

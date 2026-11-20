@@ -120,7 +120,7 @@ void PlaceholderPattern::OnAttachToMainTree()
 
 void PlaceholderPattern::RefreshBackgroundColor()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto context = host->GetContextRefPtr();
     CHECK_NULL_VOID(context);

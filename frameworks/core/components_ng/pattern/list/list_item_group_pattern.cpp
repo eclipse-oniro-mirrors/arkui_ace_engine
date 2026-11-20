@@ -67,10 +67,10 @@ void ApplyLowEndHeaderFooterMaterial(const RefPtr<FrameNode>& node, const RefPtr
                 .level = UiMaterialLevel::SMOOTH,
                 .colorMode = options->colorMode == ColorMode::COLOR_MODE_UNDEFINED ? colorMode : options->colorMode,
             },
-        .materialColor = options->materialColor,
         .applyShadow = options->applyShadow,
-        .dipScale = static_cast<float>(pipeline->GetDipScale()),
         .interactive = options->interactive.value_or(false),
+        .materialColor = options->materialColor,
+        .dipScale = static_cast<float>(pipeline->GetDipScale()),
     };
     renderContext->SetImmersiveMaterialConfig(config);
     renderContext->SetSystemMaterial(material->Copy());
@@ -257,7 +257,7 @@ bool ListItemGroupPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>&
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<ListItemGroupLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);

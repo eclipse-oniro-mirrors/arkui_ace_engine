@@ -32,6 +32,7 @@
 #include "core/components_ng/pattern/custom/custom_node_base.h"
 #include "core/components_ng/pattern/rich_editor/bridge/rich_editor_custom_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_layout_property.h"
+#include "core/components_ng/pattern/stage/page_info.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/components_ng/pattern/text_field/text_field_layout_property.h"
 #include "core/components_ng/pattern/text_field/text_field_type_utils.h"
@@ -39,6 +40,7 @@
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/interfaces/native/node/node_text_input_modifier.h"
 #include "core/interfaces/native/node/rich_editor_modifier.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -736,6 +738,7 @@ int32_t PageSceneRuleManager::UnregisterResponseRuleSet(int32_t processId, const
     if (processIter->second.empty()) {
         responseRuleSets_.erase(processIter);
     }
+    EraseResponseReportStatesLocked(processId, ruleSetId);
     return PAGE_SCENE_NO_ERROR;
 }
 
@@ -1044,6 +1047,7 @@ void PageSceneRuleManager::ClearProcess(int32_t processId, bool clearSearchRules
     std::lock_guard<std::mutex> lock(mutex_);
     registeredRuleSets_.erase(processId);
     responseRuleSets_.erase(processId);
+    EraseResponseReportStatesLocked(processId, "");
     if (clearSearchRules) {
         searchRuleSets_.erase(processId);
         std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
@@ -1926,7 +1930,156 @@ std::optional<PageSceneResponseMatch> PageSceneRuleManager::MatchPageSceneRespon
     }
     match.matched = true;
     match.sceneJson = BuildResponseSceneJson(ruleSet.value(), match.hits);
+    // Remember what has just been reported so the stable-point sweep can tell when it leaves.
+    RecordResponseReport(processId, ruleSet.value(), match.hits, responseNode, startNodes);
     return match;
+}
+
+void PageSceneRuleManager::RecordResponseReport(int32_t processId, const PageSceneRuleSet& ruleSet,
+    const std::vector<PageSceneResponseHit>& hits, const RefPtr<FrameNode>& responseNode,
+    const DumpStartNodeSet& startNodes)
+{
+    RefPtr<PipelineContext> pipeline;
+    if (responseNode) {
+        pipeline = responseNode->GetContextRefPtr();
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const auto& hit : hits) {
+        PageSceneResponseReportState state;
+        state.processId = processId;
+        state.ruleSetId = ruleSet.ruleSetId;
+        state.ruleId = hit.ruleId;
+        state.pageName = hit.pageName;
+        state.node = responseNode;
+        state.pipeline = pipeline;
+        state.viewportNode = startNodes.dumpBeginNode;
+        auto key = std::to_string(processId) + ":" + ruleSet.ruleSetId + ":" + hit.ruleId;
+        responseReportStates_[key] = std::move(state);
+    }
+}
+
+std::vector<PageSceneResponseExit> PageSceneRuleManager::CollectResponseExits()
+{
+    std::vector<PageSceneResponseExit> exits;
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto iter = responseReportStates_.begin(); iter != responseReportStates_.end();) {
+        const auto& state = iter->second;
+        if (FindResponseRuleLocked(state.processId, state.ruleSetId, state.ruleId) == nullptr) {
+            // The registration is gone: unregistering is not a scene exit.
+            iter = responseReportStates_.erase(iter);
+            continue;
+        }
+        if (IsResponseSceneStillPresent(state)) {
+            ++iter;
+            continue;
+        }
+        PageSceneResponseExit exit;
+        exit.processId = state.processId;
+        exit.ruleSetId = state.ruleSetId;
+        exit.ruleId = state.ruleId;
+        exit.pageName = state.pageName;
+        exit.pipeline = state.pipeline;
+        exits.emplace_back(std::move(exit));
+        // One exit per leave: a re-match reports a new hit and arms the next exit.
+        iter = responseReportStates_.erase(iter);
+    }
+    return exits;
+}
+
+bool PageSceneRuleManager::IsResponseSceneStillPresent(const PageSceneResponseReportState& state) const
+{
+    auto rule = FindResponseRuleLocked(state.processId, state.ruleSetId, state.ruleId);
+    if (rule == nullptr) {
+        return false;
+    }
+    auto node = state.node.Upgrade();
+    auto pipeline = state.pipeline.Upgrade();
+    if (!node || !pipeline) {
+        return false;
+    }
+    // Background: the window is hidden even though the tree is untouched.
+    if (!pipeline->GetOnShow() || !node->IsOnMainTree()) {
+        return false;
+    }
+    std::string routerPageName;
+    std::string navDestinationName;
+    auto pageInfo = pipeline->GetLastPageInfo();
+    if (pageInfo) {
+        routerPageName = pageInfo->GetPageUrl();
+        navDestinationName = pipeline->GetNavDestinationPageName(pageInfo);
+    }
+    // Page/custom-control conditions are ORed, mirroring MatchResponseRule.
+    bool pageMatched = MatchResponsePage(*rule, routerPageName, navDestinationName);
+    std::vector<std::string> matchedCustomControls;
+    bool customMatched = MatchResponseCustom(*rule, node, matchedCustomControls);
+    if (!pageMatched && !customMatched) {
+        return false;
+    }
+    if (IsResponseNodeFullyTransparent(node)) {
+        return false;
+    }
+    DumpStartNodeSet startNodes;
+    startNodes.dumpBeginNode = state.viewportNode.Upgrade();
+    auto visibleRect = ComputeResponseVisibleRect(node, startNodes);
+    if (!visibleRect.has_value()) {
+        return false;
+    }
+    std::string inspectorId;
+    if (MatchResponseInspectorId(*rule, node, inspectorId)) {
+        return true;
+    }
+    return MatchResponseRegion(*rule, visibleRect.value());
+}
+
+const PageSceneRule* PageSceneRuleManager::FindResponseRuleLocked(
+    int32_t processId, const std::string& ruleSetId, const std::string& ruleId) const
+{
+    auto processIter = responseRuleSets_.find(processId);
+    if (processIter == responseRuleSets_.end()) {
+        return nullptr;
+    }
+    auto ruleSetIter = processIter->second.find(ruleSetId);
+    if (ruleSetIter == processIter->second.end()) {
+        return nullptr;
+    }
+    for (const auto& rule : ruleSetIter->second.rules) {
+        if (rule.ruleId == ruleId) {
+            return &rule;
+        }
+    }
+    return nullptr;
+}
+
+bool PageSceneRuleManager::IsResponseNodeFullyTransparent(const RefPtr<FrameNode>& node) const
+{
+    double effectiveOpacity = 1.0;
+    RefPtr<UINode> current = node;
+    while (current) {
+        auto frameNode = AceType::DynamicCast<FrameNode>(current);
+        if (frameNode) {
+            auto renderContext = frameNode->GetRenderContext();
+            if (renderContext && renderContext->HasOpacity()) {
+                effectiveOpacity *= renderContext->GetOpacityValue();
+            }
+        }
+        current = current->GetParent();
+    }
+    return effectiveOpacity <= 0.0;
+}
+
+void PageSceneRuleManager::EraseResponseReportStatesLocked(int32_t processId, const std::string& ruleSetId)
+{
+    auto prefix = std::to_string(processId) + ":";
+    if (!ruleSetId.empty()) {
+        prefix += ruleSetId + ":";
+    }
+    for (auto iter = responseReportStates_.begin(); iter != responseReportStates_.end();) {
+        if (iter->first.compare(0, prefix.size(), prefix) == 0) {
+            iter = responseReportStates_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
 }
 
 std::optional<PageSceneResponseHit> PageSceneRuleManager::MatchResponseRule(const PageSceneRule& rule,

@@ -746,6 +746,7 @@ private:
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     bool CustomizeExpandSafeArea() override;
     void OnSyncGeometryNode(const DirtySwapConfig& config) override;
+    void AdjustEllipseBadgePosition();
 
     void InitLongPressEvent(const RefPtr<GestureEventHub>& gestureHub);
     void InitDragEvent(const RefPtr<GestureEventHub>& gestureHub);

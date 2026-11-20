@@ -147,6 +147,7 @@ public:
     static void InitTabText(const RefPtr<TextLayoutProperty>& textLayoutProperty);
     static void UpdateLabelStyle(const LabelStyle& labelStyle, RefPtr<TextLayoutProperty> textLayoutProperty);
     static void CreateSidebarSectionTitleWithResourceObj(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void ScheduleEllipsePositionAdjustment(const RefPtr<FrameNode>& badgeNode);
 
 private:
     static RefPtr<TabContentPattern> GetTabContentPattern(FrameNode* node);
@@ -158,7 +159,6 @@ private:
         bool& isDefaultBadgeSize, bool& isEllipseMode);
     static bool ResolveBadgeRTL(const RefPtr<FrameNode>& badgeNode);
     static float CalculateEllipseRtlPositionX(const RefPtr<FrameNode>& badgeNode, float eightVpPx);
-    static void ScheduleEllipsePositionAdjustment(const RefPtr<FrameNode>& badgeNode);
     static void WrapWithBadge(const RefPtr<FrameNode>& columnNode, const RefPtr<FrameNode>& iconNode,
         const RefPtr<FrameNode>& textNode, const TabBarBadgeParam& badgeParam,
         const RefPtr<LinearLayoutProperty>& columnLayoutProperty);

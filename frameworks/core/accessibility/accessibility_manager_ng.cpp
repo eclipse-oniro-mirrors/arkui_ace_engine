@@ -721,7 +721,7 @@ bool AccessibilityManagerNG::IsHandlePipelineAccessibilityHoverEnter(const RefPt
 {
     auto pipeline = root->GetContext();
     CHECK_NULL_RETURN(pipeline, false);
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipeline);
+    auto ngPipeline = pipeline;
     CHECK_NULL_RETURN(ngPipeline, false);
 
     auto container = Container::GetContainer(ngPipeline->GetInstanceId());

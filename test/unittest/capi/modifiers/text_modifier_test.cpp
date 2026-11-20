@@ -1091,7 +1091,7 @@ HWTEST_F(TextModifierTest, setTextOptionsTestValueValidValues, TestSize.Level1)
     auto pattern = frameNode->GetPattern<TextPattern>();
     ASSERT_NE(pattern, nullptr);
     auto baseController = pattern->GetTextController();
-    auto textController = AceType::DynamicCast<TextController>(baseController);
+    auto textController = baseController;
     ASSERT_NE(textController, nullptr);
 
     // check that controller in peer is properly set

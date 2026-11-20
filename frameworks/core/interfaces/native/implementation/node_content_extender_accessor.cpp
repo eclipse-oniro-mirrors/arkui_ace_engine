@@ -66,9 +66,9 @@ Ark_Int32 AddFrameNodeImpl(Ark_NativePointer peer, Ark_NativePointer node)
     if (frameNode->IsAdopted()) {
         return ERROR_CODE_NODE_IS_ADOPTED;
     }
-    auto nodeContent = AceType::DynamicCast<NG::NodeContent>(peerImpl->content);
+    auto nodeContent = peerImpl->content;
     CHECK_NULL_RETURN(nodeContent, ERROR_CODE_PARAM_INVALID);
-    auto childNode = AceType::DynamicCast<UINode>(frameNode);
+    RefPtr<UINode> childNode = frameNode;
     CHECK_NULL_RETURN(childNode, ERROR_CODE_PARAM_INVALID);
     nodeContent->AddNode(AceType::RawPtr(childNode));
     childNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
@@ -83,9 +83,9 @@ Ark_Boolean RemoveFrameNodeImpl(Ark_NativePointer peer, Ark_NativePointer node)
     CHECK_NULL_RETURN(node, false);
     auto frameNodePeer = reinterpret_cast<FrameNodePeer*>(node);
     CHECK_NULL_RETURN(frameNodePeer->node, false);
-    auto nodeContent = AceType::DynamicCast<NG::NodeContent>(peerImpl->content);
+    auto nodeContent = peerImpl->content;
     CHECK_NULL_RETURN(nodeContent, false);
-    auto childNode = AceType::DynamicCast<UINode>(frameNodePeer->node);
+    RefPtr<UINode> childNode = frameNodePeer->node;
     CHECK_NULL_RETURN(childNode, false);
     childNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
     nodeContent->RemoveNode(AceType::RawPtr(childNode));

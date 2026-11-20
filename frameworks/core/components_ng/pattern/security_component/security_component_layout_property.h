@@ -39,7 +39,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<SecurityComponentLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propBackgroundLeftPadding_ = CloneBackgroundLeftPadding();
         value->propBackgroundRightPadding_ = CloneBackgroundRightPadding();
         value->propBackgroundTopPadding_ = CloneBackgroundTopPadding();

@@ -1422,7 +1422,7 @@ HWTEST_F(SheetShowInSubwindowTestNg, UpdateSheetObject, TestSize.Level1)
     ASSERT_NE(sheetPattern, nullptr);
     sheetPattern->InitSheetObject();
     EXPECT_TRUE(sheetPattern->isFirstInit_);
-    auto object1 = AceType::DynamicCast<SheetObject>(sheetPattern->GetSheetObject());
+    auto object1 = sheetPattern->GetSheetObject();
     ASSERT_NE(object1, nullptr);
     object1->sheetWidth_ = 10.0f;
     EXPECT_TRUE(object1->GetSheetType() == SheetType::SHEET_BOTTOM);
@@ -1432,12 +1432,12 @@ HWTEST_F(SheetShowInSubwindowTestNg, UpdateSheetObject, TestSize.Level1)
      * @tc.steps: step1. Test object not side sheet.
      */
     sheetPattern->UpdateSheetObject(SheetType::SHEET_BOTTOM);
-    auto object3 = AceType::DynamicCast<SheetObject>(sheetPattern->GetSheetObject());
+    auto object3 = sheetPattern->GetSheetObject();
     ASSERT_NE(object3, nullptr);
     EXPECT_FLOAT_EQ(object3->sheetWidth_, 10.0f);
     EXPECT_TRUE(object3->GetSheetType() == SheetType::SHEET_BOTTOM);
     sheetPattern->UpdateSheetObject(SheetType::SHEET_CENTER);
-    auto object4 = AceType::DynamicCast<SheetObject>(sheetPattern->GetSheetObject());
+    auto object4 = sheetPattern->GetSheetObject();
     ASSERT_NE(object4, nullptr);
     EXPECT_FLOAT_EQ(object4->sheetWidth_, 10.0f);
     EXPECT_TRUE(object4->GetSheetType() == SheetType::SHEET_CENTER);
@@ -1446,7 +1446,7 @@ HWTEST_F(SheetShowInSubwindowTestNg, UpdateSheetObject, TestSize.Level1)
      * @tc.steps: step2. Test side sheet object, will copy data.
      */
     sheetPattern->UpdateSheetObject(SheetType::SHEET_SIDE);
-    auto object5 = AceType::DynamicCast<SheetObject>(sheetPattern->GetSheetObject());
+    auto object5 = sheetPattern->GetSheetObject();
     ASSERT_NE(object5, nullptr);
     EXPECT_TRUE(object5->GetSheetType() == SheetType::SHEET_SIDE);
     EXPECT_FLOAT_EQ(object5->sheetWidth_, 10.0f);
@@ -1454,7 +1454,7 @@ HWTEST_F(SheetShowInSubwindowTestNg, UpdateSheetObject, TestSize.Level1)
     sheetPattern->ResetScrollUserDefinedIdealSize(object4, object5);
     object5->sheetWidth_ = 20.0f;
     sheetPattern->UpdateSheetObject(SheetType::SHEET_POPUP);
-    auto object6 = AceType::DynamicCast<SheetObject>(sheetPattern->GetSheetObject());
+    auto object6 = sheetPattern->GetSheetObject();
     ASSERT_NE(object6, nullptr);
     EXPECT_TRUE(object6->GetSheetType() == SheetType::SHEET_POPUP);
     EXPECT_FLOAT_EQ(object6->sheetWidth_, 20.0f);

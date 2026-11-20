@@ -607,7 +607,9 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CommonMethod_setBlendMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
-    native static _CommonMethod_setAdvancedBlendMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _CommonMethod_setAdvancedBlendMode0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _CommonMethod_setAdvancedBlendMode1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setGeometryTransition(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -1245,6 +1247,8 @@ export class ArkUIGeneratedNativeModule {
     native static _ListAttribute_setSticky(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ListAttribute_setScrollSnapAlign(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _ListAttribute_setScrollSnapStrategy(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ListAttribute_setMaintainVisibleContentPosition(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -2524,7 +2528,9 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabsAttribute_setNestedScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
-    native static _TabsAttribute_setBarOverlap(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _TabsAttribute_setBarOverlap0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setBarOverlap1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarBackgroundColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -3238,6 +3244,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _UIPickerComponentAttribute_setDisplayedItemCount(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _UIPickerComponentAttribute_setSelectedTextStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _UnionEffectContainer_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
     native static _UnionEffectContainerInterface_setUnionEffectContainerOptions(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -3679,6 +3687,8 @@ export class ArkUIGeneratedNativeModule {
     native static _XComponentAttribute_setHdrBrightness1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _XComponentAttribute_setBufferQueueCount(ptr: KPointer, count: KInt): void
+    @ani.unsafe.Direct
+    native static _XComponentAttribute_setEnableSurfaceVisibilityLifecycle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Root_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
@@ -4178,8 +4188,6 @@ export class ArkUIGeneratedNativeModule {
     native static _CanvasRenderer_createRadialGradient(ptr: KPointer, x0: KDouble, y0: KDouble, r0: KDouble, x1: KDouble, y1: KDouble, r1: KDouble): KPointer
     @ani.unsafe.Direct
     native static _CanvasRenderer_createConicGradient(ptr: KPointer, startAngle: KDouble, x: KDouble, y: KDouble): KPointer
-    @ani.unsafe.Quick
-    native static _CanvasRenderer_getPixelMap(ptr: KPointer, sx: KDouble, sy: KDouble, sw: KDouble, sh: KDouble): KInteropReturnBuffer
     @ani.unsafe.Quick
     native static _CanvasRenderer_getLineDash(ptr: KPointer): KInteropReturnBuffer
     @ani.unsafe.Direct

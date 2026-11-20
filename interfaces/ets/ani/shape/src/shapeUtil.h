@@ -126,6 +126,16 @@ void SetRadiusValue(const OHOS::Ace::RefPtr<OHOS::Ace::ShapeRect>& shapeRect,
 bool ParseStringNumberUndefinedObject(ani_env* env, ani_ref property_ref, OHOS::Ace::DimensionUnit defaultUnit,
     std::optional<OHOS::Ace::CalcDimension>& result);
 template <typename T>
+void ANIDestroyShape([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_class cls, ani_long ptr)
+{
+    auto peer = reinterpret_cast<T*>(ptr);
+    if (peer == nullptr) {
+        return;
+    }
+    delete peer;
+}
+
+template <typename T>
 ani_object ANIShapeFromPtr(ani_env* env, ani_long ptr, const char* className, const char* propertyName)
 {
     ani_status status;
@@ -135,7 +145,8 @@ ani_object ANIShapeFromPtr(ani_env* env, ani_long ptr, const char* className, co
         LOGW("ANIShapeFromPtr find class error, status:%{public}d", status);
         return nullptr;
     }
-    if ((status = env->Class_FindMethod(myClass, "<ctor>", ":", &ctor)) != ANI_OK) {
+    // Find constructor (nullptr signature matches any constructor)
+    if ((status = env->Class_FindMethod(myClass, "<ctor>", nullptr, &ctor)) != ANI_OK) {
         LOGW("ANIShapeFromPtr find constructor error, status:%{public}d", status);
         return nullptr;
     }
@@ -144,17 +155,18 @@ ani_object ANIShapeFromPtr(ani_env* env, ani_long ptr, const char* className, co
         LOGW("ANIShapeFromPtr Object_New error, status:%{public}d", status);
         return nullptr;
     }
-    ani_long addr = 0L;
-    if ((status = env->Object_GetPropertyByName_Long(result, propertyName, &addr)) != ANI_OK) {
-        LOGW("ANIShapeFromPtr getProperty error, status:%{public}d", status);
-        return nullptr;
-    }
-    auto peer = reinterpret_cast<T*>(addr);
-    delete peer;
+    // The constructor created a temporary peer and registered a cleaner for it.
+    // Overwrite basicShapeResult with the transferred ptr. The old cleaner will
+    // clean up the temporary peer when registerCleaner is called below.
     if ((status = env->Object_SetPropertyByName_Long(result, propertyName, reinterpret_cast<ani_long>(ptr))) !=
         ANI_OK) {
         LOGW("ANIShapeFromPtr setProperty error, status:%{public}d", status);
         return nullptr;
+    }
+    // Call registerCleaner(ptr) — this cleans up the old temporary peer and registers a new cleaner
+    status = env->Object_CallMethodByName_Void(result, "registerCleaner", nullptr, ptr);
+    if (status != ANI_OK) {
+        LOGW("ANIShapeFromPtr registerCleaner error, status:%{public}d", status);
     }
     return result;
 }

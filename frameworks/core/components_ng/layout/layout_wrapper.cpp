@@ -14,10 +14,12 @@
  */
 
 #include "core/components_ng/layout/layout_wrapper.h"
+#include "core/components_ng/layout/safe_area_inset_wrapper.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/property/measure_utils.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 #include "base/log/ace_checker.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
@@ -861,12 +863,12 @@ void LayoutWrapper::CreateRootConstraint()
     layoutProperty->UpdateLayoutConstraint(layoutConstraint);
 }
 
-void LayoutWrapper::MeasureSafeAreaInsetContainer(LayoutWrapper* insetContainer)
+void MeasureSafeAreaInsetContainer(LayoutWrapper* self, LayoutWrapper* insetContainer)
 {
-    auto layoutProperty = GetLayoutProperty();
+    auto layoutProperty = self->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    const auto& options = layoutProperty->GetSafeAreaInset();
-    if (!insetContainer || !options.has_value() || options->Empty()) {
+    const auto* options = layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset();
+    if (!insetContainer || !options || options->Empty()) {
         layoutProperty->UpdateSafeAreaInsetContribution({});
         return;
     }
@@ -891,7 +893,7 @@ void LayoutWrapper::MeasureSafeAreaInsetContainer(LayoutWrapper* insetContainer)
         CHECK_NULL_CONTINUE(contentGeometry);
         const auto edgeSize = contentGeometry->GetMarginFrameSize();
         const auto spacing = ConvertToPx(edgeOptions->spacing, constraint->scaleProperty).value_or(0.0f);
-        switch (layoutProperty->GetResolvedSafeAreaInsetEdge(edge).edge) {
+        switch (layoutProperty->GetSafeAreaInsetState().GetResolvedSafeAreaInsetEdge(edge).edge) {
             case SafeAreaInsetPhysicalEdge::TOP:
                 contribution.top = edgeSize.Height() + spacing;
                 break;
@@ -909,14 +911,14 @@ void LayoutWrapper::MeasureSafeAreaInsetContainer(LayoutWrapper* insetContainer)
     layoutProperty->UpdateSafeAreaInsetContribution(contribution);
 }
 
-void LayoutWrapper::LayoutSafeAreaInsetContainer(LayoutWrapper* insetContainer)
+void LayoutSafeAreaInsetContainer(LayoutWrapper* self, LayoutWrapper* insetContainer)
 {
     CHECK_NULL_VOID(insetContainer);
-    auto layoutProperty = GetLayoutProperty();
-    auto geometryNode = GetGeometryNode();
+    auto layoutProperty = self->GetLayoutProperty();
+    auto geometryNode = self->GetGeometryNode();
     CHECK_NULL_VOID(layoutProperty);
     CHECK_NULL_VOID(geometryNode);
-    const auto& options = layoutProperty->GetSafeAreaInset();
+    const auto* options = layoutProperty->GetSafeAreaInsetState().GetSafeAreaInset();
     CHECK_NULL_VOID(options);
 
     const auto frameSize = geometryNode->GetFrameSize();
@@ -948,7 +950,7 @@ void LayoutWrapper::LayoutSafeAreaInsetContainer(LayoutWrapper* insetContainer)
         const auto edgeSize = contentGeometry->GetMarginFrameSize();
         float x = 0.0f;
         float y = 0.0f;
-        const auto& resolved = layoutProperty->GetResolvedSafeAreaInsetEdge(edge);
+        const auto& resolved = layoutProperty->GetSafeAreaInsetState().GetResolvedSafeAreaInsetEdge(edge);
         if (resolved.edge == SafeAreaInsetPhysicalEdge::TOP || resolved.edge == SafeAreaInsetPhysicalEdge::BOTTOM) {
             switch (resolved.alignment) {
                 case SafeAreaInsetAlignment::START:

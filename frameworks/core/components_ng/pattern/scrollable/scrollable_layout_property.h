@@ -70,7 +70,7 @@ protected:
     void Clone(RefPtr<LayoutProperty> property) const override
     {
         auto value = DynamicCast<ScrollableLayoutProperty>(property);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propContentStartOffset_ = CloneContentStartOffset();
         value->propContentEndOffset_ = CloneContentEndOffset();
         value->propSupportLazyLoadingEmptyBranch_ = CloneSupportLazyLoadingEmptyBranch();

@@ -41,6 +41,7 @@ enum class ExecutionState {
     FAILED,
     TARGET_NOT_FOUND,
     INTERRUPTED_BY_USER,
+    SECURITY_DENIED,
 };
 
 // Executor execution result

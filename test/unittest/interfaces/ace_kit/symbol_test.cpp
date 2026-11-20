@@ -61,7 +61,7 @@ protected:
         if (!aceNode) {
             return nullptr;
         }
-        return AceType::DynamicCast<NG::FrameNode>(aceNode);
+        return aceNode;
     }
 
     NG::TextPattern* GetTextPattern()

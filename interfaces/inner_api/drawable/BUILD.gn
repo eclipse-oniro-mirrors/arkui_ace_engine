@@ -23,6 +23,7 @@ config("drawable_config") {
 }
 
 ohos_shared_library("drawable_inner_ani") {
+  branch_protector_ret = "pac_ret"
   public_configs = [ ":drawable_config" ]
   sources = [ "./drawable_descriptor_ani.cpp" ]
   external_deps = [

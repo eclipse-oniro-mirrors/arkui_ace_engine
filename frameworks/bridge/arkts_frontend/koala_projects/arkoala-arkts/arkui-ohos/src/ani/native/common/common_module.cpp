@@ -18,7 +18,7 @@
 
 #include <array>
 
-#include "core/components_ng/property/measure_property.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 #if !defined(PREVIEW)
 #define OHOS_AAFWK_HILOG_TAG_WRAPPER_H
@@ -718,6 +718,7 @@ void SetCustomCallbackWithCheck(ani_env* env, ani_object obj, ani_long ptr, ani_
         ani_env* env = nullptr;
         vm->GetEnv(ANI_VERSION_1, &env);
         env->WeakReference_Delete(*wref);
+        delete wref;
     });
     env->WeakReference_Create(frameNode, frameNodeWeakRef.get());
     if ((status = env->Object_GetType(frameNode, &frameNodeType)) != ANI_OK) {

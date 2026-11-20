@@ -53,11 +53,16 @@ public:
 protected:
     ExecutorResult SetFailureState(ExecutionState state = ExecutionState::FAILED)
     {
-        failureState_ = state;
+        // A security refusal is final for this executor; later "not found" style
+        // failures must not mask the security denied classification.
+        if (failureState_ != ExecutionState::SECURITY_DENIED) {
+            failureState_ = state;
+        }
         return ExecutorResult::FAILED;
     }
 
     FrameNodeMatch FindFrameNode(double x, double y, GestureRecognizerPred pred);
+    bool IsTargetDeniedAt(double x, double y);
     WeakPtr<PipelineContext> context_;
     ExecutionState failureState_ = ExecutionState::FAILED;
 };

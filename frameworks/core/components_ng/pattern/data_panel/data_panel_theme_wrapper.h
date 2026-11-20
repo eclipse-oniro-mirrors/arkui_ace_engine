@@ -46,7 +46,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<DataPanelThemeWrapper>();
-            auto theme = AceType::DynamicCast<DataPanelTheme>(wrapper);
+            RefPtr<DataPanelTheme> theme = wrapper;
             if (!themeConstants) {
                 return wrapper;
             }

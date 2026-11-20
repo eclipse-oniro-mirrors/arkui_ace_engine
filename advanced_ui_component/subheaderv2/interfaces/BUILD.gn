@@ -40,6 +40,7 @@ gen_obj("subheaderv2_abc_preview") {
 }
 
 ohos_shared_library("subheaderv2") {
+  branch_protector_ret = "pac_ret"
   sources = [ "subheaderv2.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

@@ -233,7 +233,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<CalendarPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propCurrentDayStyle_ = CloneCurrentDayStyle();
         value->propNonCurrentDayStyle_ = CloneNonCurrentDayStyle();
         value->propTodayStyle_ = CloneTodayStyle();

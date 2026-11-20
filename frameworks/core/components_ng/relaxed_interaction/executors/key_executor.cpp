@@ -15,6 +15,7 @@
 
 #include "core/components_ng/relaxed_interaction/executors/key_executor.h"
 
+#include "core/components_ng/relaxed_interaction/utils/focused_target_security_gate.h"
 #include "core/event/key_event.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -28,6 +29,10 @@ ExecutorResult KeyExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
+    }
+
+    if (IsFocusedTargetDenied(context_, GetType())) {
+        return SetFailureState(ExecutionState::SECURITY_DENIED);
     }
 
     KeyEvent downEvent(static_cast<KeyCode>(keyCode_), KeyAction::DOWN);

@@ -130,6 +130,9 @@ void XComponentPatternV2::OnAttachToMainTree()
     if (autoInitialize_) {
         HandleSurfaceCreated();
     }
+    if (IsSurfaceVisibilityLifecycle()) {
+        RegisterVisibilityLifecycleCallback();
+    }
     if (renderSurface_) {
         renderSurface_->UpdateBufferTypeLeak(GetLeakType());
     }
@@ -276,6 +279,7 @@ void XComponentPatternV2::OnDetachFromMainTree()
     if (autoInitialize_) {
         HandleSurfaceDestroyed();
     }
+    UnregisterVisibilityLifecycleCallback();
     CHECK_NULL_VOID(displaySync_);
     if (displaySync_->IsOnPipeline()) {
         TAG_LOGD(AceLogTag::ACE_XCOMPONENT, "OnDetachFromMainTree:remove displaySync: "
@@ -375,18 +379,9 @@ void XComponentPatternV2::DisposeSurface()
         surfaceHolder_->nativeWindow_ = nullptr;
     }
     nativeWindow_ = nullptr;
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto renderContext = host->GetRenderContext();
-    CHECK_NULL_VOID(renderContext);
-    // for surface type
-    CHECK_NULL_VOID(renderContextForSurface_);
-    renderContext->RemoveChild(renderContextForSurface_);
+    FlushRemoveChild();
     renderContextForSurface_ = nullptr;
     handlingSurfaceRenderContext_ = renderContextForSurface_;
-#ifdef ENABLE_ROSEN_BACKEND
-    FlushImplicitTransaction(host);
-#endif
 }
 
 std::shared_ptr<Rosen::RSTransactionHandler> XComponentPatternV2::GetRSTransactionHandler(
@@ -419,16 +414,33 @@ std::shared_ptr<Rosen::RSUIContext> XComponentPatternV2::GetRSUIContext(const Re
     return nullptr;
 }
 
-void XComponentPatternV2::FlushImplicitTransaction(const RefPtr<FrameNode>& frameNode)
+void XComponentPatternV2::FlushRemoveChild()
 {
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // for surface type
+    CHECK_NULL_VOID(renderContextForSurface_);
+
 #ifdef ENABLE_ROSEN_BACKEND
-    if (!SystemProperties::GetMultiInstanceEnabled()) {
+    auto rsUIContext = GetRSUIContext(host);
+    auto transactionHandler = rsUIContext ? rsUIContext->GetRSTransaction() : nullptr;
+    if (transactionHandler) {
+        transactionHandler->Begin();
+    }
+#endif
+
+    renderContext->RemoveChild(renderContextForSurface_);
+
+#ifdef ENABLE_ROSEN_BACKEND
+    if (transactionHandler) {
+        transactionHandler->Commit();
+    } else if (!SystemProperties::GetMultiInstanceEnabled()) {
         auto transactionProxy = Rosen::RSTransactionProxy::GetInstance();
         if (transactionProxy != nullptr) {
             transactionProxy->FlushImplicitTransaction();
         }
-    } else if (auto transactionHandler = GetRSTransactionHandler(frameNode)) {
-        transactionHandler->FlushImplicitTransaction();
     }
 #endif
 }
@@ -439,6 +451,9 @@ int32_t XComponentPatternV2::HandleSurfaceCreated()
     InitSurface();
     CHECK_NULL_RETURN(renderSurface_, ERROR_CODE_PARAM_INVALID);
     isInitialized_ = true;
+    // visibility lifecycle pairing needs an "ever initialized" marker: isInitialized_
+    // is cleared on destroy, but re-create must stay allowed after that
+    hasSurfaceInitialized_ = true;
     if (surfaceHolder_) {
         auto callbackList = surfaceHolder_->surfaceCallbackList_;
         TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] surfaceHolder OnSurfaceCreated", GetId().c_str());
@@ -513,6 +528,9 @@ void XComponentPatternV2::OnWindowHide()
         XComponentPattern::OnWindowHide();
         return;
     }
+    // window-level visibility feeds the same pairing state machine as the
+    // component-level visible-area callback; the state guard keeps pairs intact
+    OnVisibilityLifecycleChange(false);
     CHECK_EQUAL_VOID(hasReleasedSurface_, true);
     if (renderSurface_) {
         renderSurface_->OnWindowStateChange(false);
@@ -527,12 +545,48 @@ void XComponentPatternV2::OnWindowShow()
         XComponentPattern::OnWindowShow();
         return;
     }
+    // window-level visibility feeds the same pairing state machine as the
+    // component-level visible-area callback; the state guard keeps pairs intact
+    OnVisibilityLifecycleChange(true);
     CHECK_EQUAL_VOID(hasReleasedSurface_, false);
     if (renderSurface_) {
         renderSurface_->OnWindowStateChange(true);
     }
     OnSurfaceShow();
     hasReleasedSurface_ = false;
+}
+
+bool XComponentPatternV2::IsSurfaceLifecycleReady() const
+{
+    // the holder path tracks surface state with hasSurfaceInitialized_ instead of hasXComponentInit_
+    return usesSuperMethod_ ? hasXComponentInit_ : hasSurfaceInitialized_;
+}
+
+void XComponentPatternV2::OnVisibilityLifecycleCreate()
+{
+    if (usesSuperMethod_) {
+        XComponentPattern::OnVisibilityLifecycleCreate();
+        return;
+    }
+    // surfaceHolder path: fire the holder callbacks registered via C API
+    auto res = HandleSurfaceCreated();
+    if (res != ERROR_CODE_NO_ERROR) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "XComponentV2 visibility lifecycle create failed, ret: %{public}d",
+            static_cast<int32_t>(res));
+    }
+}
+
+void XComponentPatternV2::OnVisibilityLifecycleDestroy()
+{
+    if (usesSuperMethod_) {
+        XComponentPattern::OnVisibilityLifecycleDestroy();
+        return;
+    }
+    auto res = HandleSurfaceDestroyed();
+    if (res != ERROR_CODE_NO_ERROR) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "XComponentV2 visibility lifecycle destroy failed, ret: %{public}d",
+            static_cast<int32_t>(res));
+    }
 }
 
 void XComponentPatternV2::OnRebuildFrame()

@@ -44,12 +44,42 @@ export default namespace curves {
     {
         interpolate(fraction: double): double;
     }
+    class ICurveCleaner {
+        private ptr: long = 0;
+        constructor(ptr: long) { this.ptr = ptr; }
+        clean(): void {
+            if (this.ptr != 0) {
+                ICurveImpl.nativeDestroy(this.ptr);
+                this.ptr = 0;
+            }
+        }
+    }
     class ICurveImpl implements ICurve
     {
         private nativeContext: long = 0;
-    
+        protected cleaner_: ICurveCleaner | undefined = undefined;
+        private static destroyRegister: FinalizationRegistry<ICurveCleaner> =
+            new FinalizationRegistry<ICurveCleaner>(ICurveImpl.cleanCallback);
+        private static unregisterToken: object = new object();
+
+        static native nativeDestroy(ptr: long): void;
+
+        static cleanCallback(cleaner: ICurveCleaner): void {
+            cleaner.clean();
+        }
         constructor(context:long) {
             this.nativeContext = context;
+            this.registerCleaner(context);
+        }
+        registerCleaner(ptr: long): void {
+            if (this.cleaner_ !== undefined) {
+                this.cleaner_!.clean();
+            }
+            this.cleaner_ = new ICurveCleaner(ptr);
+            ICurveImpl.destroyRegister.register(this, this.cleaner_!, ICurveImpl.unregisterToken);
+        }
+        unregisterCleaner(): void {
+            ICurveImpl.destroyRegister.unregister(ICurveImpl.unregisterToken);
         }
         public native interpolate(fraction: double): double;
     }

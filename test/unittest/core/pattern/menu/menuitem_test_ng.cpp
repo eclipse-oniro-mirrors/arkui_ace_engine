@@ -96,6 +96,11 @@ const std::vector<SelectParam> CREATE_VALUE = { { "content1", "icon1" }, { "cont
 const std::vector<SelectParam> CREATE_VALUE_NEW = { { "content1_new", "" }, { "", "icon4_new" },
     { "", "" }, { "", "icon4_new" } };
 const V2::ItemDivider ITEM_DIVIDER = { Dimension(5.f), Dimension(10), Dimension(20), Color(0x000000) };
+constexpr float LEFT_ROW_X = 10.0f;
+constexpr float LEFT_ROW_WIDTH = 80.0f;
+constexpr float RIGHT_ROW_X = 120.0f;
+constexpr float RIGHT_ROW_WIDTH = 60.0f;
+constexpr float PAINT_INVALID_EDGE = -1.0f;
 } // namespace
 class MenuItemTestNg : public testing::Test {
 public:
@@ -827,6 +832,294 @@ HWTEST_F(MenuItemTestNg, MenuItemPaintMethod002, TestSize.Level1)
     result(canvas);
     delete paintWrapper;
     paintWrapper = nullptr;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod003
+ * @tc.desc: Verify GetLeftRowStartEdge returns leftRow left edge in LTR.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod003, TestSize.Level1)
+{
+    MenuItemModelNG MneuItemModelInstance;
+    MenuItemProperties itemOption;
+    MneuItemModelInstance.Create(itemOption);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+    auto leftRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(0));
+    ASSERT_NE(leftRow, nullptr);
+    leftRow->GetGeometryNode()->SetFrameOffset(OffsetF(LEFT_ROW_X, 0.0f));
+    leftRow->GetGeometryNode()->SetFrameSize(SizeF(LEFT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    EXPECT_FLOAT_EQ(paintMethod->GetLeftRowStartEdge(paintWrapper, false), LEFT_ROW_X);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod004
+ * @tc.desc: Verify GetLeftRowStartEdge returns rightRow left edge in RTL (index swapped to 1).
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod004, TestSize.Level1)
+{
+    MenuItemModelNG MneuItemModelInstance;
+    MenuItemProperties itemOption;
+    MneuItemModelInstance.Create(itemOption);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+    auto rightRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(1));
+    ASSERT_NE(rightRow, nullptr);
+    rightRow->GetGeometryNode()->SetFrameOffset(OffsetF(RIGHT_ROW_X, 0.0f));
+    rightRow->GetGeometryNode()->SetFrameSize(SizeF(RIGHT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    EXPECT_FLOAT_EQ(paintMethod->GetLeftRowStartEdge(paintWrapper, true), RIGHT_ROW_X);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod005
+ * @tc.desc: Verify GetLeftRowStartEdge returns INVALID_EDGE for CustomMenuItemPattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod005, TestSize.Level1)
+{
+    auto customNode = FrameNode::CreateFrameNode(
+        V2::TEXT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+    MenuItemModelNG MneuItemModelInstance;
+    MneuItemModelInstance.Create(customNode);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    EXPECT_FLOAT_EQ(paintMethod->GetLeftRowStartEdge(paintWrapper, false), PAINT_INVALID_EDGE);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod006
+ * @tc.desc: Verify GetRightRowEndEdge returns rightRow right edge in LTR.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod006, TestSize.Level1)
+{
+    MenuItemModelNG MneuItemModelInstance;
+    MenuItemProperties itemOption;
+    MneuItemModelInstance.Create(itemOption);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+    auto rightRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(1));
+    ASSERT_NE(rightRow, nullptr);
+    rightRow->GetGeometryNode()->SetFrameOffset(OffsetF(RIGHT_ROW_X, 0.0f));
+    rightRow->GetGeometryNode()->SetFrameSize(SizeF(RIGHT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    EXPECT_FLOAT_EQ(paintMethod->GetRightRowEndEdge(paintWrapper, false), RIGHT_ROW_X + RIGHT_ROW_WIDTH);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod007
+ * @tc.desc: Verify GetRightRowEndEdge returns leftRow right edge in RTL (index swapped to 0).
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod007, TestSize.Level1)
+{
+    MenuItemModelNG MneuItemModelInstance;
+    MenuItemProperties itemOption;
+    MneuItemModelInstance.Create(itemOption);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+    auto leftRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(0));
+    ASSERT_NE(leftRow, nullptr);
+    leftRow->GetGeometryNode()->SetFrameOffset(OffsetF(LEFT_ROW_X, 0.0f));
+    leftRow->GetGeometryNode()->SetFrameSize(SizeF(LEFT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    EXPECT_FLOAT_EQ(paintMethod->GetRightRowEndEdge(paintWrapper, true), LEFT_ROW_X + LEFT_ROW_WIDTH);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod008
+ * @tc.desc: Verify GetRightRowEndEdge returns INVALID_EDGE for CustomMenuItemPattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod008, TestSize.Level1)
+{
+    auto customNode = FrameNode::CreateFrameNode(
+        V2::TEXT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+    MenuItemModelNG MneuItemModelInstance;
+    MneuItemModelInstance.Create(customNode);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    EXPECT_FLOAT_EQ(paintMethod->GetRightRowEndEdge(paintWrapper, false), PAINT_INVALID_EDGE);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod009
+ * @tc.desc: Verify HandleMenuItem anchors startMargin to leftRow when Unit is INVALID.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod009, TestSize.Level1)
+{
+    MenuItemModelNG MneuItemModelInstance;
+    MenuItemProperties itemOption;
+    MneuItemModelInstance.Create(itemOption);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+    auto itemGeo = itemNode->GetGeometryNode();
+    itemGeo->SetFrameSize(SizeF(MENU_ITEM_SIZE_WIDTH * 2, MENU_ITEM_SIZE_HEIGHT));
+    auto leftRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(0));
+    ASSERT_NE(leftRow, nullptr);
+    leftRow->GetGeometryNode()->SetFrameOffset(OffsetF(LEFT_ROW_X, 0.0f));
+    leftRow->GetGeometryNode()->SetFrameSize(SizeF(LEFT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+    auto rightRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(1));
+    ASSERT_NE(rightRow, nullptr);
+    rightRow->GetGeometryNode()->SetFrameOffset(OffsetF(RIGHT_ROW_X, 0.0f));
+    rightRow->GetGeometryNode()->SetFrameSize(SizeF(RIGHT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    paintProp->UpdateStartMargin(Dimension(0.0f, DimensionUnit::INVALID));
+    paintProp->UpdateEndMargin(Dimension(0.0f, DimensionUnit::INVALID));
+    paintProp->UpdateStrokeWidth(Dimension(1.0f, DimensionUnit::PX));
+    paintProp->UpdateDividerColor(Color::RED);
+    paintProp->UpdateNeedDivider(true);
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DrawPath(_)).Times(AtLeast(1));
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    geometryNode->SetFrameSize(SizeF(MENU_ITEM_SIZE_WIDTH * 2, MENU_ITEM_SIZE_HEIGHT));
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    auto result = paintMethod->GetOverlayDrawFunction(paintWrapper);
+    EXPECT_NE(result, nullptr);
+    result(canvas);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod010
+ * @tc.desc: Verify HandleMenuItem falls back to theme default for CustomMenuItemPattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod010, TestSize.Level1)
+{
+    auto customNode = FrameNode::CreateFrameNode(
+        V2::TEXT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+    MenuItemModelNG MneuItemModelInstance;
+    MneuItemModelInstance.Create(customNode);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    paintProp->UpdateStartMargin(Dimension(0.0f, DimensionUnit::INVALID));
+    paintProp->UpdateEndMargin(Dimension(0.0f, DimensionUnit::INVALID));
+    paintProp->UpdateStrokeWidth(Dimension(1.0f, DimensionUnit::PX));
+    paintProp->UpdateDividerColor(Color::RED);
+    paintProp->UpdateNeedDivider(true);
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DrawPath(_)).Times(AtLeast(1));
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    geometryNode->SetFrameSize(SizeF(MENU_ITEM_SIZE_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    auto result = paintMethod->GetOverlayDrawFunction(paintWrapper);
+    EXPECT_NE(result, nullptr);
+    result(canvas);
+    delete paintWrapper;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethod011
+ * @tc.desc: Verify HandleMenuItem with both margins unset in RTL flips anchor edges.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethod011, TestSize.Level1)
+{
+    MenuItemModelNG MneuItemModelInstance;
+    MenuItemProperties itemOption;
+    MneuItemModelInstance.Create(itemOption);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(itemNode, nullptr);
+    auto layoutProp = itemNode->GetLayoutProperty();
+    ASSERT_NE(layoutProp, nullptr);
+    layoutProp->UpdateLayoutDirection(TextDirection::RTL);
+    auto itemGeo = itemNode->GetGeometryNode();
+    itemGeo->SetFrameSize(SizeF(MENU_ITEM_SIZE_WIDTH * 2, MENU_ITEM_SIZE_HEIGHT));
+    auto leftRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(0));
+    ASSERT_NE(leftRow, nullptr);
+    leftRow->GetGeometryNode()->SetFrameOffset(OffsetF(LEFT_ROW_X, 0.0f));
+    leftRow->GetGeometryNode()->SetFrameSize(SizeF(LEFT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+    auto rightRow = AceType::DynamicCast<FrameNode>(itemNode->GetChildAtIndex(1));
+    ASSERT_NE(rightRow, nullptr);
+    rightRow->GetGeometryNode()->SetFrameOffset(OffsetF(RIGHT_ROW_X, 0.0f));
+    rightRow->GetGeometryNode()->SetFrameSize(SizeF(RIGHT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
+
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    paintProp->UpdateStartMargin(Dimension(0.0f, DimensionUnit::INVALID));
+    paintProp->UpdateEndMargin(Dimension(0.0f, DimensionUnit::INVALID));
+    paintProp->UpdateStrokeWidth(Dimension(1.0f, DimensionUnit::PX));
+    paintProp->UpdateDividerColor(Color::RED);
+    paintProp->UpdateNeedDivider(true);
+
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DrawPath(_)).Times(AtLeast(1));
+    RefPtr<RenderContext> renderContext = AceType::MakeRefPtr<RenderContext>();
+    renderContext->SetHostNode(itemNode);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    geometryNode->SetFrameSize(SizeF(MENU_ITEM_SIZE_WIDTH * 2, MENU_ITEM_SIZE_HEIGHT));
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    auto result = paintMethod->GetOverlayDrawFunction(paintWrapper);
+    EXPECT_NE(result, nullptr);
+    result(canvas);
+    delete paintWrapper;
 }
 
 /**
@@ -1699,6 +1992,9 @@ HWTEST_F(MenuItemTestNg, OnThemeScopeUpdateTest005, TestSize.Level1)
  */
 HWTEST_F(MenuItemTestNg, MenuItemModelNGCreateTestNg001, TestSize.Level1)
 {
+    /**
+     * @tc.steps: step1. Set API target version to 26 and create MenuItem.
+     */
     int32_t setApiVersion = static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX);
     int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
     MockContainer::Current()->SetApiTargetVersion(setApiVersion);
@@ -1706,12 +2002,18 @@ HWTEST_F(MenuItemTestNg, MenuItemModelNGCreateTestNg001, TestSize.Level1)
     itemOption.content = "content";
     MenuItemModelNG menuItemModelInstance;
     menuItemModelInstance.Create(itemOption);
+    /**
+     * @tc.steps: step2. Verify the created FrameNode has valid pattern and event hub.
+     */
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     ASSERT_NE(frameNode, nullptr);
     auto menuItemPattern = frameNode->GetPattern<MenuItemPattern>();
     ASSERT_NE(menuItemPattern, nullptr);
     auto menuItemEventHub = frameNode->GetEventHub<MenuItemEventHub>();
     ASSERT_NE(menuItemEventHub, nullptr);
+    /**
+     * @tc.steps: step3. Trigger OnClick and verify selected state, then rollback API version.
+     */
     menuItemPattern->OnClick();
     ASSERT_TRUE(menuItemPattern->IsSelected());
     MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);

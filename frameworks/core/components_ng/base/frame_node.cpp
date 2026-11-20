@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/layout/safe_area_inset_wrapper.h"
 
 #include <algorithm>
 #include <cmath>
@@ -108,6 +109,7 @@
 #include "core/components_ng/pattern/overlay/overlay_container_pattern.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/components_ng/pattern/badge/badge_accessibility_property.h"
 #include "core/components_ng/pattern/bubble/bubble_accessibility_property.h"
@@ -218,7 +220,6 @@ constexpr int32_t MIN_OPINC_AREA = 10000;
 } // namespace
 namespace OHOS::Ace::NG {
 namespace {
-
 void ClearAccessibilityFocus(
     const RefPtr<AccessibilityProperty>& accessibilityProperty, const RefPtr<RenderContext>& renderContext)
 {
@@ -1147,6 +1148,13 @@ void FrameNode::DumpVisibleAreaInfo()
 
 void FrameNode::DumpSafeAreaInfo()
 {
+    auto insetInfo = BuildSafeAreaInsetDumpInfo(this);
+    if (insetInfo) {
+        for (auto item = insetInfo->GetChild(); item->IsValid(); item = item->GetNext()) {
+            DumpLog::GetInstance().AddDesc(item->GetKey() + ": " +
+                (item->IsString() ? item->GetString() : item->ToString()));
+        }
+    }
     auto&& opts = layoutProperty_->GetSafeAreaExpandOpts();
     if (opts) {
         DumpLog::GetInstance().AddDesc(
@@ -2109,6 +2117,12 @@ bool FrameNode::IsJsCustomPropertyUpdated() const
 
 void FrameNode::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
 {
+    if (!filter.IsFastFilter() && filter.CheckExtAttr("safeAreaInset")) {
+        auto config = BuildSafeAreaInsetConfig(this);
+        if (config) {
+            json->PutExtAttr("safeAreaInset", config, filter);
+        }
+    }
     if (renderContext_) {
         renderContext_->ToJsonValue(json, filter);
     }
@@ -2366,7 +2380,7 @@ void FrameNode::NotifyColorModeChange(uint32_t colorMode, bool recursive)
         pattern_->OnColorModeChange(colorMode);
     }
 
-    auto frameNode = AceType::DynamicCast<FrameNode>(this);
+    auto frameNode = this;
     if (frameNode && frameNode->GetOverlayNode()) {
         frameNode->GetOverlayNode()->NotifyColorModeChange(colorMode);
     }
@@ -2427,6 +2441,10 @@ void FrameNode::HandleLanguageConfigurationUpdate(const ConfigurationChange& con
 {
     CHECK_NULL_VOID(pattern_);
     pattern_->OnLanguageConfigurationUpdate();
+    auto rsContext = GetRenderContext();
+    if (rsContext) {
+        rsContext->ReloadBackgroundImage();
+    }
     MarkModifyDone();
     MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     if (cornerMarkNode_) {
@@ -2726,7 +2744,7 @@ void FrameNode::SwapDirtyLayoutWrapperOnMainThread(const RefPtr<LayoutWrapper>& 
     layoutProperty_->CleanDirty();
     DirtySwapConfig config { frameSizeChange, frameOffsetChange, contentSizeChange, contentOffsetChange };
     // check if need to paint content.
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     config.skipMeasure = layoutAlgorithmWrapper->SkipMeasure() || dirty->SkipMeasureContent();
     config.skipLayout = layoutAlgorithmWrapper->SkipLayout();
@@ -6979,7 +6997,7 @@ void FrameNode::Measure(const std::optional<LayoutConstraintF>& parentConstraint
 
 void FrameNode::MeasureSafeAreaInset()
 {
-    MeasureSafeAreaInsetContainer(RawPtr(safeAreaInsetNode_));
+    MeasureSafeAreaInsetContainer(this, RawPtr(safeAreaInsetNode_));
 }
 
 // Called to perform layout children.
@@ -7249,7 +7267,7 @@ bool FrameNode::OnLayoutFinish(bool& needSyncRsNode, DirtySwapConfig& config)
         .contentSizeChange = contentSizeChange,
         .contentOffsetChange = contentOffsetChange };
     // check if need to paint content.
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(layoutAlgorithm_);
+    auto layoutAlgorithmWrapper = layoutAlgorithm_;
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     config.skipMeasure = layoutAlgorithmWrapper->SkipMeasure();
     config.skipLayout = layoutAlgorithmWrapper->SkipLayout();
@@ -7583,7 +7601,7 @@ void FrameNode::SetCacheCount(int32_t cacheCount, const std::optional<LayoutCons
 
 void FrameNode::LayoutSafeAreaInset()
 {
-    LayoutSafeAreaInsetContainer(RawPtr(safeAreaInsetNode_));
+    LayoutSafeAreaInsetContainer(this, RawPtr(safeAreaInsetNode_));
 }
 
 void FrameNode::LayoutOverlay()
@@ -9046,6 +9064,12 @@ void FrameNode::DumpVisibleAreaInfo(std::unique_ptr<JsonValue>& json)
 
 void FrameNode::DumpSafeAreaInfo(std::unique_ptr<JsonValue>& json)
 {
+    auto insetInfo = BuildSafeAreaInsetDumpInfo(this);
+    if (insetInfo) {
+        for (auto item = insetInfo->GetChild(); item->IsValid(); item = item->GetNext()) {
+            json->Put(item->GetKey().c_str(), item);
+        }
+    }
     if (layoutProperty_->GetSafeAreaExpandOpts()) {
         json->Put("SafeAreaExpandOpts", layoutProperty_->GetSafeAreaExpandOpts()->ToString().c_str());
     }
@@ -9678,6 +9702,11 @@ void FrameNode::SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode)
     MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
+RefPtr<FrameNode> FrameNode::GetSafeAreaInsetNode() const
+{
+    return safeAreaInsetNode_;
+}
+
 void FrameNode::SetOverlayNodeIsFree(bool isFree)
 {
     if (!overlayNode_) {
@@ -9884,7 +9913,12 @@ void FrameNode::FireLpxUpdateCallbacks()
 template<typename T>
 ACE_FORCE_EXPORT RefPtr<T> FrameNode::GetAccessibilityProperty() const
 {
-    return DynamicCast<T>(const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty());
+    const auto& accessibilityProperty = const_cast<FrameNode*>(this)->GetOrCreateAccessibilityProperty();
+    if constexpr (std::is_same_v<AccessibilityProperty*, T*>) {
+        return accessibilityProperty;
+    } else {
+        return DynamicCast<T>(accessibilityProperty);
+    }
 }
 
 // Explicit template instantiation for common use cases

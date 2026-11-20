@@ -58,7 +58,7 @@ void SwitchPaintParagraph::ToJsonValue(
 RefPtr<PaintProperty> SwitchPaintProperty::Clone() const
 {
     auto value = MakeRefPtr<SwitchPaintProperty>();
-    value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+    value->PaintProperty::UpdatePaintProperty(this);
     value->propSwitchPaintParagraph_ = CloneSwitchPaintParagraph();
     value->propIsOn_ = CloneIsOn();
     value->propSwitchAnimationStyle_ = CloneSwitchAnimationStyle();

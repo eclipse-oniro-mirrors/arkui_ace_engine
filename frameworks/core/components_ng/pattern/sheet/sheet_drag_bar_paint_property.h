@@ -40,7 +40,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto paintProperty = MakeRefPtr<SheetDragBarPaintProperty>();
-        paintProperty->PaintProperty::UpdatePaintProperty(AceType::DynamicCast<PaintProperty>(this));
+        paintProperty->PaintProperty::UpdatePaintProperty(this);
         paintProperty->propBarLeftPoint_ = CloneBarLeftPoint();
         paintProperty->propBarCenterPoint_ = CloneBarCenterPoint();
         paintProperty->propBarRightPoint_ = CloneBarRightPoint();

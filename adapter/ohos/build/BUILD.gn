@@ -96,15 +96,18 @@ foreach(module, component_modules) {
     module_path = "text/span"
   }
   ohos_shared_library(module_name) {
+    branch_protector_ret = "pac_ret"
     configs = [ "$ace_root:ace_coverage_config" ]
     deps = []
     if (is_ohos) {
-      # Most components expose only DynamicModule factories. Keep the remaining
-      # direct-link and dlsym consumers in module-specific export lists.
-      version_script = "$ace_root/build/libarkui_component.map"
-      if (module == "waterflow" || module == "indexer" ||
-          module == "xcomponent") {
-        version_script = "$ace_root/build/libarkui_${sub_name}.map"
+      # Auto-detect module-specific version script: if build/libarkui_${sub_name}.map
+      # exists (listed in ace_module_map_files from ace_config.gni), use it;
+      # otherwise fall back to the generic libarkui_component.map.
+      _module_map_name = "libarkui_${sub_name}.map"
+      if (filter_include(ace_module_map_files, [ _module_map_name ]) != []) {
+        version_script = "$ace_root/build/$_module_map_name"
+      } else {
+        version_script = "$ace_root/build/libarkui_component.map"
       }
       deps += [ "$ace_root/frameworks/core/components_ng/pattern/${module_path}:ace_core_components_${module}_pattern_ng_ohos" ]
     } else if (use_mingw_win) {

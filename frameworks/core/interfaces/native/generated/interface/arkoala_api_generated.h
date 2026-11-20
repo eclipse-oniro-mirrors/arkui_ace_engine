@@ -1000,6 +1000,9 @@ typedef struct Opt_UICommonEvent Opt_UICommonEvent;
 typedef struct UIContextPeer UIContextPeer;
 typedef struct UIContextPeer* Ark_UIContext;
 typedef struct Opt_UIContext Opt_UIContext;
+typedef struct uiEffect_BlenderBasePeer uiEffect_BlenderBasePeer;
+typedef struct uiEffect_BlenderBasePeer* Ark_uiEffect_BlenderBase;
+typedef struct Opt_uiEffect_BlenderBase Opt_uiEffect_BlenderBase;
 typedef struct uiEffect_BrightnessBlenderPeer uiEffect_BrightnessBlenderPeer;
 typedef struct uiEffect_BrightnessBlenderPeer* Ark_uiEffect_BrightnessBlender;
 typedef struct Opt_uiEffect_BrightnessBlender Opt_uiEffect_BrightnessBlender;
@@ -3727,6 +3730,8 @@ typedef struct Ark_OutlineOptions Ark_OutlineOptions;
 typedef struct Opt_OutlineOptions Opt_OutlineOptions;
 typedef struct Ark_PickerBackgroundStyle Ark_PickerBackgroundStyle;
 typedef struct Opt_PickerBackgroundStyle Opt_PickerBackgroundStyle;
+typedef struct Ark_PickerComponentTextStyle Ark_PickerComponentTextStyle;
+typedef struct Opt_PickerComponentTextStyle Opt_PickerComponentTextStyle;
 typedef struct Ark_PickerDialogButtonStyle Ark_PickerDialogButtonStyle;
 typedef struct Opt_PickerDialogButtonStyle Opt_PickerDialogButtonStyle;
 typedef struct Ark_PickerIndicatorStyle Ark_PickerIndicatorStyle;
@@ -4297,6 +4302,15 @@ typedef struct Opt_BarMode {
     Ark_Tag tag;
     Ark_BarMode value;
 } Opt_BarMode;
+typedef enum Ark_BarOverlapMode {
+    ARK_BAR_OVERLAP_MODE_STANDARD = 0,
+    ARK_BAR_OVERLAP_MODE_STACK = 1,
+    ARK_BAR_OVERLAP_MODE_SAFE_AREA_PADDING = 2,
+} Ark_BarOverlapMode;
+typedef struct Opt_BarOverlapMode {
+    Ark_Tag tag;
+    Ark_BarOverlapMode value;
+} Opt_BarOverlapMode;
 typedef enum Ark_BarPosition {
     ARK_BAR_POSITION_START = 0,
     ARK_BAR_POSITION_END = 1,
@@ -4978,6 +4992,7 @@ typedef struct Opt_DividerMode {
 typedef enum Ark_DpiFollowStrategy {
     ARK_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI = 0,
     ARK_DPI_FOLLOW_STRATEGY_FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    ARK_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI_ALL = 2,
 } Ark_DpiFollowStrategy;
 typedef struct Opt_DpiFollowStrategy {
     Ark_Tag tag;
@@ -5156,6 +5171,7 @@ typedef struct Opt_EllipsisMode {
 typedef enum Ark_EmbeddedDpiFollowStrategy {
     ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI = 0,
     ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_UI_EXTENSION_ABILITY_DPI = 1,
+    ARK_EMBEDDED_DPI_FOLLOW_STRATEGY_FOLLOW_HOST_DPI_ALL = 2,
 } Ark_EmbeddedDpiFollowStrategy;
 typedef struct Opt_EmbeddedDpiFollowStrategy {
     Ark_Tag tag;
@@ -5385,6 +5401,18 @@ typedef enum Ark_FunctionKey {
     ARK_FUNCTION_KEY_DPAD_DOWN = 15,
     ARK_FUNCTION_KEY_DPAD_LEFT = 16,
     ARK_FUNCTION_KEY_DPAD_RIGHT = 17,
+    ARK_FUNCTION_KEY_CAPS_LOCK = 18,
+    ARK_FUNCTION_KEY_SCROLL_LOCK = 20,
+    ARK_FUNCTION_KEY_PAUSE_BREAK = 21,
+    ARK_FUNCTION_KEY_NUM_LOCK = 22,
+    ARK_FUNCTION_KEY_INSERT = 23,
+    ARK_FUNCTION_KEY_DELETE = 24,
+    ARK_FUNCTION_KEY_HOME = 25,
+    ARK_FUNCTION_KEY_END = 26,
+    ARK_FUNCTION_KEY_PAGE_UP = 27,
+    ARK_FUNCTION_KEY_PAGE_DOWN = 28,
+    ARK_FUNCTION_KEY_ENTER = 29,
+    ARK_FUNCTION_KEY_BACKSPACE = 30,
 } Ark_FunctionKey;
 typedef struct Opt_FunctionKey {
     Ark_Tag tag;
@@ -5757,6 +5785,7 @@ typedef enum Ark_ImmersiveStrategy {
     ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
     ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
     ARK_IMMERSIVE_STRATEGY_BIND_SHEET_EXPAND_SAFE_AREA = 7,
+    ARK_IMMERSIVE_STRATEGY_TABS_EXPAND_SAFE_AREA = 9,
 } Ark_ImmersiveStrategy;
 typedef struct Opt_ImmersiveStrategy {
     Ark_Tag tag;
@@ -9868,6 +9897,10 @@ typedef struct Opt_UIContext {
     Ark_Tag tag;
     Ark_UIContext value;
 } Opt_UIContext;
+typedef struct Opt_uiEffect_BlenderBase {
+    Ark_Tag tag;
+    Ark_uiEffect_BlenderBase value;
+} Opt_uiEffect_BlenderBase;
 typedef struct Opt_uiEffect_BrightnessBlender {
     Ark_Tag tag;
     Ark_uiEffect_BrightnessBlender value;
@@ -22376,6 +22409,7 @@ typedef struct Ark_ImmersiveOptionsInner {
     Opt_Boolean applyShadow;
     Opt_Boolean interactive;
     Opt_LightEffectOptionsInner lightEffect;
+    Opt_Int32 colorBlendMode;
 } Ark_ImmersiveOptionsInner;
 typedef struct Opt_ImmersiveOptionsInner {
     Ark_Tag tag;
@@ -24188,6 +24222,18 @@ typedef struct Opt_PickerBackgroundStyle {
     Ark_Tag tag;
     Ark_PickerBackgroundStyle value;
 } Opt_PickerBackgroundStyle;
+typedef struct Ark_PickerComponentTextStyle {
+    /* kind: Interface */
+    Opt_ResourceColor color;
+    Opt_arkui_component_units_Font font;
+    Opt_Union_F64_ResourceStr minFontSize;
+    Opt_Union_F64_ResourceStr maxFontSize;
+    Opt_TextOverflow overflow;
+} Ark_PickerComponentTextStyle;
+typedef struct Opt_PickerComponentTextStyle {
+    Ark_Tag tag;
+    Ark_PickerComponentTextStyle value;
+} Opt_PickerComponentTextStyle;
 typedef struct Ark_PickerDialogButtonStyle {
     /* kind: Interface */
     Opt_ButtonType type;
@@ -25861,9 +25907,12 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
     void (*setBlendMode)(Ark_NativePointer node,
                          const Opt_BlendMode* value,
                          const Opt_BlendApplyType* type);
-    void (*setAdvancedBlendMode)(Ark_NativePointer node,
-                                 const Opt_Union_BlendMode_Blender* effect,
-                                 const Opt_BlendApplyType* type);
+    void (*setAdvancedBlendMode0)(Ark_NativePointer node,
+                                  const Opt_Union_BlendMode_Blender* effect,
+                                  const Opt_BlendApplyType* type);
+    void (*setAdvancedBlendMode1)(Ark_NativePointer node,
+                                  const Opt_uiEffect_BlenderBase* effect,
+                                  const Opt_BlendApplyType* type);
     void (*setGeometryTransition)(Ark_NativePointer node,
                                   const Opt_String* id,
                                   const Opt_GeometryTransitionOptions* options);
@@ -26598,6 +26647,8 @@ typedef struct GENERATED_ArkUIListModifier {
                       const Opt_StickyStyle* value);
     void (*setScrollSnapAlign)(Ark_NativePointer node,
                                const Opt_ScrollSnapAlign* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setMaintainVisibleContentPosition)(Ark_NativePointer node,
                                               const Opt_Boolean* value);
     void (*setSupportEmptyBranchInLazyLoading)(Ark_NativePointer node,
@@ -28148,8 +28199,10 @@ typedef struct GENERATED_ArkUITabsModifier {
                        const Opt_DividerStyle* value);
     void (*setNestedScroll)(Ark_NativePointer node,
                             const Opt_TabsNestedScrollMode* value);
-    void (*setBarOverlap)(Ark_NativePointer node,
-                          const Opt_Boolean* value);
+    void (*setBarOverlap0)(Ark_NativePointer node,
+                           const Opt_Boolean* value);
+    void (*setBarOverlap1)(Ark_NativePointer node,
+                           const Opt_BarOverlapMode* value);
     void (*setBarBackgroundColor)(Ark_NativePointer node,
                                   const Opt_ResourceColor* value);
     void (*setBarGridAlign)(Ark_NativePointer node,
@@ -28923,6 +28976,8 @@ typedef struct GENERATED_ArkUIUIPickerComponentModifier {
                           const Opt_LengthMetricsProxy* value);
     void (*setDisplayedItemCount)(Ark_NativePointer node,
                                   const Opt_Int32* value);
+    void (*setSelectedTextStyle)(Ark_NativePointer node,
+                                 const Opt_PickerComponentTextStyle* value);
 } GENERATED_ArkUIUIPickerComponentModifier;
 
 typedef struct GENERATED_ArkUIUnionEffectContainerModifier {
@@ -29396,6 +29451,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                             Ark_Int32 value);
     void (*setBufferQueueCount)(Ark_NativePointer node,
                                 Ark_Int32 value);
+    void (*setEnableSurfaceVisibilityLifecycle)(Ark_NativePointer node,
+                                                const Opt_Boolean* value);
     void (*setHdrBrightness1)(Ark_NativePointer node,
                               const Opt_Float64* brightness,
                               const Opt_HdrType* type);
@@ -29963,11 +30020,6 @@ typedef struct GENERATED_ArkUICanvasRendererAccessor {
                                               Ark_Float64 startAngle,
                                               Ark_Float64 x,
                                               Ark_Float64 y);
-    Opt_image_PixelMap (*getPixelMap)(Ark_CanvasRenderer peer,
-                                      Ark_Float64 sx,
-                                      Ark_Float64 sy,
-                                      Ark_Float64 sw,
-                                      Ark_Float64 sh);
     Array_F64 (*getLineDash)(Ark_CanvasRenderer peer);
     void (*setLineDash)(Ark_CanvasRenderer peer,
                         const Array_F64* segments);
@@ -33162,6 +33214,7 @@ typedef struct GENERATED_ArkUITextMenuItemIdAccessor {
     Ark_TextMenuItemId (*getAskAI)();
     Ark_TextMenuItemId (*getAutoFill)();
     Ark_TextMenuItemId (*getPasswordVault)();
+    Ark_TextMenuItemId (*getTRANSLATE_INPUT)();
 } GENERATED_ArkUITextMenuItemIdAccessor;
 
 typedef struct GENERATED_ArkUITextShadowStyleAccessor {

@@ -25,6 +25,7 @@ config("ani_utils_common_config") {
   include_dirs = [ "./" ]
 }
 ohos_source_set("ani_utils_common") {
+  branch_protector_ret = "pac_ret"
   subsystem_name = ace_engine_subsystem
   part_name = ace_engine_part
 
@@ -38,6 +39,7 @@ ohos_source_set("ani_utils_common") {
   ]
 }
 ohos_shared_library("arkoala_native_ani") {
+  branch_protector_ret = "pac_ret"
   shlib_type = "ani"
   subsystem_name = ace_engine_subsystem
   part_name = ace_engine_part
@@ -148,6 +150,11 @@ ohos_shared_library("arkoala_native_ani") {
   }
   configs = [ "$ace_root:ace_config" ]
   defines = []
+  if (defined(enable_drag_framework) && enable_drag_framework) {
+    defines += [ "ENABLE_DRAG_FRAMEWORK" ]
+  } else {
+    sources -= [ "dragController/drag_controller_module.cpp" ]
+  }
   if (pixel_map_support) {
     defines += [ "PIXEL_MAP_SUPPORTED" ]
   }
@@ -162,6 +169,7 @@ ohos_shared_library("arkoala_native_ani") {
 
 if (use_linux) {
   ohos_shared_library("arkoala_native_ani_linux") {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
 

@@ -498,13 +498,13 @@ HWTEST_F(JsAccessibilityManagerTest, JsAccessibilityManager007, TestSize.Level1)
      * @tc.steps: step4. test SubscribeStateObserver
      */
     ret = jsAccessibilityManager->SubscribeStateObserver(16);
-    EXPECT_EQ(ret, false);
+    EXPECT_EQ(ret, true);
 
     /**
      * @tc.steps: step5. test UnsubscribeStateObserver
      */
     ret = jsAccessibilityManager->UnsubscribeStateObserver(16);
-    EXPECT_EQ(ret, false);
+    EXPECT_EQ(ret, true);
 }
 
 /**

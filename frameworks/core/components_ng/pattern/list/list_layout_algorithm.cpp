@@ -2529,6 +2529,28 @@ void ListLayoutAlgorithm::LayoutItem(RefPtr<LayoutWrapper>& wrapper, int32_t ind
     SetListItemIndex(wrapper, index);
 }
 
+void ListLayoutAlgorithm::LayoutDeferredCacheItem(const RefPtr<LayoutWrapper>& wrapper, int32_t index,
+    const ListItemInfo& pos, float crossSize, bool isDirty, bool show)
+{
+    CHECK_NULL_VOID(wrapper);
+    auto geometryNode = wrapper->GetGeometryNode();
+    CHECK_NULL_VOID(geometryNode);
+    const auto prevOffset = geometryNode->GetMarginFrameOffset();
+    RefPtr<LayoutWrapper> itemWrapper = wrapper;
+    auto startIndex = index;
+    LayoutItem(itemWrapper, index, pos, startIndex, crossSize);
+    ExpandWithSafeAreaPadding(wrapper);
+    auto offset = geometryNode->GetMarginFrameOffset();
+    if (axis_ == Axis::VERTICAL) {
+        offset.SetX(prevOffset.GetX());
+    } else {
+        offset.SetY(prevOffset.GetY());
+    }
+    geometryNode->SetMarginFrameOffset(offset);
+    wrapper->SetActive(show);
+    SyncGeometry(itemWrapper, isDirty);
+}
+
 void ListLayoutAlgorithm::ProcessCacheCount(LayoutWrapper* layoutWrapper, int32_t cacheCount, bool show)
 {
     if (!itemPosition_.empty() && cacheCount > 0) {
@@ -2560,7 +2582,7 @@ void ListLayoutAlgorithm::UpdateItemDecodeState(LayoutWrapper* layoutWrapper, in
 {
     auto wrapper = GetListItem(layoutWrapper, idx, false, true);
     CHECK_NULL_VOID(wrapper);
-    auto itemFrameNode = AceType::DynamicCast<FrameNode>(wrapper);
+    auto itemFrameNode = wrapper->GetHostNode();
     CHECK_NULL_VOID(itemFrameNode);
     if (itemPosition_.count(idx) > 0 && itemPosition_[idx].isGroup) {
         auto groupAlgo = wrapper->GetLayoutAlgorithm(true);
@@ -3327,7 +3349,12 @@ int32_t ListLayoutAlgorithm::LayoutCachedForward(LayoutWrapper* layoutWrapper,
             predictList.emplace_back(
                 PredictLayoutItem { curIndex, cachedCount, -1, forceCache, needParentLayout, currPos });
             if (needParentLayout) {
-                return curIndex - 1;
+                auto deferredMainLen = GetChildMainSize(wrapper, curIndex);
+                int32_t deferredId = childNode ? childNode->GetId() : -1;
+                ListItemInfo deferredPos = { deferredId, currPos, currPos + deferredMainLen, isGroup, isLazyChild };
+                // Not recorded in cachedItemPosition_: a zero-size entry would add a spurious divider.
+                LayoutDeferredCacheItem(wrapper, curIndex, deferredPos, crossSize, isDirty, show);
+                return curIndex;
             }
         }
         int32_t currCache = 1;
@@ -3391,7 +3418,12 @@ int32_t ListLayoutAlgorithm::LayoutCachedBackward(LayoutWrapper* layoutWrapper,
             predictList.emplace_back(
                 PredictLayoutItem { curIndex, -1, cachedCount, forceCache, needParentLayout, currPos });
             if (needParentLayout) {
-                return curIndex + 1;
+                auto deferredMainLen = GetChildMainSize(wrapper, curIndex);
+                int32_t deferredId = childNode ? childNode->GetId() : -1;
+                ListItemInfo deferredPos = { deferredId, currPos - deferredMainLen, currPos, isGroup, isLazyChild };
+                // Not recorded in cachedItemPosition_: a zero-size entry would add a spurious divider.
+                LayoutDeferredCacheItem(wrapper, curIndex, deferredPos, crossSize, isDirty, show);
+                return curIndex;
             }
         }
         int32_t currCache = 1;

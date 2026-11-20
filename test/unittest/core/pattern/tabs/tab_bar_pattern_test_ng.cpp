@@ -18,6 +18,9 @@
 
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/badge/badge_model_ng.h"
+#include "core/components_ng/pattern/badge/badge_layout_property.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 
 namespace OHOS::Ace::NG {
 class TabBarPatternTestNg : public TabsTestNg {
@@ -2989,5 +2992,227 @@ HWTEST_F(TabBarPatternTestNg, OnThemeScopeUpdateEmptyStyles001, TestSize.Level1)
     EXPECT_FALSE(result);
     EXPECT_TRUE(tabBarPattern_->labelStyles_.empty());
     EXPECT_TRUE(tabBarPattern_->iconStyles_.empty());
+}
+
+/**
+ * @tc.name: AdjustEllipseBadgePosition001
+ * @tc.desc: test AdjustEllipseBadgePosition when no badge node exists in tabBar children
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, AdjustEllipseBadgePosition001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+
+    // No badge nodes mounted; should not crash and should return normally.
+    tabBarPattern_->AdjustEllipseBadgePosition();
+    auto host = tabBarPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    // Verify no child has BADGE_ETS_TAG.
+    for (const auto& child : host->GetChildren()) {
+        auto column = AceType::DynamicCast<FrameNode>(child);
+        if (!column || column->GetChildren().empty()) {
+            continue;
+        }
+        auto firstChild = AceType::DynamicCast<FrameNode>(column->GetChildren().front());
+        EXPECT_TRUE(!firstChild || firstChild->GetTag() != BADGE_ETS_TAG);
+    }
+}
+
+/**
+ * @tc.name: AdjustEllipseBadgePosition002
+ * @tc.desc: test AdjustEllipseBadgePosition with badge node but IsPositionXy not set
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, AdjustEllipseBadgePosition002, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(1);
+    CreateTabsDone(model);
+
+    auto host = tabBarPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    ASSERT_FALSE(host->GetChildren().empty());
+
+    // Get the first column child of tabBar.
+    auto column = AceType::DynamicCast<FrameNode>(host->GetChildren().front());
+    ASSERT_NE(column, nullptr);
+
+    // Create a badge node and mount it as the first child of the column.
+    auto badgeNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto badgeNode = BadgeModelNG::CreateFrameNode(badgeNodeId);
+    ASSERT_NE(badgeNode, nullptr);
+    // Mount badge as first child (front of column children).
+    column->AddChild(badgeNode, 0);
+
+    // IsPositionXy is not set, so AdjustEllipseBadgePosition should skip this badge.
+    auto badgeLayoutProp = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    ASSERT_NE(badgeLayoutProp, nullptr);
+    EXPECT_FALSE(badgeLayoutProp->GetIsPositionXy().has_value());
+
+    tabBarPattern_->AdjustEllipseBadgePosition();
+
+    // Position should not have been updated since isPositionXy is not set.
+    auto positionX = badgeLayoutProp->GetBadgePositionX();
+    EXPECT_FALSE(positionX.has_value());
+}
+
+/**
+ * @tc.name: AdjustEllipseBadgePosition003
+ * @tc.desc: test AdjustEllipseBadgePosition with badge node and IsPositionXy set to true
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, AdjustEllipseBadgePosition003, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(1);
+    CreateTabsDone(model);
+
+    auto host = tabBarPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    ASSERT_FALSE(host->GetChildren().empty());
+
+    auto column = AceType::DynamicCast<FrameNode>(host->GetChildren().front());
+    ASSERT_NE(column, nullptr);
+
+    // Create a badge node and mount it as the first child of the column.
+    auto badgeNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto badgeNode = BadgeModelNG::CreateFrameNode(badgeNodeId);
+    ASSERT_NE(badgeNode, nullptr);
+    column->AddChild(badgeNode, 0);
+
+    // Set IsPositionXy to true so AdjustEllipseBadgePosition schedules adjustment.
+    auto badgeLayoutProp = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    ASSERT_NE(badgeLayoutProp, nullptr);
+    badgeLayoutProp->UpdateIsPositionXy(true);
+    EXPECT_TRUE(badgeLayoutProp->GetIsPositionXy().value());
+
+    // Set badge geometry so the after-layout task does not early-return on zero width.
+    badgeNode->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 40.0f));
+
+    // Call AdjustEllipseBadgePosition; it should call ScheduleEllipsePositionAdjustment
+    // which adds an after-layout task. This should not crash.
+    tabBarPattern_->AdjustEllipseBadgePosition();
+
+    // The after-layout task sets positionX; flush tasks to let it run.
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->FlushUITasks();
+
+    // After flush, positionX should have been set by the scheduled task.
+    auto positionX = badgeLayoutProp->GetBadgePositionX();
+    EXPECT_TRUE(positionX.has_value());
+}
+
+/**
+ * @tc.name: AdjustEllipseBadgePosition004
+ * @tc.desc: test AdjustEllipseBadgePosition with IsPositionXy set to false
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, AdjustEllipseBadgePosition004, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(1);
+    CreateTabsDone(model);
+
+    auto host = tabBarPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    ASSERT_FALSE(host->GetChildren().empty());
+
+    auto column = AceType::DynamicCast<FrameNode>(host->GetChildren().front());
+    ASSERT_NE(column, nullptr);
+
+    auto badgeNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto badgeNode = BadgeModelNG::CreateFrameNode(badgeNodeId);
+    ASSERT_NE(badgeNode, nullptr);
+    column->AddChild(badgeNode, 0);
+
+    auto badgeLayoutProp = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    ASSERT_NE(badgeLayoutProp, nullptr);
+    badgeLayoutProp->UpdateIsPositionXy(false);
+    EXPECT_FALSE(badgeLayoutProp->GetIsPositionXy().value());
+
+    // With IsPositionXy = false, AdjustEllipseBadgePosition should skip this badge.
+    tabBarPattern_->AdjustEllipseBadgePosition();
+
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->FlushUITasks();
+
+    // positionX should not have been set since isPositionXy is false.
+    auto positionX = badgeLayoutProp->GetBadgePositionX();
+    EXPECT_FALSE(positionX.has_value());
+}
+
+/**
+ * @tc.name: AdjustEllipseBadgePosition005
+ * @tc.desc: test AdjustEllipseBadgePosition with empty column (no children)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, AdjustEllipseBadgePosition005, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(1);
+    CreateTabsDone(model);
+
+    auto host = tabBarPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    // Find a column and remove all its children to test the empty-column path.
+    auto column = AceType::DynamicCast<FrameNode>(host->GetChildren().front());
+    ASSERT_NE(column, nullptr);
+    column->Clean();
+
+    // Should not crash with an empty column.
+    tabBarPattern_->AdjustEllipseBadgePosition();
+}
+
+/**
+ * @tc.name: AdjustEllipseBadgePosition006
+ * @tc.desc: test AdjustEllipseBadgePosition with multiple columns, some with badges
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabBarPatternTestNg, AdjustEllipseBadgePosition006, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+
+    auto host = tabBarPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    ASSERT_GE(host->GetChildren().size(), 2);
+
+    // Add a badge to the first column with IsPositionXy = true.
+    auto column0 = AceType::DynamicCast<FrameNode>(host->GetChildren().front());
+    ASSERT_NE(column0, nullptr);
+    auto badgeNode0 = BadgeModelNG::CreateFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    ASSERT_NE(badgeNode0, nullptr);
+    column0->AddChild(badgeNode0, 0);
+    badgeNode0->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 40.0f));
+    auto badgeProp0 = badgeNode0->GetLayoutProperty<BadgeLayoutProperty>();
+    ASSERT_NE(badgeProp0, nullptr);
+    badgeProp0->UpdateIsPositionXy(true);
+
+    // Add a badge to the second column with IsPositionXy not set.
+    auto column1 = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(1));
+    ASSERT_NE(column1, nullptr);
+    auto badgeNode1 = BadgeModelNG::CreateFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    ASSERT_NE(badgeNode1, nullptr);
+    column1->AddChild(badgeNode1, 0);
+    auto badgeProp1 = badgeNode1->GetLayoutProperty<BadgeLayoutProperty>();
+    ASSERT_NE(badgeProp1, nullptr);
+    // IsPositionXy not set for badgeNode1.
+
+    tabBarPattern_->AdjustEllipseBadgePosition();
+
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->FlushUITasks();
+
+    // badge0 should have positionX set (isPositionXy was true).
+    EXPECT_TRUE(badgeProp0->GetBadgePositionX().has_value());
+    // badge1 should NOT have positionX set (isPositionXy was not set).
+    EXPECT_FALSE(badgeProp1->GetBadgePositionX().has_value());
 }
 } // namespace OHOS::Ace::NG

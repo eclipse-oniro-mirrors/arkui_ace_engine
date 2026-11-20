@@ -345,7 +345,7 @@ protected:
     void Clone(RefPtr<LayoutProperty> property) const override
     {
         auto value = DynamicCast<TextFieldLayoutProperty>(property);
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFontStyle_ = CloneFontStyle();
         value->propTextLineStyle_ = CloneTextLineStyle();
         value->propValue_ = CloneValue();

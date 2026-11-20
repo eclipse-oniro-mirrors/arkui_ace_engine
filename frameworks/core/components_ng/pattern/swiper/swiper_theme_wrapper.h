@@ -34,7 +34,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<SwiperThemeWrapper>();
-            auto theme = AceType::DynamicCast<SwiperIndicatorTheme>(themeWrapper);
+            RefPtr<SwiperIndicatorTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

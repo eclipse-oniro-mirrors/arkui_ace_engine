@@ -446,7 +446,7 @@ void ListElement::ReleaseRecycledListItem(int32_t from, int32_t to)
         Element::RemoveChild(item->second);
         if (!itemElement->IsCurrentFocus()) {
             // Remove list item element from focus tree.
-            auto focusNode = AceType::DynamicCast<FocusNode>(itemElement);
+            RefPtr<FocusNode> focusNode = itemElement;
             if (focusNode) {
                 focusNode->RemoveSelf();
             }

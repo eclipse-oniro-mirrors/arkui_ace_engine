@@ -25,7 +25,7 @@ RefPtr<PropertyAnimatable> GetAnimatable(const RefPtr<Element>& contentElement)
         LOGE("Get Animatable failed. content element is null.");
         return nullptr;
     }
-    return AceType::DynamicCast<PropertyAnimatable>(contentElement->GetRenderNode());
+    return contentElement->GetRenderNode();
 }
 
 void SetTranslateProperties(const RefPtr<Animation<DimensionOffset>>& translateAnimation, TweenOption& option)

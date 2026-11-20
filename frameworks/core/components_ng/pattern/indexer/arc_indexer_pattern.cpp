@@ -355,7 +355,7 @@ bool ArcIndexerPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& di
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
-    auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = DynamicCast<ArcIndexerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithm, false);
@@ -1327,7 +1327,7 @@ void ArcIndexerPattern::UpdateBubbleLetterStackAndLetterTextView()
 RefPtr<FrameNode> ArcIndexerPattern::GetLetterNode()
 {
     CHECK_NULL_RETURN(popupNode_, nullptr);
-    return DynamicCast<FrameNode>(popupNode_);
+    return popupNode_;
 }
 
 bool ArcIndexerPattern::NeedShowBubble()

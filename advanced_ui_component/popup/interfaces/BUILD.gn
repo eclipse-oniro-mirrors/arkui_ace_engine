@@ -38,6 +38,7 @@ gen_obj("popup_abc_preview") {
 }
 
 ohos_shared_library("popup") {
+  branch_protector_ret = "pac_ret"
   sources = [ "popup.cpp" ]
   if (use_mingw_win || use_mac || use_linux) {
     deps = [ ":gen_obj_src_popup_abc_preview" ]

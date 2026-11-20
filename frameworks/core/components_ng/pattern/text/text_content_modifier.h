@@ -122,6 +122,7 @@ public:
         return paintOffset_;
     }
 private:
+    friend class RichEditorContentModifier;
     double NormalizeToPx(const Dimension& dimension);
     void SetDefaultAnimatablePropertyValue(const TextStyle& textStyle, const RefPtr<FrameNode>& frameNode);
     void SetDefaultFontSize(const TextStyle& textStyle);

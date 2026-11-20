@@ -547,6 +547,10 @@ class SmartGestureController {
 }
 
 class UIContext {
+    static enableTouchPadEvent(enabled) {
+        getUINativeModule().common.enableTouchPadEvent(enabled);
+    }
+
     /**
      * Construct new instance of UIContext.
      * initialize with instanceId.

@@ -51,6 +51,8 @@ private:
         const RefPtr<SelectTheme>& selectTheme, RSPath& path, RSCanvas& canvas);
     void PaintCustomDivider(SizeF optionSize, float horInterval, float iconHorInterval,
         PaintWrapper* paintWrapper, RSPath& path);
+    float GetLeftRowStartEdge(PaintWrapper* paintWrapper, bool isRtl);
+    float GetRightRowEndEdge(PaintWrapper* paintWrapper, bool isRtl);
 
     bool isOption_ = false;
 

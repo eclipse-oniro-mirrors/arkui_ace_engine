@@ -45,7 +45,7 @@ public:
         refDivider_->SetMap(dividerMap);
         RefPtr<ListDividerArithmetic> lda = AceType::MakeRefPtr<ListDividerArithmetic>(dividerMap, refDivider_);
         CHECK_NULL_VOID(dividerList_);
-        dividerList_->Set(AceType::DynamicCast<CustomAnimatableArithmetic>(lda));
+        dividerList_->Set(lda);
     }
 
     void SetIsNeedDividerAnimation(bool isNeedDividerAnimation)

@@ -132,18 +132,16 @@ void TabsSideBarTabListPattern::OnFontScaleConfigurationUpdate()
 
 void TabsSideBarTabListPattern::SetCurrentIndex(int32_t index)
 {
-    if (currentIndex_ == index) {
+    // Page switching only. Tab item visual state is synchronized separately by
+    // SyncTabItemStyle, which is driven by the swiper change-event chain. Issuing
+    // SwipeTo from that chain would re-enter page switching while a custom
+    // transition is in flight, overwrite its target (customAnimationToIndex_) and
+    // drop the pending switch. Page-level dedup is owned by SwiperPattern, so this
+    // function deliberately does not use currentIndex_ (the display index) to gate
+    // the switch.
+    if (!swiperController_) {
         return;
     }
-    int32_t prevIndex = currentIndex_;
-    currentIndex_ = index;
-
-    // Cancel old selected item highlight
-    UpdateTabItemStyle(prevIndex, false);
-    // Set new selected item highlight
-    UpdateTabItemStyle(index, true);
-
-    // Notify Swiper to switch page.
     // In sidebar display mode the system default is to switch pages without animation.
     // Only when the developer has configured a custom content transition
     // (customContentTransition, reflected as TabsPattern::isCustomAnimation_,
@@ -152,32 +150,42 @@ void TabsSideBarTabListPattern::SetCurrentIndex(int32_t index)
     // cubic curve and calling SwipeTo so that the developer's custom animation is
     // invoked. Otherwise we jump directly via SwipeToWithoutAnimation to avoid the
     // default sliding animation.
-    if (swiperController_) {
-        bool useCustomAnimation = false;
-        auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
-        if (tabsNode) {
-            auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-            if (tabsPattern) {
-                useCustomAnimation = tabsPattern->GetIsCustomAnimation();
-            }
-        }
-        if (useCustomAnimation) {
-            const auto& updateCubicCurveCallback = swiperController_->GetUpdateCubicCurveCallback();
-            if (updateCubicCurveCallback) {
-                updateCubicCurveCallback();
-            }
-            swiperController_->SwipeTo(index);
-        } else {
-            swiperController_->SwipeToWithoutAnimation(index);
+    bool useCustomAnimation = false;
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    if (tabsNode) {
+        auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+        if (tabsPattern) {
+            useCustomAnimation = tabsPattern->GetIsCustomAnimation();
         }
     }
+    if (useCustomAnimation) {
+        const auto& updateCubicCurveCallback = swiperController_->GetUpdateCubicCurveCallback();
+        if (updateCubicCurveCallback) {
+            updateCubicCurveCallback();
+        }
+        swiperController_->SwipeTo(index);
+    } else {
+        swiperController_->SwipeToWithoutAnimation(index);
+    }
+}
 
+void TabsSideBarTabListPattern::SyncTabItemStyle(int32_t index)
+{
+    if (currentIndex_ == index) {
+        return;
+    }
+    int32_t prevIndex = currentIndex_;
+    currentIndex_ = index;
+    // Cancel old selected item highlight
+    UpdateTabItemStyle(prevIndex, false);
+    // Set new selected item highlight
+    UpdateTabItemStyle(index, true);
     UpdateTabItemTextAndIconColor(index);
 }
 
 void TabsSideBarTabListPattern::UpdateTabItemTextAndIconColor(int32_t selectedIndex)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabTheme = host->GetTheme<TabTheme>(true);
     CHECK_NULL_VOID(tabTheme);
@@ -411,7 +419,7 @@ int32_t TabsSideBarTabListPattern::FindSwiperIndexForTabItem(const RefPtr<FrameN
 
 void TabsSideBarTabListPattern::UpdateTabItemStyle(int32_t index, bool selected)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabTheme = host->GetTheme<TabTheme>(true);
     CHECK_NULL_VOID(tabTheme);
@@ -788,6 +796,7 @@ void TabsSideBarTabListPattern::AddOrUpdateTabItemWithIconAndText(
     textNode->MarkModifyDone();
     textNode->MarkDirtyNode();
     iconNode->MarkModifyDone();
+    iconNode->MarkDirtyNode();
 }
 
 RefPtr<FrameNode> TabsSideBarTabListPattern::GetOrCreateTabItemNode(int32_t id)
@@ -1774,7 +1783,7 @@ void TabsSideBarTabListPattern::PlaySectionExpandCollapseAnimation(
 
 void TabsSideBarTabListPattern::RefreshSidebarTabVisibilityAndLayout()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
     CHECK_NULL_VOID(tabsNode);
@@ -1840,7 +1849,7 @@ void TabsSideBarTabListPattern::UpdateDirectVisibility(const RefPtr<FrameNode>& 
 
 void TabsSideBarTabListPattern::RebuildSections()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
     CHECK_NULL_VOID(tabsNode);
@@ -2472,7 +2481,7 @@ void TabsSideBarTabListPattern::ReorderWithSections(const RefPtr<UINode>& column
 void TabsSideBarTabListPattern::ApplyTabViewCustomization(
     const std::optional<TabViewCustomization>& customization)
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
     CHECK_NULL_VOID(tabsNode);

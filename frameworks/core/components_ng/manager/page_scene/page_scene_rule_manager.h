@@ -43,6 +43,7 @@ namespace OHOS::Ace::NG {
 class FrameNode;
 class UINode;
 class CustomNodeBase;
+class PipelineContext;
 
 struct PageSceneRectInfo {
     float x = 0.0f;
@@ -181,6 +182,18 @@ struct PageSceneResponseMatch {
     std::string sceneJson;
 };
 
+// One scene exit produced when a previously reported RESPONSE hit is no longer on screen:
+// the page was left/destroyed, the control left the tree or became invisible/transparent,
+// the container switched page (Swiper/Tabs) or the application went to background.
+struct PageSceneResponseExit {
+    int32_t processId = -1;
+    std::string ruleSetId;
+    std::string ruleId;
+    std::string pageName;
+    // Weak reference to the owning pipeline; used to post the exit report on its executor.
+    WeakPtr<PipelineContext> pipeline;
+};
+
 struct PageSceneReportState {
     std::vector<int32_t> lastReportedNodeIds;
     std::string lastSplitType;
@@ -299,6 +312,10 @@ public:
     std::optional<PageSceneResponseMatch> MatchPageSceneResponse(int32_t processId, const std::string& ruleJson,
         const RefPtr<FrameNode>& responseNode, const DumpStartNodeSet& startNodes,
         const std::string& routerPageName, const std::string& navDestinationName);
+    // Consumes the RESPONSE scenes that have been reported before but are no longer present.
+    // Called at every stable point (even when no developer response candidate arrived) so a
+    // scene exit is reported exactly once per leave. The caller owns reporting.
+    std::vector<PageSceneResponseExit> CollectResponseExits();
     bool ShouldReport(int32_t processId, const PageSceneResponseMatch& result);
 
 private:
@@ -350,6 +367,29 @@ private:
     void AppendResponseTreeChild(std::unique_ptr<JsonValue>& nodeJson, std::unique_ptr<JsonValue>& childrenJson,
         const RefPtr<UINode>& child, bool includeText, bool includeAccessibility) const;
     bool IsRegionOverlap(const std::vector<PageSceneRectInfo>& regions) const;
+
+    // RESPONSE scene exit detection: the last reported hit of a (pid, ruleSetId, ruleId) rule.
+    struct PageSceneResponseReportState {
+        int32_t processId = -1;
+        std::string ruleSetId;
+        std::string ruleId;
+        std::string pageName;
+        WeakPtr<FrameNode> node;
+        WeakPtr<PipelineContext> pipeline;
+        // Viewport node captured at report time: the exit sweep must not call
+        // PipelineContext::GetDumpStartNodes() because the unit-test link does not
+        // provide it (the mock pipeline only implements the page-info accessors).
+        WeakPtr<FrameNode> viewportNode;
+    };
+    void RecordResponseReport(int32_t processId, const PageSceneRuleSet& ruleSet,
+        const std::vector<PageSceneResponseHit>& hits, const RefPtr<FrameNode>& responseNode,
+        const DumpStartNodeSet& startNodes);
+    bool IsResponseSceneStillPresent(const PageSceneResponseReportState& state) const;
+    const PageSceneRule* FindResponseRuleLocked(
+        int32_t processId, const std::string& ruleSetId, const std::string& ruleId) const;
+    void EraseResponseReportStatesLocked(int32_t processId, const std::string& ruleSetId);
+    bool IsResponseNodeFullyTransparent(const RefPtr<FrameNode>& node) const;
+    std::unordered_map<std::string, PageSceneResponseReportState> responseReportStates_;
 
     const PageSceneMatchResult* GetPreviousSplitResultLocked(const std::string& key) const;
     void ProcessSplitResultLocked(

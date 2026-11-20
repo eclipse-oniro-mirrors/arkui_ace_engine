@@ -18,7 +18,9 @@
 
 #include "test/unittest/core/pattern/test_ng.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/syntax/static/detached_free_root_proxy_node.h"
 #include "core/interfaces/native/ani/safe_area_inset_ani_modifier.h"
 #include "core/components_ng/syntax/if_else_node.h"
@@ -93,14 +95,14 @@ HWTEST_F(SafeAreaInsetAniModifierTest, OptionsValidationAndHostIsolation, TestSi
         std::array<ArkUIAniSafeAreaInsetEdge, SAFE_AREA_INSET_EDGE_COUNT> edges;
         edges[END_INDEX] = { reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(root)), value, static_cast<int32_t>(DimensionUnit::VP), INVALID_ENUM_VALUE };
         SetSafeAreaInsetStatic(reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(host)), edges.data(), edges.size());
-        const auto& options = host->GetLayoutProperty()->GetSafeAreaInset();
-        ASSERT_TRUE(options.has_value());
+        const auto* options = host->GetLayoutProperty()->GetSafeAreaInsetState().GetSafeAreaInset();
+        ASSERT_NE(options, nullptr);
         EXPECT_FALSE(options->edges[TOP_INDEX].has_value());
         ASSERT_TRUE(options->edges[END_INDEX].has_value());
         EXPECT_DOUBLE_EQ(options->edges[END_INDEX]->spacing.GetDimension().Value(), value == 6.0 ? 6.0 : 0.0);
         EXPECT_EQ(options->edges[END_INDEX]->alignment, SafeAreaInsetAlignment::CENTER);
         EXPECT_EQ(other->GetSafeAreaInsetNode(), nullptr);
-        ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+        SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host));
     }
 }
 
@@ -116,8 +118,8 @@ HWTEST_F(SafeAreaInsetAniModifierTest, UnitsAlignmentAndEmptyEdges, TestSize.Lev
             static_cast<int32_t>(SafeAreaInsetAlignment::END) };
         auto node = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(host));
         SetSafeAreaInsetStatic(node, edges.data(), edges.size());
-        const auto& options = host->GetLayoutProperty()->GetSafeAreaInset();
-        ASSERT_TRUE(options.has_value());
+        const auto* options = host->GetLayoutProperty()->GetSafeAreaInsetState().GetSafeAreaInset();
+        ASSERT_NE(options, nullptr);
         const auto& edge = options->edges[START_INDEX];
         ASSERT_TRUE(edge.has_value());
         bool valid = unit == DimensionUnit::PX || unit == DimensionUnit::VP ||

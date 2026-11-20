@@ -40,6 +40,7 @@ gen_obj("swiperefresher_abc_preview") {
 }
 
 ohos_shared_library("swiperefresher") {
+  branch_protector_ret = "pac_ret"
   sources = [ "swiperefresher.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

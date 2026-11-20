@@ -1163,7 +1163,7 @@ void WaterFlowPattern::CheckSpringAfterContentShrink()
 
 void WaterFlowPattern::UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper>& dirty)
 {
-    auto algorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto algorithmWrapper = dirty->GetLayoutAlgorithm();
     auto sw = algorithmWrapper ? DynamicCast<WaterFlowLayoutSW>(algorithmWrapper->GetLayoutAlgorithm()) : nullptr;
     const auto serial = sw ? sw->GetFastScrollSerial() : fastScrollSerial_;
     const float calibration = layoutInfo_->CalibrateOffset();
@@ -2172,6 +2172,9 @@ void WaterFlowPattern::DumpAdvanceFunctionalProperties(
         if (layoutInfo_) {
             json->Put("CachedCount", property->GetCachedCount().value_or(layoutInfo_->defCachedCount_));
         }
+        if (property->GetScrollSnapStrategy().has_value()) {
+            json->Put("ScrollSnapStrategy", property->GetScrollSnapStrategyString().c_str());
+        }
         // Layout is authoritative; the inherited scrollbar cache may not be synchronized yet.
         if (json->Contains("isReverse")) {
             json->Replace("isReverse", property->IsReverse());
@@ -2210,6 +2213,7 @@ void WaterFlowPattern::DumpAdvanceInfo()
     DumpLog::GetInstance().AddDesc(
         "CachedCount:" + std::to_string(property->GetCachedCount().value_or(layoutInfo_->defCachedCount_)));
     DumpLog::GetInstance().AddDesc("ScrollAlign:" + scrollAlign[static_cast<int32_t>(layoutInfo_->align_)]);
+    DumpLog::GetInstance().AddDesc("ScrollSnapStrategy:", property->GetScrollSnapStrategyString().c_str());
 
     property->IsReverse() ? DumpLog::GetInstance().AddDesc("isReverse:true")
                           : DumpLog::GetInstance().AddDesc("isReverse:false");

@@ -20,38 +20,33 @@ namespace {
 const char* ANI_SHAPE_NAME = "@ohos.arkui.shape.EllipseShape";
 } // namespace
 
-void ANICreateEllipseShapeWithParam(
-    ani_env* env, [[maybe_unused]] ani_object object, [[maybe_unused]] ani_object aniOption)
+ani_long ANICreateEllipseShape(
+    ani_env* env, [[maybe_unused]] ani_object aniClass, [[maybe_unused]] ani_object aniOption)
 {
-    if (GetIsUndefinedObject(env, aniOption)) {
-        return;
-    }
-    if (!IsInstanceOfCls(env, object, ANI_SHAPE_NAME)) {
-        return;
+    ani_class cls;
+    if (ANI_OK != env->FindClass(ANI_SHAPE_NAME, &cls)) {
+        LOGE("EllipseShape find class fail");
+        return 0;
     }
 
     EllipsePeer* shapePeer = new EllipsePeer();
     auto ellipse = AceType::MakeRefPtr<Ellipse>();
 
-    std::optional<OHOS::Ace::CalcDimension> width;
-    ParseStringNumberUndefinedOption(env, aniOption, width, "width", "@ohos.arkui.shape.ShapeSize");
-    if (width.has_value() && width->IsValid()) {
-        ellipse->SetWidth(width.value());
-    }
+    if (!GetIsUndefinedObject(env, aniOption)) {
+        std::optional<OHOS::Ace::CalcDimension> width;
+        ParseStringNumberUndefinedOption(env, aniOption, width, "width", "@ohos.arkui.shape.ShapeSize");
+        if (width.has_value() && width->IsValid()) {
+            ellipse->SetWidth(width.value());
+        }
 
-    std::optional<OHOS::Ace::CalcDimension> height;
-    ParseStringNumberUndefinedOption(env, aniOption, height, "height", "@ohos.arkui.shape.ShapeSize");
-    if (height.has_value() && height->IsValid()) {
-        ellipse->SetHeight(height.value());
+        std::optional<OHOS::Ace::CalcDimension> height;
+        ParseStringNumberUndefinedOption(env, aniOption, height, "height", "@ohos.arkui.shape.ShapeSize");
+        if (height.has_value() && height->IsValid()) {
+            ellipse->SetHeight(height.value());
+        }
     }
     shapePeer->ellipseShape = ellipse;
-    ani_status status;
-    if ((status = env->Object_SetPropertyByName_Long(
-             object, "basicShapeResult", reinterpret_cast<ani_long>(shapePeer))) != ANI_OK) {
-        LOGE("EllipseShape set addr failed, status:%{public}d", status);
-        delete shapePeer;
-        return;
-    }
+    return reinterpret_cast<ani_long>(shapePeer);
 }
 
 EllipsePeer* GetEllipseShape(ani_env* env, ani_object obj)
@@ -208,8 +203,6 @@ ani_status EllipseShape::BindEllipseShape(ani_env* env)
     }
 
     std::array methods = {
-        ani_native_function {
-            "<ctor>", "C{@ohos.arkui.shape.ShapeSize}:", reinterpret_cast<void*>(ANICreateEllipseShapeWithParam) },
         ani_native_function { "width", nullptr, reinterpret_cast<void*>(ANIEllipseShapeWidth) },
         ani_native_function { "height", nullptr, reinterpret_cast<void*>(ANIEllipseShapeHeight) },
         ani_native_function { "size", nullptr, reinterpret_cast<void*>(ANIEllipseShapeSize) },
@@ -218,6 +211,14 @@ ani_status EllipseShape::BindEllipseShape(ani_env* env)
         ani_native_function { "fill", nullptr, reinterpret_cast<void*>(ANIEllipseShapeColor) },
     };
     ani_status tmp = env->Class_BindNativeMethods(cls, methods.data(), methods.size());
+    if (ANI_OK != tmp) {
+        return ANI_ERROR;
+    };
+    std::array staticMethods = {
+        ani_native_function { "create", nullptr, reinterpret_cast<void*>(ANICreateEllipseShape) },
+        ani_native_function { "nativeDestroy", nullptr, reinterpret_cast<void*>(ANIDestroyShape<EllipsePeer>) },
+    };
+    tmp = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
     if (ANI_OK != tmp) {
         return ANI_ERROR;
     };

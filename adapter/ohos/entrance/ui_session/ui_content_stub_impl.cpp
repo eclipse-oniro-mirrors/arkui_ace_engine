@@ -84,40 +84,41 @@ int32_t UIContentServiceStubImpl::RegisterSelectTextEventCallback(const EventCal
     return NO_ERROR;
 }
 
-int32_t UIContentServiceStubImpl::SendCommand(int32_t id, const std::string& command)
+int32_t UIContentServiceStubImpl::SendCommand(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
-    UiSessionManager::GetInstance()->NotifySendCommandPattern(id, command);
+    UiSessionManager::GetInstance()->NotifySendCommandPattern(id, command, securityAuth);
     return NO_ERROR;
 }
 
-int32_t UIContentServiceStubImpl::SendCommandSync(int32_t id, const std::string& command)
+int32_t UIContentServiceStubImpl::SendCommandSync(int32_t id, const std::string& command, SecurityAuthInfo securityAuth)
 {
-    return UiSessionManager::GetInstance()->NotifySendCommandSyncPattern(id, command);
+    return UiSessionManager::GetInstance()->NotifySendCommandSyncPattern(id, command, securityAuth);
 }
 
-int32_t UIContentServiceStubImpl::SendCommand(const std::string command)
+int32_t UIContentServiceStubImpl::SendCommand(const std::string command, SecurityAuthInfo securityAuth)
 {
-    UiSessionManager::GetInstance()->SendCommand(command);
-    return NO_ERROR;
-}
-
-int32_t UIContentServiceStubImpl::SendCommand(
-    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
-{
-    if (!finishCallback) {
-        return PARAM_INVALID;
-    }
-    UiSessionManager::GetInstance()->NotifySendCommandPatternWithResult(id, command, finishCallback);
+    UiSessionManager::GetInstance()->SendCommand(command, securityAuth);
     return NO_ERROR;
 }
 
 int32_t UIContentServiceStubImpl::SendCommand(
-    const std::string command, const SendCommandFinishCallback& finishCallback)
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback,
+    SecurityAuthInfo securityAuth)
 {
     if (!finishCallback) {
         return PARAM_INVALID;
     }
-    UiSessionManager::GetInstance()->SendCommandWithResult(command, finishCallback);
+    UiSessionManager::GetInstance()->NotifySendCommandPatternWithResult(id, command, finishCallback, securityAuth);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback, SecurityAuthInfo securityAuth)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->SendCommandWithResult(command, finishCallback, securityAuth);
     return NO_ERROR;
 }
 

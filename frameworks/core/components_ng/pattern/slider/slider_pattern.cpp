@@ -685,7 +685,7 @@ bool SliderPattern::InitAccessibilityVirtualNode()
     UpdateStepAccessibilityVirtualNode();
     UpdateParentNodeSize();
     parentAccessibilityNode_->SetAccessibilityNodeVirtual();
-    parentAccessibilityNode_->SetAccessibilityVirtualNodeParent(AceType::DynamicCast<NG::UINode>(host));
+    parentAccessibilityNode_->SetAccessibilityVirtualNodeParent(host);
     parentAccessibilityNode_->SetFirstAccessibilityVirtualNode();
 
     FrameNode::ProcessOffscreenNode(parentAccessibilityNode_);
@@ -4326,7 +4326,7 @@ void SliderPattern::ApplyDragFrameNodeSystemMaterial()
     float dipScale = static_cast<float>(pipeline->GetDipScale());
     auto renderContext = dragFrameNode_->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    auto filter = renderContext->CreateFrostedGlassFilter(dragFrameMaterialParam, dipScale);
+    auto filter = renderContext->CreateFrostedGlassFilter(dragFrameMaterialParam, dipScale, nullptr);
     if (filter) {
         renderContext->SetMaterialWithQualityLevel(filter, UiMaterialFilterQuality::DEFAULT);
         auto shadow = MaterialUtils::GetImmersiveShadow(dipScale * 0.8);

@@ -96,6 +96,10 @@ ExecutorResult ScrollSimulatingExecutor::ExecuteStep()
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "ScrollSimulatingExecutor failed, touchEvents is empty.");
         return ExecutorResult::FAILED;
     }
+    if (touchEvents_.front().type == TouchType::DOWN &&
+        IsTargetDeniedAt(touchEvents_.front().x, touchEvents_.front().y)) {
+        return SetFailureState(ExecutionState::SECURITY_DENIED);
+    }
     auto event = touchEvents_.front();
     touchActive_ = event.type == TouchType::DOWN || event.type == TouchType::MOVE;
     lastPosition_ = PointF(event.x, event.y);

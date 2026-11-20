@@ -20,7 +20,6 @@
 
 #include <securec.h>
 #include <algorithm>
-#include <cctype>
 #include <cinttypes>
 #include <cmath>
 #include <cstdint>
@@ -270,7 +269,6 @@ constexpr int32_t MAXIMUM_ROTATION_DELAY_TIME = 800;
 // SerializeWebState serializes the web back-forward navigation history (access stack).
 // The official @ohos.web.webview API documentation recommends not restoring state > 512KB.
 constexpr size_t MAX_WEB_STATE_SIZE = 512 * 1024; // 512KB, per SDK restoreWebState recommendation
-constexpr size_t MAX_DATA_URI_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 constexpr int32_t RESERVED_DEVICEID1 = 0xAAAAAAFF;
 constexpr int32_t RESERVED_DEVICEID2 = 0xAAAAAAFE;
 constexpr int32_t LONG_PRESS_DURATION_MS = 650;
@@ -2903,8 +2901,8 @@ bool WebPattern::ReportDecsionForSecurityHitTest(
     result.nodeId      = resultInfo.domNodeId;
     result.compId      = resultInfo.elementId;
     result.tag         = host ? host->GetTag() : "Web";
-    result.allowed     = !(resultInfo.securityLabel == NWEB_SECURITY_LABEL_DENY);
-    TAG_LOGD(AceLogTag::ACE_WEB,
+    result.allowed     = (resultInfo.securityLabel != NWEB_SECURITY_LABEL_DENY);
+    TAG_LOGI(AceLogTag::ACE_WEB,
         "WebPattern::WebSecurityReportDecision report agent compId=%{public}s, decision=%{public}d",
         result.compId.c_str(), result.allowed);
     InputManager::ReportAgentInputDecision(result);
@@ -3115,9 +3113,9 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         std::string fileUri;
         std::string fullName;
         if (!fileName.empty()) {
-            // Only build a data: URI when we know the exact dir Blink wrote to. When tempDir_ is
-            // empty the hardcoded fallback path may not match Blink's actual write location, so
-            // skip BuildImageDataUri (fullName stays empty) and rely on the file:// fallback below.
+            // Only build the file:// URI when we know the exact dir Blink wrote to. When tempDir_
+            // is empty the hardcoded fallback path may not match Blink's actual write location,
+            // so leave fullName empty and skip the HTML src rewrite below.
             if (!delegate_->tempDir_.empty()) {
                 fullName = delegate_->tempDir_ + "/dragdrop/" + fileName;
             }
@@ -3125,23 +3123,9 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         } else {
             TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event start, dragdata has no image file uri, just pass");
         }
-        // Embed the image as a data: URI in the HTML so the <img src> is self-contained.
-        // A file:// URI baked into HTML is not portable: it points into the source app's sandbox
-        // and is unreachable on a cross-device drop target (UDMF cannot transform URIs inside HTML
-        // text). The data: URI is decoded the same way on both same-device and cross-device targets.
-        // When fullName is unknown (tempDir_ empty) or BuildImageDataUri fails (file missing / too
-        // large), fall back to the file:// URI so the same-device behavior of the prior fix is
-        // preserved rather than silently dropping the rewrite.
-        if (!htmlContent.empty()) {
-            std::string dataUri;
-            if (!fullName.empty()) {
-                dataUri = BuildImageDataUri(fullName, fileName);
-            }
-            if (!dataUri.empty()) {
-                RewriteHtmlImgSrc(htmlContent, dataUri);
-            } else if (!fileUri.empty()) {
-                RewriteHtmlImgSrc(htmlContent, fileUri);
-            }
+        if (!fileUri.empty() && !fullName.empty() && !htmlContent.empty()) {
+            std::string htmlImgSrc = "file://" + fullName;
+            RewriteHtmlImgSrc(htmlContent, htmlImgSrc);
         }
         if (!plainContent.empty()) {
             isDragEndMenuShow_ = true;
@@ -3156,7 +3140,20 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
             UdmfClient::GetInstance()->AddLinkRecord(aceUnifiedData, linkUrl, linkTitle);
             TAG_LOGI(AceLogTag::ACE_WEB, "web DragDrop event Start, linkUrl size:%{public}zu", linkUrl.size());
         }
-        UdmfClient::GetInstance()->SetTagProperty(aceUnifiedData, "records_to_entries_data_format");
+        // The records_to_entries_data_format tag has two UDMF effects:
+        //  (1) Set-side: PreProcessUtils skips HTML <img src> URI authorization for tagged data
+        //      (URI_AUTHORIZATION_POLICIES forced to 0).
+        //  (2) Get-side: UdmfServiceImpl::TransferToEntriesIfNeed collapses N records into
+        //      1 record-with-entries when UnifiedData::IsNeedTransferToEntries (tag set AND
+        //      records > 1) and IsNeedTransferDeviceType (local device PC/PAD/2IN1 and the
+        //      receiver hap declares only the 2in1 device type) both hold.
+        // For image-file drags we NEED the HTML URI transform (effect 1 must be OFF), and the image
+        // is carried as a self-contained <img src>+file-uri pair that receivers handle per-record,
+        // so the records->entries merge (effect 2) is not required. Drop the tag only for image-file
+        // drags; keep it for text/link drags where the merge still matters.
+        if (fileName.empty()) {
+            UdmfClient::GetInstance()->SetTagProperty(aceUnifiedData, "records_to_entries_data_format");
+        }
         info->SetData(aceUnifiedData);
         HandleOnDragEnter(info);
         return dragDropInfo;
@@ -3205,79 +3202,6 @@ std::string WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifie
         return "";
     }
     return udmfUri;
-}
-
-std::string WebPattern::BuildImageDataUri(const std::string& fullName, const std::string& fileName)
-{
-    // Read back the temp file Blink wrote and embed it as a base64 data: URI so the HTML <img src>
-    // is self-contained and portable across devices. UDMF cannot transform URIs baked into HTML
-    // text, so a file:// URI here would be unreachable on a cross-device drop target.
-    std::ifstream file(fullName, std::ifstream::binary);
-    if (!file.is_open()) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri open failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    file.seekg(0, std::ios::end);
-    auto endPos = file.tellg();
-    // tellg() returns -1 on failure; casting that to size_t yields SIZE_MAX and the subsequent
-    // vector allocation would abort (OpenHarmony disables exceptions). Bail out and let the
-    // caller fall back to the file:// path.
-    if (endPos < 0 || file.fail()) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri tellg failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    auto size = static_cast<size_t>(endPos);
-    file.seekg(0, std::ios::beg);
-    if (size == 0) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri empty file, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    // Cap the inlined image to avoid OOM and UI-thread jank: the raw bytes, the base64 string
-    // (~1.33x) and the final HTML all live in memory at once. Beyond the threshold, fall back
-    // to file:// (same-device still works; cross-device stays at the prior behavior).
-    if (size > MAX_DATA_URI_FILE_SIZE) {
-        TAG_LOGW(AceLogTag::ACE_WEB,
-            "BuildImageDataUri skip, file too large:%{public}zu, max:%{public}zu, path:%{public}s",
-            size, MAX_DATA_URI_FILE_SIZE, fullName.c_str());
-        return "";
-    }
-    std::vector<uint8_t> buffer(size);
-    if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri read failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    // Map the file extension to a mime type. Blink's GetSafeFilenameForImageFileContents
-    // produces extensions matching the source image format (bmp/png/webp/jpeg/etc.).
-    std::string ext;
-    auto dotPos = fileName.rfind('.');
-    if (dotPos != std::string::npos) {
-        ext = fileName.substr(dotPos + 1);
-        // Cast through unsigned char before calling ::tolower — passing a negative char value
-        // (non-ASCII byte) directly to std::tolower is undefined behavior.
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    }
-    std::string mime = "image/png"; // fallback; PNG is a safe default for unknown extensions
-    if (ext == "bmp") {
-        mime = "image/bmp";
-    } else if (ext == "webp") {
-        mime = "image/webp";
-    } else if (ext == "jpg" || ext == "jpeg") {
-        mime = "image/jpeg";
-    } else if (ext == "gif") {
-        mime = "image/gif";
-    } else if (ext == "png") {
-        mime = "image/png";
-    }
-    std::string encoded = Base64Util::Encode(buffer.data(), size);
-    if (encoded.empty()) {
-        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri base64 encode failed, path:%{public}s", fullName.c_str());
-        return "";
-    }
-    TAG_LOGI(AceLogTag::ACE_WEB,
-        "BuildImageDataUri mime:%{public}s, file size:%{public}zu, data uri size:%{public}zu",
-        mime.c_str(), size, encoded.size() + mime.size() + sizeof("data:;base64,") - 1);
-    return "data:" + mime + ";base64," + encoded;
 }
 
 void WebPattern::HandleOnDropMove(const RefPtr<OHOS::Ace::DragEvent>& info)
@@ -7995,7 +7919,7 @@ bool WebPattern::ShowDateTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChoo
     CHECK_NULL_RETURN(pipelineContext, false);
     auto executor = pipelineContext->GetTaskExecutor();
     CHECK_NULL_RETURN(executor, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
@@ -8048,7 +7972,7 @@ bool WebPattern::ShowTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser>
     CHECK_NULL_RETURN(executor, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
     CHECK_NULL_RETURN(theme, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     NG::TimePickerSettingData settingData;
@@ -8101,7 +8025,7 @@ bool WebPattern::ShowDateTimeSuggestionDialog(std::shared_ptr<OHOS::NWeb::NWebDa
     CHECK_NULL_RETURN(executor, false);
     auto theme = pipelineContext->GetTheme<DialogTheme>();
     CHECK_NULL_RETURN(theme, false);
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     CHECK_NULL_RETURN(overlayManager, false);
     NG::TextPickerSettingData settingData;
@@ -9447,8 +9371,20 @@ void WebPattern::JavaScriptOnDocumentEnd(const ScriptItems& scriptItems)
 void WebPattern::UpdateJavaScriptOnDocumentStart()
 {
     if (delegate_ && onDocumentStartScriptItems_.has_value() && !onDocumentStartScriptItemsByOrder_.has_value()) {
-        delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
+        // Save a persistent copy of public scripts for later re-merge.
+        publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
+        publicOnDocumentStartScriptRegexItems_.clear();
+        publicOnDocumentStartScriptItemsByOrder_.clear();
+        // When inner scripts exist, MergeAndInject writes the merged batch, so
+        // skip the redundant public-only write here.
+        if (!hasInnerOnDocumentStartScripts_) {
+            delegate_->SetJavaScriptItems(onDocumentStartScriptItems_.value(), ScriptItemType::DOCUMENT_START);
+        }
         onDocumentStartScriptItems_ = std::nullopt;
+        // If inner scripts exist, re-inject the merged batch.
+        if (hasInnerOnDocumentStartScripts_) {
+            MergeAndInjectJavaScriptOnDocumentStart();
+        }
     }
 }
 
@@ -9456,12 +9392,152 @@ void WebPattern::UpdateJavaScriptOnDocumentStartByOrder()
 {
     if (delegate_ && onDocumentStartScriptItems_.has_value() && onDocumentStartScriptRegexItems_.has_value() &&
         onDocumentStartScriptItemsByOrder_.has_value()) {
-        delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
-            onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
-            onDocumentStartScriptItemsByOrder_.value());
+        // Save a persistent copy of public scripts before injection so that
+        // inner-only changes can re-merge later without losing public scripts.
+        publicOnDocumentStartScriptItems_ = onDocumentStartScriptItems_.value();
+        publicOnDocumentStartScriptRegexItems_ = onDocumentStartScriptRegexItems_.value();
+        publicOnDocumentStartScriptItemsByOrder_ = onDocumentStartScriptItemsByOrder_.value();
+        // When inner scripts exist, MergeAndInject writes the merged batch, so
+        // skip the redundant public-only write here.
+        if (!hasInnerOnDocumentStartScripts_) {
+            delegate_->SetJavaScriptItemsByOrder(onDocumentStartScriptItems_.value(),
+                onDocumentStartScriptRegexItems_.value(), ScriptItemType::DOCUMENT_START,
+                onDocumentStartScriptItemsByOrder_.value());
+        }
         onDocumentStartScriptItems_ = std::nullopt;
         onDocumentStartScriptRegexItems_ = std::nullopt;
         onDocumentStartScriptItemsByOrder_ = std::nullopt;
+        // If inner scripts exist, re-inject the merged batch to ensure both
+        // sets survive NWeb's replace semantics.
+        if (hasInnerOnDocumentStartScripts_) {
+            MergeAndInjectJavaScriptOnDocumentStart();
+        }
+    }
+}
+
+void WebPattern::RegisterSystemDocumentStartJS(const ScriptItems& scriptItems,
+    const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder)
+{
+    // EX-3: empty scriptItems is rejected, no registration occurs.
+    if (scriptItems.empty()) {
+        return;
+    }
+    // EX-4: full replace — system stores are cleared before writing.
+    systemDocumentStartScripts_ = scriptItems;
+    systemDocumentStartScriptRegexItems_ = scriptRegexItems;
+    systemDocumentStartScriptItemsByOrder_ = scriptItemsByOrder;
+    hasInnerOnDocumentStartScripts_ = true;
+    if (delegate_) {
+        MergeAndInjectJavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::RemoveSystemDocumentStartJS()
+{
+    // NWeb keeps the last submitted DocumentStart registration until a new batch
+    // replaces it. Remember whether system scripts had been submitted so that an
+    // empty batch can be forced to clear them even when no public scripts exist.
+    bool hadSystemScripts = !systemDocumentStartScripts_.empty();
+    systemDocumentStartScripts_.clear();
+    systemDocumentStartScriptRegexItems_.clear();
+    systemDocumentStartScriptItemsByOrder_.clear();
+    hasInnerOnDocumentStartScripts_ = false;
+    if (delegate_) {
+        MergeAndInjectJavaScriptOnDocumentStart(hadSystemScripts);
+    }
+}
+
+void WebPattern::MergeAndInjectJavaScriptOnDocumentStart(bool forceInject)
+{
+    if (!delegate_) {
+        return;
+    }
+    // Early return only when there is nothing to inject and no previously
+    // submitted system scripts need to be cleared from NWeb.
+    if (!forceInject && systemDocumentStartScripts_.empty() && publicOnDocumentStartScriptItems_.empty()) {
+        return;
+    }
+    // Use ByOrder path when app registered via ByOrder API OR when only system
+    // JS exists with ByOrder information (no public scripts at all).
+    bool appUsesByOrder = !publicOnDocumentStartScriptItemsByOrder_.empty();
+    bool onlySystemWithByOrder = publicOnDocumentStartScriptItems_.empty() &&
+        publicOnDocumentStartScriptItemsByOrder_.empty() &&
+        !systemDocumentStartScriptItemsByOrder_.empty();
+    bool useByOrderPath = appUsesByOrder || onlySystemWithByOrder;
+
+    if (useByOrderPath) {
+        ScriptItems mergedItems;
+        ScriptRegexItems mergedRegexItems;
+        ScriptItemsByOrder mergedByOrder;
+        MergeByOrderPath(mergedItems, mergedRegexItems, mergedByOrder);
+        delegate_->SetJavaScriptItemsByOrder(mergedItems, mergedRegexItems,
+            ScriptItemType::DOCUMENT_START, mergedByOrder);
+        delegate_->JavaScriptOnDocumentStartByOrder();
+    } else {
+        ScriptItems mergedItems = publicOnDocumentStartScriptItems_;
+        MergeNonByOrderPath(mergedItems);
+        delegate_->SetJavaScriptItems(mergedItems, ScriptItemType::DOCUMENT_START);
+        delegate_->JavaScriptOnDocumentStart();
+    }
+}
+
+void WebPattern::MergeByOrderPath(ScriptItems& mergedItems, ScriptRegexItems& mergedRegexItems,
+    ScriptItemsByOrder& mergedByOrder)
+{
+    // App JS inserted at the front, preserving original order. Insert-or-append
+    // to avoid overwriting when script keys collide.
+    for (const auto& [script, urlRules] : publicOnDocumentStartScriptItems_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
+    }
+    for (const auto& [script, regexList] : publicOnDocumentStartScriptRegexItems_) {
+        auto it = mergedRegexItems.find(script);
+        if (it == mergedRegexItems.end()) {
+            mergedRegexItems[script] = regexList;
+        } else {
+            it->second.insert(it->second.end(), regexList.begin(), regexList.end());
+        }
+    }
+    for (const auto& script : publicOnDocumentStartScriptItemsByOrder_) {
+        mergedByOrder.emplace_back(script);
+    }
+    // System JS appended after app JS.
+    for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
+    }
+    for (const auto& [script, regexList] : systemDocumentStartScriptRegexItems_) {
+        auto it = mergedRegexItems.find(script);
+        if (it == mergedRegexItems.end()) {
+            mergedRegexItems[script] = regexList;
+        } else {
+            it->second.insert(it->second.end(), regexList.begin(), regexList.end());
+        }
+    }
+    for (const auto& script : systemDocumentStartScriptItemsByOrder_) {
+        mergedByOrder.emplace_back(script);
+    }
+}
+
+void WebPattern::MergeNonByOrderPath(ScriptItems& mergedItems)
+{
+    // Non-ByOrder fallback (DD-3): merge system JS into ScriptItems.
+    // Regex rules and execution order are not preserved in this path (BR-4).
+    for (const auto& [script, urlRules] : systemDocumentStartScripts_) {
+        auto it = mergedItems.find(script);
+        if (it == mergedItems.end()) {
+            mergedItems[script] = urlRules;
+        } else {
+            it->second.insert(it->second.end(), urlRules.begin(), urlRules.end());
+        }
     }
 }
 
@@ -9899,7 +9975,7 @@ void WebPattern::OnShowAutofillPopup(
             CHECK_NULL_VOID(webPattern);
             webPattern->SuggestionSelected(index);
         };
-        auto optionNode = AceType::DynamicCast<FrameNode>(option);
+        auto optionNode = option;
         if (optionNode) {
             CHECK_NULL_CONTINUE(menuItemModifier);
             if (!menuItemModifier->hasMenuItemEventHub(optionNode) ||
@@ -9956,7 +10032,7 @@ void WebPattern::OnShowAutofillPopupV2(
             CHECK_NULL_VOID(webPattern);
             webPattern->SuggestionSelected(index);
         };
-        auto optionNode = AceType::DynamicCast<FrameNode>(option);
+        auto optionNode = option;
         if (optionNode) {
             CHECK_NULL_CONTINUE(menuItemModifier);
             if (!menuItemModifier->hasMenuItemEventHub(optionNode) ||
@@ -11429,14 +11505,24 @@ void WebPattern::RunJsInit()
         return;
     }
     if (!isRegisterJsObject_) {
-        isRegisterJsObject_ = true;
-        RegisterTranslateTextJavaScript();
-        return;
+         isRegisterJsObject_ = true;
+         TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId: %{public}d", GetWebId());
+         // Register translate script as system DocumentStart JS so it executes
+         // at DocumentStart stage (before page load). The rule "*" matches all pages.
+         // ScriptItems: key = script content, value = URL match rules.
+         // ScriptItemsByOrder: script contents in execution order.
+         ScriptItems sysScriptItems;
+         sysScriptItems.insert(std::make_pair(g_translateTextData.translateScript, std::vector<std::string>{ "*" }));
+         sysScriptItems.insert(std::make_pair(g_translateTextData.initScript, std::vector<std::string>{ "*" }));
+         ScriptRegexItems sysRegexItems;
+         ScriptItemsByOrder sysByOrder;
+         sysByOrder.emplace_back(g_translateTextData.translateScript);
+         sysByOrder.emplace_back(g_translateTextData.initScript);
+         RegisterSystemDocumentStartJS(sysScriptItems, sysRegexItems, sysByOrder);
+         // Registers the JS Bridge with isNeedRefresh=true, which internally calls
+         // nweb->Reload() so the reloaded page picks up the system DocumentStart JS.
+         RegisterTranslateTextJavaScript();
     }
-    TAG_LOGI(AceLogTag::ACE_WEB, "run java TranslateScript and InitScript. WebId:%{public}d", GetWebId());
-    CHECK_NULL_VOID(delegate_);
-    delegate_->ExecuteTypeScript(g_translateTextData.translateScript, [](std::string result) {});
-    delegate_->ExecuteTypeScript(g_translateTextData.initScript, [](std::string result) {});
 }
 
 void WebPattern::GetTranslateText(std::string extraData, std::function<void(std::string)> callback, bool isContinued)
@@ -11583,6 +11669,9 @@ void WebPattern::EndTranslate()
         CHECK_NULL_VOID(webPattern);
         if (webPattern->isRegisterJsObject_) {
             CHECK_NULL_VOID(webPattern->delegate_);
+            // Remove system DocumentStart JS before reload so the reloaded
+            // page does not re-inject the translate script at DocumentStart.
+            webPattern->RemoveSystemDocumentStartJS();
             std::string p = g_translateTextData.registerObjectName;
             TAG_LOGI(AceLogTag::ACE_WEB, "UnRegister TranslateText JsObject %{public}s", p.c_str());
             webPattern->delegate_->UnRegisterNativeArkJSFunction(std::move(p));

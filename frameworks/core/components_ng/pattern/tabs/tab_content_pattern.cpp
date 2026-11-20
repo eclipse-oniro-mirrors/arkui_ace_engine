@@ -25,7 +25,7 @@ namespace OHOS::Ace::NG {
 
 void TabContentPattern::OnAttachToMainTree()
 {
-    auto hostNode = AceType::DynamicCast<FrameNode>(GetHost());
+    auto hostNode = GetHost();
     CHECK_NULL_VOID(hostNode);
     auto tabs = TabContentModelNG::FindTabsNode(hostNode);
     CHECK_NULL_VOID(tabs);
@@ -56,7 +56,7 @@ void TabContentPattern::OnModifyDone()
     lastAppliedVisibility_ = defaultVisibility;
     lastAppliedSidebarSection_ = sidebarSection;
 
-    auto tabsNode = AceType::DynamicCast<TabsNode>(TabContentModelNG::FindTabsNode(host));
+    auto tabsNode = TabContentModelNG::FindTabsNode(host);
     CHECK_NULL_VOID(tabsNode);
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);

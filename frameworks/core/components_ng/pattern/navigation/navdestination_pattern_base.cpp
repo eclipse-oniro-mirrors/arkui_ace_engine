@@ -50,7 +50,25 @@ void ResetForceSplitTouchTargets(const RefPtr<NavigationPattern>& navPattern)
     navPattern->SetTouchedSecondaryColumnDestination(nullptr);
 }
 
-void RecordPrimaryOrSecondaryTouch(const RefPtr<NavigationPattern>& navPattern,
+// Sync the Navigation-internal touched column to ForceSplitManager so dialogs can follow the touched column
+// even when the split is implemented inside Navigation (page-level touch callbacks only see the whole page,
+// which maps the entire Navigation to one column).
+void SyncLastTouchedColumnType(const RefPtr<FrameNode>& host, ForceSplitPageColumnType columnType)
+{
+    CHECK_NULL_VOID(host);
+    auto context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    auto forceSplitMgr = AceType::DynamicCast<ForceSplitManager>(context->GetForceSplitManager());
+    CHECK_NULL_VOID(forceSplitMgr);
+    TAG_LOGD(AceLogTag::ACE_NAVIGATION,
+        "navigation destination touched, sync last touched column type: %{public}d, nodeId: %{public}d",
+        static_cast<int32_t>(columnType), host->GetId());
+    forceSplitMgr->SetLastTouchedColumnType(columnType);
+    // Yield the page-level record for this touch round: the Navigation knows the exact inner column.
+    forceSplitMgr->MarkNavigationColumnRecorded();
+}
+
+void RecordPrimaryOrSecondaryTouch(const RefPtr<NavigationPattern>& navPattern, const RefPtr<FrameNode>& host,
     const RefPtr<NavDestinationGroupNode>& touchedDest, const RefPtr<NavDestinationGroupNode>& topPrimaryDest,
     const RefPtr<NavDestinationGroupNode>& topSecondaryDest)
 {
@@ -58,10 +76,12 @@ void RecordPrimaryOrSecondaryTouch(const RefPtr<NavigationPattern>& navPattern,
     CHECK_NULL_VOID(touchedDest);
     if (touchedDest == topPrimaryDest) {
         navPattern->SetTouchedPrimaryColumnDestination(touchedDest);
+        SyncLastTouchedColumnType(host, ForceSplitPageColumnType::PRIMARY);
         return;
     }
     if (touchedDest == topSecondaryDest) {
         navPattern->SetTouchedSecondaryColumnDestination(touchedDest);
+        SyncLastTouchedColumnType(host, ForceSplitPageColumnType::SECONDARY);
     }
 }
 
@@ -83,23 +103,28 @@ void RecordTouchWhenNavBarIsHome(const RefPtr<NavigationPattern>& navPattern, co
     CHECK_NULL_VOID(navPattern);
     CHECK_NULL_VOID(host);
     if (TryRecordNavBarHomeTouch(navPattern, host)) {
+        // NavBar as home sits in the primary column of the Navigation split.
+        SyncLastTouchedColumnType(host, ForceSplitPageColumnType::PRIMARY);
         return;
     }
     navPattern->SetIsHomeNodeTouched(false);
-    RecordPrimaryOrSecondaryTouch(navPattern, touchedDest, topPrimaryDest, topSecondaryDest);
+    RecordPrimaryOrSecondaryTouch(navPattern, host, touchedDest, topPrimaryDest, topSecondaryDest);
 }
 
 void RecordTouchWhenHomeDestinationIsHome(const RefPtr<NavigationPattern>& navPattern,
-    const RefPtr<NavDestinationGroupNode>& touchedDest, const RefPtr<NavDestinationGroupNode>& topPrimaryDest,
+    const RefPtr<FrameNode>& host, const RefPtr<NavDestinationGroupNode>& touchedDest,
+    const RefPtr<NavDestinationGroupNode>& topPrimaryDest,
     const RefPtr<NavDestinationGroupNode>& topSecondaryDest)
 {
     CHECK_NULL_VOID(navPattern);
     bool homeTouched = touchedDest && touchedDest->GetNavDestinationType() == NavDestinationType::HOME;
     navPattern->SetIsHomeNodeTouched(homeTouched);
     if (homeTouched) {
+        // Home destination sits in the primary column of the Navigation split.
+        SyncLastTouchedColumnType(host, ForceSplitPageColumnType::PRIMARY);
         return;
     }
-    RecordPrimaryOrSecondaryTouch(navPattern, touchedDest, topPrimaryDest, topSecondaryDest);
+    RecordPrimaryOrSecondaryTouch(navPattern, host, touchedDest, topPrimaryDest, topSecondaryDest);
 }
 } // namespace
 
@@ -570,7 +595,7 @@ void NavDestinationPatternBase::InitOnTouchEvent(const RefPtr<FrameNode>& host)
 
 void NavDestinationPatternBase::OnTouchEvent()
 {
-    auto host = AceType::DynamicCast<FrameNode>(GetHost());
+    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto navNode = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
     CHECK_NULL_VOID(navNode);
@@ -592,7 +617,7 @@ void NavDestinationPatternBase::OnTouchEvent()
         RecordTouchWhenNavBarIsHome(navPattern, host, touchedDest, topPrimaryDest, topSecondaryDest);
         return;
     }
-    RecordTouchWhenHomeDestinationIsHome(navPattern, touchedDest, topPrimaryDest, topSecondaryDest);
+    RecordTouchWhenHomeDestinationIsHome(navPattern, host, touchedDest, topPrimaryDest, topSecondaryDest);
 }
 
 void NavDestinationPatternBase::RemoveOnTouchEvent(const RefPtr<FrameNode>& host)

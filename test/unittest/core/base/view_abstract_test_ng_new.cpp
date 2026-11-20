@@ -379,7 +379,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractTest038, TestSize.Level1)
     /**
      * @tc.expected: step3. Return expected results..
      */
-    auto Node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto Node = frameNode;
     ASSERT_NE(Node, nullptr);
     auto layoutProperty = Node->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
@@ -804,7 +804,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableClickTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto gestureHub = node->GetOrCreateGestureEventHub();
     auto& callback = gestureHub->clickEventActuator_->userCallback_;
@@ -847,7 +847,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableTouchTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto gestureHub = node->GetOrCreateGestureEventHub();
     auto& callback = gestureHub->touchEventActuator_->userCallback_;
@@ -890,7 +890,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableMouseTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto eventHub = node->GetOrCreateInputEventHub();
     eventHub->CreateMouseEventActuator();
@@ -937,7 +937,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableAxisTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto eventHub = node->GetOrCreateInputEventHub();
     eventHub->CreateAxisEventActuator();
@@ -982,7 +982,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableHoverTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto eventHub = node->GetOrCreateInputEventHub();
     eventHub->CreateHoverEventActuator();
@@ -1027,7 +1027,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableKeyTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto focusHub = node->GetOrCreateFocusHub();
     auto& callback = focusHub->focusCallbackEvents_->onKeyEventCallback_;
@@ -1073,7 +1073,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableFocusTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto focusHub = node->GetOrCreateFocusHub();
     auto& callback = focusHub->focusCallbackEvents_->onFocusCallback_;
@@ -1118,9 +1118,9 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableBlurTest, TestSize.Level1)
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNodeOne = static_cast<FrameNode*>(ViewAbstract::GetFrameNode());
     EXPECT_EQ(strcmp(frameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
-    auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
+    auto frameNode = topFrameNodeOne;
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     auto focusHub = node->GetOrCreateFocusHub();
     auto& callback = focusHub->focusCallbackEvents_->onBlurCallback_;
@@ -1439,7 +1439,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableClickByFrameNodeTest, TestSize.L
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     GestureEventFunc tapEventFunc;
     ViewAbstract::SetOnClick(AceType::RawPtr(node), std::move(tapEventFunc));
@@ -1473,7 +1473,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableTouchByFrameNodeTest, TestSize.L
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     TouchEventFunc touchEventFunc;
     ViewAbstract::SetOnTouch(AceType::RawPtr(node), std::move(touchEventFunc));
@@ -1507,7 +1507,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableMouseByFrameNodeTest, TestSize.L
     EXPECT_EQ(strcmp(topFrameNodeOne->GetTag().c_str(), TAG_CHILD), 0);
     auto frameNode = AceType::DynamicCast<FrameNode>(topFrameNodeOne);
     ASSERT_NE(frameNode, nullptr);
-    auto node = AceType::DynamicCast<NG::FrameNode>(frameNode);
+    auto node = frameNode;
     ASSERT_NE(node, nullptr);
     OnMouseEventFunc onMouseEventFunc = [](MouseInfo& info) {};
     ViewAbstract::SetOnMouse(AceType::RawPtr(node), std::move(onMouseEventFunc));

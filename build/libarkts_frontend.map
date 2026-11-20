@@ -1,0 +1,44 @@
+# Copyright (c) 2026 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Generated from consumer UND-closure scan (15 entries). Do not add symbols without a consumer.
+{
+  global:
+    _init;
+    _fini;
+    # Preserve cross-DSO CFI entry points when enabled by the toolchain.
+    __cfi_check*;
+    OHOS_ACE_CreatArkTsDynamicFrontend;
+    OHOS_ACE_CreateAniReference;
+    OHOS_ACE_CreateArktsFrontend;
+    OHOS_ACE_CreateArktsPluginFrontend;
+    OHOS_ACE_DeleteAniReference;
+    # String-based dlsym entries (invisible to link-time UND closure scan):
+    # arkts_module_preloader.cpp / arkts_dynamic_renderer_loader.cpp.
+    OHOS_ACE_PreloadAceArkTSModule;
+    OHOS_ACE_GetArkTSRuntime;
+    OHOS_ACE_CreatEaWorkerTaskWrapper;
+    OHOS_ACE_GetCurrentThreadAniEnv;
+    _ZN4OHOS3Ace13ArktsFrontend29RegisterDrawInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEEi;
+    _ZN4OHOS3Ace13ArktsFrontend31RegisterLayoutInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEEi;
+    _ZN4OHOS3Ace13ArktsFrontend31UnregisterDrawInspectorCallbackEi;
+    _ZN4OHOS3Ace13ArktsFrontend33UnregisterLayoutInspectorCallbackEi;
+    _ZN4OHOS3Ace13ArktsFrontend37RegisterDrawChildrenInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEEi;
+    _ZN4OHOS3Ace13ArktsFrontend39RegisterLayoutChildrenInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEERKNSt3__h12basic_stringIcNS7_11char_traitsIcEENS7_9allocatorIcEEEE;
+    _ZN4OHOS3Ace13ArktsFrontend39RegisterLayoutChildrenInspectorCallbackERKNS0_6RefPtrINS0_14InspectorEventEEEi;
+    _ZN4OHOS3Ace13ArktsFrontend39UnregisterDrawChildrenInspectorCallbackEi;
+    _ZN4OHOS3Ace13ArktsFrontend41UnregisterLayoutChildrenInspectorCallbackERKNSt3__h12basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEE;
+    _ZN4OHOS3Ace13ArktsFrontend41UnregisterLayoutChildrenInspectorCallbackEi;
+  local:
+    *;
+};

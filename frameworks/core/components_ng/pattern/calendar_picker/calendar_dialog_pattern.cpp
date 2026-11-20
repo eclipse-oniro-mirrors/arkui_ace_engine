@@ -197,7 +197,7 @@ void CalendarDialogPattern::UpdateCalendarLayout()
 
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    auto hostNode = AceType::DynamicCast<FrameNode>(host);
+    auto hostNode = host;
     CHECK_NULL_VOID(hostNode);
     auto title = host->GetChildAtIndex(TITLE_NODE_INDEX);
     CHECK_NULL_VOID(title);
@@ -305,7 +305,7 @@ void CalendarDialogPattern::UpdateImage(
     CHECK_NULL_VOID(imageLayoutProperty);
 
     ImageSourceInfo imageSourceInfo;
-    imageSourceInfo.SetResourceId(resourceId);
+    imageSourceInfo.SetResourceId(resourceId, theme->GetEntryArrowColor());
     imageLayoutProperty->UpdateImageSourceInfo(imageSourceInfo);
     imageNode->MarkModifyDone();
 }

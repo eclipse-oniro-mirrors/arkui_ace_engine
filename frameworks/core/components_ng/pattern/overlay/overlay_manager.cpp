@@ -2074,7 +2074,7 @@ RefPtr<FrameNode> OverlayManager::GetNextNodeWithOrder(const std::optional<doubl
         }
 
         auto nodeIter = nodeVector.begin();
-        return DynamicCast<FrameNode>(*nodeIter);
+        return *nodeIter;
     }
     return nullptr;
 }
@@ -2088,7 +2088,7 @@ RefPtr<FrameNode> OverlayManager::GetTopOrderNode()
         }
 
         auto nodeIter = nodeVector.rbegin();
-        return DynamicCast<FrameNode>(*nodeIter);
+        return *nodeIter;
     }
     return nullptr;
 }
@@ -2125,7 +2125,7 @@ RefPtr<FrameNode> OverlayManager::GetTopFocusableNode()
         }
 
         for (auto nodeIter = nodeVector.rbegin(); nodeIter != nodeVector.rend(); nodeIter++) {
-            auto topNode = DynamicCast<FrameNode>(*nodeIter);
+            auto topNode = *nodeIter;
             CHECK_NULL_CONTINUE(topNode);
             auto focusable = GetNodeFocusable(topNode);
             CHECK_NULL_CONTINUE(focusable);
@@ -5058,7 +5058,7 @@ RefPtr<FrameNode> OverlayManager::GetSheetMask(const RefPtr<FrameNode>& sheetNod
         CHECK_NULL_RETURN(sheetWrapperModifier, nullptr);
         return sheetWrapperModifier->sheetWrapperGetSheetMaskNode(sheetParent);
     }
-    return DynamicCast<FrameNode>(sheetParent);
+    return sheetParent;
 }
 
 void OverlayManager::SetCustomKeyboardOption(bool supportAvoidance)
@@ -7548,7 +7548,7 @@ void OverlayManager::ReportCapiOverlayEvent(const RefPtr<FrameNode>& keyNode, bo
         if (!triggerNode && overlayType && std::strcmp(overlayType, "popup") == 0) {
             for (const auto& [id, info] : popupMap_) {
                 if (info.popupNode == keyNode) {
-                    triggerNode = AceType::DynamicCast<FrameNode>(info.target.Upgrade());
+                    triggerNode = info.target.Upgrade();
                     break;
                 }
             }

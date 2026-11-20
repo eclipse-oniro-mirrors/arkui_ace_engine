@@ -136,7 +136,7 @@ RefPtr<AceType> CmpAccessibilityRegistry::GetMainAccessibilityManager(NG::FrameN
     auto frontend = context->GetFrontend();
     CHECK_NULL_RETURN(frontend, nullptr);
     auto mainAM = frontend->GetAccessibilityManager();
-    return AceType::DynamicCast<AceType>(mainAM);
+    return mainAM;
 }
 
 bool CmpAccessibilityRegistry::HasSubAM(const NG::FrameNode* node)

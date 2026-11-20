@@ -389,7 +389,7 @@ void TextFieldSelectOverlay::OnUpdateSelectOverlayInfo(SelectOverlayInfo& overla
     }
     OnUpdateOnCreateMenuCallback(overlayInfo);
     auto layoutProperty =
-        DynamicCast<TextFieldLayoutProperty>(textFieldPattern->GetLayoutProperty<TextFieldLayoutProperty>());
+        textFieldPattern->GetLayoutProperty<TextFieldLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
     if (layoutProperty->HasMaxLines()) {
         uint32_t maxLine = layoutProperty->GetMaxLinesValue(Infinity<uint32_t>());

@@ -22,6 +22,7 @@
 
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_common_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
+#include "base/utils/string_utils.h"
 #include "core/components_ng/pattern/container_picker/container_picker_theme.h"
 #include "core/components_ng/pattern/container_picker/container_picker_utils.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
@@ -416,6 +417,132 @@ ArkUINativeModuleValue ContainerPickerBridge::ResetContainerPickerItemHeight(Ark
     auto containerPickerModifier = nodeModifiers->getContainerPickerModifier();
     CHECK_NULL_RETURN(containerPickerModifier, panda::NativePointerRef::New(vm, nullptr));
     containerPickerModifier->resetContainerPickerItemHeight(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+constexpr int32_t FONT_WEIGHT_NUM_LIGHTER = 100;
+constexpr int32_t FONT_WEIGHT_NUM_NORMAL = 400;
+constexpr int32_t FONT_WEIGHT_NUM_MEDIUM = 500;
+constexpr int32_t FONT_WEIGHT_NUM_BOLD = 700;
+constexpr int32_t FONT_WEIGHT_NUM_BOLDER = 900;
+
+static bool ParseDimensionArg(EcmaVM* vm, const Local<JSValueRef>& arg, ArkUI_Float32& out)
+{
+    CalcDimension dim;
+    RefPtr<ResourceObject> resObj;
+    if (!arg->IsNull() && !arg->IsUndefined() &&
+        ArkTSUtils::ParseJsDimensionFp(vm, arg, dim, resObj, false, false) &&
+        dim.IsValid() && !dim.IsNegative()) {
+        out = static_cast<ArkUI_Float32>(dim.Value());
+        return true;
+    }
+    return false;
+}
+
+static void ParseFontWeightArg(EcmaVM* vm, const Local<JSValueRef>& fontWeightArg,
+    ArkUI_PickerComponentTextStyle& textStyle)
+{
+    if (fontWeightArg->IsNull() || fontWeightArg->IsUndefined()) {
+        return;
+    }
+    std::string weightStr;
+    if (fontWeightArg->IsNumber()) {
+        int32_t weightNum = fontWeightArg->ToNumber(vm)->Value();
+        static const std::string weightNames[] = {
+            "lighter", "normal", "regular", "medium", "bold", "bolder"
+        };
+        constexpr int32_t weightNamesSize =
+            static_cast<int32_t>(sizeof(weightNames) / sizeof(weightNames[0]));
+        if (weightNum >= 0 && weightNum < weightNamesSize) {
+            weightStr = weightNames[weightNum];
+        } else {
+            switch (weightNum) {
+                case FONT_WEIGHT_NUM_LIGHTER: weightStr = "lighter"; break;
+                case FONT_WEIGHT_NUM_NORMAL: weightStr = "normal"; break;
+                case FONT_WEIGHT_NUM_MEDIUM: weightStr = "medium"; break;
+                case FONT_WEIGHT_NUM_BOLD: weightStr = "bold"; break;
+                case FONT_WEIGHT_NUM_BOLDER: weightStr = "bolder"; break;
+                default: weightStr = std::to_string(weightNum); break;
+            }
+        }
+    } else if (fontWeightArg->IsString(vm)) {
+        ArkTSUtils::ParseJsString(vm, fontWeightArg, weightStr);
+    }
+    if (!weightStr.empty()) {
+        auto parseResult = StringUtils::ParseFontWeight(weightStr);
+        if (parseResult.first) {
+            textStyle.hasFontWeight = true;
+            textStyle.fontWeight = static_cast<ArkUI_Int32>(parseResult.second);
+        }
+    }
+}
+
+static ArkUI_PickerComponentTextStyle ParsePickerTextStyleArgs(
+    EcmaVM* vm, const Local<JSValueRef>& colorArg, const Local<JSValueRef>& fontSizeArg,
+    const Local<JSValueRef>& fontWeightArg, const Local<JSValueRef>& minFontSizeArg,
+    const Local<JSValueRef>& maxFontSizeArg, const Local<JSValueRef>& overflowArg)
+{
+    ArkUI_PickerComponentTextStyle textStyle = {};
+    auto nodeInfo = ArkTSUtils::MakeNativeNodeInfo(nullptr);
+    Color textColor;
+    RefPtr<ResourceObject> colorResObj;
+    if (!colorArg->IsNull() && !colorArg->IsUndefined() &&
+        ArkTSUtils::ParseJsColorAlpha(vm, colorArg, textColor, colorResObj, nodeInfo)) {
+        textStyle.hasColor = true;
+        textStyle.color = textColor.GetValue();
+    }
+    if (ParseDimensionArg(vm, fontSizeArg, textStyle.fontSize)) {
+        textStyle.hasFontSize = true;
+    }
+    ParseFontWeightArg(vm, fontWeightArg, textStyle);
+    if (ParseDimensionArg(vm, minFontSizeArg, textStyle.minFontSize)) {
+        textStyle.hasMinFontSize = true;
+    }
+    if (ParseDimensionArg(vm, maxFontSizeArg, textStyle.maxFontSize)) {
+        textStyle.hasMaxFontSize = true;
+    }
+    if (!overflowArg->IsNull() && !overflowArg->IsUndefined() && overflowArg->IsNumber()) {
+        textStyle.hasOverflow = true;
+        textStyle.overflow = overflowArg->ToNumber(vm)->Value();
+    }
+    return textStyle;
+}
+
+ArkUINativeModuleValue ContainerPickerBridge::SetContainerPickerSelectedTextStyle(
+    ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
+    CHECK_NULL_RETURN(nativeNode, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeModifiers = GetArkUINodeModifiers();
+    CHECK_NULL_RETURN(nodeModifiers, panda::NativePointerRef::New(vm, nullptr));
+    auto containerPickerModifier = nodeModifiers->getContainerPickerModifier();
+    CHECK_NULL_RETURN(containerPickerModifier, panda::NativePointerRef::New(vm, nullptr));
+
+    ArkUI_PickerComponentTextStyle textStyle = ParsePickerTextStyleArgs(
+        vm, runtimeCallInfo->GetCallArgRef(NUM_1), runtimeCallInfo->GetCallArgRef(NUM_2),
+        runtimeCallInfo->GetCallArgRef(NUM_3), runtimeCallInfo->GetCallArgRef(NUM_4),
+        runtimeCallInfo->GetCallArgRef(NUM_5), runtimeCallInfo->GetCallArgRef(NUM_6));
+
+    containerPickerModifier->setContainerPickerSelectedTextStyle(nativeNode, &textStyle);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ContainerPickerBridge::ResetContainerPickerSelectedTextStyle(
+    ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
+    CHECK_NULL_RETURN(nativeNode, panda::NativePointerRef::New(vm, nullptr));
+    auto nodeModifiers = GetArkUINodeModifiers();
+    CHECK_NULL_RETURN(nodeModifiers, panda::NativePointerRef::New(vm, nullptr));
+    auto containerPickerModifier = nodeModifiers->getContainerPickerModifier();
+    CHECK_NULL_RETURN(containerPickerModifier, panda::NativePointerRef::New(vm, nullptr));
+    containerPickerModifier->resetContainerPickerSelectedTextStyle(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

@@ -48,13 +48,17 @@ class AccessibilityEventInfo;
 namespace OHOS::Ace {
 struct ImmersiveOptions;
 struct UiMaterialParam;
+class AccessibilityProvider;
 class NotifyDragEvent;
 class GestureEvent;
 using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
-enum class CommandErrorType : uint8_t { NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL };
+enum class CommandErrorType : uint8_t {
+    NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL,
+    NOT_SUPPORTED, SECURITY_DENIED
+};
 
 struct ACE_FORCE_EXPORT CommandResult {
     bool success = false;
@@ -386,7 +390,7 @@ public:
     {
         auto host = GetHost();
         CHECK_NULL_RETURN(host, nullptr);
-        return DynamicCast<T>(host->GetLayoutProperty<T>());
+        return host->GetLayoutProperty<T>();
     }
 
     template<typename T>
@@ -394,7 +398,7 @@ public:
     {
         auto host = GetHost();
         CHECK_NULL_RETURN(host, nullptr);
-        return DynamicCast<T>(host->GetPaintProperty<T>());
+        return host->GetPaintProperty<T>();
     }
 
     template<typename T>
@@ -402,7 +406,7 @@ public:
     {
         auto host = GetHost();
         CHECK_NULL_RETURN(host, nullptr);
-        return DynamicCast<T>(host->GetEventHub<T>());
+        return host->GetEventHub<T>();
     }
 
     void MarkDirty(PropertyChangeFlag flag = PROPERTY_UPDATE_MEASURE_SELF);
@@ -537,6 +541,11 @@ public:
     }
 
     virtual RefPtr<AccessibilitySessionAdapter> GetAccessibilitySessionAdapter()
+    {
+        return nullptr;
+    }
+
+    virtual RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider()
     {
         return nullptr;
     }

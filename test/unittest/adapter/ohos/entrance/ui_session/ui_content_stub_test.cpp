@@ -2211,8 +2211,9 @@ HWTEST_F(UIContentStubTest, SendCommandWithFinishCallback_002, TestSize.Level1)
     const std::string command = R"({"cmd":"setText","params":{"value":"test"}})";
     const std::string resultJson = R"({"result":"SUCCESS"})";
 
-    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _))
-        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback) {
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo&) {
             callback(resultJson);
         }));
     int reportCount = 0;
@@ -2226,11 +2227,14 @@ HWTEST_F(UIContentStubTest, SendCommandWithFinishCallback_002, TestSize.Level1)
     ASSERT_TRUE(data.WriteUint64(requestId));
     ASSERT_TRUE(data.WriteInt32(nodeId));
     ASSERT_TRUE(data.WriteString(command));
+    ASSERT_TRUE(data.WriteBool(false));
+    ASSERT_TRUE(data.WriteUint64(UINT64_MAX));
     EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
         NO_ERROR);
 
-    EXPECT_CALL(*manager, SendCommandWithResult(command, _))
-        .WillOnce(Invoke([&](const std::string&, const UiSessionManager::CommandResultCallback& callback) {
+    EXPECT_CALL(*manager, SendCommandWithResult(command, _, _))
+        .WillOnce(Invoke([&](const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo&) {
             callback(resultJson);
         }));
     MessageParcel keyData;
@@ -2238,10 +2242,121 @@ HWTEST_F(UIContentStubTest, SendCommandWithFinishCallback_002, TestSize.Level1)
     PrepareValidUiSessionParcel(keyData);
     ASSERT_TRUE(keyData.WriteUint64(requestId));
     ASSERT_TRUE(keyData.WriteString(command));
+    ASSERT_TRUE(keyData.WriteBool(false));
+    ASSERT_TRUE(keyData.WriteUint64(UINT64_MAX));
     EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SEND_COMMAND_WITH_FINISH_CALLBACK, keyData, reply, option),
         NO_ERROR);
     Mock::VerifyAndClearExpectations(manager);
     EXPECT_EQ(reportCount, 2);
+}
+
+/**
+ * @tc.name: SendCommandSecurityAuthFlag001
+ * @tc.desc: The SendCommand finish-callback entry forwards the SecurityAuthInfo
+ *           request from the IPC parcel to the session manager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, SendCommandSecurityAuthFlag001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x99887766ULL;
+    constexpr int32_t nodeId = 7;
+    constexpr uint64_t agentTokenId = 0x1234567890ABCDEFULL;
+    const std::string command = R"({"cmd":"setText","params":{"value":"x"}})";
+
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([](const std::string&) {}));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(nodeId));
+    ASSERT_TRUE(data.WriteString(command));
+    ASSERT_TRUE(data.WriteBool(true));
+    ASSERT_TRUE(data.WriteUint64(agentTokenId));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: SendCommandAccessibilityEnvelopeForwarded
+ * @tc.desc: The SendCommand request carrying the protocol envelope is forwarded to the session manager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, SendCommandAccessibilityEnvelopeForwarded, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x123456789ABDULL;
+    constexpr int32_t hostId = 84;
+    const std::string command = R"({"protocol":"arkui.accessibility","version":1,"elementId":"77",)"
+        R"("action":"ACTION_CLICK","arguments":{}})";
+    const std::string resultJson = R"({"result":"SUCCESS"})";
+    int reportCount = 0;
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(hostId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo&) {
+            callback(resultJson);
+        }));
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([&](const std::string& json) { EXPECT_EQ(json, resultJson); ++reportCount; }));
+    MessageParcel data;
+    MessageParcel reply;
+    MessageOption option;
+    data.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(data);
+    ASSERT_TRUE(data.WriteUint64(requestId));
+    ASSERT_TRUE(data.WriteInt32(hostId));
+    ASSERT_TRUE(data.WriteString(command));
+    EXPECT_EQ(stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, data, reply, option),
+        NO_ERROR);
+    EXPECT_EQ(reportCount, 1);
+    Mock::VerifyAndClearExpectations(manager);
+}
+
+/**
+ * @tc.name: SendCommandLegacyParcelKeepsDefaults001
+ * @tc.desc: A legacy parcel without the SecurityAuthInfo fields keeps the defaults.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, SendCommandLegacyParcelKeepsDefaults001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> stub = std::make_shared<UIContentServiceStubImpl>();
+    auto manager = static_cast<OHOS::Ace::MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(manager, nullptr);
+    constexpr uint64_t requestId = 0x99887766ULL;
+    constexpr int32_t nodeId = 7;
+    const std::string command = R"({"cmd":"setText","params":{"value":"x"}})";
+
+    SecurityAuthInfo legacy;
+    EXPECT_CALL(*manager, NotifySendCommandPatternWithResult(nodeId, command, _, _))
+        .WillOnce(Invoke([&](int32_t, const std::string&, const UiSessionManager::CommandResultCallback& callback,
+                             const SecurityAuthInfo& securityAuth) {
+            legacy = securityAuth;
+            callback(R"({"result":"SUCCESS"})");
+        }));
+    EXPECT_CALL(*manager, MakeCommandResultCallback(_, requestId))
+        .WillOnce(Return([](const std::string&) {}));
+    MessageParcel legacyData;
+    MessageParcel reply;
+    MessageOption option;
+    legacyData.EnablePayloadStorage();
+    PrepareValidUiSessionParcel(legacyData);
+    ASSERT_TRUE(legacyData.WriteUint64(requestId));
+    ASSERT_TRUE(legacyData.WriteInt32(nodeId));
+    ASSERT_TRUE(legacyData.WriteString(command));
+    EXPECT_EQ(
+        stub->OnRemoteRequest(IUiContentService::SENDCOMMAND_EVENT_WITH_FINISH_CALLBACK, legacyData, reply, option),
+        NO_ERROR);
+    EXPECT_FALSE(legacy.needSecurityAuth);
+    EXPECT_EQ(legacy.agentTokenId, UINT64_MAX);
+    Mock::VerifyAndClearExpectations(manager);
 }
 
 HWTEST_F(UIContentStubTest, SearchReview_ClickFlushDoesNotDetectPages, TestSize.Level1)
@@ -2784,6 +2899,66 @@ HWTEST_F(PageSceneProxyValidationTest, CustomGeometryIsValidatedBeforeSending, T
     EXPECT_EQ(remote->calls, 1);
     EXPECT_EQ(remote->lastCode, IUiContentService::REGISTER_PAGE_SCENE_RULES);
     EXPECT_EQ(remote->payload, VALID_PROXY_CUSTOM_RULE);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryRatioLowerBoundIsRejected, TestSize.Level1)
+{
+    // heightRatioGt < 0.5 -> PARAM_INVALID
+    std::string invalidHeight = VALID_PROXY_CUSTOM_RULE;
+    auto pos = invalidHeight.find("heightRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    invalidHeight.replace(pos, 17, "heightRatioGt\":0.4");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidHeight, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+
+    // widthRatioLte < 0.2 -> PARAM_INVALID
+    std::string invalidWidth = VALID_PROXY_CUSTOM_RULE;
+    pos = invalidWidth.find("widthRatioLte\":0.5");
+    ASSERT_NE(pos, std::string::npos);
+    invalidWidth.replace(pos, 17, "widthRatioLte\":0.1");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidWidth, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+
+    // totalWidthRatioGt < 0.5 -> PARAM_INVALID
+    std::string invalidTotal = VALID_PROXY_CUSTOM_RULE;
+    pos = invalidTotal.find("totalWidthRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    invalidTotal.replace(pos, 22, "totalWidthRatioGt\":0.4");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(invalidTotal, [](const std::string&) {}), PARAM_INVALID);
+    EXPECT_EQ(remote->calls, 0);
+}
+
+HWTEST_F(PageSceneProxyValidationTest, CustomGeometryRatioLowerBoundEqualIsValid, TestSize.Level1)
+{
+    // Each sub-test uses a distinct ruleSetId to avoid the proxy single-registration gate.
+    // heightRatioGt = 0.8 (lower bound) -> NO_ERROR
+    std::string minHeight = VALID_PROXY_CUSTOM_RULE;
+    auto pos = minHeight.find("heightRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    minHeight.replace(pos, 17, "heightRatioGt\":0.8");
+    minHeight.replace(minHeight.find("\"split_rules\""), 13, "\"lower_h\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minHeight, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    remote->calls = 0;
+
+    // widthRatioLte = 0.2 (lower bound) -> NO_ERROR
+    std::string minWidth = VALID_PROXY_CUSTOM_RULE;
+    pos = minWidth.find("widthRatioLte\":0.5");
+    ASSERT_NE(pos, std::string::npos);
+    minWidth.replace(pos, 17, "widthRatioLte\":0.2");
+    minWidth.replace(minWidth.find("\"split_rules\""), 13, "\"lower_w\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minWidth, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
+    remote->calls = 0;
+
+    // totalWidthRatioGt = 0.8 (lower bound) -> NO_ERROR
+    std::string minTotal = VALID_PROXY_CUSTOM_RULE;
+    pos = minTotal.find("totalWidthRatioGt\":0.8");
+    ASSERT_NE(pos, std::string::npos);
+    minTotal.replace(pos, 22, "totalWidthRatioGt\":0.8");
+    minTotal.replace(minTotal.find("\"split_rules\""), 13, "\"lower_t\"");
+    EXPECT_EQ(proxy->RegisterPageSceneRules(minTotal, [](const std::string&) {}), NO_ERROR);
+    EXPECT_EQ(remote->calls, 1);
 }
 
 HWTEST_F(PageSceneProxyValidationTest, LegacyIdsKeepReceiverValidation, TestSize.Level1)

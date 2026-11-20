@@ -27,10 +27,12 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/common/ace_application_info.h"
+#include "core/components_ng/event/developer_response_publisher.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/event/response_ctrl.h"
 #include "core/components_ng/event/touch_event.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
@@ -900,5 +902,61 @@ HWTEST_F(TouchEventTestNg, TouchEventReportMultiPointerTest009, TestSize.Level1)
 
     touchEventActuator->HandleEvent(point);
     EXPECT_TRUE(callbackCalled);
+}
+
+namespace {
+class CountingResponseObserver : public DeveloperResponseObserver {
+public:
+    DECLARE_ACE_TYPE(CountingResponseObserver, DeveloperResponseObserver);
+    void OnDeveloperResponse(const DeveloperResponseCandidate& candidate) override
+    {
+        ++count_;
+    }
+    int32_t count_ = 0;
+};
+} // namespace
+
+/**
+ * @tc.name: DeveloperResponseRequiresDeveloperTouchCallback
+ * @tc.desc: A framework-internal touch listener (for example the pressed-state task installed by
+ *           EventHub::AddPressedListener) must not publish a RESPONSE candidate; only a node with
+ *           a developer-visible touch callback may (AC-3.2).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TouchEventTestNg, DeveloperResponseRequiresDeveloperTouchCallback, TestSize.Level1)
+{
+    auto touchEventActuator = AceType::MakeRefPtr<TouchEventActuator>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::BUTTON_ETS_TAG, 1101, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    touchEventActuator->AttachFrameNode(frameNode);
+
+    auto observer = AceType::MakeRefPtr<CountingResponseObserver>();
+    auto publisher = DeveloperResponsePublisher::GetInstance();
+    publisher->SetObserver(AceType::RawPtr(observer));
+
+    TouchEvent point;
+    point.type = TouchType::UP;
+    point.id = 1;
+    point.time = std::chrono::steady_clock::now();
+
+    /**
+     * @tc.steps: step1. Add an internal touch listener only (no developer onTouch).
+     * @tc.expected: no candidate is published.
+     */
+    touchEventActuator->AddTouchEvent(AceType::MakeRefPtr<TouchEventImpl>([](TouchEventInfo&) {}));
+    EXPECT_FALSE(touchEventActuator->HasDeveloperTouchCallback());
+    touchEventActuator->HandleEvent(point);
+    EXPECT_EQ(observer->count_, 0);
+
+    /**
+     * @tc.steps: step2. Bind a developer onTouch callback.
+     * @tc.expected: exactly one candidate is published.
+     */
+    touchEventActuator->SetOnTouchEvent([](TouchEventInfo&) {});
+    EXPECT_TRUE(touchEventActuator->HasDeveloperTouchCallback());
+    touchEventActuator->HandleEvent(point);
+    EXPECT_EQ(observer->count_, 1);
+
+    publisher->SetObserver(nullptr);
 }
 } // namespace OHOS::Ace::NG

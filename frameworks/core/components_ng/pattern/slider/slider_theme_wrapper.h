@@ -45,7 +45,7 @@ public:
                 LOGE("Build AppTheme error, themeConstants is null!");
                 return wrapper;
             }
-            ParsePattern(themeConstants, AceType::DynamicCast<SliderTheme>(wrapper));
+            ParsePattern(themeConstants, RefPtr<SliderTheme>(wrapper));
             return wrapper;
         }
     };

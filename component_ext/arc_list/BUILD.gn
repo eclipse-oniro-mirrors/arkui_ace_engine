@@ -39,6 +39,7 @@ gen_obj("arkui_arclist_abc") {
 }
 
 ohos_shared_library("arclist") {
+  branch_protector_ret = "pac_ret"
   defines = [ "USE_ARK_ENGINE" ]
   sources = [
     "${component_ext_path}/arc_list/arc_list_napi.cpp",
@@ -101,6 +102,7 @@ ohos_shared_library("arclist") {
 if (is_arkui_x) {
   foreach(item, ace_platforms) {
     ohos_shared_library("arkui_arclist_" + item.name) {
+      branch_protector_ret = "pac_ret"
       output_name = "arkui_arclist"
       defines = [ "USE_ARK_ENGINE" ]
       sources = [

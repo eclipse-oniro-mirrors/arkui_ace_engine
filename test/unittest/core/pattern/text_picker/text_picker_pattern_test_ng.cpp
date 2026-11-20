@@ -603,7 +603,7 @@ HWTEST_F(TextPickerPatternTestNg, TextPickerPatternTest005, TestSize.Level1)
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     /**
      * test method HandleChangeCallback
@@ -1401,6 +1401,50 @@ HWTEST_F(TextPickerPatternTestNg, TextPickerPatternOnWindowSizeChanged003, TestS
 
     textPickerPattern_->OnWindowSizeChanged(TEST_TEXT_PICKER_WINDOW_WIDTH, TEST_TEXT_PICKER_WINDOW_HEIGHT,
         WindowSizeChangeReason::RESIZE);
+
+    auto columnNodes = textPickerPattern_->GetColumnNodes();
+    EXPECT_FALSE(columnNodes.empty());
+}
+
+/**
+ * @tc.name: TextPickerPatternOnWindowSizeChanged004
+ * @tc.desc: Test TextPickerPattern OnWindowSizeChanged with MOVE reason (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerPatternTestNg, TextPickerPatternOnWindowSizeChanged004, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(frameNode_, nullptr);
+    ASSERT_NE(textPickerPattern_, nullptr);
+    ASSERT_NE(columnNode_, nullptr);
+    ASSERT_NE(textPickerColumnPattern_, nullptr);
+
+    std::vector<NG::RangeContent> range = { { "", "test1" }, { "", "test2" } };
+    textPickerColumnPattern_->SetOptions(range);
+    textPickerPattern_->OnWindowSizeChanged(TEST_TEXT_PICKER_WINDOW_WIDTH, TEST_TEXT_PICKER_WINDOW_HEIGHT,
+        WindowSizeChangeReason::MOVE);
+
+    auto columnNodes = textPickerPattern_->GetColumnNodes();
+    EXPECT_FALSE(columnNodes.empty());
+}
+
+/**
+ * @tc.name: TextPickerPatternOnWindowSizeChanged005
+ * @tc.desc: Test TextPickerPattern OnWindowSizeChanged with DRAG_MOVE reason (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerPatternTestNg, TextPickerPatternOnWindowSizeChanged005, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(frameNode_, nullptr);
+    ASSERT_NE(textPickerPattern_, nullptr);
+    ASSERT_NE(columnNode_, nullptr);
+    ASSERT_NE(textPickerColumnPattern_, nullptr);
+
+    std::vector<NG::RangeContent> range = { { "", "test1" }, { "", "test2" } };
+    textPickerColumnPattern_->SetOptions(range);
+    textPickerPattern_->OnWindowSizeChanged(TEST_TEXT_PICKER_WINDOW_WIDTH, TEST_TEXT_PICKER_WINDOW_HEIGHT,
+        WindowSizeChangeReason::DRAG_MOVE);
 
     auto columnNodes = textPickerPattern_->GetColumnNodes();
     EXPECT_FALSE(columnNodes.empty());

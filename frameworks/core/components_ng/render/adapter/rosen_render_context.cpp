@@ -6288,11 +6288,18 @@ void RosenRenderContext::OnFgDynamicBrightnessOptionUpdate(const std::optional<B
         return;
     }
     CHECK_NULL_VOID(rsNode_);
-    rsNode_->SetFgBrightnessParams({ brightnessOption->rate, brightnessOption->lightUpDegree,
-        brightnessOption->cubicCoeff, brightnessOption->quadCoeff, brightnessOption->saturation,
-        { brightnessOption->posRGB[0], brightnessOption->posRGB[1], brightnessOption->posRGB[2] },
-        { brightnessOption->negRGB[0], brightnessOption->negRGB[1], brightnessOption->negRGB[2] } });
-    rsNode_->SetFgBrightnessFract(brightnessOption->fraction);
+    auto brightnessBlender = std::make_shared<Rosen::BrightnessBlender>();
+    brightnessBlender->SetLinearRate(static_cast<float>(brightnessOption->rate));
+    brightnessBlender->SetDegree(static_cast<float>(brightnessOption->lightUpDegree));
+    brightnessBlender->SetCubicRate(static_cast<float>(brightnessOption->cubicCoeff));
+    brightnessBlender->SetQuadRate(static_cast<float>(brightnessOption->quadCoeff));
+    brightnessBlender->SetSaturation(static_cast<float>(brightnessOption->saturation));
+    brightnessBlender->SetPositiveCoeff(Rosen::Vector3f(
+        brightnessOption->posRGB[0], brightnessOption->posRGB[1], brightnessOption->posRGB[INDEX_2]));
+    brightnessBlender->SetNegativeCoeff(Rosen::Vector3f(
+        brightnessOption->negRGB[0], brightnessOption->negRGB[1], brightnessOption->negRGB[INDEX_2]));
+    brightnessBlender->SetFraction(static_cast<float>(brightnessOption->fraction));
+    rsNode_->SetBlender(brightnessBlender.get());
     RequestNextFrame();
 }
 
@@ -9624,9 +9631,9 @@ void RosenRenderContext::UpdateForegroundFilterDistortionParam(const DistortionP
 }
 
 std::shared_ptr<Rosen::RSNGFilterBase> RosenRenderContext::CreateFrostedGlassFilter(
-    const FrostedGlassParam& param, float dipScale)
+    const FrostedGlassParam& param, float dipScale, const ExtraGlassParam* extraParam)
 {
-    return RosenEffectConverter::ConvertToFrostedGlassFilter(param, dipScale);
+    return RosenEffectConverter::ConvertToFrostedGlassFilter(param, dipScale, extraParam);
 }
 
 void RosenRenderContext::SetBackgroundNGFilterEC(const std::shared_ptr<Rosen::RSNGFilterBase>& materialFilter)

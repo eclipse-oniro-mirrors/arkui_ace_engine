@@ -40,6 +40,7 @@ gen_obj("downloadfilebutton_abc_preview") {
 }
 
 ohos_shared_library("downloadfilebutton") {
+  branch_protector_ret = "pac_ret"
   sources = [ "downloadfilebutton.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

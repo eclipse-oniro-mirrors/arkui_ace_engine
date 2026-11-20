@@ -2211,7 +2211,7 @@ void ListItemGroupLayoutAlgorithm::UpdateGroupDecodeCacheWindow(LayoutWrapper* g
         if (!wrapper) {
             continue;
         }
-        auto itemFrameNode = AceType::DynamicCast<FrameNode>(wrapper);
+        auto itemFrameNode = wrapper->GetHostNode();
         if (!itemFrameNode) {
             continue;
         }

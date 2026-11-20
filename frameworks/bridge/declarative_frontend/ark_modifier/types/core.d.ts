@@ -590,6 +590,7 @@ type LayoutStyle = 'alwaysCenter' | 'alwaysAverageSplit' | 'spaceAroundAverage' 
 type TabsAnimationMode = 'none' | 'content' | 'actionSheet';
 type ScrollableBarModeOptions = object;
 type BarOverlapOptions = object;
+type BarOverlapMode = 'STANDARD' | 'STACK' | 'SAFE_AREA_PADDING';
 type TabBarOptions = object | CustomBuilder;
 type FlexDirection = 'row' | 'rowReverse' | 'column' | 'columnReverse';
 type ScrollState = 'idle' | 'scroll' | 'fling';

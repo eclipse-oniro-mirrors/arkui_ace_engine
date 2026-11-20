@@ -728,18 +728,18 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
                     pageTranslateScope_ = 0;
                     pageTranslateOwnerPid_ = -1;
                 }
+                if (shouldResetWebTranslate) {
+                    ResetTranslate(-1);
+                }
+                if (shouldResetPageTranslate) {
+                    ResetPageTranslate(-1);
+                }
             }
             // reportMap remove this processId
             this->reportObjectMap_.erase(processId);
             // processMap remove this processId
             for (auto& [_, processSet] : processMap_) {
                 processSet.erase(processId);
-            }
-            if (shouldResetWebTranslate) {
-                ResetTranslate(-1);
-            }
-            if (shouldResetPageTranslate) {
-                ResetPageTranslate(-1);
             }
         }
         std::vector<std::string> pageSceneRemovals;
@@ -851,9 +851,21 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
         LOGW("RegisterPageSceneRules invalid rule json, process id:%{public}d", processId);
         return PARAM_INVALID;
     }
+    if (ruleSetInfo.invalidResponseRule) {
+        // AC-1.12: one schema-invalid RESPONSE rule rejects the whole ruleSet; never register
+        // a partial set and never fall through to the legacy TEXT_EDITOR branch.
+        LOGW("RegisterPageSceneRules invalid response rule, process id:%{public}d", processId);
+        return PARAM_INVALID;
+    }
     if (HasPageSceneRule(ruleSetInfo, PAGE_SCENE_RESPONSE_SCENE, false, "")) {
         return RegisterResponsePageSceneRules(processId, ruleJson);
     }
+    return RegisterLegacyPageSceneRules(processId, ruleSetInfo, ruleJson);
+}
+
+int32_t UiSessionManagerOhos::RegisterLegacyPageSceneRules(
+    int32_t processId, const PageSceneRuleSetInfo& ruleSetInfo, const std::string& ruleJson)
+{
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
         if (pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end()) {
@@ -1706,6 +1718,17 @@ UiSessionManagerOhos::PageSceneRuleSetInfo UiSessionManagerOhos::ExtractPageScen
         PageSceneRuleInfo ruleInfo;
         ruleInfo.ruleId = GetJsonString(ruleJsonValue, PAGE_SCENE_RULE_ID);
         ruleInfo.sceneType = GetJsonString(ruleJsonValue, PAGE_SCENE_SCENE_TYPE);
+        const bool isResponseRule = ruleInfo.sceneType == PAGE_SCENE_RESPONSE_SCENE;
+        // A RESPONSE rule that fails the schema is a ruleSet-level error: AC-1.12 requires the
+        // whole registration to fail with PARAM_INVALID instead of dropping the rule silently
+        // and falling through to the legacy TEXT_EDITOR path.
+        const bool invalidResponseRule =
+            isResponseRule && ruleSetInfo.arkuiEnabled &&
+            (!IsValidPageSceneId(ruleInfo.ruleId) || !HasResponsePageSceneCondition(ruleJsonValue));
+        if (invalidResponseRule) {
+            ruleSetInfo.invalidResponseRule = true;
+            continue;
+        }
         if (ruleInfo.ruleId.empty() || ruleInfo.sceneType.empty()) {
             continue;
         }
@@ -2010,7 +2033,8 @@ void UiSessionManagerOhos::NotifyAllWebPattern(bool isRegister)
     }
 }
 
-void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::string& command)
+void UiSessionManagerOhos::NotifySendCommandPattern(
+    int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth)
 {
     NotifySendCommandFunction notifySendCommandFunction;
     {
@@ -2018,12 +2042,12 @@ void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::strin
         notifySendCommandFunction = notifySendCommandFunction_;
     }
     if (notifySendCommandFunction) {
-        notifySendCommandFunction(id, command);
+        notifySendCommandFunction(id, command, securityAuth);
     }
 }
 
-void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
-    int32_t id, const std::string& command, const CommandResultCallback& finishCallback)
+void UiSessionManagerOhos::NotifySendCommandPatternWithResult(int32_t id, const std::string& command,
+    const CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     NotifySendCommandWithResultFunction notifyFunction;
     {
@@ -2031,7 +2055,7 @@ void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
         notifyFunction = notifySendCommandWithResultFunction_;
     }
     if (notifyFunction) {
-        notifyFunction(id, command, finishCallback);
+        notifyFunction(id, command, finishCallback, securityAuth);
         return;
     }
     if (finishCallback) {
@@ -2039,7 +2063,8 @@ void UiSessionManagerOhos::NotifySendCommandPatternWithResult(
     }
 }
 
-int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std::string& command)
+int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(
+    int32_t id, const std::string& command, const SecurityAuthInfo& securityAuth)
 {
     NotifySendCommandSyncFunction notifySendCommandSyncFunction;
     {
@@ -2049,7 +2074,7 @@ int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std
     if (!notifySendCommandSyncFunction) {
         return 11; // 11 is the error code for no callback
     }
-    return notifySendCommandSyncFunction(id, command);
+    return notifySendCommandSyncFunction(id, command, securityAuth);
 }
 
 void UiSessionManagerOhos::SaveRegisterForWebFunction(NotifyAllWebFunction&& function)
@@ -2757,7 +2782,7 @@ void UiSessionManagerOhos::SendPixelMap(const std::vector<std::pair<int32_t, std
     processIter->second.clear();
 }
 
-void UiSessionManagerOhos::SendCommand(const std::string& command)
+void UiSessionManagerOhos::SendCommand(const std::string& command, const SecurityAuthInfo& securityAuth)
 {
     auto json = InspectorJsonUtil::ParseJsonString(command);
     if (!json || json->IsNull()) {
@@ -2777,17 +2802,19 @@ void UiSessionManagerOhos::SendCommand(const std::string& command)
         relaxedCommandFunction = relaxedCommandFunction_;
     }
     if (sendCommandFunction && value && value->IsNumber()) {
+        // Keycode injection targets the focused node; run the security gate against
+        // it when the caller requested security auth (see the keycode callback).
         int32_t cmdNumber = value->GetInt();
-        sendCommandFunction(cmdNumber);
+        sendCommandFunction(cmdNumber, securityAuth);
     } else if (relaxedCommandFunction) {
-        relaxedCommandFunction(command);
+        relaxedCommandFunction(command, securityAuth);
     } else {
         LOGW("SendCommand failed");
     }
 }
 
-void UiSessionManagerOhos::SendCommandWithResult(
-    const std::string& command, const CommandResultCallback& finishCallback)
+void UiSessionManagerOhos::SendCommandWithResult(const std::string& command,
+    const CommandResultCallback& finishCallback, const SecurityAuthInfo& securityAuth)
 {
     if (!finishCallback) {
         return;
@@ -2808,7 +2835,7 @@ void UiSessionManagerOhos::SendCommandWithResult(
         }
     }
     if (sendFunction) {
-        sendFunction(command, finishCallback);
+        sendFunction(command, finishCallback, securityAuth);
         return;
     }
     finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");

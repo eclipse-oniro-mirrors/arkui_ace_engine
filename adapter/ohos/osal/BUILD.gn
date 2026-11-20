@@ -22,6 +22,7 @@ template("ace_osal_ohos_source_set") {
   forward_variables_from(invoker, "*")
 
   ohos_source_set(target_name) {
+    branch_protector_ret = "pac_ret"
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     defines += invoker.defines
@@ -129,6 +130,7 @@ template("ace_osal_ohos_source_set") {
     }
 
     external_deps += [
+      "ability_runtime:app_context",
       "ability_runtime:app_manager",
       "hicollie:libhicollie",
       "hiview:libperfmonitor",
@@ -296,6 +298,7 @@ foreach(item, ace_platforms) {
   platform = item.name
   if (platform == "ohos" || platform == "ohos_ng") {
     ace_osal_ohos_source_set("ace_osal_ohos_${platform}") {
+      branch_protector_ret = "pac_ret"
       platform = item.name
       assert(defined(platform) && platform != "", "platform must be defined")
       defines = []

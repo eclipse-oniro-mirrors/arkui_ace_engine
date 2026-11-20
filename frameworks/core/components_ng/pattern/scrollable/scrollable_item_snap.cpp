@@ -136,11 +136,11 @@ void Scrollable::RunItemSnapStage(
     itemSnapChainActive_ = true;
     snapOffsetProperty_->AnimateWithVelocity(option, endPos, velocity,
         [weak = AceType::WeakClaim(this), id = Container::CurrentId(), finalStage, source = snapAnimationSource_,
-            startVelocity = velocity, generation, onHandoff = std::move(onHandoff)]() mutable {
+            generation, onHandoff = std::move(onHandoff)]() mutable {
             ContainerScope scope(id);
             auto scroll = weak.Upgrade();
             CHECK_NULL_VOID(scroll);
-            scroll->OnItemSnapStageFinished(generation, finalStage, source, startVelocity, std::move(onHandoff));
+            scroll->OnItemSnapStageFinished(generation, finalStage, source, std::move(onHandoff));
         });
     state_ = AnimationState::SNAP;
     auto context = context_.Upgrade();
@@ -266,9 +266,11 @@ void Scrollable::FlushItemSnapAnimationStart()
 // Feat-20260806915268 item snap stage helpers (definitions live in scrollable_item_snap.cpp).
 // Dispatches a finished stage by generation; posts the handoff as a UI task and re-checks
 // the generation before running it. The handoff carries TWO velocities: providerVelocity
-// retains the stage-start decision velocity, while motionVelocity is the actual residual.
+// feeds the re-evaluation's decision (the live velocity at the handoff instant — what
+// the motion still has left when the finishing stage ends), while
+// motionVelocity keeps the stage-2 spring's physical continuity (the same live value).
 // The provider's distance-limited first stage hands off through CompleteItemSnapApproach.
-void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source, float startVelocity,
+void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source,
     std::function<void(float, float)>&& onHandoff)
 {
     if (itemSnapGeneration_ != generation) {
@@ -290,9 +292,16 @@ void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, i
         return;
     }
     if (onHandoff) {
-        // Layout-dependent final targets can require another stabilization stage. Preserve
-        // decision and physical velocities separately, just as in the initial handoff.
-        PostItemSnapHandoff(continuationGeneration, startVelocity, snapVelocity_, std::move(onHandoff));
+        // Hand off while the snap chain is still current. The re-evaluation receives the
+        // LIVE velocity at the handoff instant (snapVelocity_): what the motion still has
+        // left when the finishing stage ends. The same value drives the next stage spring's
+        // initial velocity so the takeover stays visually continuous. A stage that runs its
+        // full spring course ends nearly at rest (1~10 px/s on a real backend), so a fully
+        // decayed stage reports a velocity close to zero; a cut-short stage or an immediate
+        // handoff (near-zero delta) still carries real speed. continuationGeneration (not
+        // the consumed stage generation) keeps this handoff live for the posted task while
+        // a repeated backend completion of the same stage stays discarded.
+        PostItemSnapHandoff(continuationGeneration, snapVelocity_, snapVelocity_, std::move(onHandoff));
     }
 }
 
@@ -391,8 +400,9 @@ bool Scrollable::HandleAxisSnapUpdate(float mainDelta, bool fromScrollBar)
 // For 0 < |approachDelta| < |flingDelta| it hands off at approach; for
 // |approachDelta| >= |flingDelta| it waits for completion, including the equal-budget case.
 // [targetGetter] is invoked with the handoff velocity to resolve the absolute final target, and stage 2 springs
-// to that target. The provider receives the stage start (release fling) velocity; the stage-2
-// spring receives the physical residual so the motion stays continuous (see
+// to that target. The initial provider handoff (CompleteItemSnapApproach) carries the stage
+// start (release fling) velocity with the physical residual for the stage-2 spring; later
+// re-evaluation handoffs carry the live handoff-instant velocity (see
 // OnItemSnapStageFinished). Both stages are interruptible by a new gesture through the
 // existing snap-animation stop paths. When [approachDelta] is near zero the approach stage
 // is skipped.
@@ -429,10 +439,10 @@ void Scrollable::StartItemSnapTwoStageAnimation(float approachDelta, float scrol
         }
         scroll->snapAnimationFromScrollBar_ = fromScrollBar;
         scroll->snapAnimationSource_ = source;
-        auto finish = [weak, source](float velocity) {
+        auto finish = [weak, source](float) {
             auto current = weak.Upgrade();
             CHECK_NULL_VOID(current);
-            current->OnItemSnapStageFinished(current->itemSnapGeneration_, true, source, velocity, nullptr);
+            current->OnItemSnapStageFinished(current->itemSnapGeneration_, true, source, nullptr);
         };
         scroll->RunItemSnapStage(resolved, motionVelocity, true,
             CreateItemSnapContinuation(weak, fromScrollBar, source, std::move(targetGetter), std::move(finish)));

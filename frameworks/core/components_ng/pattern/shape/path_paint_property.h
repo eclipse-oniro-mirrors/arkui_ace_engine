@@ -36,7 +36,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<PathPaintProperty>();
-        value->PaintProperty::UpdatePaintProperty(DynamicCast<PaintProperty>(this));
+        value->PaintProperty::UpdatePaintProperty(this);
         value->propCommands_ = CloneCommands();
         value->propFill_ = CloneFill();
         value->propFillOpacity_ = CloneFillOpacity();

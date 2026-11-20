@@ -52,6 +52,7 @@ public:
     }
     virtual void RegisterScreenBroadcast() {}
     virtual void RegisterTouchEventCallback(TouchEventCallback&& callback) = 0;
+    virtual void EnableTouchpadRawEvent(bool enabled) {}
     virtual void RegisterDragEventCallback(DragEventCallBack&& callback) = 0;
     virtual void RegisterKeyEventCallback(KeyEventCallback&& callback) = 0;
     virtual void RegisterNonPointerEventCallback(NonPointerEventCallback&& callback) = 0;

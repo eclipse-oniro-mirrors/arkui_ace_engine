@@ -34,8 +34,8 @@ RefPtr<SpanString> SpanStringModeSwitcher::FilterSpanString(
 void SpanStringModeSwitcher::SwitchToPlainText(RefPtr<MutableSpanString>& styledString)
 {
     CHECK_NULL_VOID(styledString);
-    auto plainStr = AceType::MakeRefPtr<PlainTextSpanString>(AceType::DynamicCast<SpanString>(styledString));
-    styledString = AceType::DynamicCast<MutableSpanString>(plainStr);
+    auto plainStr = AceType::MakeRefPtr<PlainTextSpanString>(styledString);
+    styledString = plainStr;
 }
 
 void SpanStringModeSwitcher::SwitchToMutable(RefPtr<MutableSpanString>& styledString)

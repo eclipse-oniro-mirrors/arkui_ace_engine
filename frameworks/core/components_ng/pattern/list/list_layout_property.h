@@ -29,6 +29,7 @@
 
 namespace OHOS::Ace {
 struct ParamConfig;
+struct ScrollSnapStrategy;
 }
 
 namespace OHOS::Ace::NG {
@@ -124,8 +125,20 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DividerColorSetByUser, bool, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(CacheRange, CacheRange, PROPERTY_UPDATE_MEASURE_SELF);
 
+    // Item scroll snap strategy (built-in align or custom offset provider).
+    std::optional<ScrollSnapStrategy> GetScrollSnapStrategy() const;
+    void UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy);
+    void ResetScrollSnapStrategy();
+
     int32_t defCachedCount_ = 1;
     std::optional<ContentClip> contentClip_;
+
+private:
+    std::optional<ScrollSnapAlign> snapStrategyAlign_;
+    bool snapHasProvider_ = false;
+    std::function<double(double, double)> snapApproachOffset_;
+    std::function<double(double)> snapOffset_;
+
 protected:
     void Clone(RefPtr<LayoutProperty> layoutProperty) const override;
 };

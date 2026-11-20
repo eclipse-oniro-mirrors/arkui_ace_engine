@@ -1493,7 +1493,7 @@ HWTEST_F(RichEditorMenuTestNg, ProcessAutoFill001, TestSize.Level0)
     /**
      * @tc.steps: step2. Execute autofill when paste request is received.
      */
-    auto flag = richEditorPattern->ProcessAutoFill(false, AceAutoFillTriggerType::PASTE_REQUEST);
+    auto flag = richEditorPattern->ProcessAutoFill(false, false, AceAutoFillTriggerType::PASTE_REQUEST);
     EXPECT_FALSE(flag.first);
     EXPECT_FALSE(flag.second);
 }
@@ -1521,7 +1521,7 @@ HWTEST_F(RichEditorMenuTestNg, ProcessAutoFill002, TestSize.Level0)
     ASSERT_NE(richEditorNode, nullptr);
     auto richEditorPattern = richEditorNode->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-    auto flag = richEditorPattern->ProcessAutoFill(false, AceAutoFillTriggerType::PASTE_REQUEST);
+    auto flag = richEditorPattern->ProcessAutoFill(false, false, AceAutoFillTriggerType::PASTE_REQUEST);
     EXPECT_FALSE(flag.first);
     EXPECT_FALSE(flag.second);
 }

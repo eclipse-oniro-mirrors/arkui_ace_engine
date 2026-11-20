@@ -344,7 +344,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest003, TestSize.Lev
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto pickerNodeLayout = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();
     ASSERT_NE(pickerNodeLayout, nullptr);
@@ -413,7 +413,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest005, TestSize.Lev
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto pickerNodeLayout = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();
     ASSERT_NE(pickerNodeLayout, nullptr);
@@ -485,7 +485,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest004, TestSize.Lev
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto pickerNodeLayout = frameNode->GetLayoutProperty<TextPickerLayoutProperty>();
     ASSERT_NE(pickerNodeLayout, nullptr);
@@ -817,7 +817,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest015, TestSize.Lev
     auto textPickerPattern = frameNode_->GetPattern<TextPickerPattern>();
     auto child = textPickerPattern->GetColumnNode();
     ASSERT_NE(child, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(child)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = child->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
 
     RefPtr<TextLayoutProperty> textLayoutProperty = columnPattern->GetLayoutProperty<TextLayoutProperty>();
@@ -896,7 +896,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest018, TestSize.Lev
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->OnAttachToFrameNode();
     CrownEvent crownEvent;
@@ -933,7 +933,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest019, TestSize.Lev
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->OnAttachToFrameNode();
     auto layout = columnPattern->GetParentLayout();
@@ -1003,7 +1003,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest021, TestSize.Lev
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->OnAttachToFrameNode();
     EXPECT_EQ(columnPattern->GetDigitalCrownSensitivity(), DEFAULT_CROWNSENSITIVITY);
@@ -1071,7 +1071,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest023, TestSize.Lev
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->OnAttachToFrameNode();
     columnPattern->SetSelectedMarkPaint(true);
@@ -1105,7 +1105,7 @@ HWTEST_F(TextPickerColumnTestTwoNg, TextPickerColumnPatternTest024, TestSize.Lev
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
     ASSERT_NE(columnNode, nullptr);
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<TextPickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     columnPattern->OnAttachToFrameNode();
     columnPattern->SetSelectedMarkPaint(true);

@@ -128,3 +128,21 @@ group("ui_content_stub_unittest_linux") {
   testonly = true
   deps = [ ":ui_content_stub_unittest(${host_toolchain})" ]
 }
+
+ace_unittest("ui_session_accessibility_command_test") {
+  module_name = "Adapter-UiSession"
+  type = "new"
+  if (is_host_product) {
+    type = "host_components"
+  }
+  sources = [
+    "ui_session_accessibility_command_test.cpp",
+    "$ace_root/adapter/ohos/entrance/ui_session/ui_session_accessibility_command.cpp",
+  ]
+  if (is_host_product) {
+    include_dirs =
+        [ "//foundation/barrierfree/accessibility/interfaces/innerkits/common/include" ]
+  } else {
+    external_deps = [ "accessibility:accessibility_common" ]
+  }
+}

@@ -141,6 +141,8 @@ public:
         touchedSecondaryColumnPage_.Reset();
         return page;
     }
+
+    ACE_FORCE_EXPORT ForceSplitPageColumnType GetPageColumnType(const RefPtr<FrameNode>& page) const;
     void OnStageNodeStructureChanged() override;
 
     bool IsVirtualStackBasedSplit() const;
@@ -266,7 +268,6 @@ private:
         const RefPtr<FrameNode>& page, PageTransitionType transitionType, int32_t animationId);
     void ResetRouterAnimatedPages();
     int32_t GetPrimaryNodeCount() const;
-    ForceSplitPageColumnType GetPageColumnType(const RefPtr<FrameNode>& page) const;
     void SetPageColumnType(const RefPtr<FrameNode>& page, ForceSplitPageColumnType columnType);
     void ClearRouterPageState(const RefPtr<FrameNode>& page);
     bool IsSecondaryPushToPrimaryScene(const RefPtr<FrameNode>& prePrimaryTopPage,

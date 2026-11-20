@@ -20,6 +20,10 @@
 #include "core/components_ng/pattern/list/list_model.h"
 #include "core/components_ng/pattern/list/list_properties.h"
 
+namespace OHOS::Ace {
+struct ScrollSnapStrategy;
+}
+
 namespace OHOS::Ace::NG {
 
 class ACE_FORCE_EXPORT ListModelNG : public ListModel {
@@ -57,6 +61,9 @@ public:
     void SetContentEndOffset(float endOffset) override;
     void SetScrollSnapAlign(ScrollSnapAlign scrollSnapAlign) override;
     void SetNestedScroll(const NestedScrollOptions& nestedOpt) override;
+    // Two-stage item scroll snap strategy; exclusive with scrollSnapAlign (last set wins).
+    void SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy) override;
+    void ResetScrollSnapStrategy() override;
     void SetScrollEnabled(bool scrollEnabled) override;
     void SetFriction(double friction) override;
     void SetFocusWrapMode(FocusWrapMode focusWrapMode) override;
@@ -158,6 +165,8 @@ public:
     static EffectEdge GetEffectEdge(FrameNode* frameNode);
     static void SetScrollSnapAlign(FrameNode* frameNode, ScrollSnapAlign scrollSnapAlign);
     static int32_t GetScrollSnapAlign(FrameNode* frameNode);
+    static void SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& scrollSnapStrategy);
+    static void ResetScrollSnapStrategy(FrameNode* frameNode);
     static void SetContentStartOffset(FrameNode* frameNode, float startOffset);
     static float GetContentStartOffset(FrameNode* frameNode);
     static void SetContentEndOffset(FrameNode* frameNode, float endOffset);

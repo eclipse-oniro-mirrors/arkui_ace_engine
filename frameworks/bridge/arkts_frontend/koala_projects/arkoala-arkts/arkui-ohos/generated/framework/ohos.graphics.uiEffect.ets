@@ -21,6 +21,17 @@ import { default as uiEffect } from '@ohos.graphics.uiEffect'
 import { SerializerBase, DeserializerBase, CallbackResource, InteropNativeModule, MaterializedBase, Tags, RuntimeType, toPeerPtr, nullptr, KPointer, NativeBuffer, KSerializerBuffer, KUint8ArrayPtr } from '@koalaui/interop'
 import { int32, int64, float32, unsafeCast } from '@koalaui/common'
 import { CallbackTransformer } from './../CallbackTransformer'
+export class uiEffect_BlenderBase_serializer {
+    public static write(buffer: SerializerBase, value: uiEffect.BlenderBase): void {
+        let valueSerializer: SerializerBase = buffer
+        valueSerializer.writePointer(extractors.toUiEffectBlenderBasePtr(value))
+    }
+    public static read(buffer: DeserializerBase): uiEffect.BlenderBase {
+        let valueDeserializer: DeserializerBase = buffer
+        let ptr: KPointer = valueDeserializer.readPointer()
+        return extractors.fromUiEffectBlenderBasePtr(ptr)
+    }
+}
 export class uiEffect_BrightnessBlender_serializer {
     public static write(buffer: SerializerBase, value: uiEffect.BrightnessBlender): void {
         let valueSerializer: SerializerBase = buffer

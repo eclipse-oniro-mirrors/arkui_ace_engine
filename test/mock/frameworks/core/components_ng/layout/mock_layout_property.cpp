@@ -19,6 +19,7 @@
 #include "core/components_ng/property/flex_property.h"
 #include "core/components_ng/property/grid_property.h"
 #include "core/components_ng/property/position_property.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {

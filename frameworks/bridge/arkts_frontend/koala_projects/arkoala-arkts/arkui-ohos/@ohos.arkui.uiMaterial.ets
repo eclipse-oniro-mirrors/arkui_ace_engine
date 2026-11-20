@@ -57,6 +57,10 @@ namespace uiMaterial {
         GENTLE = 1,
         SMOOTH = 2,
     }
+    export enum MaterialColorBlendMode {
+        LINEAR_MIX = 0,
+        TINTED_GLASS = 1,
+    }
     export interface LightEffectOptions {
         color?: ResourceColor,
     }
@@ -67,6 +71,7 @@ namespace uiMaterial {
         applyShadow?: boolean,
         interactive?: boolean,
         lightEffect?: LightEffectOptions | null,
+        colorBlendMode?: MaterialColorBlendMode,
     }
     class Cleaner {
         private ptr: long = 0;
@@ -127,6 +132,8 @@ namespace uiMaterial {
                     applyShadow: options_cast.applyShadow,
                     interactive: options_cast.interactive,
                     lightEffect: ImmersiveMaterial.ConvertLightEffectOptions(options_cast.lightEffect),
+                    colorBlendMode: (options_cast.colorBlendMode === undefined) ? undefined :
+                        (options_cast.colorBlendMode as MaterialColorBlendMode).valueOf(),
                 } as ImmersiveOptionsInner;
             }
             this.materialObj_ = ImmersiveHelper.ImmersiveConstruct(val);

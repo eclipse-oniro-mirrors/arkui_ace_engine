@@ -17,6 +17,7 @@ ace_unittest("event_manager_test_ng") {
   module_name = "Component-Snapshot"
   type = "new"
   sources = [
+    "$ace_root/frameworks/core/components_ng/pattern/command/ui_command_security_gate.cpp",
     "$ace_root/frameworks/core/event/resample_algo.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_input_manager.cpp",
     "$ace_root/test/mock/frameworks/base/mousestyle/mock_mouse_style.cpp",

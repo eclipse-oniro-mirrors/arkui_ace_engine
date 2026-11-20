@@ -1050,7 +1050,7 @@ HWTEST_F(DatePickerTestThree, DatePickerColumnPatternTest003, TestSize.Level1)
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<DatePickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto pickerNodeLayout = columnNode->GetLayoutProperty<DataPickerLayoutProperty>();
     ASSERT_NE(pickerNodeLayout, nullptr);
@@ -1125,7 +1125,7 @@ HWTEST_F(DatePickerTestThree, DatePickerColumnPatternTest004, TestSize.Level1)
     ASSERT_NE(frameNode, nullptr);
     frameNode->MarkModifyDone();
     auto columnNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild()->GetLastChild()->GetLastChild());
-    auto columnPattern = AceType::DynamicCast<FrameNode>(columnNode)->GetPattern<DatePickerColumnPattern>();
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
     ASSERT_NE(columnPattern, nullptr);
     auto pickerNodeLayout = columnNode->GetLayoutProperty<DataPickerLayoutProperty>();
     ASSERT_NE(pickerNodeLayout, nullptr);

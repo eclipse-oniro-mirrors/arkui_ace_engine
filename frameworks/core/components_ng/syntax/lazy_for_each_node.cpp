@@ -658,7 +658,7 @@ void LazyForEachNode::OnConfigurationUpdate(const ConfigurationChange& configura
     if (configurationChange.IsNeedUpdate() && builder_) {
         auto map = builder_->GetCachedUINodeMap();
         for (auto& it : map) {
-            auto node = DynamicCast<UINode>(it.second.second);
+            auto node = it.second.second;
             if (node) {
                 node->UpdateConfigurationUpdate(configurationChange);
             }

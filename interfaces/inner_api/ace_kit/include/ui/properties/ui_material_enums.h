@@ -94,6 +94,11 @@ enum class VibrancyMode : int8_t {
     BRIGHTEN = 2,
     DARKEN = 3,
 };
+
+enum class MaterialColorBlendMode : int8_t {
+    LINEAR_MIX = 0,
+    TINTED_GLASS = 1,
+};
 } // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_INTERFACES_INNER_API_ACE_KIT_INCLUDE_UI_PROPERTIES_UI_MATERIAL_ENUM_H

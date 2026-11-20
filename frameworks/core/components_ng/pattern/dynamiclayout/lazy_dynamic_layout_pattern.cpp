@@ -46,7 +46,7 @@ bool LazyDynamicLayoutPattern::OnDirtyLayoutWrapperSwap(
         return false;
     }
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = dirty->GetLayoutAlgorithm();
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto layoutAlgorithm = AceType::DynamicCast<LazyDynamicLayoutAlgorithm>(
         layoutAlgorithmWrapper->GetLayoutAlgorithm());

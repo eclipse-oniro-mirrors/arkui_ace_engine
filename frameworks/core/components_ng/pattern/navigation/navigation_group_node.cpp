@@ -595,7 +595,7 @@ RefPtr<UINode> NavigationGroupNode::GetNavDestinationNode(RefPtr<UINode> uiNode)
             // this is a navDestination node
             return uiNode;
         }
-        if (AceType::DynamicCast<UINode>(uiNode)) {
+        if (uiNode) {
             // this is an UINode, go deep further for navDestination node
             auto children = uiNode->GetChildren();
             uiNode = children.front();
@@ -2278,7 +2278,7 @@ bool NavigationGroupNode::CheckNeedUpdateParentNode(const RefPtr<UINode>& curNod
     auto navigationManager = pipelineContext->GetNavigationManager();
     CHECK_NULL_RETURN(navigationManager, true);
     // update navigation manager map <parentId, std::vector<navigationId>>
-    navigationManager->AddNavigation(parentNode->GetId(), DynamicCast<FrameNode>(Claim(this)));
+    navigationManager->AddNavigation(parentNode->GetId(), Claim(this));
     return true;
 }
 

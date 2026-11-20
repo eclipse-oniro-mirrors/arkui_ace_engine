@@ -2652,7 +2652,10 @@ HWTEST_F(FrameNodeTestNg, TypedComponentPointerOffset001, TestSize.Level1)
     auto count = pattern->RefCount();
     EXPECT_EQ(node->GetPatternPtr<OffsetPattern>(), raw);
     EXPECT_EQ(node->GetPatternPtr<Pattern>(), static_cast<Pattern*>(raw));
-    EXPECT_EQ(node->GetPatternPtr<AceType>(), static_cast<AceType*>(raw));
+    EXPECT_EQ(static_cast<AceType*>(node->GetPatternPtr<Pattern>()), static_cast<AceType*>(raw));
+    EXPECT_EQ(node->GetRawPattern<OffsetPattern>(), raw);
+    EXPECT_EQ(node->GetRawPattern<Pattern>(), static_cast<Pattern*>(raw));
+    EXPECT_EQ(static_cast<AceType*>(node->GetRawPattern<Pattern>()), static_cast<AceType*>(raw));
     EXPECT_EQ(pattern->RefCount(), count);
 
     auto layout = AceType::MakeRefPtr<OffsetLayoutProperty>();
@@ -2665,6 +2668,9 @@ HWTEST_F(FrameNodeTestNg, TypedComponentPointerOffset001, TestSize.Level1)
     ASSERT_NE(static_cast<void*>(AceType::RawPtr(paint)),
         static_cast<void*>(static_cast<PaintProperty*>(AceType::RawPtr(paint))));
     EXPECT_EQ(node->GetPaintPropertyPtr<OffsetPaintProperty>(), AceType::RawPtr(paint));
+    EXPECT_EQ(node->GetPaintPropertyPtr<PaintProperty>(), static_cast<PaintProperty*>(AceType::RawPtr(paint)));
+    EXPECT_EQ(static_cast<AceType*>(node->GetPaintPropertyPtr<PaintProperty>()),
+        static_cast<AceType*>(AceType::RawPtr(paint)));
 }
 
 /**

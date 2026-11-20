@@ -57,10 +57,13 @@ struct AgentInputResult {
     int32_t nodeId = -1;
     std::string compId;
     std::string tag;
-    bool allowed = true;
+    // Only reported when allowed is false; allowed is a reserved field.
+    bool allowed = false;
+    // Bundle name of the app hosting the target (target app), empty when unavailable.
+    std::string bundleName;
+    int32_t index = 0;
 };
 
-// Frozen per-node decision, captured when the node is first engaged by the gesture.
 struct NodeSnapshot {
     WeakPtr<FrameNode> node;
     std::string compId;
@@ -68,8 +71,6 @@ struct NodeSnapshot {
     bool hasControlMode = false;
 };
 
-// Per-gesture state: each node's decision freezes on first engagement; reporting
-// dedups across MOVE and repeats once more on UP/RELEASE.
 struct AgentGestureState {
     int32_t initialNodeId = -1;
     bool hasSession = false;

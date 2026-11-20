@@ -275,23 +275,20 @@ HWTEST_F(DatePickerTestCore, DatePickerCore006, TestSize.Level1)
     const std::string language = "en";
     AceApplicationInfo::GetInstance().SetLocale(language, "US", "Latn", "");
     datePickerPattern->OnLanguageConfigurationUpdate();
+    // Clear the static month-day cache so GetSolarMonthDay re-formats via ICU
+    // under the newly set locale instead of returning a stale cached value.
+    datePickerPattern->solarMonthDays_.clear();
 
     auto date = PickerDateF::CreateMonthDay(4, 16, false, false);
     auto result = datePickerPattern->GetFormatString(date);
     EXPECT_FALSE(result.empty());
 
-    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
-    auto monthPos = expectedOrder.find('M');
-    auto dayPos = expectedOrder.find('d');
-    if (monthPos != std::string::npos && dayPos != std::string::npos && dayPos < monthPos) {
-        auto dayStr = datePickerPattern->solarDays_[15];
-        auto monthStr = datePickerPattern->solarMonths_[3];
-        EXPECT_EQ(result, dayStr + " " + monthStr);
-    } else {
-        auto dayStr = datePickerPattern->solarDays_[15];
-        auto monthStr = datePickerPattern->solarMonths_[3];
-        EXPECT_EQ(result, monthStr + " " + dayStr);
-    }
+    // Solar month-day is formatted by ICU ("MMMd"); the result must equal the
+    // locale's ICU-formatted month-day (separator + field order decided by ICU).
+    DateTime expected;
+    expected.month = 3; // 4 - 1, W3C month is 0-based
+    expected.day = 16;
+    EXPECT_EQ(result, Localization::GetInstance()->FormatDateTime(expected, "MMMd"));
 }
 
 /**
@@ -309,21 +306,55 @@ HWTEST_F(DatePickerTestCore, DatePickerCore007, TestSize.Level1)
     const std::string language = "de";
     AceApplicationInfo::GetInstance().SetLocale(language, "DE", "Latn", "");
     datePickerPattern->OnLanguageConfigurationUpdate();
+    // Clear the static month-day cache so GetSolarMonthDay re-formats via ICU
+    // under the newly set locale instead of returning a stale cached value.
+    datePickerPattern->solarMonthDays_.clear();
 
     auto date = PickerDateF::CreateMonthDay(4, 16, false, false);
     auto result = datePickerPattern->GetFormatString(date);
     EXPECT_FALSE(result.empty());
 
-    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
-    auto monthPos = expectedOrder.find('M');
-    auto dayPos = expectedOrder.find('d');
-    auto dayStr = datePickerPattern->solarDays_[15];
-    auto monthStr = datePickerPattern->solarMonths_[3];
-    if (monthPos != std::string::npos && dayPos != std::string::npos && dayPos < monthPos) {
-        EXPECT_EQ(result, dayStr + " " + monthStr);
-    } else {
-        EXPECT_EQ(result, monthStr + " " + dayStr);
-    }
+    // Solar month-day is formatted by ICU ("MMMd"); the result must equal the
+    // locale's ICU-formatted month-day (separator + field order decided by ICU),
+    // e.g. de-DE puts day before month with a "." separator.
+    DateTime expected;
+    expected.month = 3; // 4 - 1, W3C month is 0-based
+    expected.day = 16;
+    EXPECT_EQ(result, Localization::GetInstance()->FormatDateTime(expected, "MMMd"));
+}
+
+/**
+ * @tc.name: DatePickerCore025
+ * @tc.desc: Test GetFormatString for zh (CJK) uses no separator between month and day
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore025, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    const std::string language = "zh";
+    AceApplicationInfo::GetInstance().SetLocale(language, "CN", "Hans", "");
+    datePickerPattern->OnLanguageConfigurationUpdate();
+    // Clear the static month-day cache so GetSolarMonthDay re-formats via ICU
+    // under the newly set locale instead of returning a stale cached value.
+    datePickerPattern->solarMonthDays_.clear();
+
+    auto date = PickerDateF::CreateMonthDay(4, 16, false, false);
+    auto result = datePickerPattern->GetFormatString(date);
+    EXPECT_FALSE(result.empty());
+
+    // Solar month-day is formatted by ICU ("MMMd"); the result must equal the
+    // locale's ICU-formatted month-day. For zh-CN ICU yields a compact "M月d日"
+    // form with no space separator.
+    DateTime expected;
+    expected.month = 3; // 4 - 1, W3C month is 0-based
+    expected.day = 16;
+    EXPECT_EQ(result, Localization::GetInstance()->FormatDateTime(expected, "MMMd"));
+    // CJK month-day is compact: no space separator is inserted.
+    EXPECT_EQ(result.find(' '), std::string::npos);
 }
 
 /**

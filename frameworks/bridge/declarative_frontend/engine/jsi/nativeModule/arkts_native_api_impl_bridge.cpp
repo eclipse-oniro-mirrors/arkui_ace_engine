@@ -2001,6 +2001,10 @@ void ArkUINativeModule::RegisterListAttributes(Local<panda::ObjectRef> object, E
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetScrollSnapAlign));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetScrollSnapAlign"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::ResetScrollSnapAlign));
+    list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setScrollSnapStrategy"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetScrollSnapStrategy));
+    list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetScrollSnapStrategy"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::ResetScrollSnapStrategy));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setDivider"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetDivider));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetDivider"),
@@ -2745,6 +2749,12 @@ void ArkUINativeModule::RegisterContainerPickerAttributes(Local<panda::ObjectRef
     containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContainerPickerItemHeight"),
         panda::FunctionRef::New(
             const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::ResetContainerPickerItemHeight));
+    containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "setContainerPickerSelectedTextStyle"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::SetContainerPickerSelectedTextStyle));
+    containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContainerPickerSelectedTextStyle"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::ResetContainerPickerSelectedTextStyle));
     containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "setContainerPickerOnChange"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ContainerPickerBridge::SetContainerPickerOnChange));
     containerPicker->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetContainerPickerOnChange"),
@@ -3194,6 +3204,10 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::SetSafeAreaPadding));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetSafeAreaPadding"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::ResetSafeAreaPadding));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setSafeAreaInset"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::SetSafeAreaInset));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetSafeAreaInset"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::ResetSafeAreaInset));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setMarkAnchor"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM *>(vm), CommonBridge::SetMarkAnchor));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetMarkAnchor"),
@@ -3483,6 +3497,8 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetOnTouch));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnTouch"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetOnTouch));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "enableTouchPadEvent"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::EnableTouchPadEvent));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnAppear"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetOnAppear));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnAppear"),

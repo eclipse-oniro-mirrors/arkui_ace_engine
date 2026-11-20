@@ -43,6 +43,7 @@ const char APPLY_SHADOW_NAME[] = "applyShadow";
 const char INTERACTIVE_NAME[] = "interactive";
 const char LIGHT_EFFECT_NAME[] = "lightEffect";
 const char LIGHT_EFFECT_COLOR_NAME[] = "color";
+const char COLOR_BLEND_MODE_NAME[] = "colorBlendMode";
 struct JsEnumInt {
     std::string_view enumName;
     int32_t enumInt;
@@ -219,6 +220,14 @@ ImmersiveOptions UiMaterialNapi::ParseImmersiveOptions(napi_env env, napi_value 
             }
         }
     }
+    napi_value napiColorBlendModeParam = GetNamedProperty(env, value, COLOR_BLEND_MODE_NAME);
+    if (GetValueType(env, napiColorBlendModeParam) == napi_number) {
+        int32_t blendMode = GetCInt32(napiColorBlendModeParam, env);
+        if (blendMode >= static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) &&
+            blendMode <= static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS)) {
+            options.colorBlendMode = static_cast<MaterialColorBlendMode>(blendMode);
+        }
+    }
     if (CheckIsECStyle(options.style)) {
         ConvertToImmersiveOptionsEC(options);
     }
@@ -347,6 +356,9 @@ void UiMaterialNapi::ConvertToImmersiveOptionsEC(ImmersiveOptions& newOptions)
     newOptions.interactive = false;
     newOptions.lightEffectOptions = std::nullopt;
     newOptions.colorResObj = nullptr;
+    // colorBlendMode is preserved here for future EC parameter extension.
+    // It currently has no effect on pure EC style, but may become useful when more params are added.
+    // For EC_SUB style it takes effect via the sub-shader path.
 }
 
 void UiMaterialNapi::ConvertToImmersiveOptionsECSub(ImmersiveOptions& newOptions)
@@ -522,6 +534,16 @@ napi_status UiMaterialNapi::EnumMaterialStateInit(napi_env env, napi_value expor
     return EnumInit(env, exports, enumClassName, enumStructs);
 }
 
+napi_status UiMaterialNapi::EnumMaterialColorBlendModeInit(napi_env env, napi_value exports)
+{
+    const char* enumClassName = "MaterialColorBlendMode";
+    const std::vector<struct JsEnumInt> enumStructs = {
+        { "LINEAR_MIX", static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) },
+        { "TINTED_GLASS", static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS) },
+    };
+    return EnumInit(env, exports, enumClassName, enumStructs);
+}
+
 napi_status UiMaterialNapi::ImmersiveMaterialInit(napi_env env, napi_value exports, napi_value baseCtr)
 {
     napi_property_descriptor static_prop[] = {};
@@ -588,6 +610,7 @@ napi_value UiMaterialNapi::Init(napi_env env, napi_value exports)
     NAPI_CALL(env, EnumImmersiveStyleInit(env, exports));
     NAPI_CALL(env, EnumImmersiveLevelInit(env, exports));
     NAPI_CALL(env, EnumMaterialStateInit(env, exports));
+    NAPI_CALL(env, EnumMaterialColorBlendModeInit(env, exports));
     NAPI_CALL(env, ImmersiveMaterialInit(env, exports, constructor));
     return exports;
 }

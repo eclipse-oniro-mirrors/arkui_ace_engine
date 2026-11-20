@@ -306,7 +306,8 @@ void MenuItemPattern::OnModifyDone()
 
         auto renderContext = host->GetRenderContext();
         if (renderContext) {
-            renderContext->SetClipToBounds(true);
+            // SetClipToFrame: overlay divider avoids BorderRadius RRect clip; content/foreground retain own clipping.
+            renderContext->SetClipToFrame(true);
         }
         if (!longPressEvent_ && Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
             InitLongPressEvent();
@@ -536,7 +537,8 @@ void MenuItemPattern::HandleFocusEvent()
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    renderContext->SetClipToBounds(focusPadding_ == 0.0_vp);
+    // SetClipToFrame: overlay divider avoids BorderRadius RRect clip; content/foreground retain own clipping.
+    renderContext->SetClipToFrame(focusPadding_ == 0.0_vp);
     auto context = host->GetContextRefPtr();
     CHECK_NULL_VOID(context);
     auto selectTheme = host->GetTheme<SelectTheme>(true);
@@ -574,7 +576,8 @@ void MenuItemPattern::HandleBlurEvent()
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    renderContext->SetClipToBounds(true);
+    // SetClipToFrame: overlay divider avoids BorderRadius RRect clip; content/foreground retain own clipping.
+    renderContext->SetClipToFrame(true);
     if (isFocusBGColorSet_) {
         renderContext->ResetBackgroundColor();
         renderContext->SetBackgroundColor(Color::TRANSPARENT.GetValue());
@@ -696,7 +699,7 @@ void MenuItemPattern::CleanParentMenuItemBgColor()
     props->UpdatePress(false);
     auto parentNode = host->GetParent();
     CHECK_NULL_VOID(parentNode);
-    auto parent = AceType::DynamicCast<UINode>(parentNode);
+    auto parent = parentNode;
     CHECK_NULL_VOID(parent);
     menuPattern->OnItemPressed(parent, index_, false, false);
     PlayBgColorAnimation();
@@ -1538,7 +1541,7 @@ void MenuItemPattern::NotifyPressStatus(bool isPress)
     ACE_UINODE_TRACE(menu);
     auto menuPattern = menu->GetPattern<MenuPattern>();
     CHECK_NULL_VOID(menuPattern);
-    auto parent = AceType::DynamicCast<UINode>(host->GetParent());
+    auto parent = host->GetParent();
     auto menuWrapper = GetMenuWrapper();
     auto menuWrapperPattern = menuWrapper ? menuWrapper->GetPattern<MenuWrapperPattern>() : nullptr;
 
@@ -1667,7 +1670,7 @@ void MenuItemPattern::OnHover(bool isHover)
         CHECK_NULL_VOID(menuPattern);
         auto props = GetPaintProperty<MenuItemPaintProperty>();
         CHECK_NULL_VOID(props);
-        auto parent = AceType::DynamicCast<UINode>(host->GetParent());
+        auto parent = host->GetParent();
         SetBgBlendColor(isHover || isSubMenuShowed_ ? theme->GetHoverColor() : Color::TRANSPARENT);
         props->UpdateHover(isHover || isSubMenuShowed_);
         UpdateDividerHoverStatus(isHover || isSubMenuShowed_);
@@ -2921,13 +2924,16 @@ void MenuItemPattern::ModifyDivider()
         auto paintProperty = host->GetPaintProperty<MenuItemPaintProperty>();
         CHECK_NULL_VOID(paintProperty);
         auto strokeWidth = hasDivider ? divider->strokeWidth : selectTheme->GetDefaultDividerWidth();
-        auto startMargin = hasDivider ? divider->startMargin : selectTheme->GetDefaultDividerStartMargin();
-        auto endMargin = hasDivider ? divider->endMargin : selectTheme->GetDefaultDividerEndMargin();
         auto color = hasDivider ? divider->color : selectTheme->GetLineColor();
         paintProperty->UpdateStrokeWidth(strokeWidth);
-        paintProperty->UpdateStartMargin(startMargin);
-        paintProperty->UpdateEndMargin(endMargin);
         paintProperty->UpdateDividerColor(color);
+        if (hasDivider) {
+            paintProperty->UpdateStartMargin(divider->startMargin);
+            paintProperty->UpdateEndMargin(divider->endMargin);
+        } else {
+            paintProperty->ResetStartMargin();
+            paintProperty->ResetEndMargin();
+        }
         host->MarkModifyDone();
         host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
     }

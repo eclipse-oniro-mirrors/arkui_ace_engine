@@ -321,7 +321,7 @@ void CalendarPickerDialogShow(const NativeCalendarDialogOptions& options,
     NG::BorderRadiusProperty dialogRadius;
     SetRadius(dialogRadius, calendarTheme->GetDialogBorderRadius());
     properties.borderRadius = dialogRadius;
-    auto context = AccessibilityManager::DynamicCast<NG::PipelineContext>(pipelineContext);
+    auto context = pipelineContext;
     auto overlayManager = context ? context->GetOverlayManager() : nullptr;
     auto weak = WeakPtr<NG::OverlayManager>(overlayManager);
     auto overlayManager_ = weak.Upgrade();

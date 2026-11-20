@@ -916,7 +916,7 @@ HWTEST_F(SelectPatternTwoTestNg, UpdateMenuOption, TestSize.Level1)
 
     // Ensure there is at least one option
     ASSERT_FALSE(menuPattern->GetOptions().empty());
-    auto menuItemNode = AceType::DynamicCast<FrameNode>(menuPattern->GetOptions().at(0));
+    auto menuItemNode = menuPattern->GetOptions().at(0);
     ASSERT_NE(menuItemNode, nullptr);
     auto menuItemPattern = menuItemNode->GetPattern<MenuItemPattern>();
     ASSERT_NE(menuItemPattern, nullptr);

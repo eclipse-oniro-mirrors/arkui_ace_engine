@@ -418,6 +418,8 @@ private:
     void RegisterPipelineEvent(int32_t instanceId);
     void RegisterPipelineEvent(const RefPtr<PipelineContext>& pipeline);
     void RegisterUIExtensionManagerEvent(int32_t instanceId);
+    void RegisterBrandColorChangeListener();
+    void UnRegisterBrandColorChangeListener();
     void UpdateSessionInstanceId(int32_t instanceId);
 
     void RegisterVisibleAreaChange();

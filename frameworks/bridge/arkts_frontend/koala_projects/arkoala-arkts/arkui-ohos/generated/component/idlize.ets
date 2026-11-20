@@ -8266,6 +8266,7 @@ export interface ImmersiveOptionsInner {
     applyShadow?: boolean;
     interactive?: boolean;
     lightEffect?: LightEffectOptionsInner | null;
+    colorBlendMode?: int32;
 }
 export interface WaterFlowSectionsInterface {
     ptr: KPointer;
@@ -10741,6 +10742,14 @@ export class ImmersiveOptionsInner_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForColorBlendMode = value.colorBlendMode
+        if (valueHolderForColorBlendMode !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForColorBlendModeTmpValue = valueHolderForColorBlendMode!
+            valueSerializer.writeInt32(valueHolderForColorBlendModeTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): ImmersiveOptionsInner {
         let valueDeserializer: DeserializerBase = buffer
@@ -10793,7 +10802,13 @@ export class ImmersiveOptionsInner_serializer {
             lightEffectTmpBuf = LightEffectOptionsInner_serializer.read(valueDeserializer)
         }
         const lightEffectTmpResult: LightEffectOptionsInner | null | undefined = lightEffectTmpBuf
-        let value: ImmersiveOptionsInner = ({style: styleTmpResult, materialColor: materialColorTmpResult, colorInvert: colorInvertTmpResult, applyShadow: applyShadowTmpResult, interactive: interactiveTmpResult, lightEffect: lightEffectTmpResult} as ImmersiveOptionsInner)
+        const colorBlendModeTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let colorBlendModeTmpBuf: int32 | undefined = undefined
+        if ((colorBlendModeTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            colorBlendModeTmpBuf = valueDeserializer.readInt32()
+        }
+        const colorBlendModeTmpResult: int32 | undefined = colorBlendModeTmpBuf
+        let value: ImmersiveOptionsInner = ({style: styleTmpResult, materialColor: materialColorTmpResult, colorInvert: colorInvertTmpResult, applyShadow: applyShadowTmpResult, interactive: interactiveTmpResult, lightEffect: lightEffectTmpResult, colorBlendMode: colorBlendModeTmpResult} as ImmersiveOptionsInner)
         return value
     }
 }

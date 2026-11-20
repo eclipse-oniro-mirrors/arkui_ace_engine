@@ -306,7 +306,7 @@ HitTestResult FormNode::TouchTest(const PointF& globalPoint, const PointF& paren
         }
         return testResult;
     }
-    auto subContext = DynamicCast<OHOS::Ace::PipelineBase>(subContainer->GetPipelineContext());
+    auto subContext = subContainer->GetPipelineContext();
     CHECK_NULL_RETURN(subContext, testResult);
     subContext->SetPluginEventOffset(Offset(selfGlobalOffset.GetX(), selfGlobalOffset.GetY()));
     context->SetTouchPipeline(WeakPtr<PipelineBase>(subContext));

@@ -34,7 +34,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants> &themeConstants) const
         {
             auto themeWrapper = AceType::Claim(new ButtonThemeWrapper());
-            auto theme = AceType::DynamicCast<ButtonTheme>(themeWrapper);
+            RefPtr<ButtonTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

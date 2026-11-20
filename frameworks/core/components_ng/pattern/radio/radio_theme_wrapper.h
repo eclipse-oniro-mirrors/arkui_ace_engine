@@ -39,7 +39,7 @@ public:
             if (!themeConstants) {
                 return wrapper;
             }
-            ParsePattern(themeConstants, AceType::DynamicCast<RadioTheme>(wrapper));
+            ParsePattern(themeConstants, RefPtr<RadioTheme>(wrapper));
             return wrapper;
         }
     };

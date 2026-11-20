@@ -73,6 +73,7 @@ public:
     static uint32_t GetBackgroundColor();
 
     void RegisterTouchEventCallback(TouchEventCallback&& callback) override;
+    void EnableTouchpadRawEvent(bool enabled) override;
     void RegisterDragEventCallback(DragEventCallBack&& callback) override;
     void RegisterKeyEventCallback(KeyEventCallback&& callback) override;
     void RegisterNonPointerEventCallback(NonPointerEventCallback&& callback) override;

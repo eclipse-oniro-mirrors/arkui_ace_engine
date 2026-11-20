@@ -182,6 +182,7 @@ type BlendMode = drawing.BlendMode;
 type VisualEffect = uiEffect.VisualEffect;
 type Filter = uiEffect.Filter;
 type BrightnessBlender = uiEffect.BrightnessBlender;
+type BlenderBase = uiEffect.BlenderBase;
 
 export declare enum SafeAreaInsetAlignment {
     START = 0,
@@ -433,6 +434,7 @@ export interface CommonMethod {
     overlay(value: string | CustomBuilder | ComponentContent | undefined, options?: OverlayOptions): this;
     blendMode(value: BlendMode | undefined, type?: BlendApplyType): this;
     advancedBlendMode(effect: BlendMode | BrightnessBlender | undefined, type?: BlendApplyType): this;
+    advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this;
     bindTips(message: TipsMessageType | undefined, options?: TipsOptions): this;
     bindPopup(show: boolean | undefined, popup: PopupOptions | CustomPopupOptions | undefined): this;
     bindMenu(content: Array<MenuElement> | CustomBuilder | undefined, options?: MenuOptions | undefined): this;
@@ -742,7 +744,8 @@ export declare class ArkCommonMethodPeer extends PeerNode {
     ): void;
     public blendMode0Attribute(value: BlendMode | undefined, type?: BlendApplyType): void;
     public blendMode1Attribute(mode: BlendMode | undefined, type?: BlendApplyType): void;
-    public advancedBlendModeAttribute(effect: BlendMode | BrightnessBlender | undefined, type?: BlendApplyType): void;
+    public advancedBlendMode0Attribute(effect: BlendMode | BrightnessBlender | undefined, type?: BlendApplyType): void;
+    public advancedBlendMode1Attribute(effect: BlenderBase | undefined, type?: BlendApplyType): void;
     public bindTipsAttribute(message: TipsMessageType | undefined, options?: TipsOptions): void;
     public bindPopupAttribute(show: boolean | undefined, popup: PopupOptions | CustomPopupOptions | undefined): void;
     public bindMenu0Attribute(content: Array<MenuElement> | CustomBuilder | undefined, options?: MenuOptions): void;
@@ -1000,6 +1003,7 @@ export declare class ArkCommonMethodPeer extends PeerNode {
     public overlay(value: string | CustomBuilder | ComponentContent | undefined, options?: OverlayOptions): this;
     public blendMode(value: BlendMode | undefined, type?: BlendApplyType): this;
     public advancedBlendMode(effect: BlendMode | BrightnessBlender | undefined, type?: BlendApplyType): this;
+    public advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this;
     public bindTips(message: TipsMessageType | undefined, options?: TipsOptions): this;
     public bindPopup(show: boolean | undefined, popup: PopupOptions | CustomPopupOptions | undefined): this;
     public bindMenu(content: Array<MenuElement> | CustomBuilder | undefined, options?: MenuOptions | undefined): this;
@@ -1395,6 +1399,7 @@ export declare class ArkCommonMethodStyle implements CommonMethod {
     public overlay(value: string | CustomBuilder | ComponentContent | undefined, options?: OverlayOptions): this;
     public blendMode(value: BlendMode | undefined, type?: BlendApplyType): this;
     public advancedBlendMode(effect: BlendMode | BrightnessBlender | undefined, type?: BlendApplyType): this;
+    public advancedBlendMode(effect: BlenderBase | undefined, type?: BlendApplyType): this;
     public bindTips(message: TipsMessageType | undefined, options?: TipsOptions): this;
     public bindPopup(show: boolean | undefined, popup: PopupOptions | CustomPopupOptions | undefined): this;
     public bindMenu(content: Array<MenuElement> | CustomBuilder | undefined, options?: MenuOptions | undefined): this;

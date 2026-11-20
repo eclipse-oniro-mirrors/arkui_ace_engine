@@ -59,6 +59,14 @@ class ArkContainerPickerComponent extends ArkComponent implements UIPickerCompon
       height);
     return this;
   }
+  selectedTextStyle(style: Optional<PickerComponentTextStyle>): this {
+    modifierWithKey(
+      this._modifiersWithKeys,
+      ContainerPickerSelectedTextStyleModifier.identity,
+      ContainerPickerSelectedTextStyleModifier,
+      style);
+    return this;
+  }
 
 }
 class ContainerPickerOnChangeModifier extends ModifierWithKey<Optional<OnPickerCallback>> {
@@ -185,6 +193,28 @@ class ContainerPickerItemHeightModifier extends ModifierWithKey<Optional<LengthM
       getUINativeModule().containerPicker.resetContainerPickerItemHeight(node);
     } else {
       getUINativeModule().containerPicker.setContainerPickerItemHeight(node, this.value);
+    }
+  }
+}
+
+class ContainerPickerSelectedTextStyleModifier extends ModifierWithKey<Optional<PickerComponentTextStyle>> {
+  constructor(value: Optional<PickerComponentTextStyle>) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('containerPickerSelectedTextStyle');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().containerPicker.resetContainerPickerSelectedTextStyle(node);
+    } else {
+      const style = this.value;
+      const color = style?.color;
+      const fontSize = style?.font?.size;
+      const fontWeight = style?.font?.weight;
+      const minFontSize = style?.minFontSize;
+      const maxFontSize = style?.maxFontSize;
+      const overflow = style?.overflow;
+      getUINativeModule().containerPicker.setContainerPickerSelectedTextStyle(
+        node, color, fontSize, fontWeight, minFontSize, maxFontSize, overflow);
     }
   }
 }

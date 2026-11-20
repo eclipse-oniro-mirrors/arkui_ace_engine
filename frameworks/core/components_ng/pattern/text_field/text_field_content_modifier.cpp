@@ -683,28 +683,56 @@ void TextFieldContentModifier::UpdateTextFadeout(
 }
 
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-void TextFieldContentModifier::SetAutoFillTranslationOffset(const float value)
-{
-    CHECK_NULL_VOID(autoFillTranslationOffset_);
-    autoFillTranslationOffset_->Set(value);
-}
-
 void TextFieldContentModifier::SetDefaultAutoFillTranslationOffset()
 {
     autoFillTranslationOffset_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
     AttachProperty(autoFillTranslationOffset_);
 }
 
-void TextFieldContentModifier::SetAutoFillTextScrollOffset(const float value)
-{
-    CHECK_NULL_VOID(autoFillTextScrollOffset_);
-    autoFillTextScrollOffset_->Set(value);
-}
-
 void TextFieldContentModifier::SetDefaultAutoFillTextScrollOffset()
 {
     autoFillTextScrollOffset_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
     AttachProperty(autoFillTextScrollOffset_);
+}
+
+void TextFieldContentModifier::SetDefaultAutoFillCharIndex()
+{
+    autoFillEmphasizeCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    AttachProperty(autoFillEmphasizeCharIndex_);
+    autoFillDefaultCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    AttachProperty(autoFillDefaultCharIndex_);
+}
+
+void TextFieldContentModifier::DoAutoFillDraw(DrawingContext& context)
+{
+    auto textFieldPattern = DynamicCast<TextFieldPattern>(pattern_.Upgrade());
+    CHECK_NULL_VOID(textFieldPattern);
+    auto autoFillController = textFieldPattern->GetOrCreateAutoFillController();
+    CHECK_NULL_VOID(autoFillController);
+    CHECK_NULL_VOID(contentOffset_);
+    auto contentOffset = contentOffset_->Get();
+    autoFillController->DrawAutoFill(context.canvas, contentOffset,
+        autoFillTranslationOffset_->Get(), autoFillTextScrollOffset_->Get(),
+        autoFillDefaultCharIndex_->Get(), autoFillEmphasizeCharTextColor_,
+        autoFillDefaultCharInitTextColor_, autoFillOriginTextColor_);
+}
+#endif
+
+// IAutoFillContentModifier overrides must be compiled on every platform:
+// the interface is inherited unconditionally (see text_field_content_modifier.h),
+// so the vtable references these entries even when ENABLE_AUTO_FILL_CONTROLLER
+// is undefined (e.g. cross-platform builds). They are cheap null-safe property
+// setters, safe to build without the auto fill controller.
+void TextFieldContentModifier::SetAutoFillTranslationOffset(const float value)
+{
+    CHECK_NULL_VOID(autoFillTranslationOffset_);
+    autoFillTranslationOffset_->Set(value);
+}
+
+void TextFieldContentModifier::SetAutoFillTextScrollOffset(const float value)
+{
+    CHECK_NULL_VOID(autoFillTextScrollOffset_);
+    autoFillTextScrollOffset_->Set(value);
 }
 
 void TextFieldContentModifier::SetAutoFillEmphasizeCharIndex(const float value)
@@ -719,71 +747,16 @@ void TextFieldContentModifier::SetAutoFillDefaultCharIndex(const float value)
     autoFillDefaultCharIndex_->Set(value);
 }
 
-void TextFieldContentModifier::SetDefaultAutoFillCharIndex()
-{
-    autoFillEmphasizeCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
-    AttachProperty(autoFillEmphasizeCharIndex_);
-    autoFillDefaultCharIndex_ = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
-    AttachProperty(autoFillDefaultCharIndex_);
-}
-
 void TextFieldContentModifier::SetAutoFillOriginTextColor(const Color& value)
 {
     autoFillOriginTextColor_ = value;
 }
 
-void TextFieldContentModifier::DoAutoFillDraw(DrawingContext& context)
+void TextFieldContentModifier::ResetAutoFillProperties()
 {
-    auto& canvas = context.canvas;
-    auto textFieldPattern = DynamicCast<TextFieldPattern>(pattern_.Upgrade());
-    CHECK_NULL_VOID(textFieldPattern);
-    auto autoFillController = textFieldPattern->GetOrCreateAutoFillController();
-    CHECK_NULL_VOID(autoFillController);
-    auto paragraph = autoFillController->GetAutoFillParagraph();
-    CHECK_NULL_VOID(paragraph);
-    CHECK_NULL_VOID(contentOffset_);
-    auto contentOffset = contentOffset_->Get();
-    auto contentRect = textFieldPattern->GetContentRect();
-    auto clipRectY1 = 0.0f;
-    auto frameNode = textFieldPattern->GetHost();
-    CHECK_NULL_VOID(frameNode);
-    auto layoutProperty = frameNode->GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    clipRectY1 = contentRect.GetY() + contentRect.Height();
-
-    auto defaultCharIndex = std::ceil(autoFillDefaultCharIndex_->Get());
-    auto length = paragraph->GetParagraphText().length();
-    auto originTextColor = autoFillOriginTextColor_.value_or(autoFillDefaultCharInitTextColor_);
-    paragraph->UpdateColor(0, defaultCharIndex, originTextColor);
-    paragraph->UpdateColor(defaultCharIndex, length, autoFillEmphasizeCharTextColor_);
-
-    auto emphasizeTranslationOffset = autoFillTranslationOffset_->Get();
-    auto isRTL = autoFillController->GetTextDirection(layoutProperty) == TextDirection::RTL;
-    canvas.Save();
-    auto textShowWidth = std::abs(emphasizeTranslationOffset);
-    auto clipRectX0 = contentRect.GetX();
-    auto clipRectX1 = contentRect.GetX() + textShowWidth;
-    if (isRTL) {
-        clipRectX0 = contentRect.GetX() + contentRect.Width() + emphasizeTranslationOffset;
-        clipRectX1 = contentRect.GetX() + contentRect.Width();
-    }
-    RSRect clipInnerRect = RSRect(clipRectX0, contentRect.GetY(), clipRectX1, clipRectY1);
-    canvas.ClipRect(clipInnerRect, RSClipOp::INTERSECT);
-    auto textRectX = autoFillController->GetAnimationTextRect().GetX();
-    if (paragraph) {
-        auto autoFillTextRectOffsetX = autoFillTextScrollOffset_->Get();
-        RSRect clipRect;
-        std::vector<RSPoint> clipRadius;
-        GetFrameRectClip(clipRect, clipRadius);
-        auto textFrameRect = textFieldPattern->GetFrameRect();
-        clipRect = RSRect(0.0f, 0.0f, clipRectX1, textFrameRect.Height());
-        if (isRTL) {
-            clipRect = RSRect(clipRectX0, 0.0f, clipRectX1, textFrameRect.Height());
-        }
-        canvas.ClipRoundRect(clipRect, clipRadius, true);
-        paragraph->Paint(canvas, textRectX - autoFillTextRectOffsetX, contentOffset.GetY());
-    }
-    canvas.Restore();
+    SetAutoFillTranslationOffset(0.0f);
+    SetAutoFillTextScrollOffset(0.0f);
+    SetAutoFillEmphasizeCharIndex(0.0f);
+    SetAutoFillDefaultCharIndex(0.0f);
 }
-#endif
 } // namespace OHOS::Ace::NG

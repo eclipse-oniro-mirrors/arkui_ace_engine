@@ -32,22 +32,31 @@ public:
 
     int64_t CJTransferToImageBitmap();
 
-    static void AddOffscreenCanvasPattern(const RefPtr<AceType>& pattern)
+    static uint32_t AddOffscreenCanvasPattern(const RefPtr<AceType>& pattern)
     {
-        CHECK_NULL_VOID(pattern);
+        CHECK_NULL_RETURN(pattern, 0);
         std::lock_guard<std::mutex> lock(mutex_);
-        offscreenPatternMap_[offscreenPatternCount_++] = pattern;
+        uint32_t id = offscreenPatternCount_;
+        offscreenPatternMap_[id] = pattern;
+        ++offscreenPatternCount_;
+        return id;
     }
 
     static RefPtr<AceType> GetOffscreenPattern(int32_t id)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        return offscreenPatternMap_[id];
+        auto iter = offscreenPatternMap_.find(id);
+        return iter == offscreenPatternMap_.end() ? nullptr : iter->second;
     }
 
     uint32_t GetId()
     {
         return id_;
+    }
+
+    void SetId(uint32_t id)
+    {
+        id_ = id;
     }
 
     void SetWidth(double width)
@@ -73,7 +82,7 @@ public:
 private:
     static std::mutex mutex_;
 
-    uint32_t id_;
+    uint32_t id_ = 0;
     double width_ = 0.0f;
     double height_ = 0.0f;
 

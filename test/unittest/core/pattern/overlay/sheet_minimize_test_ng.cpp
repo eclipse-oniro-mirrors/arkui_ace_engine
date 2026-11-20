@@ -302,7 +302,7 @@ HWTEST_F(SheetMinimizeTestNG, GetSheetTransitionCurve001, TestSize.Level1)
      */
     auto curve = object->GetSheetTransitionCurve(0.0f);
     ASSERT_NE(curve, nullptr);
-    auto springCurve = AceType::DynamicCast<InterpolatingSpring>(curve);
+    auto springCurve = curve;
     ASSERT_NE(springCurve, nullptr);
     EXPECT_EQ(springCurve->velocity_, 0.0f);
     EXPECT_EQ(springCurve->mass_, CURVE_MASS);

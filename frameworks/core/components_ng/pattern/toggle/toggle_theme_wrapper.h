@@ -33,7 +33,7 @@ public:
         RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<ToggleThemeWrapper>();
-            auto theme = AceType::DynamicCast<ToggleTheme>(themeWrapper);
+            RefPtr<ToggleTheme> theme = themeWrapper;
             if (!themeConstants) {
                 return themeWrapper;
             }

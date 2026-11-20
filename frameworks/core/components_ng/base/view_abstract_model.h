@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_VIEW_ABSTRACT_MODEL_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -66,7 +67,11 @@ using OnNewDragFunc = std::function<void(const RefPtr<OHOS::Ace::DragEvent>&)>;
 using BiasPair = std::pair<float, float>;
 using OnNeedSoftkeyboardFunc = std::function<bool()>;
 using SafeAreaInsetBuilder = std::function<void()>;
-using SafeAreaInsetBuilderArray = std::array<SafeAreaInsetBuilder, NG::SAFE_AREA_INSET_EDGE_COUNT>;
+// Element count is the SafeAreaInset edge count (TOP, END, BOTTOM, START);
+// kept in sync with NG::SAFE_AREA_INSET_EDGE_COUNT by a static_assert in the
+// implementation to avoid including the full option definitions here.
+constexpr size_t SAFE_AREA_INSET_BUILDER_COUNT = 4;
+using SafeAreaInsetBuilderArray = std::array<SafeAreaInsetBuilder, SAFE_AREA_INSET_BUILDER_COUNT>;
 enum class ResponseType : int32_t {
     RIGHT_CLICK = 0,
     LONG_PRESS,

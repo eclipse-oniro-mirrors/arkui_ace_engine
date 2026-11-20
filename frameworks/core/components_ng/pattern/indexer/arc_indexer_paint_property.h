@@ -30,7 +30,7 @@ public:
     RefPtr<PaintProperty> Clone() const override
     {
         auto value = MakeRefPtr<ArcIndexerPaintProperty>();
-        value->IndexerPaintProperty::UpdateLayoutProperty(DynamicCast<IndexerPaintProperty>(this));
+        value->IndexerPaintProperty::UpdateLayoutProperty(this);
         return value;
     }
 

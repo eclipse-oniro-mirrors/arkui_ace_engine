@@ -106,6 +106,8 @@ export class ArkUIAniModule {
     native static _Extractors_ToMatrix4TransitPtr(value: matrix4.Matrix4Transit): KPointer;
     native static _Extractors_ToUiEffectFilterPtr(value: uiEffect.Filter): KPointer;
     native static _Extractors_ToUiEffectBrightnessBlenderPtr(value: uiEffect.BrightnessBlender): KPointer;
+    native static _Extractors_ToUiEffectHdrBrightnessBlenderPtr(value: uiEffect.HdrBrightnessBlender): KPointer;
+    native static _Extractors_ToUiEffectBlenderBasePtr(value: uiEffect.BlenderBase): KPointer;
     native static _Extractors_ToUiEffectVisualEffectPtr(value: uiEffect.VisualEffect): KPointer;
     native static _Extractors_ToUiMaterialMaterialPtr(value: uiMaterial.Material): KPointer;
     native static _Extractors_ToDrawContextPtr(value: DrawContext): KPointer;
@@ -488,6 +490,7 @@ export class ArkUIAniModule {
     native static _CanvasRenderer_GetCanvasDensity(peerPtr: KPointer): number
     native static _GetSystemDensity(): number
     native static _CanvasRenderer_GetImageData(peerPtr: KPointer, sx: number, sy: number, sw: number, sh: number): Uint8ClampedArray
+    native static _CanvasRenderer_GetPixelMap(peerPtr: KPointer, sx: number, sy: number, sw: number, sh: number): image.PixelMap | undefined
     native static _CanvasRenderer_PutImageData0(peerPtr: KPointer, array: Uint8ClampedArray, dx: number, dy: number, width: KInt, height: KInt): void
     native static _CanvasRenderer_PutImageData1(peerPtr: KPointer, array: Uint8ClampedArray, dx: number, dy: number, width: KInt, height: KInt,
         dirtyX: number, dirtyY: number, dirtyWidth: number, dirtyHeight: number): void

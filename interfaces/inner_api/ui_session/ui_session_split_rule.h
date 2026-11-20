@@ -100,16 +100,20 @@ inline bool ReadOptionalBool(const cJSON* object, const char* name, bool& value)
     return true;
 }
 
-inline bool ReadRatio(const cJSON* object, const char* name, double& value)
+inline bool ReadRatio(const cJSON* object, const char* name, double& value, double minValue)
 {
     auto item = Field(object, name);
-    if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) || item->valuedouble <= 0.0 ||
-        item->valuedouble > 1.0) {
+    if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) ||
+        item->valuedouble < minValue || item->valuedouble > 1.0) {
         return false;
     }
     value = item->valuedouble;
     return true;
 }
+
+constexpr double HEIGHT_RATIO_MIN = 0.8;
+constexpr double WIDTH_RATIO_MIN = 0.2;
+constexpr double TOTAL_WIDTH_RATIO_MIN = 0.8;
 
 // Exact built-in FrameNode tags from inspector_constants.cpp and NG node/model factories.
 // Keep this catalog in sync when adding built-in FrameNode tags. Proxy validation must work
@@ -182,9 +186,10 @@ inline bool ReadSelectors(const cJSON* custom, PageSceneSplitRule& rule)
 
 inline bool ReadGeometryRatios(const cJSON* geometry, PageSceneSplitRule& rule)
 {
-    return cJSON_IsObject(geometry) && ReadRatio(geometry, "heightRatioGt", rule.heightRatioGt) &&
-           ReadRatio(geometry, "widthRatioLte", rule.widthRatioLte) &&
-           ReadRatio(geometry, "totalWidthRatioGt", rule.totalWidthRatioGt);
+    return cJSON_IsObject(geometry) &&
+           ReadRatio(geometry, "heightRatioGt", rule.heightRatioGt, HEIGHT_RATIO_MIN) &&
+           ReadRatio(geometry, "widthRatioLte", rule.widthRatioLte, WIDTH_RATIO_MIN) &&
+           ReadRatio(geometry, "totalWidthRatioGt", rule.totalWidthRatioGt, TOTAL_WIDTH_RATIO_MIN);
 }
 
 inline bool ReadGeometry(const cJSON* custom, PageSceneSplitRule& rule)

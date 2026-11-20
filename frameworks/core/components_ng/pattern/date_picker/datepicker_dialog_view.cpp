@@ -1695,7 +1695,7 @@ void DatePickerDialogView::PlayHoverAnimation(const RefPtr<FrameNode>& titleButt
     auto context = titleButton->GetContextRefPtr();
     AnimationUtils::Animate(option, [weak = WeakPtr<FrameNode>(titleButton), color]() {
         auto titleButton = weak.Upgrade();
-        auto buttonTitleNode = AceType::DynamicCast<FrameNode>(titleButton);
+        auto buttonTitleNode = titleButton;
         CHECK_NULL_VOID(buttonTitleNode);
         auto buttonTitleRenderContext = buttonTitleNode->GetRenderContext();
         buttonTitleRenderContext->UpdateBackgroundColor(color);

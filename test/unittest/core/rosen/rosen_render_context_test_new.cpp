@@ -30,8 +30,10 @@
 
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/base/mount_policy.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/common/event_manager.h"
@@ -167,7 +169,7 @@ public:
 
     void Install(const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
     {
-        ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host_), options, contents);
+        SafeAreaInsetView::SetSafeAreaInset(AceType::RawPtr(host_), options, contents);
         auto container = host_->GetSafeAreaInsetNode();
         ASSERT_NE(container, nullptr);
         container->renderContext_ = InitRosenRenderContext(container);
@@ -294,7 +296,7 @@ HWTEST_F(SafeAreaInsetRosenTest, DirectContentPositionAndClick001, TestSize.Leve
         Tap(30.0f + rect.Left() + 5.0f, 40.0f + rect.Top() + 5.0f);
         EXPECT_EQ(clicks, 1);
         EXPECT_EQ(touches, (std::vector<TouchType> { TouchType::DOWN, TouchType::MOVE, TouchType::UP }));
-        ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host_));
+        SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host_));
     }
 }
 
@@ -415,7 +417,7 @@ HWTEST_F(SafeAreaInsetRosenTest, DirectContentMoveReplaceReset001, TestSize.Leve
     container->RebuildRenderContextTree();
     Tap(185.0f, 235.0f);
     EXPECT_EQ(replacementClicks, 2);
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host_));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host_));
     host_->RebuildRenderContextTree();
     Tap(185.0f, 235.0f);
     EXPECT_EQ(replacementClicks, 2);
@@ -438,15 +440,28 @@ HWTEST_F(SafeAreaInsetRosenTest, DirectContentSingleMixedMount001, TestSize.Leve
     Install(options, contents);
     auto container = host_->GetSafeAreaInsetNode();
     auto context = AceType::DynamicCast<RosenRenderContext>(container->GetRenderContext());
-    for (auto policy : { MountPolicy::SINGLE_IF_RENDER_NODE, MountPolicy::MIXED }) {
-        container->SetMountPolicy(policy);
-        container->MarkNeedSyncRenderTree(true);
-        container->RebuildRenderContextTree();
-        EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
-        auto targets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
-        ASSERT_EQ(targets.size(), 1);
-        EXPECT_EQ(targets.front(), AceType::DynamicCast<RosenRenderContext>(button->GetRenderContext())->GetRSNode());
-    }
+    auto buttonRSNode = AceType::DynamicCast<RosenRenderContext>(button->GetRenderContext())->GetRSNode();
+
+    // Single mode: the direct content stays a direct RS child of the container, and the
+    // mixed target list covers only mixed children plus dedicated slots, not ordinary ones.
+    container->SetMountPolicy(MountPolicy::SINGLE_IF_RENDER_NODE);
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
+    auto singleTargets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
+    EXPECT_EQ(std::find(singleTargets.begin(), singleTargets.end(), buttonRSNode), singleTargets.end());
+
+    // Mixed mode: mirror the real mount-policy switch (SwitchSingleToMixedMountPolicy):
+    // reset the mixed list, apply the policy, then sync existing children before rebuild.
+    context->ResetMixedRenderChildren();
+    container->SetMountPolicy(MountPolicy::MIXED);
+    context->SyncMixedFrameChildren(container->MergeChildrenWithDisappearingChildren());
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
+    auto mixedTargets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
+    ASSERT_EQ(mixedTargets.size(), 1);
+    EXPECT_EQ(mixedTargets.front(), buttonRSNode);
 }
 
 /**
@@ -1779,7 +1794,7 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew051, TestSize.Level1)
     overlay.align = Alignment::TOP_LEFT;
     overlay.x = Dimension(10.0_px);
     overlay.y = Dimension(5.0_px);
-    RefPtr<RenderContext> renderContext = AceType::DynamicCast<RenderContext>(rosenRenderContext);
+    RefPtr<RenderContext> renderContext = rosenRenderContext;
     ASSERT_NE(renderContext, nullptr);
     renderContext->UpdateOverlayText(overlay);
     ASSERT_NE(rosenRenderContext->overlayTextModifier_, nullptr);
@@ -1863,5 +1878,40 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNewShadowShape001, TestSi
     rosenRenderContext->SyncGeometryProperties(paintRect);
     rosenRenderContext->OnShadowShapeUpdate(circle);
     EXPECT_NE(rosenRenderContext->GetRSNode()->GetStagingProperties().GetShadowPath(), nullptr);
+}
+
+/**
+ * @tc.name: RosenRenderContextTestNew052
+ * @tc.desc: OnFgDynamicBrightnessOptionUpdate() applies blender on RS node with all brightness params.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew052, TestSize.Level1)
+{
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode("frame", -1, []() { return AceType::MakeRefPtr<PagePattern>(nullptr); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    rosenRenderContext->paintRect_ = RectF(1.0f, 1.0f, 1.0f, 1.0f);
+    // RS node must exist, otherwise SetBlender path is skipped by CHECK_NULL_VOID
+    ASSERT_NE(rosenRenderContext->GetRSNode(), nullptr);
+
+    // empty optional: early return, no blender is created
+    std::optional<BrightnessOption> emptyOption;
+    rosenRenderContext->OnFgDynamicBrightnessOptionUpdate(emptyOption);
+
+    // full option: BrightnessBlender is created with all params and set on RS node
+    BrightnessOption option;
+    option.rate = 0.5;
+    option.lightUpDegree = 0.2;
+    option.cubicCoeff = 0.1;
+    option.quadCoeff = 0.3;
+    option.saturation = 0.8;
+    option.posRGB = { 0.1f, 0.2f, 0.3f };
+    option.negRGB = { 0.4f, 0.5f, 0.6f };
+    option.fraction = 0.9;
+    std::optional<BrightnessOption> brightnessOption = std::make_optional(option);
+    rosenRenderContext->OnFgDynamicBrightnessOptionUpdate(brightnessOption);
+
+    // repeated update with the same option should not crash
+    rosenRenderContext->OnFgDynamicBrightnessOptionUpdate(brightnessOption);
 }
 } // namespace OHOS::Ace::NG

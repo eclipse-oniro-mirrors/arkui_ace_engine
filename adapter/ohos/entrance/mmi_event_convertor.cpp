@@ -38,12 +38,11 @@ constexpr int64_t US_TO_MS = 1000;
 template<typename EventT>
 void ConvertAgentIdentity(MMI::InputEvent& source, EventT& event)
 {
-    event.isAgent = source.IsFlag(OHOS::MMI::InputEvent::EVENT_FLAG_CONTROLLER);
-    event.agentWindowId = source.GetAgentWindowId();
     const auto injectorInfo = source.GetInjectorInfo();
-    event.callingUid = event.isAgent && injectorInfo.has_value() ? injectorInfo->uid : -1;
-    // Controller injection carries the opaque SAF session in optionalData; zero is also valid.
-    event.hasSafSessionId = event.isAgent && injectorInfo.has_value();
+    event.isAgent = source.HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_PENDING_CHECK) && injectorInfo.has_value();
+    event.agentWindowId = source.GetAgentWindowId();
+    event.callingUid = event.isAgent ? injectorInfo->uid : -1;
+    event.hasSafSessionId = event.isAgent;
     event.safSessionId = event.hasSafSessionId ? injectorInfo->optionalData : 0;
 }
 

@@ -660,7 +660,7 @@ public:
     void UpdateForegroundFilterDistortionParam(const DistortionParam& param) override;
 
     std::shared_ptr<Rosen::RSNGFilterBase> CreateFrostedGlassFilter(
-        const FrostedGlassParam& param, float dipScale) override;
+        const FrostedGlassParam& param, float dipScale, const ExtraGlassParam* extraParam) override;
 
     void SetBackgroundNGFilterEC(const std::shared_ptr<Rosen::RSNGFilterBase>& materialFilter) override;
     void SetMaterialShaderECSub(const std::shared_ptr<Rosen::RSNGShaderBase>& materialFilter) override;

@@ -2102,11 +2102,21 @@ HWTEST_P(CommonMethodModifierTest, DISABLED_setBlendModeTestPlaceholder, TestSiz
 }
 
 /*
- * @tc.name: setAdvancedBlendModeTestPlaceholder
+ * @tc.name: setAdvancedBlendMode0TestPlaceholder
  * @tc.desc:
  * @tc.type: FUNC
  */
-HWTEST_P(CommonMethodModifierTest, DISABLED_setAdvancedBlendModeTestPlaceholder, TestSize.Level1)
+HWTEST_P(CommonMethodModifierTest, DISABLED_setAdvancedBlendMode0TestPlaceholder, TestSize.Level1)
+{
+    FAIL() << "This is placeholder to have disabled test";
+}
+
+/*
+ * @tc.name: setAdvancedBlendMode1TestPlaceholder
+ * @tc.desc:
+ * @tc.type: FUNC
+ */
+HWTEST_P(CommonMethodModifierTest, DISABLED_setAdvancedBlendMode1TestPlaceholder, TestSize.Level1)
 {
     FAIL() << "This is placeholder to have disabled test";
 }

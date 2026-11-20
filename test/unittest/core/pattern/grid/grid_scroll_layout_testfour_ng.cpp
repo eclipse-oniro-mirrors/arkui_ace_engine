@@ -674,7 +674,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount001, TestSize.Level1)
     CreateItemsInLazyForEach(50, [](uint32_t idx) { return ITEM_MAIN_SIZE; });
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto* wrapper = AceType::RawPtr(frameNode_);
@@ -710,7 +710,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount002, TestSize.Level1)
     CreateFixedItems(50);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -755,7 +755,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount003, TestSize.Level1)
     CreateFixedItems(50);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -791,7 +791,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount004, TestSize.Level1)
         { 2, { { 0, 12 }, { 1, 13 }, { 2, 14 } } },
         { 3, { { 0, 15 }, { 1, 16 }, { 2, 17 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -823,7 +823,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount005, TestSize.Level1)
     pattern_->info_.endMainLineIndex_ = 8;
     pattern_->info_.startIndex_ = 18;
     pattern_->info_.endIndex_ = 26;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 3);
@@ -854,7 +854,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount006, TestSize.Level1)
     pattern_->info_.startIndex_ = 6;
     pattern_->info_.endIndex_ = 14;
     pattern_->info_.childrenCount_ = 50;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 3);
@@ -884,7 +884,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount007, TestSize.Level1)
     pattern_->info_.startIndex_ = 6;
     pattern_->info_.endIndex_ = 10;
     pattern_->info_.childrenCount_ = 20;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -932,7 +932,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount008, TestSize.Level1)
         { 3, { { 0, 12 }, { 1, 13 }, { 2, 14 } } },
         { 4, { { 0, 15 }, { 1, 16 }, { 2, 17 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -975,7 +975,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount009, TestSize.Level1)
         { 0, { { 0, 0 }, { 1, 1 }, { 2, 2 } } },
         { 1, { { 0, 3 }, { 1, 4 }, { 2, 5 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1019,7 +1019,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount010, TestSize.Level1)
         { 0, { { 0, 0 }, { 1, 1 }, { 2, 2 } } },
         { 1, { { 0, 3 }, { 1, 4 }, { 2, 5 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1061,7 +1061,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount011, TestSize.Level1)
         { 5, { { 0, 12 }, { 1, 13 }, { 2, 14 } } },
         { 7, { { 0, 21 }, { 1, 22 }, { 2, 23 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1103,7 +1103,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount012, TestSize.Level1)
         { 1, { { 0, 3 }, { 1, 4 }, { 2, 5 } } },
         { 3, { { 0, 9 }, { 1, 10 }, { 2, 11 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -1147,7 +1147,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount013, TestSize.Level1)
         { 0, { { 0, 0 }, { 1, 0 }, { 2, 0 } } },
         { 1, { { 0, 1 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -1190,7 +1190,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount014, TestSize.Level1)
         { 0, { { 0, 0 }, { 1, 0 }, { 2, 0 } } },
         { 1, { { 0, 1 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1231,7 +1231,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount015, TestSize.Level1)
         { 0, { { 0, 0 }, { 1, 0 }, { 2, 0 } } },
         { 1, { { 0, 1 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -1274,7 +1274,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount016, TestSize.Level1)
         { 0, { { 0, 0 }, { 1, 0 }, { 2, 0 } } },
         { 1, { { 0, 1 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1310,7 +1310,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount017, TestSize.Level1)
     CreateFixedItems(30);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Bottom out of bounds: startMainLineIndex_ (5) > endMainLineIndex_ (3)
@@ -1370,7 +1370,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount018, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 0, { { 0, 0 }, { 1, 0 }, { 2, 0 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1426,7 +1426,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount019, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 3, { { 0, 6 }, { 1, 6 }, { 2, 6 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -1487,7 +1487,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount020, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 4, { { 0, 7 }, { 1, 8 }, { 2, 9 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -1538,7 +1538,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount021, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 3, { { 0, 9 }, { 1, 10 }, { 2, 11 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheStart = algo->CalculateStartCachedCount(option, 2);
@@ -1592,7 +1592,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount022, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 3, { { 0, 6 }, { 1, 6 }, { 2, 6 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1628,7 +1628,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount023, TestSize.Level1)
 
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.childrenCount_ = 30;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Call helper directly with effectiveStartIndex = 0.
@@ -1662,7 +1662,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount024, TestSize.Level1)
 
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.childrenCount_ = 30;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Call helper directly with effectiveEndIndex = 20 (past all irregular indexes).
@@ -1695,7 +1695,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount025, TestSize.Level1)
     CreateFixedItems(30);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Bottom out of bounds: startMainLineIndex_ (5) > endMainLineIndex_ (3)
@@ -1745,7 +1745,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount026, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 16, { { 0, 48 }, { 1, 49 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1786,7 +1786,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount027, TestSize.Level1)
     pattern_->info_.gridMatrix_ = {
         { 0, { { 0, 0 }, { 1, 1 }, { 2, 2 } } },
     };
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1825,7 +1825,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount028, TestSize.Level1)
     pattern_->info_.childrenCount_ = 20;
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.gridMatrix_ = {};
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -1861,7 +1861,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount029, TestSize.Level1)
 
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.childrenCount_ = 30;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // anchor = 6, diff = 8 - 6 - 1 = 1, budget = 2
@@ -1897,7 +1897,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount030, TestSize.Level1)
 
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.childrenCount_ = 30;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // anchor = 2, diff = 6 - 2 - 1 = 3, budget = 2
@@ -1934,7 +1934,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount031, TestSize.Level1)
 
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.childrenCount_ = 30;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // anchor = 4, diff = 9 - 4 - 1 = 4, budget = 2
@@ -1968,7 +1968,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount032, TestSize.Level1)
 
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.childrenCount_ = 30;
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // anchor = 2, diff = 2 - 0 - 1 = 1, budget = 2
@@ -2014,7 +2014,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount033, TestSize.Level1)
     pattern_->info_.childrenCount_ = 21;
     pattern_->info_.crossCount_ = 3;
     pattern_->info_.gridMatrix_ = {};
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     auto cacheEnd = algo->CalculateEndCachedCount(option, 2);
@@ -2048,7 +2048,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount034, TestSize.Level1)
     CreateFixedItems(25);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Viewport starts on irregular 22; matrix miss on startMainLineIndex_ - cachedCount.
@@ -2086,7 +2086,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount035, TestSize.Level1)
     CreateFixedItems(6);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Bottom out of bounds: startMainLineIndex_ (5) > endMainLineIndex_ (0)
@@ -2125,7 +2125,7 @@ HWTEST_F(GridScrollLayoutTestFourNg, CachedCount036, TestSize.Level1)
     CreateFixedItems(5);
     CreateDone();
 
-    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
     auto algo =
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     // Bottom out of bounds so GetEffectiveStartIndex() == childrenCount.

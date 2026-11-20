@@ -34,7 +34,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<DragBarLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(AceType::DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propFullScreenMode_ = CloneFullScreenMode();
         value->propHotRegionHeight_ = CloneHotRegionHeight();
         return value;

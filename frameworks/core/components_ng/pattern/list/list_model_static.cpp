@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/interfaces/native/node/node_arc_list_modifier.h"
 #include "core/components_ng/pattern/list/list_position_controller.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 
 namespace OHOS::Ace::NG {
@@ -148,10 +149,32 @@ void ListModelStatic::SetSticky(FrameNode* frameNode, const std::optional<int32_
 
 void ListModelStatic::SetScrollSnapAlign(FrameNode* frameNode, const std::optional<ScrollSnapAlign>& scrollSnapAlign)
 {
+    CHECK_NULL_VOID(frameNode);
     if (scrollSnapAlign.has_value()) {
+        // Last-set-wins: configuring the legacy align attribute clears the scrollSnapStrategy capability.
+        auto layoutProperty = frameNode->GetLayoutProperty<ListLayoutProperty>();
+        if (layoutProperty && layoutProperty->GetScrollSnapStrategy().has_value()) {
+            ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, frameNode);
+        }
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign, scrollSnapAlign.value(), frameNode);
     } else {
         ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign, frameNode);
+    }
+}
+
+void ListModelStatic::SetScrollSnapStrategy(
+    FrameNode* frameNode, const std::optional<ScrollSnapStrategy>& scrollSnapStrategy)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (scrollSnapStrategy.has_value()) {
+        // Last-set-wins: configuring scrollSnapStrategy clears the legacy align attribute.
+        auto layoutProperty = frameNode->GetLayoutProperty<ListLayoutProperty>();
+        if (layoutProperty && layoutProperty->GetScrollSnapAlign().has_value()) {
+            ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapAlign, frameNode);
+        }
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, scrollSnapStrategy.value(), frameNode);
+    } else {
+        ACE_RESET_NODE_LAYOUT_PROPERTY(ListLayoutProperty, ScrollSnapStrategy, frameNode);
     }
 }
 

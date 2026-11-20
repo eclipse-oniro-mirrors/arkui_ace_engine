@@ -34,7 +34,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto value = MakeRefPtr<ListItemLayoutProperty>();
-        value->LayoutProperty::UpdateLayoutProperty(DynamicCast<LayoutProperty>(this));
+        value->LayoutProperty::UpdateLayoutProperty(this);
         value->propStartDeleteAreaDistance_ = CloneStartDeleteAreaDistance();
         value->propEndDeleteAreaDistance_ = CloneEndDeleteAreaDistance();
         return value;

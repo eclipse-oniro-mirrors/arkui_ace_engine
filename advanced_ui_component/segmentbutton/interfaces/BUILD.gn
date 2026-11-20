@@ -40,6 +40,7 @@ gen_obj("segmentbutton_abc_preview") {
 }
 
 ohos_shared_library("segmentbutton") {
+  branch_protector_ret = "pac_ret"
   sources = [ "segmentbutton.cpp" ]
 
   if (use_mingw_win || use_mac || use_linux) {

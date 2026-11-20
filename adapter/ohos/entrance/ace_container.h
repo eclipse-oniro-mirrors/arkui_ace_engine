@@ -96,12 +96,17 @@ struct ParsedConfig {
     std::string mnc;
     std::string preferredLanguage;
     std::string fontId;
+    std::string themeSkin;
+    std::string themeIcon;
+    // One-shot policy for this configuration update only; not part of IsValid so it never
+    // triggers an otherwise-empty configuration update.
+    bool fontAnimationEnabled = true;
     bool IsValid() const
     {
         return !(colorMode.empty() && deviceAccess.empty() && languageTag.empty() && direction.empty() &&
                  densitydpi.empty() && themeTag.empty() && fontScale.empty() && fontWeightScale.empty() &&
                  colorModeIsSetByApp.empty() && mcc.empty() && mnc.empty() && fontFamily.empty() &&
-                 preferredLanguage.empty() && fontId.empty());
+                 preferredLanguage.empty() && fontId.empty() && themeSkin.empty() && themeIcon.empty());
     }
 };
 
@@ -1050,6 +1055,7 @@ private:
     int32_t pageId_ = 0;
     bool useCurrentEventRunner_ = false;
     sptr<OHOS::Rosen::Window> uiWindow_ = nullptr;
+    sptr<OHOS::Rosen::IWindowVisibilityChangedListener> windowVisibilityListener_ = nullptr;
     std::string windowName_;
     uint32_t windowId_ = OHOS::Rosen::INVALID_WINDOW_ID;
     float windowScale_ = 1.0f;
@@ -1110,7 +1116,9 @@ private:
 
     SingleHandTransform singleHandTransform_;
 
-    bool lastThemeHasSkin_ = false;
+    uint32_t lastThemeFonts_ = 0;
+    uint32_t lastThemeIcons_ = 0;
+    uint32_t lastThemeSkin_ = 0;
 
     // for multiple frontEnd
     // valid only when type_ is STATIC_HYBRID_DYNAMIC or DYNAMIC_HYBRID_STATIC

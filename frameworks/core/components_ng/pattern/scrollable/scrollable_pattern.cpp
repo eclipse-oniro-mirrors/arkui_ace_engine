@@ -77,6 +77,7 @@
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/event/mouse_event.h"
 #include "core/gestures/drag_event.h"
 #include "core/interfaces/native/node/sheet_modifier.h"
@@ -247,7 +248,7 @@ void ScrollablePattern::CreateAnalyzerOverlay(const RefPtr<FrameNode> node)
     overlayNode->SetParent(AceType::WeakClaim(AceType::RawPtr(node)));
     overlayNode->SetActive(true);
     overlayNode->SetHitTestMode(HitTestMode::HTMTRANSPARENT);
-    auto overlayProperty = AceType::DynamicCast<LayoutProperty>(overlayNode->GetLayoutProperty());
+    auto overlayProperty = overlayNode->GetLayoutProperty();
     CHECK_NULL_VOID(overlayProperty);
     overlayProperty->SetIsOverlayNode(true);
     overlayProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
@@ -1928,6 +1929,9 @@ bool ScrollablePattern::HandleEdgeEffect(float offset, int32_t source, const Siz
         if ((isAtTop && Positive(offset)) || (isAtBottom && Negative(offset))) {
             animateOverScrollStart_ = false;
             animateOverScrollEnd_ = false;
+            // The accessibility SCROLL_END is still fired for frames rejected at edge,
+            // so the user attribution must be recorded before this early return.
+            MarkUserScrollSource(source);
             return false;
         }
     }
@@ -2063,7 +2067,7 @@ std::pair<double, double> ScrollablePattern::GetAutoAdjustAvoidOffset()
         std::swap(result.first, result.second);
     }
     CalcPaddingAvoidDistByMainAxis(layoutProperty->GetPaddingProperty(), result, isRtl);
-    if (layoutProperty->HasSafeAreaInset()) {
+    if (layoutProperty->GetSafeAreaInsetState().HasSafeAreaInset()) {
         CalcEffectiveSafeAreaAvoidDistByMainAxis(
             layoutProperty->GetOrCreateSafeAreaPadding(), result);
     } else {

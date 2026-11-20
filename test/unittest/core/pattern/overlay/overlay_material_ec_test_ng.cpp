@@ -919,6 +919,25 @@ HWTEST_F(OverlayMaterialECTestNg, ImmersiveMaterialConfig002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: ImmersiveMaterialConfig_ColorBlendModeNotEqual
+ * @tc.desc: Test operator== returns false when only colorBlendMode differs
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayMaterialECTestNg, ImmersiveMaterialConfig_ColorBlendModeNotEqual, TestSize.Level1)
+{
+    ImmersiveMaterialConfig config1;
+    ImmersiveMaterialConfig config2;
+    EXPECT_TRUE(config1 == config2);
+
+    config1.colorBlendMode = MaterialColorBlendMode::TINTED_GLASS;
+    config2.colorBlendMode = MaterialColorBlendMode::LINEAR_MIX;
+    EXPECT_FALSE(config1 == config2);
+
+    config2.colorBlendMode = MaterialColorBlendMode::TINTED_GLASS;
+    EXPECT_TRUE(config1 == config2);
+}
+
+/**
  * @tc.name: ImmersiveMaterialConfig003
  * @tc.desc: Test ImmersiveMaterialConfig with lightEffectOptions
  * @tc.type: FUNC
@@ -1714,7 +1733,7 @@ HWTEST_F(OverlayMaterialECTestNg, MaterialUtilsGetUiMaterialShaderECSub001, Test
 {
     ImmersiveMaterialConfig config;
     std::shared_ptr<Rosen::RSNGShaderBase> shader;
-    bool result = MaterialUtils::GetUiMaterialShaderECSub(config, shader);
+    bool result = MaterialUtils::GetUiMaterialShaderECSub(config, shader, nullptr);
     EXPECT_FALSE(result);
 }
 

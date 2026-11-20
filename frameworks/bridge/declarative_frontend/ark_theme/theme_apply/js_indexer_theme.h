@@ -33,7 +33,7 @@ public:
         }
         auto* stack = NG::ViewStackProcessor::GetInstance();
         CHECK_NULL_VOID(stack);
-        auto frameNode = AceType::DynamicCast<NG::FrameNode>(stack->GetMainFrameNode());
+        auto frameNode = stack->GetMainFrameNode();
         CHECK_NULL_VOID(frameNode);
         if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
             NG::IndexerThemeColors indexerThemeColors;

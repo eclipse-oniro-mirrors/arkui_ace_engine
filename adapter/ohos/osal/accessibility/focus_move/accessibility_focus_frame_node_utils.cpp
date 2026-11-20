@@ -314,7 +314,7 @@ std::shared_ptr<FocusRulesCheckNode> FrameNodeRulesCheckNode::GetUserNextFocusNo
     auto node = weakNode_.Upgrade();
     CHECK_NULL_RETURN(node, nullptr);
     auto context = node->GetContextRefPtr();
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
+    auto ngPipeline = context;
     CHECK_NULL_RETURN(ngPipeline, nullptr);
     auto rootNode = ngPipeline->GetRootElement();
     CHECK_NULL_RETURN(rootNode, nullptr);
@@ -336,7 +336,7 @@ std::shared_ptr<FocusRulesCheckNode> FrameNodeRulesCheckNode::GetUserPrevFocusNo
     auto node = weakNode_.Upgrade();
     CHECK_NULL_RETURN(node, nullptr);
     auto context = node->GetContextRefPtr();
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
+    auto ngPipeline = context;
     CHECK_NULL_RETURN(ngPipeline, nullptr);
     auto rootNode = ngPipeline->GetRootElement();
     CHECK_NULL_RETURN(rootNode, nullptr);
@@ -431,7 +431,7 @@ bool FrameNodeRulesCheckNode::IsDescendantMode()
         return true;
     }
     auto context = node->GetContextRefPtr();
-    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
+    auto ngPipeline = context;
     CHECK_NULL_RETURN(ngPipeline, false);
     auto jsAccessibilityManager = AceType::DynamicCast<JsAccessibilityManager>(ngPipeline->GetAccessibilityManager());
     CHECK_NULL_RETURN(jsAccessibilityManager, false);

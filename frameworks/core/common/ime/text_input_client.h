@@ -18,11 +18,13 @@
 
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 #include "base/memory/ace_type.h"
 #include "base/utils/string_utils.h"
 #include "base/utils/utf_helper.h"
+#include "base/view_data/ace_auto_fill_type.h"
 #include "core/common/ime/text_editing_value.h"
 #include "core/common/ime/text_input_action.h"
 #include "core/common/ime/text_input_type.h"
@@ -331,6 +333,64 @@ public:
     virtual void ResetOriginCaretPosition() {};
     virtual bool RecordOriginCaretPosition() { return false; };
     virtual bool IsShortCutBlocked() { return false; };
+    // Dispatch AutoFill processing to the concrete pattern (TextField / RichEditor).
+    // Virtual dispatch avoids cross-split-SO link-time symbol dependencies between
+    // the text_field and rich_editor component shared libraries.
+    virtual void ProcessAutoFillTrigger(AceAutoFillTriggerType triggerType) {}
+    virtual std::string GetAutoFillUserName() { return ""; }
+    virtual std::string GetAutoFillNewPassword() { return ""; }
+    virtual void SetAutoFillUserName(const std::string& userName) {}
+    virtual void SetAutoFillNewPassword(const std::string& newPassword) {}
+ 
+    // Shared mapping from AutoFill content type to the TextInputType that drives
+    // IME keyboard selection (e.g. password -> secure keyboard, email -> email
+    // keyboard). Lives on TextInputClient so both TextField and RichEditor can
+    // reuse it. Defined inline in the header so each component shared library
+    // compiles its own copy: no cross-SO symbol dependency at link time.
+    static const std::unordered_map<AceAutoFillType, TextInputType>& GetAutoFillKeyboardMap()
+    {
+        static const std::unordered_map<AceAutoFillType, TextInputType> autoFillKeyboardMap = {
+            { AceAutoFillType::ACE_PASSWORD, TextInputType::VISIBLE_PASSWORD },
+            { AceAutoFillType::ACE_USER_NAME, TextInputType::USER_NAME },
+            { AceAutoFillType::ACE_NEW_PASSWORD, TextInputType::NEW_PASSWORD },
+            { AceAutoFillType::ACE_FULL_STREET_ADDRESS, TextInputType::TEXT },
+            { AceAutoFillType::ACE_HOUSE_NUMBER, TextInputType::TEXT },
+            { AceAutoFillType::ACE_DISTRICT_ADDRESS, TextInputType::TEXT },
+            { AceAutoFillType::ACE_CITY_ADDRESS, TextInputType::TEXT },
+            { AceAutoFillType::ACE_PROVINCE_ADDRESS, TextInputType::TEXT },
+            { AceAutoFillType::ACE_COUNTRY_ADDRESS, TextInputType::TEXT },
+            { AceAutoFillType::ACE_PERSON_FULL_NAME, TextInputType::TEXT },
+            { AceAutoFillType::ACE_PERSON_LAST_NAME, TextInputType::TEXT },
+            { AceAutoFillType::ACE_PERSON_FIRST_NAME, TextInputType::TEXT },
+            { AceAutoFillType::ACE_PHONE_NUMBER, TextInputType::PHONE },
+            { AceAutoFillType::ACE_PHONE_COUNTRY_CODE, TextInputType::PHONE },
+            { AceAutoFillType::ACE_FULL_PHONE_NUMBER, TextInputType::PHONE },
+            { AceAutoFillType::ACE_EMAIL_ADDRESS, TextInputType::EMAIL_ADDRESS },
+            { AceAutoFillType::ACE_BANK_CARD_NUMBER, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_ID_CARD_NUMBER, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_PRECISE_TIME, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_HOUR_AND_MINUTE, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_DATE, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_MONTH, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_YEAR, TextInputType::NUMBER },
+            { AceAutoFillType::ACE_NICKNAME, TextInputType::TEXT },
+            { AceAutoFillType::ACE_DETAIL_INFO_WITHOUT_STREET, TextInputType::TEXT },
+            { AceAutoFillType::ACE_FORMAT_ADDRESS, TextInputType::TEXT },
+            { AceAutoFillType::ACE_PASSPORT_NUMBER, TextInputType::TEXT },
+            { AceAutoFillType::ACE_VALIDITY, TextInputType::TEXT },
+            { AceAutoFillType::ACE_ISSUE_AT, TextInputType::TEXT },
+            { AceAutoFillType::ACE_ORGANIZATION, TextInputType::TEXT },
+            { AceAutoFillType::ACE_TAX_ID, TextInputType::TEXT },
+            { AceAutoFillType::ACE_ADDRESS_CITY_AND_STATE, TextInputType::TEXT },
+            { AceAutoFillType::ACE_FLIGHT_NUMBER, TextInputType::TEXT },
+            { AceAutoFillType::ACE_LICENSE_NUMBER, TextInputType::TEXT },
+            { AceAutoFillType::ACE_LICENSE_FILE_NUMBER, TextInputType::TEXT },
+            { AceAutoFillType::ACE_LICENSE_PLATE, TextInputType::TEXT },
+            { AceAutoFillType::ACE_ENGINE_NUMBER, TextInputType::TEXT },
+            { AceAutoFillType::ACE_LICENSE_CHASSIS_NUMBER, TextInputType::TEXT },
+        };
+        return autoFillKeyboardMap;
+    }
 protected:
     int32_t instanceId_ = -1;
     bool shiftFlag_ = false;

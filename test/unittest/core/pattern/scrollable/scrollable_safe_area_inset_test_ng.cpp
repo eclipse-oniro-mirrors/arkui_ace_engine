@@ -22,6 +22,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/safe_area_inset_view.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
@@ -31,6 +32,7 @@
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/property/measure_property.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -102,7 +104,7 @@ void ApplyInset(const std::vector<InsetItem>& items)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
-    ViewAbstract::SetSafeAreaInset(frameNode, BuildOptions(items), BuildContents(items));
+    SafeAreaInsetView::SetSafeAreaInset(frameNode, BuildOptions(items), BuildContents(items));
 }
 
 RefPtr<SafeAreaInsetPattern> GetInsetPattern(const RefPtr<FrameNode>& host)
@@ -180,7 +182,7 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid001, TestSiz
     ASSERT_NE(insetPattern, nullptr);
     EXPECT_EQ(GetContentFrame(insetPattern, SafeAreaInsetEdge::TOP)->GetGeometryNode()->GetFrameOffset(),
         OffsetF(100.0f, 0.0f));
-    const auto& contribution = host->GetLayoutProperty()->GetSafeAreaInsetContribution();
+    const auto& contribution = host->GetLayoutProperty()->GetSafeAreaInsetState().GetSafeAreaInsetContribution();
     EXPECT_FLOAT_EQ(contribution.top.value_or(0.0f), 28.0f);
 }
 
@@ -212,7 +214,7 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid002, TestSiz
         OffsetF(100.0f, 0.0f));
     EXPECT_EQ(GetContentFrame(insetPattern, SafeAreaInsetEdge::BOTTOM)->GetGeometryNode()->GetFrameOffset(),
         OffsetF(100.0f, 170.0f));
-    const auto& contribution = host->GetLayoutProperty()->GetSafeAreaInsetContribution();
+    const auto& contribution = host->GetLayoutProperty()->GetSafeAreaInsetState().GetSafeAreaInsetContribution();
     EXPECT_FLOAT_EQ(contribution.top.value_or(0.0f), 28.0f);
     EXPECT_FLOAT_EQ(contribution.bottom.value_or(0.0f), 38.0f);
 }
@@ -305,7 +307,7 @@ HWTEST_F(ScrollableSafeAreaInsetTestNg, ScrollableSafeAreaInsetAvoid006, TestSiz
     EXPECT_FLOAT_EQ(avoid.first, 28.0f);
     EXPECT_FLOAT_EQ(avoid.second, 0.0f);
 
-    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host));
+    SafeAreaInsetView::ResetSafeAreaInset(AceType::RawPtr(host));
     FlushUITasks(host);
     avoid = pattern->GetAutoAdjustAvoidOffset();
     EXPECT_FLOAT_EQ(avoid.first, 6.0f);

@@ -401,7 +401,7 @@ void StageElement::AddListenerForPopPage(
     // Add stop listener to remove top page when transition done.
     controllerIn_->AddStopListener([weak, pageInWeak, pageOutWeak]() {
         auto stage = weak.Upgrade();
-        auto elementIn = DynamicCast<Element>(pageInWeak.Upgrade());
+        auto elementIn = pageInWeak.Upgrade();
         if (stage && elementIn) {
             // Remove top page.
             stage->UpdateChild(elementIn, nullptr);

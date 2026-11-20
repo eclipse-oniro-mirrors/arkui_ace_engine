@@ -67,6 +67,11 @@ class LazyArkXComponentComponent extends ArkComponent {
     return this;
   }
 
+  enableSurfaceVisibilityLifecycle(isVisibilityLifecycle: boolean): LazyArkXComponentComponent {
+    this.lazyComponent.enableSurfaceVisibilityLifecycle(isVisibilityLifecycle);
+    return this;
+  }
+
   bufferQueueCount(count: number): LazyArkXComponentComponent {
     this.lazyComponent.bufferQueueCount(count);
     return this;

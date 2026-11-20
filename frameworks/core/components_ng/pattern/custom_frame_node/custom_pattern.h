@@ -56,6 +56,7 @@ public:
 
     bool ReusedNodeSkipMeasure() override;
     ArkUI_AccessibilityProvider* GetNativeAccessibilityProvider();
+    RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider() override;
     void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) override;
     void InitializeAccessibility(PipelineContext* context);
     void UninitializeAccessibility(FrameNode* frameNode, PipelineContext* context);

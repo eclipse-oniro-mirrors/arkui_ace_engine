@@ -38,6 +38,8 @@ public:
     static ani_double GetSystemDensity(ani_env* env, [[maybe_unused]] ani_object aniClass);
     static ani_object GetImageData(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long peerPtr, ani_double sx,
         ani_double sy, ani_double sw, ani_double sh);
+    static ani_object GetPixelMap(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long peerPtr, ani_double sx,
+        ani_double sy, ani_double sw, ani_double sh);
     static void PutImageData0(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long peerPtr, ani_object array,
         ani_double dx, ani_double dy, ani_int width, ani_int height);
     static void PutImageData1(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long peerPtr, ani_object array,

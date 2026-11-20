@@ -419,7 +419,7 @@ HWTEST_F(TabsSidebarTabListTddTestNg, RemoveBuilderByContentId001, TestSize.Leve
 
 /**
  * @tc.name: SetCurrentIndexUpdates001
- * @tc.desc: SetCurrentIndex updates the current index value
+ * @tc.desc: SetCurrentIndex is page-switch only and does not update the display index
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarTabListTddTestNg, SetCurrentIndexUpdates001, TestSize.Level1)
@@ -428,12 +428,12 @@ HWTEST_F(TabsSidebarTabListTddTestNg, SetCurrentIndexUpdates001, TestSize.Level1
     ASSERT_NE(pattern, nullptr);
     pattern->InitCurrentIndex(0);
     pattern->SetCurrentIndex(3);
-    EXPECT_EQ(pattern->GetCurrentIndex(), 3);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 0);
 }
 
 /**
  * @tc.name: SetCurrentIndexNegative001
- * @tc.desc: SetCurrentIndex with negative value still sets
+ * @tc.desc: SetCurrentIndex with negative value does not update the display index
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarTabListTddTestNg, SetCurrentIndexNegative001, TestSize.Level1)
@@ -442,12 +442,12 @@ HWTEST_F(TabsSidebarTabListTddTestNg, SetCurrentIndexNegative001, TestSize.Level
     ASSERT_NE(pattern, nullptr);
     pattern->InitCurrentIndex(0);
     pattern->SetCurrentIndex(-1);
-    EXPECT_EQ(pattern->GetCurrentIndex(), -1);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 0);
 }
 
 /**
  * @tc.name: SetCurrentIndexSameValue001
- * @tc.desc: SetCurrentIndex with same value is a no-op
+ * @tc.desc: SetCurrentIndex never mutates currentIndex_ (page-switch only), even for a different value
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarTabListTddTestNg, SetCurrentIndexSameValue001, TestSize.Level1)
@@ -457,6 +457,52 @@ HWTEST_F(TabsSidebarTabListTddTestNg, SetCurrentIndexSameValue001, TestSize.Leve
     tree.pattern->currentIndex_ = 2;
     tree.pattern->SetCurrentIndex(2);
     EXPECT_EQ(tree.pattern->currentIndex_, 2);
+
+    tree.pattern->SetCurrentIndex(3);
+    EXPECT_EQ(tree.pattern->currentIndex_, 2);
+}
+
+// ===================== SyncTabItemStyle =====================
+
+/**
+ * @tc.name: SyncTabItemStyleUpdates001
+ * @tc.desc: SyncTabItemStyle updates currentIndex_ to the new index
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTabListTddTestNg, SyncTabItemStyleUpdates001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->SyncTabItemStyle(3);
+    EXPECT_EQ(pattern->GetCurrentIndex(), 3);
+}
+
+/**
+ * @tc.name: SyncTabItemStyleSameValue001
+ * @tc.desc: SyncTabItemStyle with same value is a no-op (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTabListTddTestNg, SyncTabItemStyleSameValue001, TestSize.Level1)
+{
+    SidebarTabListTree tree;
+    tree.Build();
+    tree.pattern->currentIndex_ = 2;
+    tree.pattern->SyncTabItemStyle(2);
+    EXPECT_EQ(tree.pattern->currentIndex_, 2);
+}
+
+/**
+ * @tc.name: SyncTabItemStyleNegative001
+ * @tc.desc: SyncTabItemStyle with negative value updates currentIndex_ (no clamp)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTabListTddTestNg, SyncTabItemStyleNegative001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->InitCurrentIndex(0);
+    pattern->SyncTabItemStyle(-1);
+    EXPECT_EQ(pattern->GetCurrentIndex(), -1);
 }
 
 /**

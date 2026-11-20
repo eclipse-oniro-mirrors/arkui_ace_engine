@@ -183,6 +183,30 @@ ani_object CanvasModule::GetImageData(ani_env* env, [[maybe_unused]] ani_object 
     return aniValue;
 }
 
+static ani_object CreateEtsPixelMapFromPeer(ani_env* env, image_PixelMapPeer* pixelMapPeer)
+{
+    CHECK_NULL_RETURN(pixelMapPeer->pixelMap, nullptr);
+    auto mediaPixelMap = pixelMapPeer->pixelMap->GetPixelMapSharedPtr();
+    CHECK_NULL_RETURN(mediaPixelMap, nullptr);
+    return Media::PixelMapTaiheAni::CreateEtsPixelMap(env, mediaPixelMap);
+}
+
+ani_object CanvasModule::GetPixelMap(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long peerPtr,
+    ani_double sx, ani_double sy, ani_double sw, ani_double sh)
+{
+    auto* peer = reinterpret_cast<ArkUICanvasRenderer>(peerPtr);
+    CHECK_NULL_RETURN(peer, nullptr);
+    const auto* modifier = GetNodeAniModifier();
+    CHECK_NULL_RETURN(modifier, nullptr);
+    auto* canvasModifier = modifier->getCanvasAniModifier();
+    CHECK_NULL_RETURN(canvasModifier, nullptr);
+    auto* pixelMapPeer = reinterpret_cast<image_PixelMapPeer*>(canvasModifier->getPixelMap(peer, sx, sy, sw, sh));
+    CHECK_NULL_RETURN(pixelMapPeer, nullptr);
+    auto etsPixelMap = CreateEtsPixelMapFromPeer(env, pixelMapPeer);
+    image_PixelMapPeer::Destroy(pixelMapPeer);
+    return etsPixelMap;
+}
+
 void CanvasModule::PutImageData0(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long peerPtr, ani_object array,
     ani_double dx, ani_double dy, ani_int width, ani_int height)
 {

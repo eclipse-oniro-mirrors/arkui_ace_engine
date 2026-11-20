@@ -953,7 +953,7 @@ void SwiperPattern::PostIdleTaskToCleanTabContent()
             if (!child || child->IsActive()) {
                 continue;
             }
-            auto tabContentPattern = AceType::DynamicCast<TabContentPattern>(child->GetPattern<TabContentPattern>());
+            auto tabContentPattern = child->GetPattern<TabContentPattern>();
             if (tabContentPattern) {
                 tabContentPattern->CleanChildren();
             }

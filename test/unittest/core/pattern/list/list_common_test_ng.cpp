@@ -1721,7 +1721,7 @@ HWTEST_F(ListCommonTestNg, EventHub001, TestSize.Level1)
      */
     auto onItemDragStart = [](const ItemDragInfo&, int32_t) {
         auto dragItem = AceType::MakeRefPtr<FrameNode>("test", 0, AceType::MakeRefPtr<Pattern>());
-        return AceType::DynamicCast<UINode>(dragItem);
+        return RefPtr<UINode>(dragItem);
     };
     ListModelNG model = CreateList();
     model.SetOnItemDragStart(onItemDragStart);

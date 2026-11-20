@@ -39,7 +39,7 @@ void MenuLayoutProperty::BindToJsonValue(std::unique_ptr<JsonValue>& json, const
     //     ]
     // }
     for (auto&&option : options) {
-        auto pattern = DynamicCast<FrameNode>(option)->GetPattern<MenuItemPattern>();
+        auto pattern = option->GetPattern<MenuItemPattern>();
         CHECK_NULL_VOID(pattern);
         auto jsonValue = JsonUtil::Create(true);
 

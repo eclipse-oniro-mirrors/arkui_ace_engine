@@ -91,6 +91,7 @@ public:
     void OnExtensionDetachToDisplay();
 
     void OnAttachContext(PipelineContext *context) override;
+    void OnDetachContext(PipelineContext *context) override;
     void AfterMountToParent() override;
     void OnSyncGeometryNode(const DirtySwapConfig& config) override;
     void OnWindowShow() override;
@@ -180,6 +181,8 @@ public:
     std::string GetBrandColorStr() const;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
     std::string ResolveBrandColor(int32_t themeScopeId) const;
+    void RegisterBrandColorChangeListener();
+    void UnRegisterBrandColorChangeListener();
     // Called after brand color is successfully sent to UEA (via Want or BusinessData).
     // Updates both brandColorStr_ (current cache) and lastSentBrandColorStr_ (dedup record).
     void SetLastSentBrandColorStr(const std::string& brandColorStr)

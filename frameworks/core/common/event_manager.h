@@ -109,6 +109,8 @@ class EventManager : public NG::KeyEventManager {
     DECLARE_ACE_TYPE(EventManager, KeyEventManager);
 
 public:
+    void ClearTouchPadEvents() {}
+
     EventManager();
     ~EventManager() override;
     // After the touch down event is triggered, the touch test is performed to collect the corresponding
@@ -137,7 +139,7 @@ public:
     void ResetSmartGestureManager();
     ACE_NON_VIRTUAL bool DispatchTouchEvent(const TouchEvent& point, bool sendOnTouch = true);
     static bool IsAgentTouchInScope(const TouchEvent& event);
-    bool IsAgentTouchAllowed(const TouchEvent& event, int32_t nodeId);
+    bool IsAgentTouchAllowed(const TouchEvent& event, const RefPtr<NG::FrameNode>& node);
     void PrepareAgentMousePress(const MouseEvent& event);
     bool DispatchTouchEvent(const AxisEvent& event, bool sendOnTouch = true);
     void DispatchTouchCancelToRecognizer(

@@ -33,7 +33,7 @@ public:
     RefPtr<LayoutProperty> Clone() const override
     {
         auto copy = MakeRefPtr<LinearIndicatorLayoutProperty>();
-        copy->LinearLayoutProperty::UpdateLayoutProperty(DynamicCast<LinearLayoutProperty>(this));
+        copy->LinearLayoutProperty::UpdateLayoutProperty(this);
         copy->propStrokeWidth_ = CloneStrokeWidth();
         copy->propStrokeRadius_ = CloneStrokeRadius();
         copy->propTrackBackgroundColor_ = CloneTrackBackgroundColor();

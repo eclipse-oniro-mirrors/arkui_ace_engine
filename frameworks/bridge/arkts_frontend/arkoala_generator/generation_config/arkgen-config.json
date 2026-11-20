@@ -195,6 +195,7 @@
         "ohos.graphics.drawing.Matrix",
         "ohos.graphics.drawing.Region",
         "ohos.graphics.uiEffect.uiEffect.Blender",
+        "ohos.graphics.uiEffect.uiEffect.BlenderBase",
         "ohos.graphics.uiEffect.uiEffect.BrightnessBlender",
         "ohos.graphics.uiEffect.uiEffect.HdrBrightnessBlender",
         "ohos.inputMethod.ExtraConfig.InputMethodExtraConfig",
@@ -1096,6 +1097,10 @@
             },
             "getImageData": {
                 "hookName": "hookGetImageData",
+                "replaceImplementation": true
+            },
+            "getPixelMap": {
+                "hookName": "hookGetPixelMap",
                 "replaceImplementation": true
             },
             "putImageData": {

@@ -59,8 +59,7 @@ void HandednessManager::SetReferenceNodeId(int32_t nodeId)
 
 bool HandednessManager::IsBreakpointMet()
 {
-    // WidthBreakpoint: WIDTH_XS=0, WIDTH_SM=1, WIDTH_MD=2, WIDTH_LG=3, WIDTH_XL=4
-    // HeightBreakpoint: HEIGHT_SM=0, HEIGHT_MD=1, HEIGHT_LG=2
+    // WidthBreakpoint: XS=0, SM=1, MD=2, LG=3, XL=4; HeightBreakpoint: SM=0, MD=1, LG=2.
     constexpr int32_t WIDTH_BREAKPOINT_MD = 2;
     constexpr int32_t WIDTH_BREAKPOINT_LG = 3;
     constexpr int32_t HEIGHT_BREAKPOINT_MD = 1;
@@ -94,36 +93,45 @@ int32_t HandednessManager::QueryHoldHandPostureFromMsdp()
     motionClient.UnsubscribeCallback(Msdp::MOTION_TYPE_HOLDING_HAND, callback);
     return event.status >= 0 ? event.status : 0;
 #else
-    return 0; // MSDP 不可用，降级为未知
+    TAG_LOGD(AceLogTag::ACE_LAYOUT, "MSDP unavailable, degrade to unknown posture");
+    return 0;
 #endif
+}
+
+PopupSide HandednessManager::CalcPopupSide(int32_t posture, int32_t operatingHand)
+{
+    if (posture == 1) {
+        // Left hand holding: operating hand is left or unrecognized -> LEFT; otherwise CENTER.
+        return (operatingHand == 1 || operatingHand == 0) ? PopupSide::LEFT : PopupSide::CENTER;
+    }
+    if (posture == 2) {
+        // Right hand holding: operating hand is right or unrecognized -> RIGHT; otherwise CENTER.
+        return (operatingHand == 2 || operatingHand == 0) ? PopupSide::RIGHT : PopupSide::CENTER;
+    }
+    if (posture == 3) {
+        // Both hands holding: follow the operating hand.
+        if (operatingHand == 1) {
+            return PopupSide::LEFT;
+        }
+        if (operatingHand == 2) {
+            return PopupSide::RIGHT;
+        }
+        return PopupSide::CENTER;
+    }
+    // posture == 0/16 or query failure: unknown posture, keep CENTER.
+    return PopupSide::CENTER;
 }
 
 PopupSide HandednessManager::QueryPopupSideByHoldingHand()
 {
     if (!IsBreakpointMet()) {
+        TAG_LOGD(AceLogTag::ACE_LAYOUT, "breakpoint not met, popup side keep CENTER");
         return PopupSide::CENTER;
     }
     int32_t posture = QueryHoldHandPostureFromMsdp();
-    if (posture == 1) {
-        // 左手握持：操作手也是左手→LEFT，否则→CENTER
-        return operatingHand_ == 1 ? PopupSide::LEFT : PopupSide::CENTER;
-    }
-    if (posture == 2) {
-        // 右手握持：操作手也是右手→RIGHT，否则→CENTER
-        return operatingHand_ == 2 ? PopupSide::RIGHT : PopupSide::CENTER;
-    }
-    if (posture == 3) {
-        // 双手握持：跟随操作手
-        if (operatingHand_ == 1) {
-            return PopupSide::LEFT;
-        }
-        if (operatingHand_ == 2) {
-            return PopupSide::RIGHT;
-        }
-        return PopupSide::CENTER;
-    }
-    // posture == 0/16 或查询失败：未知姿态，居中
-    return PopupSide::CENTER;
+    TAG_LOGD(AceLogTag::ACE_LAYOUT,
+        "holding hand posture=%{public}d, operating hand=%{public}d", posture, operatingHand_);
+    return CalcPopupSide(posture, operatingHand_);
 }
 
 std::pair<int32_t, OffsetF> HandednessManager::QueryAnchorPosition()
@@ -137,7 +145,6 @@ std::pair<int32_t, OffsetF> HandednessManager::QueryAnchorPosition(int32_t nodeI
     if (!IsBreakpointMet()) {
         return { INVALID_NODE_ID, OffsetF(0, 0) };
     }
-    // 传 -1 时走原有逻辑，使用 lastFocusNodeId_
     int32_t targetId = (nodeId < 0) ? lastFocusNodeId_ : nodeId;
     if (targetId < 0) {
         return { INVALID_NODE_ID, OffsetF(0, 0) };

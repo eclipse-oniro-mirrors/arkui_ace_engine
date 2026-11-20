@@ -372,7 +372,7 @@ HWTEST_F(ContainerModelToolBarTestNg, FocusEventTest_003, TestSize.Level1)
 {
     // 创建容器模态框
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -433,7 +433,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_001,
 {
     // 创建容器模态框
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -478,7 +478,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_002,
 {
     // 创建容器模态框
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -528,7 +528,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_003,
 {
     // 创建容器模态框
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -578,7 +578,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_004,
 {
     // 创建容器模态框
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);
@@ -641,7 +641,7 @@ HWTEST_F(ContainerModelToolBarTestNg, ToolBarRowPatternGetNextFocusNodeTest_005,
 {
     // 创建容器模态框
     CreateContainerModal();
-    auto pipeline = AceType::DynamicCast<PipelineContext>(MockPipelineContext::GetCurrent());
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrent();
     ASSERT_NE(pipeline, nullptr);
     auto rootNode = pipeline->rootNode_;
     ASSERT_NE(rootNode, nullptr);

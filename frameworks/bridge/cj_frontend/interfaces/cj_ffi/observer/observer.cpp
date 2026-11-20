@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <vector>
 #include "observer.h"
 
 #include "observer_listener.h"
@@ -22,6 +23,7 @@
 namespace OHOS {
 namespace Rosen {
 
+std::mutex CJObserver::listenerMutex_;
 std::unordered_map<int64_t, std::shared_ptr<CJObserverListener>> CJObserver::scrollEventListeners_;
 std::unordered_map<std::string, std::unordered_map<int64_t, std::shared_ptr<CJObserverListener>>>
     CJObserver::specifiedScrollEventListeners_;
@@ -33,6 +35,7 @@ std::unordered_map<std::string, std::unordered_map<int64_t, std::shared_ptr<CJOb
 // Scroll event callbacks
 void CJObserver::RegisterScrollEventCallback(int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     auto listener = std::make_shared<CJObserverListener>();
     auto iter = scrollEventListeners_.find(callbackId);
     if (iter != scrollEventListeners_.end()) {
@@ -44,6 +47,7 @@ void CJObserver::RegisterScrollEventCallback(int64_t callbackId)
 
 void CJObserver::RegisterScrollEventCallback(const std::string& id, int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     auto listener = std::make_shared<CJObserverListener>();
     auto iter = specifiedScrollEventListeners_.find(id);
     if (iter == specifiedScrollEventListeners_.end()) {
@@ -63,6 +67,7 @@ void CJObserver::RegisterScrollEventCallback(const std::string& id, int64_t call
 
 void CJObserver::UnRegisterScrollEventCallback(int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     if (callbackId == -1) {
         auto listener = std::make_shared<CJObserverListener>();
         listener->RemoveAllCallback(EVENT_SCROLL);
@@ -79,6 +84,7 @@ void CJObserver::UnRegisterScrollEventCallback(int64_t callbackId)
 
 void CJObserver::UnRegisterScrollEventCallback(const std::string& id, int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     if (callbackId == -1) {
         auto listener = std::make_shared<CJObserverListener>();
         listener->RemoveAllCallback(EVENT_SCROLL);
@@ -105,24 +111,39 @@ void CJObserver::UnRegisterScrollEventCallback(const std::string& id, int64_t ca
 void CJObserver::HandleScrollEventStateChange(
     const std::string& id, int32_t uniqueId, Ace::NG::ScrollEventType eventType, float offset, Ace::Axis axis)
 {
-    for (const auto& pair : scrollEventListeners_) {
-        pair.second->OnScrollEventStateChange(id, uniqueId, eventType, offset, axis);
+    std::vector<std::shared_ptr<CJObserverListener>> listeners;
+    {
+        std::lock_guard<std::mutex> lock(listenerMutex_);
+        listeners.reserve(scrollEventListeners_.size());
+        for (const auto& pair : scrollEventListeners_) {
+            listeners.push_back(pair.second);
+        }
+    }
+    for (const auto& listener : listeners) {
+        listener->OnScrollEventStateChange(id, uniqueId, eventType, offset, axis);
     }
 
-    auto iter = specifiedScrollEventListeners_.find(id);
-    if (iter == specifiedScrollEventListeners_.end()) {
-        return;
+    listeners.clear();
+    {
+        std::lock_guard<std::mutex> lock(listenerMutex_);
+        auto iter = specifiedScrollEventListeners_.find(id);
+        if (iter == specifiedScrollEventListeners_.end()) {
+            return;
+        }
+        listeners.reserve(iter->second.size());
+        for (const auto& pair : iter->second) {
+            listeners.push_back(pair.second);
+        }
     }
-
-    auto& holder = iter->second;
-    for (const auto& pair : holder) {
-        pair.second->OnScrollEventStateChange(id, uniqueId, eventType, offset, axis);
+    for (const auto& listener : listeners) {
+        listener->OnScrollEventStateChange(id, uniqueId, eventType, offset, axis);
     }
 }
 
 // TabContent Update callbacks
 void CJObserver::RegisterTabContentUpdateCallback(int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     auto listener = std::make_shared<CJObserverListener>();
     auto iter = tabContentUpdateListeners_.find(callbackId);
     if (iter != tabContentUpdateListeners_.end()) {
@@ -134,6 +155,7 @@ void CJObserver::RegisterTabContentUpdateCallback(int64_t callbackId)
 
 void CJObserver::RegisterTabContentUpdateCallback(const std::string& id, int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     auto listener = std::make_shared<CJObserverListener>();
     auto iter = specifiedTabContentUpdateListeners_.find(id);
     if (iter == specifiedTabContentUpdateListeners_.end()) {
@@ -153,6 +175,7 @@ void CJObserver::RegisterTabContentUpdateCallback(const std::string& id, int64_t
 
 void CJObserver::UnRegisterTabContentUpdateCallback(int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     if (callbackId == -1) {
         auto listener = std::make_shared<CJObserverListener>();
         listener->RemoveAllCallback(EVENT_TAB_CONTENT_UPDATE);
@@ -169,6 +192,7 @@ void CJObserver::UnRegisterTabContentUpdateCallback(int64_t callbackId)
 
 void CJObserver::UnRegisterTabContentUpdateCallback(const std::string& id, int64_t callbackId)
 {
+    std::lock_guard<std::mutex> lock(listenerMutex_);
     if (callbackId == -1) {
         auto listener = std::make_shared<CJObserverListener>();
         listener->RemoveAllCallback(EVENT_TAB_CONTENT_UPDATE);
@@ -194,18 +218,32 @@ void CJObserver::UnRegisterTabContentUpdateCallback(const std::string& id, int64
 
 void CJObserver::HandleTabContentUpdateStateChange(const Ace::NG::TabContentInfo& tabContentInfo)
 {
-    for (const auto& pair : tabContentUpdateListeners_) {
-        pair.second->OnTabContentUpdateStateChange(tabContentInfo);
+    std::vector<std::shared_ptr<CJObserverListener>> listeners;
+    {
+        std::lock_guard<std::mutex> lock(listenerMutex_);
+        listeners.reserve(tabContentUpdateListeners_.size());
+        for (const auto& pair : tabContentUpdateListeners_) {
+            listeners.push_back(pair.second);
+        }
+    }
+    for (const auto& listener : listeners) {
+        listener->OnTabContentUpdateStateChange(tabContentInfo);
     }
 
-    auto iter = specifiedTabContentUpdateListeners_.find(tabContentInfo.id);
-    if (iter == specifiedTabContentUpdateListeners_.end()) {
-        return;
+    listeners.clear();
+    {
+        std::lock_guard<std::mutex> lock(listenerMutex_);
+        auto iter = specifiedTabContentUpdateListeners_.find(tabContentInfo.id);
+        if (iter == specifiedTabContentUpdateListeners_.end()) {
+            return;
+        }
+        listeners.reserve(iter->second.size());
+        for (const auto& pair : iter->second) {
+            listeners.push_back(pair.second);
+        }
     }
-
-    auto& holder = iter->second;
-    for (const auto& pair : holder) {
-        pair.second->OnTabContentUpdateStateChange(tabContentInfo);
+    for (const auto& listener : listeners) {
+        listener->OnTabContentUpdateStateChange(tabContentInfo);
     }
 }
 

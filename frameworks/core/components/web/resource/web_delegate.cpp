@@ -245,7 +245,7 @@ public:
         }
         auto delegate = webDelegate_.Upgrade();
         if (delegate) {
-            TAG_LOGD(AceLogTag::ACE_WEB, "SecurityHitTestCallback OnReceiveValue called");
+            TAG_LOGI(AceLogTag::ACE_WEB, "SecurityHitTestCallback OnReceiveValue called");
             delegate->OnTouchForSecurityHitTest(state_);
         }
     }
@@ -5567,7 +5567,7 @@ void WebDelegate::GetElementInfoForSecurityHitTest(SecurityHitTestInfo& secInfo)
             auto callback = std::make_shared<SecurityHitTestCallback>(weak, state);
             if (delegate->nweb_) {
                 delegate->nweb_->GetElementInfoForSecurityHitTest(x, y, callback);
-                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::GetElementInfoForSecurityHitTest called");
+                TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::GetElementInfoForSecurityHitTest called");
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebGetElementInfoForSecurityHitTest");
@@ -5584,11 +5584,11 @@ void WebDelegate::OnTouchForSecurityHitTest(std::shared_ptr<SecurityHitTestInfo>
             auto webPattern = delegate->webPattern_.Upgrade();
             CHECK_NULL_VOID(webPattern);
             CHECK_NULL_VOID(state);
-            TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest report");
+            TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest report");
             bool allowed = webPattern->ReportDecsionForSecurityHitTest(
                 state->callingUid, state->sessionId, state->response);
             if (allowed && delegate->nweb_) {
-                TAG_LOGD(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest TouchPress");
+                TAG_LOGI(AceLogTag::ACE_WEB, "WebDelegate::OnTouchForSecurityHitTest TouchPress");
                 delegate->nweb_->OnTouchPress(state->id, state->x, state->y, state->from_overlay);
             }
         },
@@ -5904,6 +5904,11 @@ void WebDelegate::OnPageStarted(const std::string& param)
             delegate->RecordWebEvent(Recorder::EventType::WEB_PAGE_BEGIN, param);
             delegate->ResetStateOfDataDetectorJS();
             webPattern->InitDataDetector();
+            auto pageUrl = delegate->GetUrl();
+            if (pageUrl != "about:blank") {
+                TAG_LOGI(AceLogTag::ACE_WEB, "OnPageStarted:Start to RunJsInit.");
+                webPattern->RunJsInit();
+            }
         },
         TaskExecutor::TaskType::JS, "ArkUIWebPageStarted");
     taskExecutor_->PostTask(
@@ -5934,11 +5939,6 @@ void WebDelegate::OnPageFinished(const std::string& param)
             webEventHub->FireOnPageFinishedEvent(std::make_shared<LoadWebPageFinishEvent>(param));
             webPattern->OnScrollEndRecursive(std::nullopt);
             delegate->RecordWebEvent(Recorder::EventType::WEB_PAGE_END, param);
-            auto pageUrl = delegate->GetUrl();
-            if (pageUrl != "about:blank") {
-                TAG_LOGI(AceLogTag::ACE_WEB, "OnPageFinished:Start to RunJsInit.");
-                webPattern->RunJsInit();
-            }
             delegate->RunDataDetectorJS();
         },
         TaskExecutor::TaskType::JS, "ArkUIWebPageFinished");
@@ -9796,7 +9796,7 @@ void WebDelegate::OnAttachContext(const RefPtr<NG::PipelineContext> &context)
         auto windowId = context->GetFocusWindowId();
         nweb_->SetWindowId(windowId);
     }
-    auto pipelineContext = DynamicCast<NG::PipelineContext>(context);
+    auto pipelineContext = context;
     CHECK_NULL_VOID(pipelineContext);
     pipelineContext->AddAfterRenderTask(
         [weak = WeakClaim(this), instanceId = instanceId_]() {

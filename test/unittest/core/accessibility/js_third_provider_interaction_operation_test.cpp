@@ -29,6 +29,7 @@
 
 #include "frameworks/core/accessibility/accessibility_node.h"
 #include "frameworks/core/accessibility/accessibility_utils.h"
+#include "frameworks/core/accessibility/accessibility_session_adapter.h"
 #include "frameworks/core/accessibility/native_interface_accessibility_provider.h"
 #include "frameworks/core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "frameworks/core/components_ng/pattern/stage/page_pattern.h"
@@ -1449,6 +1450,247 @@ HWTEST_F(JsThirdProviderInteractionOperationTest, NativeHoverMissingHostIsReject
     ArkUI_AccessibilityElementInfo info;
     info.SetElementId(123);
     EXPECT_FALSE(operation->SendNativeHoverEvent(info, AccessibilityHoverEventType::ENTER));
+}
+
+namespace {
+class CollectedActionProvider : public AccessibilityProvider {
+    DECLARE_ACE_TYPE(CollectedActionProvider, AccessibilityProvider);
+
+public:
+    CollectedActionProvider() = default;
+    ~CollectedActionProvider() override = default;
+
+    int32_t FindAccessibilityNodeInfosById(const int64_t elementId, const int32_t mode,
+        const int32_t requestId, std::vector<ArkUI_AccessibilityElementInfo>& infos) override
+    {
+        if (noCallbacks) {
+            return 0;
+        }
+        if (elementId != targetId) {
+            return -1;
+        }
+        ArkUI_AccessibilityElementInfo info;
+        info.SetElementId(returnWrongTarget ? targetId + 1 : targetId);
+        info.AddOperationAction({ static_cast<ArkUI_Accessibility_ActionType>(declaredAction), nullptr });
+        infos.push_back(info);
+        return 0;
+    }
+    int32_t FindAccessibilityNodeInfosByText(const int64_t elementId, std::string text,
+        const int32_t requestId, std::vector<ArkUI_AccessibilityElementInfo>& infos) override
+    {
+        return 0;
+    }
+    int32_t FindFocusedAccessibilityNode(const int64_t elementId, int32_t focusType,
+        const int32_t requestId, ArkUI_AccessibilityElementInfo& elementInfo) override
+    {
+        return 0;
+    }
+    int32_t FindNextFocusAccessibilityNode(const int64_t elementId, int32_t direction,
+        const int32_t requestId, ArkUI_AccessibilityElementInfo& elementInfo) override
+    {
+        return 0;
+    }
+    int32_t ExecuteAccessibilityAction(const int64_t elementId, int32_t action, const int32_t requestId,
+        const std::map<std::string, std::string>& actionArguments) override
+    {
+        if (elementId != targetId || action != declaredAction) {
+            return -1;
+        }
+        auto text = actionArguments.find("setText");
+        receivedText = text == actionArguments.end() ? "" : text->second;
+        ++executionCount;
+        return executeResult;
+    }
+    int32_t ClearFocusedAccessibilityNode() override
+    {
+        return 0;
+    }
+    int32_t GetAccessibilityNodeCursorPosition(const int64_t elementId,
+        const int32_t requestId, int32_t& cursorPosition) override
+    {
+        return 0;
+    }
+    int32_t SendAccessibilityAsyncEvent(const ArkUI_AccessibilityEventInfo& accessibilityEvent,
+        void (*callback)(int32_t errorCode)) override
+    {
+        return 0;
+    }
+
+    int64_t targetId = 77;
+    int32_t declaredAction = 0;
+    int32_t executeResult = 0;
+    int32_t executionCount = 0;
+    bool noCallbacks = false;
+    bool returnWrongTarget = false;
+    std::string receivedText;
+};
+} // namespace
+
+/**
+ * @tc.name: SendCommandCollectedProviderAction
+ * @tc.desc: A collected third-party target uses its own registered provider and declared action.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, SendCommandCollectedProviderAction, TestSize.Level1)
+{
+    constexpr int32_t click = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK);
+    auto provider = AceType::MakeRefPtr<CollectedActionProvider>();
+    provider->targetId = 77;
+    provider->declaredAction = click;
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto host = FrameNode::CreateFrameNode("Custom", 1234567, AceType::MakeRefPtr<Pattern>(), true);
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        provider, manager, host);
+    operation->Initialize();
+    const int64_t targetId = provider->targetId;
+
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, click, {}),
+        UiSessionAccessibilityResult::SUCCESS);
+    EXPECT_EQ(provider->executionCount, 1);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId + 1, click, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 1);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId,
+        static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_LONG_CLICK), {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 1);
+    provider->executeResult = -1;
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, click, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 2);
+    provider->executeResult = 0;
+
+    {
+        WeakPtr<AccessibilityProvider> expiredProvider;
+        {
+            auto registeredProvider = AceType::MakeRefPtr<CollectedActionProvider>();
+            expiredProvider = WeakPtr<AccessibilityProvider>(registeredProvider);
+        }
+        auto orphanOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+            expiredProvider, manager, host);
+        EXPECT_EQ(orphanOperation->ExecuteActionForCollectedNode(targetId, click, {}),
+            UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    }
+    {
+        auto unregisteredProvider = AceType::MakeRefPtr<CollectedActionProvider>();
+        unregisteredProvider->noCallbacks = true;
+        auto unregisteredOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+            unregisteredProvider, manager, host);
+        EXPECT_EQ(unregisteredOperation->ExecuteActionForCollectedNode(targetId, click, {}),
+            UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    }
+    EXPECT_EQ(provider->executionCount, 2);
+
+    provider->declaredAction = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CUSTOM);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(
+        targetId, provider->declaredAction, {{ "customAction", "open" }}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 2);
+    provider->declaredAction = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_SET_TEXT);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(
+        targetId, provider->declaredAction, {{ "setText", "provider text" }}),
+        UiSessionAccessibilityResult::SUCCESS);
+    EXPECT_EQ(provider->receivedText, "provider text");
+    EXPECT_EQ(provider->executionCount, 3);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, click, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 3);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, provider->declaredAction, {}, false),
+        UiSessionAccessibilityResult::INVALID_PARAM);
+    EXPECT_EQ(provider->executionCount, 3);
+    provider->returnWrongTarget = true;
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, provider->declaredAction, {}, false),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 3);
+    EXPECT_EQ(operation->ExecuteActionForCollectedNode(targetId, provider->declaredAction, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 3);
+    provider->returnWrongTarget = false;
+    const std::vector<Accessibility::ActionType> mappingActions = {
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_FOCUS,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_FOCUS,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_SELECT,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_SELECTION,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_NEXT_TEXT,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_PREVIOUS_TEXT,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_SPAN_CLICK,
+    };
+    for (auto systemAction : mappingActions) {
+        provider->declaredAction = static_cast<int32_t>(systemAction);
+        auto before = provider->executionCount;
+        std::map<std::string, std::string> arguments;
+        if (systemAction == Accessibility::ActionType::ACCESSIBILITY_ACTION_SPAN_CLICK) {
+            arguments["spanId"] = "0";
+        }
+        EXPECT_EQ(operation->ExecuteActionForCollectedNode(
+            targetId, static_cast<int32_t>(systemAction), arguments),
+            UiSessionAccessibilityResult::SUCCESS);
+        EXPECT_EQ(provider->executionCount, before + 1);
+    }
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_INVALID, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, static_cast<int32_t>(mappingActions.size()) + 3);
+}
+
+namespace {
+class FallbackTestPattern : public Pattern {
+public:
+    explicit FallbackTestPattern(const RefPtr<AccessibilityProvider>& provider) : provider_(provider) {}
+
+    RefPtr<AccessibilityProvider> GetOrCreateAccessibilityProvider() override
+    {
+        return provider_;
+    }
+
+private:
+    RefPtr<AccessibilityProvider> provider_;
+};
+} // namespace
+
+/**
+ * @tc.name: SendCommandCollectedActionWithoutAms
+ * @tc.desc: A third-party action executes through the pattern-owned provider when no AAMS operation exists.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsThirdProviderInteractionOperationTest, SendCommandCollectedActionWithoutAms, TestSize.Level1)
+{
+    constexpr int64_t targetId = 55;
+    constexpr int32_t click = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK);
+    auto provider = AceType::MakeRefPtr<CollectedActionProvider>();
+    provider->targetId = targetId;
+    provider->declaredAction = click;
+
+    auto emptyHost = FrameNode::CreateFrameNode("Custom", 2345670,
+        AceType::MakeRefPtr<FallbackTestPattern>(nullptr), true);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(emptyHost, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 0);
+
+    auto host = FrameNode::CreateFrameNode("Custom", 2345671,
+        AceType::MakeRefPtr<FallbackTestPattern>(provider), true);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::SUCCESS);
+    EXPECT_EQ(provider->executionCount, 1);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId + 1,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
+    EXPECT_EQ(provider->executionCount, 1);
+    provider->declaredAction = static_cast<int32_t>(Accessibility::ActionType::ACCESSIBILITY_ACTION_LONG_CLICK);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(host, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::EXECUTE_FAIL);
+    EXPECT_EQ(provider->executionCount, 1);
+
+    auto plainHost = FrameNode::CreateFrameNode("FrameNode", 2345672, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_EQ(ExecuteUiSessionAccessibilityAction(plainHost, targetId,
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
+        UiSessionAccessibilityResult::NODE_NOT_FOUND);
 }
 
 } // namespace OHOS::Ace::NG

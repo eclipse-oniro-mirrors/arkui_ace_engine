@@ -34,6 +34,7 @@ if (is_arkui_x) {
   import("//foundation/multimedia/image_framework/ide/image_decode_config.gni")
   import("//plugins/drawable_descriptor/drawable_descriptor.gni")
   ohos_source_set("native_drawabledescriptor_static") {
+    branch_protector_ret = "pac_ret"
     configs = [
       "$ace_root:ace_config",
       "$ace_root:ace_coverage_config",

@@ -764,7 +764,7 @@ HWTEST_F(RectPatternTddTestNg, SetRadiusValueStaticInvalidIndex001, TestSize.Lev
 {
     auto rectModelNG = RectModelNG();
     rectModelNG.Create();
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto paintProperty = frameNode->GetPaintProperty<RectPaintProperty>();
     ASSERT_NE(paintProperty, nullptr);
@@ -785,7 +785,7 @@ HWTEST_F(RectPatternTddTestNg, SetRadiusValueResObjStaticInvalidResObj001, TestS
 {
     auto rectModelNG = RectModelNG();
     rectModelNG.Create();
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<ShapePattern>();
     ASSERT_NE(pattern, nullptr);
@@ -813,7 +813,7 @@ HWTEST_F(RectPatternTddTestNg, SetRadiusValueResObjStaticInvalidIndex001, TestSi
 {
     auto rectModelNG = RectModelNG();
     rectModelNG.Create();
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<ShapePattern>();
     ASSERT_NE(pattern, nullptr);
@@ -842,7 +842,7 @@ HWTEST_F(RectPatternTddTestNg, SetRadiusValueInstance001, TestSize.Level1)
 {
     auto rectModelNG = RectModelNG();
     rectModelNG.Create();
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto paintProperty = frameNode->GetPaintProperty<RectPaintProperty>();
     ASSERT_NE(paintProperty, nullptr);
@@ -879,7 +879,7 @@ HWTEST_F(RectPatternTddTestNg, SetRadiusValueInstanceInvalidIndex001, TestSize.L
 {
     auto rectModelNG = RectModelNG();
     rectModelNG.Create();
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto paintProperty = frameNode->GetPaintProperty<RectPaintProperty>();
     ASSERT_NE(paintProperty, nullptr);
@@ -979,7 +979,7 @@ HWTEST_F(RectPatternTddTestNg, SetRadiusValueResObjInstance002, TestSize.Level1)
 {
     auto rectModelNG = RectModelNG();
     rectModelNG.Create();
-    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ASSERT_NE(frameNode, nullptr);
     auto pattern = frameNode->GetPattern<ShapePattern>();
     ASSERT_NE(pattern, nullptr);

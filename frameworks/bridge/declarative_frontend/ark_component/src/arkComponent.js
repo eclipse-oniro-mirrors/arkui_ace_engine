@@ -12112,6 +12112,20 @@ class ListScrollSnapAlignModifier extends ModifierWithKey {
   }
 }
 ListScrollSnapAlignModifier.identity = Symbol('listScrollSnapAlign');
+class ListScrollSnapStrategyModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().list.resetScrollSnapStrategy(node);
+    }
+    else {
+      getUINativeModule().list.setScrollSnapStrategy(node, this.value);
+    }
+  }
+}
+ListScrollSnapStrategyModifier.identity = Symbol('listScrollSnapStrategy');
 class ListDividerModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -12842,6 +12856,10 @@ class ArkListComponent extends ArkScrollable {
   }
   scrollSnapAlign(value) {
     modifierWithKey(this._modifiersWithKeys, ListScrollSnapAlignModifier.identity, ListScrollSnapAlignModifier, value);
+    return this;
+  }
+  scrollSnapStrategy(value) {
+    modifierWithKey(this._modifiersWithKeys, ListScrollSnapStrategyModifier.identity, ListScrollSnapStrategyModifier, value);
     return this;
   }
   nestedScroll(value) {
@@ -14078,6 +14096,10 @@ class ArkContainerPickerComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, ContainerPickerItemHeightModifier.identity, ContainerPickerItemHeightModifier, height);
     return this;
   }
+  selectedTextStyle(style) {
+    modifierWithKey(this._modifiersWithKeys, ContainerPickerSelectedTextStyleModifier.identity, ContainerPickerSelectedTextStyleModifier, style);
+    return this;
+  }
 
 }
 
@@ -14211,6 +14233,27 @@ class ContainerPickerItemHeightModifier extends ModifierWithKey {
   }
 }
 ContainerPickerItemHeightModifier.identity = Symbol('containerPickerItemHeight');
+
+class ContainerPickerSelectedTextStyleModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().containerPicker.resetContainerPickerSelectedTextStyle(node);
+    } else {
+      const style = this.value;
+      const color = style === null || style === void 0 ? void 0 : style.color;
+      const fontSize = style === null || style === void 0 ? void 0 : (style.font === null || style.font === void 0 ? void 0 : style.font.size);
+      const fontWeight = style === null || style === void 0 ? void 0 : (style.font === null || style.font === void 0 ? void 0 : style.font.weight);
+      const minFontSize = style === null || style === void 0 ? void 0 : style.minFontSize;
+      const maxFontSize = style === null || style === void 0 ? void 0 : style.maxFontSize;
+      const overflow = style === null || style === void 0 ? void 0 : style.overflow;
+      getUINativeModule().containerPicker.setContainerPickerSelectedTextStyle(node, color, fontSize, fontWeight, minFontSize, maxFontSize, overflow);
+    }
+  }
+}
+ContainerPickerSelectedTextStyleModifier.identity = Symbol('containerPickerSelectedTextStyle');
 // @ts-ignore
 if (globalThis.UIPickerComponent !== undefined) {
   globalThis.UIPickerComponent.attributeModifier = function (modifier) {

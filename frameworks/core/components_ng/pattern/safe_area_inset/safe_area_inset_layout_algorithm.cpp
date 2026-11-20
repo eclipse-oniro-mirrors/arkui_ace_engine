@@ -19,7 +19,6 @@
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
-#include "core/components_ng/property/measure_property.h"
 
 namespace OHOS::Ace::NG {
 
@@ -38,7 +37,7 @@ void SafeAreaInsetLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(host);
     auto pattern = host->GetPattern<SafeAreaInsetPattern>();
     CHECK_NULL_VOID(pattern);
-    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+    for (size_t index = 0; index < SafeAreaInsetPattern::GetEdgeCount(); ++index) {
         auto edge = static_cast<SafeAreaInsetEdge>(index);
         if (!pattern->GetEdgeContent(edge) || pattern->GetEdgeContent(edge)->FrameCount() == 0) {
             continue;

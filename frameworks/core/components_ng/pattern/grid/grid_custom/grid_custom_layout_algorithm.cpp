@@ -136,6 +136,7 @@ void GridCustomLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     wrapper_->SetActiveChildRange(
         startIndex, endIndex, cachedItemCnt.first, cachedItemCnt.second, props->GetShowCachedItemsValue(false));
     wrapper_->SetCacheCount(cachedItemCnt.first);
+    UpdateGridDecodeCacheWindow(wrapper_, cacheLines, true);
     UpdateOverlay(wrapper_);
 }
 
@@ -287,7 +288,7 @@ void GridCustomLayoutAlgorithm::MeasureForward(float mainSize)
 
 void GridCustomLayoutAlgorithm::MeasureBackward(float mainSize)
 {
-    if (IsScrollBarDrag() || NeedJump(mainSize) || reloadFlag_) {
+    if (NeedJump(mainSize) || reloadFlag_) {
         JumpToTargetOffset(mainSize);
         return;
     }

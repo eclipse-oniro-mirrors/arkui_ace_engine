@@ -25,6 +25,9 @@
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/scrollable/scrollable_animation_consts.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
+#include "core/animation/select_motion.h"
+#include "core/gestures/drag_constants.h"
+#include "core/gestures/drag_event.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #define private public
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
@@ -60,6 +63,98 @@ ScrollSnapStrategy MakeProviderStrategy(std::function<double(double)> snapFunc)
 } // namespace
 
 class GridScrollSnapTestNg : public GridTestNg {};
+
+/**
+ * @tc.name: SelectWithScroll_001
+ * @tc.desc: A mouse release can start snap before the last box-selection motion frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollSnapTestNg, SelectWithScroll_001, TestSize.Level1)
+{
+    constexpr float edgeDistance = 30.0f;
+    constexpr float centerAnchor = 50.0f;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetMultiSelectable(true);
+    model.SetScrollSnapStrategy(MakeStrategy(ScrollSnapAlign::CENTER));
+    CreateGridItems(GRID_ITEM_NUMBER, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateDone();
+
+    GestureEvent event;
+    event.SetInputEventType(InputEventType::MOUSE_BUTTON);
+    const Offset start(ITEM_MAIN_SIZE / 2.0f, ITEM_MAIN_SIZE / 2.0f);
+    event.SetLocalLocation(start);
+    event.SetGlobalLocation(start);
+    event.SetRawGlobalLocation(start);
+    pattern_->HandleDragStart(event);
+    const Offset edge(start.GetX(), HEIGHT + edgeDistance);
+    event.SetLocalLocation(edge);
+    event.SetGlobalLocation(edge);
+    event.SetRawGlobalLocation(edge);
+    pattern_->HandleDragUpdate(event);
+    auto motion = pattern_->selectMotion_;
+    ASSERT_NE(motion, nullptr);
+    ASSERT_FALSE(motion->IsCompleted());
+    motion->OnTimestampChanged(0.0f, 0.0f, false);
+    FlushUITasks();
+    const double offsetBeforeRelease = pattern_->GetTotalOffset();
+    ASSERT_GT(offsetBeforeRelease, 0.0);
+    ASSERT_LT(offsetBeforeRelease, GRID_MAX_OFFSET);
+    ASSERT_LT(motion->GetCurrentPosition(), 0.0);
+
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    scrollable->HandleTouchUp();
+    ASSERT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
+    pattern_->HandleDragEnd();
+
+    // Animator notifies the motion listener before it checks IsCompleted().
+    motion->OnTimestampChanged(16.0f, 0.0f, false);
+    EXPECT_TRUE(motion->IsCompleted());
+    FlushUITasks();
+    EXPECT_DOUBLE_EQ(pattern_->GetTotalOffset(), offsetBeforeRelease);
+}
+
+/**
+ * @tc.name: HandleOnDragStatusCallback_001
+ * @tc.desc: Dropping after drag hot-zone scrolling settles to the nearest Grid item anchor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollSnapTestNg, HandleOnDragStatusCallback_001, TestSize.Level1)
+{
+    constexpr int32_t dragItemCount = 20;
+    constexpr float dragScrollDistance = 70.0f;
+    constexpr float centerAnchor = 50.0f;
+    MockPipelineContext::GetCurrent()->SetMinPlatformVersion(11);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetScrollSnapStrategy(MakeStrategy(ScrollSnapAlign::CENTER));
+    CreateGridItems(dragItemCount, ITEM_MAIN_SIZE, ITEM_MAIN_SIZE);
+    CreateDone();
+
+    auto drag = AceType::MakeRefPtr<NotifyDragEvent>();
+    drag->SetX(WIDTH / 2.0f);
+    drag->SetY(HEIGHT - 5.0f);
+    pattern_->HandleOnDragStatusCallback(DragEventType::START, drag);
+    pattern_->HandleOnDragStatusCallback(DragEventType::MOVE, drag);
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    FlushUITasks();
+    UpdateCurrentOffset(static_cast<float>(pattern_->GetTotalOffset()) - dragScrollDistance, SCROLL_FROM_AXIS);
+    ASSERT_DOUBLE_EQ(pattern_->GetTotalOffset(), dragScrollDistance);
+
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    pattern_->HandleOnDragStatusCallback(DragEventType::LEAVE, drag);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(scrollable->state_, Scrollable::AnimationState::IDLE);
+
+    pattern_->HandleOnDragStatusCallback(DragEventType::DROP, drag);
+    FlushUITasks();
+    EXPECT_EQ(scrollable->state_, Scrollable::AnimationState::SNAP);
+    EXPECT_FLOAT_EQ(scrollable->GetFinalPosition(), -centerAnchor);
+}
 
 /**
  * @tc.name: SnapTypeGate001
