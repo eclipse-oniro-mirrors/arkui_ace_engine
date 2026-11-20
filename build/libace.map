@@ -4585,6 +4585,7 @@
       "OHOS::Ace::NG::FocusHub::SetFocusType(OHOS::Ace::NG::FocusType)";
       "OHOS::Ace::NG::FocusHub::SetIsDefaultFocus(bool)";
       "OHOS::Ace::NG::FocusHub::SetPaintColor(OHOS::Ace::Color const&)";
+      "OHOS::Ace::NG::FocusHub::SetPaintWidth(OHOS::Ace::Dimension const&)";
       "OHOS::Ace::NG::FocusHub::SetParentFocusable(bool)";
       "OHOS::Ace::NG::FrameNode::AddToOcclusionMap(bool)";
       "OHOS::Ace::NG::FrameNode::CreateAnimatablePropertyFloat(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&, float, std::__h::function<void (float)> const&, OHOS::Ace::PropertyUnit const&)";

@@ -819,8 +819,20 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::GetOrCreateTabItemNode(int32_t id)
     buttonModifier->updateBackgroundColorFlagByUserToLayoutProp(nodeHandle, true);
     buttonModifier->setBlendColor(
         nodeHandle, tabTheme->GetSideBarListItemPressedColor(), tabTheme->GetSideBarListItemHoverColor());
-    buttonModifier->setFocusBorderColor(nodeHandle, tabTheme->GetSideBarListItemFocusColor());
-    buttonModifier->setFocusBorderWidth(nodeHandle, SIDEBAR_TAB_ITEM_FOCUS_WIDTH);
+    // Mirror legacy TabBarItemPattern::OnAttachToMainTree (tab_bar_item_pattern.h): the tab item is
+    // a label-less Button whose hub is turned into SCOPE by ButtonPattern::InitButtonLabel, while its
+    // inner Row/Image/Text children are not focusable. Make the item itself a focus stop so the
+    // IsChildFocusable() chain up to sideBar is not broken.
+    auto itemFocusHub = tabItemNode->GetOrCreateFocusHub();
+    if (itemFocusHub) {
+        itemFocusHub->SetFocusable(true, false);
+        itemFocusHub->SetFocusDependence(FocusDependence::SELF);
+        // ButtonPattern::GetFocusPattern() returns OUTER_BORDER for normal buttons, which draws the
+        // ring outside the item with a gap. Sidebar tab items should paint the ring inside.
+        itemFocusHub->SetFocusStyleType(FocusStyleType::INNER_BORDER);
+        itemFocusHub->SetPaintColor(tabTheme->GetSideBarListItemFocusColor());
+        itemFocusHub->SetPaintWidth(SIDEBAR_TAB_ITEM_FOCUS_WIDTH);
+    }
     buttonModifier->updateTypeToLayoutProp(nodeHandle, ButtonType::NORMAL);
     auto radius = tabTheme->GetSideBarListItemCornerRadius();
     buttonModifier->setButtonBorderRadius(nodeHandle, radius, radius, radius, radius);

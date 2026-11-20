@@ -52,6 +52,11 @@ public:
         return MakeRefPtr<TabsSideBarLayoutAlgorithm>();
     }
 
+    FocusPattern GetFocusPattern() const override
+    {
+        return { FocusType::SCOPE, true };
+    }
+
     void SetHeaderNode(const RefPtr<UINode>& header)
     {
         headerNode_ = header;
