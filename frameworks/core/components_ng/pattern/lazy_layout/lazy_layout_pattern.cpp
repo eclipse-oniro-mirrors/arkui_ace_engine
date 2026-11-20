@@ -205,6 +205,8 @@ private:
     {
         auto host = GetHostNode();
         auto property = GetLayoutProperty();
+        CHECK_NULL_RETURN(host, false);
+        CHECK_NULL_RETURN(property, false);
         // These paths require FrameNode callbacks or tree mutation, not isolated wrapper measurement.
         return !host->GetExtensionHandler() && !host->GetKitNode() && !host->GetOverlayNode() &&
             !AceType::InstanceOf<CustomMeasureLayoutNode>(host) && !property->GetLayoutRect() &&
