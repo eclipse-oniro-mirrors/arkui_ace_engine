@@ -43,6 +43,7 @@
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "base/subwindow/subwindow_manager.h"
+#include "core/components_ng/pattern/sheet/bridge/sheet_pattern_inner_modifier.h"
 #include "core/components_ng/pattern/sheet/sheet_manager.h"
 #include "core/components_ng/pattern/sheet/sheet_style.h"
 #include "core/components_ng/pattern/sheet/sheet_view.h"
@@ -158,7 +159,9 @@ void SheetPresentationPattern::OnModifyDone()
                 sheetStyle.backgroundColor.value_or(sheetTheme->GetSheetBackgoundColor()));
         } else if (MaterialUtils::IsEnableMaterialParam(sheetStyle.systemMaterial) &&
                    SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
-            renderContext->UpdateBackgroundColor(sheetTheme->GetSheetBackgoundColor());
+            auto* sheetPatternModifier = InnerModifier::GetSheetPatternInnerModifier();
+            CHECK_NULL_VOID(sheetPatternModifier);
+            sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(host, sheetStyle, sheetTheme);
         }
     }
     InitPanEvent();
@@ -752,6 +755,13 @@ void SheetPresentationPattern::SetSheetRenderMaterial()
     }
     if (sheetStyle.systemMaterial || sheetStyle.closeButtonMaterial) {
         SetSheetCloseIconMaterial(sheetStyle.closeButtonMaterial);
+    }
+    auto sheetTheme = host->GetTheme<SheetTheme>(true);
+    CHECK_NULL_VOID(sheetTheme);
+    if (sheetStyle.systemMaterial && SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+        auto* sheetPatternModifier = InnerModifier::GetSheetPatternInnerModifier();
+        CHECK_NULL_VOID(sheetPatternModifier);
+        sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(host, sheetStyle, sheetTheme);
     }
 }
 
@@ -4778,7 +4788,9 @@ void SheetPresentationPattern::UpdateBgColor(const RefPtr<ResourceObject>& resOb
         renderContext->UpdateBackgroundColor(backgroundColor);
     } else if (currSheetStyle.systemMaterial && SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE &&
                sheetTheme) {
-        renderContext->UpdateBackgroundColor(sheetTheme->GetSheetBackgoundColor());
+        auto* sheetPatternModifier = InnerModifier::GetSheetPatternInnerModifier();
+        CHECK_NULL_VOID(sheetPatternModifier);
+        sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(sheetNode, currSheetStyle, sheetTheme);
     }
     sheetNode->MarkModifyDone();
 }

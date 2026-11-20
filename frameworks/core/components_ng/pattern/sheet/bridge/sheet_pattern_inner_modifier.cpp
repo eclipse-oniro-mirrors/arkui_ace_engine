@@ -21,6 +21,7 @@
 #include "core/components_ng/pattern/sheet/sheet_object.h"
 #include "core/components_ng/pattern/sheet/sheet_presentation_pattern.h"
 #include "core/components_ng/pattern/sheet/sheet_presentation_property.h"
+#include "core/components_ng/pattern/sheet/sheet_theme.h"
 #include "core/components_ng/render/render_context.h"
 
 namespace OHOS::Ace::NG::InnerModifier {
@@ -656,6 +657,19 @@ bool SheetIsOnDisappearing(const RefPtr<FrameNode>& sheetNode)
     CHECK_NULL_RETURN(sheetPattern, false);
     return sheetPattern->IsOnDisappearing();
 }
+
+void SheetUpdateBackgroundColorIfNoMaterialColor(const RefPtr<FrameNode>& sheetNode, const SheetStyle& sheetStyle,
+    const RefPtr<SheetTheme>& sheetTheme)
+{
+    CHECK_NULL_VOID(sheetNode);
+    CHECK_NULL_VOID(sheetTheme);
+    auto renderContext = sheetNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto immersiveOptions = sheetStyle.systemMaterial ? sheetStyle.systemMaterial->GetImmersiveOptions() : nullptr;
+    if (!immersiveOptions || !immersiveOptions->materialColor.has_value()) {
+        renderContext->UpdateBackgroundColor(sheetTheme->GetSheetBackgoundColor());
+    }
+}
 } // namespace
 
 const ArkUISheetPatternInnerModifier* GetSheetPatternInnerModifier()
@@ -736,6 +750,7 @@ const ArkUISheetPatternInnerModifier* GetSheetPatternInnerModifier()
         .sheetSetSheetBlurSnapshotFreeze = SheetSetSheetBlurSnapshotFreeze,
         .sheetUpdateSheetScrollBar = SheetUpdateSheetScrollBar,
         .sheetIsOnDisappearing = SheetIsOnDisappearing,
+        .sheetUpdateBackgroundColorIfNoMaterialColor = SheetUpdateBackgroundColorIfNoMaterialColor,
     };
     return &modifier;
 }
