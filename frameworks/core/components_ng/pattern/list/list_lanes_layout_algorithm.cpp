@@ -635,9 +635,9 @@ bool ListLanesLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutW
     if (lanes_ == 1) {
         return ListLayoutAlgorithm::MeasureFastScrollNeighbors(layoutWrapper, size);
     }
-    const auto targetOpt = GetPhysicalLanesRow(GetFastScrollState()->input.targetIndex.value());
-    CHECK_NULL_RETURN(targetOpt, false);
-    const auto target = *targetOpt;
+    const int32_t targetIndex = GetFastScrollState()->input.targetIndex.value();
+    const auto target = GetPhysicalLanesRow(targetIndex).value_or(
+        ListPositionMap::EstimateRange { targetIndex, targetIndex });
     const auto [start, end] = GetFastScrollPreparationRange(size);
     if (!std::isfinite(start) || !std::isfinite(end)) {
         GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::INVALID;
