@@ -392,13 +392,7 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
         extensionSessionInfo.connectToRenderToken_  = rsUIContext->GetConnectToRender();
     };
     setConnectToRender();
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    if (window) {
-        auto rsWindow = window->GetRSWindow();
-        if (rsWindow) {
-            extensionSessionInfo.callerPersistentId_ = static_cast<int32_t>(rsWindow->GetWindowId());
-        }
-    }
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId();
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
     pattern->SetLastSentBrandColorStr(brandColorStr);
@@ -431,6 +425,17 @@ void SecuritySessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wan
     AAFwk::WantParams wantParam(wantPtr->GetParams());
     wantParam.SetParam(UIEXTENSION_CONFIG_FIELD, AAFwk::WantParamWrapper::Box(configParam));
     wantPtr->SetParams(wantParam);
+}
+
+int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
+{
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_RETURN(container, 0);
+    auto window = static_cast<RosenWindow*>(container->GetWindow());
+    CHECK_NULL_RETURN(window, 0);
+    auto rsWindow = window->GetRSWindow();
+    CHECK_NULL_RETURN(rsWindow, 0);
+    return static_cast<int32_t>(rsWindow->GetWindowId());
 }
 
 void SecuritySessionWrapperImpl::ReDispatchWantParams()
@@ -506,13 +511,7 @@ void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
     sessionInfo.parentWindowType_ = parentWindowType;
     sessionInfo.realParentId_ = static_cast<int32_t>(pipeline->GetRealHostWindowId());
     sessionInfo.brandColorStr_ = pattern->GetBrandColorStr();
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    if (window) {
-        auto rsWindow = window->GetRSWindow();
-        if (rsWindow) {
-            sessionInfo.callerPersistentId_ = static_cast<int32_t>(rsWindow->GetWindowId());
-        }
-    }
+    sessionInfo.callerPersistentId_ = GetCallerPersistentId();
 
     PLATFORM_LOGI("UpdateExtensionParent, persistentId=%{public}d, newHostWindowId=%{public}u, "
         "callerPersistentId=%{public}d.",

@@ -121,6 +121,7 @@ private:
         uint32_t customId, const AAFwk::Want& data, std::optional<AAFwk::Want>& reply);
     void DispatchExtensionDataToHostWindow(uint32_t customId, const AAFwk::Want& data);
     void UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr);
+    int32_t GetCallerPersistentId();
     AceLogTag tag_ = AceLogTag::ACE_SECURITYUIEXTENSION;
     WeakPtr<SecurityUIExtensionPattern> hostPattern_;
     RefPtr<TaskExecutor> taskExecutor_;

@@ -364,13 +364,7 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.brandColorStr_ = brandColorStr;
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    if (window) {
-        auto rsWindow = window->GetRSWindow();
-        if (rsWindow) {
-            extensionSessionInfo.callerPersistentId_ = static_cast<int32_t>(rsWindow->GetWindowId());
-        }
-    }
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId();
     SetConnectToRenderInner(container, extensionSessionInfo);
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
@@ -420,7 +414,18 @@ void PreviewSessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& want
     wantParam.SetParam(UIEXTENSION_CONFIG_FIELD, AAFwk::WantParamWrapper::Box(configParam));
     wantPtr->SetParams(wantParam);
 }
- 
+
+int32_t PreviewSessionWrapperImpl::GetCallerPersistentId()
+{
+    auto container = Platform::AceContainer::GetContainer(GetInstanceId());
+    CHECK_NULL_RETURN(container, 0);
+    auto window = static_cast<RosenWindow*>(container->GetWindow());
+    CHECK_NULL_RETURN(window, 0);
+    auto rsWindow = window->GetRSWindow();
+    CHECK_NULL_RETURN(rsWindow, 0);
+    return static_cast<int32_t>(rsWindow->GetWindowId());
+}
+
 void PreviewSessionWrapperImpl::ReDispatchWantParams()
 {
     CHECK_NULL_VOID(session_);

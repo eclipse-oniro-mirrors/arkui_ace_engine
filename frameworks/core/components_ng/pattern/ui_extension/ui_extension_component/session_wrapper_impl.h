@@ -120,6 +120,7 @@ private:
     int32_t GetFrameNodeId() const;
     void InitAllCallback();
     void SetConnectToRenderInner(const RefPtr<PipelineBase>& context, Rosen::SessionInfo& sessionInfo);
+    int32_t GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline);
     void InitForegroundCallback();
     void InitBackgroundCallback();
     void InitDestructionCallback();

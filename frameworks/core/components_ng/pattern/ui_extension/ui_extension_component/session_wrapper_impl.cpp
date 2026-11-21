@@ -708,13 +708,7 @@ void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
     sessionInfo.realParentId_ = static_cast<int32_t>(pipeline->GetRealHostWindowId());
     sessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
     sessionInfo.brandColorStr_ = pattern->GetBrandColorStr();
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    if (window) {
-        auto rsWindow = window->GetRSWindow();
-        if (rsWindow) {
-            sessionInfo.callerPersistentId_ = static_cast<int32_t>(rsWindow->GetWindowId());
-        }
-    }
+    sessionInfo.callerPersistentId_ = GetCallerPersistentId(pipeline);
 
     UIEXT_LOGI("UpdateExtensionParent, persistentId=%{public}d, newHostWindowId=%{public}u, "
         "callerPersistentId=%{public}d, componentId=%{public}d.",
@@ -799,13 +793,7 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
     extensionSessionInfo.brandColorStr_ = brandColorStr;
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    if (window) {
-        auto rsWindow = window->GetRSWindow();
-        if (rsWindow) {
-            extensionSessionInfo.callerPersistentId_ = static_cast<int32_t>(rsWindow->GetWindowId());
-        }
-    }
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId(pipeline);
     SetConnectToRenderInner(pipeline, extensionSessionInfo);
     auto session = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session);
@@ -828,6 +816,24 @@ void SessionWrapperImpl::SetConnectToRenderInner(
     CHECK_NULL_VOID(rsUIContext);
     extensionSessionInfo.connectToRenderToken_ = rsUIContext->GetConnectToRender();
     UIEXT_LOGI("SessionWrapperImpl get connectToRenderToken success.");
+}
+
+int32_t SessionWrapperImpl::GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline)
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_RETURN(container, 0);
+    if (container->IsDynamicRender() &&
+        container->GetUIContentType() == UIContentType::DYNAMIC_COMPONENT) {
+        return static_cast<int32_t>(pipeline->GetFocusWindowId());
+    }
+    if (container->IsSceneBoardWindow()) {
+        return GetWindowSceneId();
+    }
+    auto window = static_cast<RosenWindow*>(container->GetWindow());
+    CHECK_NULL_RETURN(window, 0);
+    auto rsWindow = window->GetRSWindow();
+    CHECK_NULL_RETURN(rsWindow, 0);
+    return static_cast<int32_t>(rsWindow->GetWindowId());
 }
 
 void SessionWrapperImpl::UpdateSessionConfig()
