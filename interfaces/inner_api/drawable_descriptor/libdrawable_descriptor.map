@@ -1,0 +1,47 @@
+# Copyright (c) 2026 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{
+  global:
+    extern "C++" {
+      "OHOS::Ace::Napi::DrawableDescriptor::GetPixelMap()";
+      "OHOS::Ace::Napi::DrawableDescriptor::GetDrawableType()";
+      "OHOS::Ace::Napi::DrawableDescriptor::SetSVGResourceLimitLevel(int)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetPixelMap()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetDrawableType()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetStaticMaskClipPath()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetForeground()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetBackground()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetMask()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::SetForeground(std::__h::shared_ptr<OHOS::Media::PixelMap>)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::SetBackground(std::__h::shared_ptr<OHOS::Media::PixelMap>)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::SetMask(std::__h::shared_ptr<OHOS::Media::PixelMap>)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::Customized()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::InitialMask(std::__h::shared_ptr<OHOS::Global::Resource::ResourceManager> const&)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetDefaultMask()";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::GetCompositePixelMapWithBadge(std::__h::shared_ptr<OHOS::Media::PixelMap>, std::__h::shared_ptr<OHOS::Media::PixelMap>, std::__h::shared_ptr<OHOS::Media::PixelMap>&)";
+      OHOS::Ace::Napi::LayeredDrawableDescriptor::InitLayeredParam*;
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::SetBlendMode(int)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::InitialResource(std::__h::shared_ptr<OHOS::Global::Resource::ResourceManager> const&)";
+      "OHOS::Ace::Napi::LayeredDrawableDescriptor::InitBlendMode()";
+      OHOS::Ace::Napi::DrawableDescriptorFactory::Create*;
+      "OHOS::Ace::Napi::JsDrawableDescriptor::Export(napi_env__*, napi_value__*)";
+      "OHOS::Ace::Napi::JsDrawableDescriptor::ToNapi(napi_env__*, OHOS::Ace::Napi::DrawableDescriptor*, OHOS::Ace::Napi::DrawableDescriptor::DrawableType)";
+      "OHOS::Ace::Napi::JsDrawableDescriptor::MODULE_NAME";
+      vtable?for?OHOS::Ace::Napi::DrawableDescriptor;
+      vtable?for?OHOS::Ace::Napi::LayeredDrawableDescriptor;
+    };
+    __cfi_check*;
+  local:
+    *;
+};
