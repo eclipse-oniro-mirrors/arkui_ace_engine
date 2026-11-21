@@ -107,7 +107,6 @@ ace_unittest("ressched_report_test") {
     "$ace_root/test/mock/frameworks/core/components_ng/image_provider/mock_image_loading_context.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_source_info.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/image_provider/mock_image_utils.cpp",
-    "$ace_root/test/mock/frameworks/core/event/package/mock_package_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/pattern/mock_app_bar_utils.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/pattern/mock_app_bar_view.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/pattern/mock_container_modal_utils.cpp",
