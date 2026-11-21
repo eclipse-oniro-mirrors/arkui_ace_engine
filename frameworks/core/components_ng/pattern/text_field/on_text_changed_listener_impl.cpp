@@ -439,7 +439,7 @@ void OnTextChangedListenerImpl::AutoFillReceivePrivateCommand(
     auto textFieldPattern = AceType::DynamicCast<TextFieldPattern>(patternPtr);
     auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(patternPtr);
     if (!textFieldPattern && !richEditorPattern) {
-        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "pattern is neither TextField nor RichEditor");
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "invalid pattern");
         return;
     }
     bool isPopup = false;
@@ -453,7 +453,7 @@ void OnTextChangedListenerImpl::AutoFillReceivePrivateCommand(
             richEditorPattern->SetAutoFillUserName(userNameValue);
             patternPtr->ProcessAutoFillTrigger(AceAutoFillTriggerType::AUTO_REQUEST);
         }
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.userName size:%{public}zu", userNameValue.size());
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "userName size:%{public}zu", userNameValue.size());
     } else if (privateCommand.find(std::string(AUTO_FILL_PARAMS_NEWPASSWORD)) != privateCommand.end()) {
         auto newPassword = privateCommand.find(std::string(AUTO_FILL_PARAMS_NEWPASSWORD));
         const auto& newPasswordValue = std::get<std::string>(newPassword->second);
@@ -464,9 +464,9 @@ void OnTextChangedListenerImpl::AutoFillReceivePrivateCommand(
             richEditorPattern->SetAutoFillNewPassword(newPasswordValue);
             patternPtr->ProcessAutoFillTrigger(AceAutoFillTriggerType::AUTO_REQUEST);
         }
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.newPassword size:%{public}zu", newPasswordValue.size());
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "newPassword size:%{public}zu", newPasswordValue.size());
     } else if (privateCommand.find(std::string(AUTO_FILL_PARAMS_OTHERACCOUNT)) != privateCommand.end()) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "com.autofill.params.otherAccount");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "otherAccount");
         if (textFieldPattern) {
             textFieldPattern->SetAutoFillOtherAccount(true);
             textFieldPattern->ProcessAutoFill(isPopup, true);
@@ -475,7 +475,7 @@ void OnTextChangedListenerImpl::AutoFillReceivePrivateCommand(
             patternPtr->ProcessAutoFillTrigger(AceAutoFillTriggerType::AUTO_REQUEST);
         }
     } else {
-        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "invalid autofill data privateCommand");
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Invalid data");
     }
 }
 
@@ -550,9 +550,9 @@ void OnTextChangedListenerImpl::FinishTextPreview()
 int32_t OnTextChangedListenerImpl::ReceivePrivateCommand(
     const std::unordered_map<std::string, MiscServices::PrivateDataValue>& privateCommand)
 {
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ReceivePrivateCommand keys=%{public}zu", privateCommand.size());
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ReceiveCmd keys=%{public}zu", privateCommand.size());
     for (const auto& item : privateCommand) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ReceivePrivateCommand key='%{public}s'", item.first.c_str());
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "key='%{public}s'", item.first.c_str());
     }
     auto uiTask = [textFieldPattern = pattern_, privateCommand] {
         auto textInputClient = textFieldPattern.Upgrade();

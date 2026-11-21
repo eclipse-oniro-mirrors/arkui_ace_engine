@@ -574,7 +574,7 @@ bool TextFieldPattern::ParseCommand(const std::string& command)
 bool TextFieldPattern::HandleMSDPAutoFillCommand(const std::unique_ptr<JsonValue>& json)
 {
     CHECK_NULL_RETURN(json && json->IsObject(), false);
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "recv msdp_autofill json: %{public}s", json->ToString().c_str());
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "recv json:%{public}s", json->ToString().c_str());
     auto params = json->GetValue("params");
     CHECK_NULL_RETURN(params && params->IsObject(), false);
     auto result = params->GetValue("result");
@@ -3558,7 +3558,7 @@ void TextFieldPattern::ProcessAutoFillAndKeyboard(RequestAutoFillReason autoFill
     bool ignoreFillType, bool isNewPassWord, AceAutoFillTriggerType triggerType)
 {
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ProcessAutoFillAndKeyboard, autoFillReason:%{public}d", autoFillReason);
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "processKB, reason:%{public}d", autoFillReason);
     bool isPopup = false;
     auto isSuccess = ProcessAutoFill(isPopup, ignoreFillType, isNewPassWord, triggerType);
     if (!isPopup && isSuccess) {
@@ -3570,7 +3570,7 @@ void TextFieldPattern::ProcessAutoFillAndKeyboard(RequestAutoFillReason autoFill
     }
     if (!isPopup && triggerType == AceAutoFillTriggerType::AUTO_REQUEST &&
         autoFillReason == RequestAutoFillReason::SINGLE_CLICK && IsAutoFillRequestSuccessOnFocus()) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "don't need to request keyboard if focus event has requested autofill");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "skip kb cause autofill has been requested");
         SetAutoFillRequestSuccessOnFocus(false);
         return;
     }
@@ -3617,7 +3617,7 @@ HintToTypeWrap TextFieldPattern::GetHintType()
     CHECK_NULL_RETURN(textFieldManager, hintToTypeWrap);
     auto msdpType = textFieldManager->GetMSDPAutoFillType(host->GetId());
     if (msdpType.has_value()) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "GetHintType msdpType: %{public}s", msdpType.value().c_str());
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "Hint:%{public}s", msdpType.value().c_str());
     }
     auto onePlaceHolder = UtfUtils::Str16DebugToStr8(GetPlaceHolder());
     if (onePlaceHolder.empty() && !msdpType.has_value()) {
@@ -3743,7 +3743,7 @@ bool TextFieldPattern::ProcessAutoFill(bool& isPopup, bool ignoreFillType, bool 
 {
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
     if (!CheckAutoFill(ignoreFillType, triggerType)) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "don't need to auto fill.");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "Check fail exit.");
         return false;
     }
     auto host = GetHost();
@@ -3751,14 +3751,14 @@ bool TextFieldPattern::ProcessAutoFill(bool& isPopup, bool ignoreFillType, bool 
     auto autoFillType = GetAutoFillType();
     auto container = Container::Current();
     if (container == nullptr) {
-        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Get current container is nullptr.");
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Container is null.");
         return false;
     }
     if (IsTriggerAutoFillPassword() && autoFillType == AceAutoFillType::ACE_UNSPECIFIED) {
         autoFillType = AceAutoFillType::ACE_USER_NAME;
     }
     auto onUIExtNodeDestroy = [weak = WeakPtr<FrameNode>(host)]() {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeDestroy called.");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeDestroy.");
         auto textFieldNode = weak.Upgrade();
         CHECK_NULL_VOID(textFieldNode);
         auto pageNode = textFieldNode->GetPageNode();
@@ -3768,7 +3768,7 @@ bool TextFieldPattern::ProcessAutoFill(bool& isPopup, bool ignoreFillType, bool 
         pagePattern->SetIsModalCovered(false);
     };
     auto onUIExtNodeBindingCompleted = [weak = WeakPtr<FrameNode>(host)]() {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeBindingCompleted called.");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeBindingCompleted.");
         auto textFieldNode = weak.Upgrade();
         CHECK_NULL_VOID(textFieldNode);
         auto pageNode = textFieldNode->GetPageNode();
@@ -10059,7 +10059,7 @@ void TextFieldPattern::DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, b
     info->SetTag(host->GetTag());
     auto utf8TextValue = UtfUtils::Str16DebugToStr8(contentController_->GetTextUtf16Value());
     if (utf8TextValue.empty()) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "DumpViewDataPageNode empty value, nodeId:%{public}d", host->GetId());
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "text empty, id:%{public}d", host->GetId());
     }
     if (autoFillOtherAccount_) {
         viewDataWrap->SetOtherAccount(true);
@@ -10098,7 +10098,7 @@ void TextFieldPattern::NotifyFillRequestSuccess(RefPtr<ViewDataWrap> viewDataWra
     RefPtr<PageNodeInfoWrap> nodeWrap, AceAutoFillType autoFillType, AceAutoFillTriggerType triggerType)
 {
 #ifdef ENABLE_AUTO_FILL_CONTROLLER
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "autoFillType:%{public}d, triggerType:%{public}d",
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "af:%{public}d, trig:%{public}d",
         static_cast<int32_t>(autoFillType), static_cast<int32_t>(triggerType));
     SetFillRequestFinish(true);
     auto host = GetHost();
@@ -10128,11 +10128,11 @@ void TextFieldPattern::NotifyFillRequestSuccess(RefPtr<ViewDataWrap> viewDataWra
     }
     auto type = GetAutoFillType();
     if (nodeWrap->GetValue().empty()) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "empty value, nodeId:%{public}d", host->GetId());
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "empty val, nodeId:%{public}d", host->GetId());
     }
     bool fromOtherAccount = viewDataWrap->GetOtherAccount();
     if (!(type == AceAutoFillType::ACE_NEW_PASSWORD && type == autoFillType) && !fromOtherAccount) {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "Set last auto fill text value, type:%{public}d",
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "Set last autofill val, type:%{public}d",
             static_cast<int32_t>(type));
         lastAutoFillTextValue_ = nodeWrap->GetValue();
     }
@@ -10149,11 +10149,11 @@ void TextFieldPattern::NotifyFillRequestSuccess(RefPtr<ViewDataWrap> viewDataWra
 
 void TextFieldPattern::NotifyFillRequestFailed(int32_t errCode, const std::string& fillContent, bool isPopup)
 {
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "NotifyFillRequestFailed errCode:%{public}d", errCode);
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "FillReq fail, errCode:%{public}d", errCode);
     SetFillRequestFinish(true);
 
 #if defined(ENABLE_STANDARD_INPUT)
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "fillContent size is : %{public}zu", fillContent.size());
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ContentLen: %{public}zu", fillContent.size());
     if (errCode == AUTO_FILL_CANCEL) {
         if (!fillContent.empty() && IsTriggerAutoFillPassword()) {
             auto jsonObject = JsonUtil::ParseJsonString(fillContent);

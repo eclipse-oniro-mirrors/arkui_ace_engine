@@ -90,7 +90,7 @@ void ClipboardImpl::HasDataType(
             for (auto mimeType = mimeTypes.begin(); mimeType != mimeTypes.end(); ++mimeType) {
                 /* Check the device logs for "async task timeout" to confirm if a timeout occurred. */
                 hasData = OHOS::MiscServices::PasteboardClient::GetInstance()->HasDataType(*mimeType, WAIT_TIME);
-                TAG_LOGI(AceLogTag::ACE_CLIPBOARD, "Clipboard data mimeType %{public}s available ? %{public}d",
+                TAG_LOGI(AceLogTag::ACE_CLIPBOARD, "mimeType %{public}s:%{public}d",
                     mimeType->c_str(), hasData);
                 if (hasData) {
                     isAutoFill = AUTO_FILL_SECURE_PASTE == *mimeType;

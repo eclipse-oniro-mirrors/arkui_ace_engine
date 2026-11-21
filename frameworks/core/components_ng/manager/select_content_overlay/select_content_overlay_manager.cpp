@@ -705,7 +705,7 @@ void SelectContentOverlayManager::MountNodeToRoot(
     if (nodeType == NodeType::TOUCH_MENU || nodeType == NodeType::RIGHT_CLICK_MENU) {
         slot = index;
     }
-    TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "MountNodeToRoot:%{public}s, id:%{public}d", rootNode->GetTag().c_str(),
+    TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "mountTo:%{public}s/%{public}d", rootNode->GetTag().c_str(),
         rootNode->GetId());
     overlayNode->MountToParent(rootNode, slot);
     rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
@@ -1536,7 +1536,7 @@ bool SelectContentOverlayManager::IsEnableSubWindowMenu()
     auto overlayManager = pipeline->GetSelectOverlayManager();
     CHECK_NULL_RETURN(overlayManager, false);
     auto showMode = overlayManager->GetMenuShowMode();
-    TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "IsEnableSubWindowMenu showMode:%{public}d", showMode);
+    TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "MenuShowMode:%{public}d", showMode);
     if (showMode != TextMenuShowMode::PREFER_WINDOW) {
         return false;
     }

@@ -691,7 +691,7 @@ TextFieldManagerNG::~TextFieldManagerNG()
 bool TextFieldManagerNG::ParseFillContentJsonValue(const std::unique_ptr<JsonValue>& jsonObject)
 {
     if (!jsonObject->IsValid() || !jsonObject->IsArray()) {
-        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "fillContent list format is invalid");
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "json format is invalid");
         return false;
     }
 
@@ -742,14 +742,13 @@ void TextFieldManagerNG::GenerateFillContentMap(const std::string& fillContent, 
             if (map.size() < MAX_FILL_CONTENT_SIZE) {
                 map.insert(std::pair<std::string, std::variant<std::string, bool, int32_t>>(strKey, strVal));
             } else {
-                TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "fillContent is more than 5");
+                TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "fillContent >= 5");
                 break;
             }
         } else if (child->IsArray() && child->GetKey() == "accountList") {
             if (child->GetArraySize() > MAX_ACCOUNT_LIST_SIZE) {
                 TAG_LOGW(AceLogTag::ACE_AUTO_FILL,
-                    "accountList size %{public}d exceeds limit %{public}d, truncated",
-                    static_cast<int32_t>(child->GetArraySize()), MAX_ACCOUNT_LIST_SIZE);
+                    "size %{public}d exceeds limit, truncated", static_cast<int32_t>(child->GetArraySize()));
             }
             for (int32_t k = 0; k < child->GetArraySize() && k < MAX_ACCOUNT_LIST_SIZE; ++k) {
                 auto elem = child->GetArrayItem(k);
@@ -802,7 +801,7 @@ bool TextFieldManagerNG::ParseMSDPAutoFillJsonValue(const std::unique_ptr<JsonVa
 {
     CHECK_NULL_RETURN(jsonObject, false);
     if (!jsonObject->IsValid() || !jsonObject->IsArray()) {
-        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "MSDP auto fill result format is invalid");
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "MSDP json format is invalid");
         return false;
     }
     ClearMSDPAutoFillTypes();

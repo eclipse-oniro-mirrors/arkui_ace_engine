@@ -156,7 +156,7 @@ bool SelectOverlayManager::ResetSelectionAndDestroySelectOverlay(bool isBackPres
     auto isClosed = selectContentManager_->CloseCurrent(
         animation, isBackPressed ? CloseReason::CLOSE_REASON_BACK_PRESSED : CloseReason::CLOSE_REASON_NORMAL);
     auto closeFlag = isDestroyed || (isClosed && isStopBackPress);
-    TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "isDestroyed:%{public}d,isClosed:%{public}d", isDestroyed, isClosed);
+    TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY, "ID:%{public}d,IC:%{public}d", isDestroyed, isClosed);
     return closeFlag;
 }
 
