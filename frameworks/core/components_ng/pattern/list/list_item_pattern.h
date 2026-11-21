@@ -38,6 +38,7 @@ class Animator;
 namespace OHOS::Ace::NG {
 class ForEachBaseNode;
 class InspectorFilter;
+class ListPattern;
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace::NG {
@@ -284,6 +285,10 @@ private:
     void InitPressEvent();
     void DoDeleteAnimation(bool isRightDelete);
     void FireSwipeActionOffsetChange(float oldOffset, float newOffset);
+    const char* ResetSwipeOffset();
+    static void FinishSwipeGesture(
+        const WeakPtr<ListItemPattern>& weak, const GestureEvent& info, const char* action, int32_t nodeId);
+    void HandleDragEndImpl(const GestureEvent& info, ListPattern& listPattern);
     void FireSwipeActionStateChange(ListItemSwipeIndex newSwiperIndex);
     void UpdateClickJudgeCallback();
     bool ClickJudgeVertical(const SizeF& size, double xOffset, double yOffset);
