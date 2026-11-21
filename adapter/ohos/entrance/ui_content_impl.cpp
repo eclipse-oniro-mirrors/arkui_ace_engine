@@ -4834,11 +4834,13 @@ void UIContentImpl::UpdateHostWindowInfo(uint32_t hostWindowId)
     taskExecutor->PostTask(
         [this, hostWindowId]() {
             hostWindowInfo_.focusWindowId = hostWindowId;
-            hostWindowInfo_.realHostWindowId = hostWindowId;
+            auto realHostWindowId = window_->GetRealParentId();
+            hostWindowInfo_.realHostWindowId = realHostWindowId != 0 ?
+                realHostWindowId : hostWindowInfo_.realHostWindowId; 
             auto cont = Platform::AceContainer::GetContainer(instanceId_);
             CHECK_NULL_VOID(cont);
             cont->SetFocusWindowId(hostWindowId);
-            cont->SetRealHostWindowId(hostWindowId);
+            cont->SetRealHostWindowId(hostWindowInfo_.realHostWindowId);
             auto pipeline = cont->GetPipelineContext();
             CHECK_NULL_VOID(pipeline);
             pipeline->FlushHostWindowInfoChangedCallback(hostWindowId);
