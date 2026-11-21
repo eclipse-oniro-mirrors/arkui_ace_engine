@@ -133,7 +133,6 @@ void ImageAnimatorPattern::SetShowingIndex(int32_t index)
     auto imageLayoutProperty = imageFrameNode->GetLayoutProperty<ImageLayoutProperty>();
     CHECK_NULL_VOID(imageLayoutProperty);
     if (index >= static_cast<int32_t>(images_.size()) || index < 0) {
-        LOGW("ImageAnimator update index error, index: %{public}d, size: %{public}zu", index, images_.size());
         return;
     }
     nowImageIndex_ = index;

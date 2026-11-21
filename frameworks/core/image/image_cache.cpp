@@ -83,7 +83,6 @@ void ImageCache::ClearCacheImgObj(const std::string& key)
         std::scoped_lock lock(imgObjMutex_);
         auto iter = imgObjCache_.find(key);
         if (iter != imgObjCache_.end()) {
-            TAG_LOGW(AceLogTag::ACE_IMAGE, "Attempting to clear imageObjCache for key: %{public}s.", key.c_str());
             cacheImgObjList_.erase(iter->second);
             imgObjCache_.erase(iter);
         }
@@ -93,7 +92,6 @@ void ImageCache::ClearCacheImgObj(const std::string& key)
         std::scoped_lock lock(imgObjMutex_);
         auto iter = imgObjCacheNG_.find(key);
         if (iter != imgObjCacheNG_.end()) {
-            TAG_LOGW(AceLogTag::ACE_IMAGE, "Attempting to clear imageObjCacheNG for key: %{public}s.", key.c_str());
             cacheImgObjListNG_.erase(iter->second);
             imgObjCacheNG_.erase(iter);
         }
