@@ -4450,6 +4450,7 @@
       "OHOS::Ace::LogWrapper::GetBriefFileName(char const*)";
       "OHOS::Ace::MaterialUtils::CallSetMaterial(OHOS::Ace::NG::FrameNode*, OHOS::Ace::UiMaterial const*)";
       "OHOS::Ace::MaterialUtils::CheckMaterialValid(int)";
+      "OHOS::Ace::MaterialUtils::GetColorByMode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::ColorMode, unsigned int)";
       "OHOS::Ace::MaterialUtils::GetConfiguredMaterialState()";
       "OHOS::Ace::MaterialUtils::GetConfiguredMaterialType()";
       "OHOS::Ace::MaterialUtils::GetImmersiveShadow(float)";

@@ -17,9 +17,12 @@
 
 #include "interfaces/inner_api/ace/utils.h"
 
+#include "base/utils/resource_configuration.h"
 #include "core/common/color_inverter.h"
+#include "core/common/container.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/common/visual_effect/transparency_utils.h"
+#include "core/components/common/properties/blur_style_option.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/components/theme/theme_constants.h"
 #include "core/components_ng/render/ui_material_filter_creator.h"
@@ -250,6 +253,10 @@ std::string UiMaterial::ToString() const
             if (immersiveOptions_->colorMode != ColorMode::COLOR_MODE_UNDEFINED) {
                 result.append(", colorMode: ").append(ColorModeToString(immersiveOptions_->colorMode));
             }
+            if (immersiveOptions_->userColorMode != ThemeColorMode::SYSTEM) {
+                result.append(", userColorMode: ")
+                    .append(immersiveOptions_->userColorMode == ThemeColorMode::DARK ? "DARK" : "LIGHT");
+            }
             AppendLightEffectInfo(result, immersiveOptions_->lightEffectOptions);
         }
     }
@@ -310,7 +317,7 @@ std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfig
     if (materialLevel == UiMaterialLevel::SMOOTH) {
         result.key = UiMaterialMapKey {
             .level = UiMaterialLevel::SMOOTH,
-            .colorMode = (options->colorMode == ColorMode::COLOR_MODE_UNDEFINED) ? colorMode : options->colorMode,
+            .colorMode = GetFinalColorMode(options, colorMode, false),
         };
         result.materialColor = options->materialColor;
         Color materialColor;
@@ -327,16 +334,11 @@ std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfig
     bool finalInvertColor = ValidColorInvert(options, materialLevel, static_cast<UiMaterialTransparency>(transparency));
     result.colorInvert = finalInvertColor;
     result.materialColor = options->materialColor;
-    if (finalInvertColor) {
-        colorMode = ColorMode::LIGHT;
-    } else if (options->colorMode != ColorMode::COLOR_MODE_UNDEFINED) {
-        colorMode = options->colorMode;
-    }
     result.key = UiMaterialMapKey {
         .level = materialLevel,
         .style = options->style,
         .transparency = static_cast<UiMaterialTransparency>(transparency),
-        .colorMode = colorMode,
+        .colorMode = GetFinalColorMode(options, colorMode, finalInvertColor),
     };
     Color materialColor;
     if (ResourceParseUtilsBase::ParseResColorWithColorMode(options->colorResObj, materialColor, result.key.colorMode)) {
@@ -358,6 +360,25 @@ ColorMode MaterialUtils::GetNodeColorMode(const RefPtr<NG::FrameNode>& node)
         colorMode = MaterialUtils::GetResourceColorMode(pipeline);
     }
     return colorMode;
+}
+
+std::optional<Color> MaterialUtils::GetColorByMode(
+    const RefPtr<NG::FrameNode>& node, ColorMode colorMode, uint32_t resId)
+{
+    CHECK_NULL_RETURN(node, std::nullopt);
+    auto container = Container::GetContainer(node->GetInstanceId());
+    CHECK_NULL_RETURN(container, std::nullopt);
+    auto resourceObject = AceType::MakeRefPtr<ResourceObject>(
+        container->GetBundleName(), container->GetModuleName(), node->GetInstanceId());
+    auto adapterInCache = ResourceManager::GetInstance().GetOrCreateResourceAdapter(resourceObject);
+    CHECK_NULL_RETURN(adapterInCache, std::nullopt);
+    ResourceConfiguration resConfig;
+    resConfig.SetColorMode(colorMode);
+    ConfigurationChange configChange { .colorModeUpdate = true };
+    auto resourceAdapter = adapterInCache->GetOverrideResourceAdapter(resConfig, configChange);
+    CHECK_NULL_RETURN(resourceAdapter, std::nullopt);
+    auto color = resourceAdapter->GetColor(resId);
+    return color;
 }
 
 std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfigWithScale(
@@ -385,10 +406,31 @@ std::optional<ImmersiveMaterialConfig> MaterialUtils::GetImmersiveMaterialConfig
     return GetImmersiveMaterialConfig(options, adjustedDipScale, colorMode, node);
 }
 
+ColorMode MaterialUtils::GetFinalColorMode(
+    const std::shared_ptr<ImmersiveOptions>& options, ColorMode nodeColorMode, bool finalInvertColor)
+{
+    if (!options) {
+        return nodeColorMode;
+    }
+    if (options->userColorMode != ThemeColorMode::SYSTEM) {
+        return options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT;
+    }
+    if (finalInvertColor) {
+        return ColorMode::LIGHT;
+    }
+    if (options->colorMode != ColorMode::COLOR_MODE_UNDEFINED) {
+        return options->colorMode;
+    }
+    return nodeColorMode;
+}
+
 bool MaterialUtils::ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& options, UiMaterialLevel systemLevel,
     UiMaterialTransparency systemTransparency)
 {
     if (!options || !options->colorInvert) {
+        return false;
+    }
+    if (options->userColorMode != ThemeColorMode::SYSTEM) {
         return false;
     }
     if (systemLevel == UiMaterialLevel::SMOOTH) {

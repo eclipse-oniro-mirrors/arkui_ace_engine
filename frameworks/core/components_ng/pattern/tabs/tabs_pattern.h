@@ -381,6 +381,7 @@ public:
     void RemoveTabContentNode(const RefPtr<TabContentNode>& tabContentNode);
     bool IsColorInvertEnabled();
     ColorMode GetColorInvertColorMode();
+    ColorMode GetBarMaskColorMode();
 
     const std::optional<float>& GetRealSideBarWidthPx() const
     {

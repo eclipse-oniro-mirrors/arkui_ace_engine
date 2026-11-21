@@ -3110,6 +3110,7 @@ interfaces/native/event/ui_input_event_impl.h @ArkUI_Event
 interfaces/native/libace.ndk.json @arkui_architecture
 interfaces/native/native_animate.h @arkuicodepulse
 interfaces/native/native_dialog.h @arkuipopupwindow_all
+interfaces/native/native_material.h @arkuicodepulse
 interfaces/native/native_error_message_macros.h @arkui_framework_xnode
 interfaces/native/native_error_message_wrapper.cpp @arkui_framework_xnode
 interfaces/native/native_error_message_wrapper.h @arkui_framework_xnode

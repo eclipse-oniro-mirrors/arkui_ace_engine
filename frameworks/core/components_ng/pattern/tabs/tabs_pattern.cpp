@@ -34,6 +34,7 @@
 #include "core/common/visual_effect/transparency_utils.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components/common/properties/blur_style_option.h"
 #include "core/components/tab_bar/tabs_event.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/base/view_abstract.h"
@@ -1751,11 +1752,11 @@ void TabsPattern::UpdateBgMaskNode()
     CHECK_NULL_VOID(property);
     auto style = property->GetBarFloatingStyle();
     Color baseColor(MASK_COLOR_LIGHT);
-    ColorMode colorInvertColorMode = GetColorInvertColorMode();
+    ColorMode maskColorMode = GetBarMaskColorMode();
     if (style.has_value() && style->maskColor.has_value()) {
         baseColor = style->maskColor.value();
-    } else if (colorInvertColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
-        if (colorInvertColorMode == ColorMode::DARK) {
+    } else if (maskColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
+        if (maskColorMode == ColorMode::DARK) {
             baseColor = Color(MASK_COLOR_DARK);
         }
     } else {
@@ -2191,6 +2192,9 @@ bool TabsPattern::IsColorInvertEnabled()
     if (!options || !options->colorInvert) {
         return false;
     }
+    if (options->userColorMode != ThemeColorMode::SYSTEM) {
+        return false;
+    }
     auto materialLevel = SystemProperties::GetUiMaterialLevel();
     if (materialLevel != UiMaterialLevel::EXQUISITE && materialLevel != UiMaterialLevel::GENTLE) {
         return false;
@@ -2209,6 +2213,20 @@ ColorMode TabsPattern::GetColorInvertColorMode()
         return isColorPickerDark_.value() ? ColorMode::DARK : ColorMode::LIGHT;
     }
     return ColorMode::COLOR_MODE_UNDEFINED;
+}
+
+ColorMode TabsPattern::GetBarMaskColorMode()
+{
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(property, ColorMode::COLOR_MODE_UNDEFINED);
+    auto style = property->GetBarFloatingStyle();
+    if (style.has_value() && style->systemMaterial) {
+        const auto& options = style->systemMaterial->GetImmersiveOptions();
+        if (options && options->userColorMode != ThemeColorMode::SYSTEM) {
+            return options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT;
+        }
+    }
+    return GetColorInvertColorMode();
 }
 
 void TabsPattern::InitColorPickerIfNeeded()

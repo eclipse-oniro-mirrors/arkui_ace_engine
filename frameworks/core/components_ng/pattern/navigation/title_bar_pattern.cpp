@@ -29,6 +29,7 @@
 #include "core/components/theme/resource_adapter.h"
 #include "core/components/button/button_theme.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components/common/properties/blur_style_option.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/divider/divider_pattern.h"
@@ -1276,6 +1277,18 @@ void TitleBarPattern::UpdateMenuMaterialInner(const RefPtr<UINode>& menuNode, co
         }
         ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuItemNode), AceType::RawPtr(subMaterial));
     }
+
+    if (innerMaterial) {
+        auto options = innerMaterial->GetImmersiveOptions();
+        if (options && options->userColorMode != ThemeColorMode::SYSTEM) {
+            auto titleBarNode = AceType::DynamicCast<TitleBarNode>(host);
+            CHECK_NULL_VOID(titleBarNode);
+            auto parentNode = AceType::DynamicCast<NavDestinationNodeBase>(titleBarNode->GetParent());
+            CHECK_NULL_VOID(parentNode);
+            parentNode->SetExpectMoreMenuViewColorMode(
+                options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT);
+        }
+    }
 }
 
 void TitleBarPattern::UpdateMenuBrightnessEffect(const RefPtr<UINode>& menuNode, bool forceUpdate)
@@ -2250,6 +2263,9 @@ bool TitleBarPattern::IsColorInvertEnabled()
     if (!options || !options->colorInvert) {
         return false;
     }
+    if (options->userColorMode != ThemeColorMode::SYSTEM) {
+        return false;
+    }
     auto transparencyLevel = static_cast<UiMaterialTransparency>(
         TransparencyUtils::GetTransparencyLevel(static_cast<int32_t>(materialLevel)));
     if (materialLevel == UiMaterialLevel::EXQUISITE) {
@@ -2689,7 +2705,10 @@ bool TitleBarPattern::GetTextTitleColor(bool isMainText, Color& color)
     auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     bool isColorInvertEnabled = IsColorInvertEnabled();
-    if (!isColorInvertEnabled) {
+    auto material = GetCurrentMaterial();
+    auto options = material ? material->GetImmersiveOptions() : nullptr;
+    bool hasUserColorMode = options && options->userColorMode != ThemeColorMode::SYSTEM;
+    if (!isColorInvertEnabled && !hasUserColorMode) {
         auto theme = NavigationGetTheme(host->GetThemeScopeId());
         CHECK_NULL_RETURN(theme, false);
         if (isMainText) {
@@ -2705,7 +2724,12 @@ bool TitleBarPattern::GetTextTitleColor(bool isMainText, Color& color)
         }
         return true;
     }
-    auto colorMode = GetCurrentColorMode(isColorInvertEnabled, TitleBarAreaType::BACK_BUTTON_AND_TEXT);
+    ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED;
+    if (hasUserColorMode) {
+        colorMode = options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT;
+    } else {
+        colorMode = GetCurrentColorMode(isColorInvertEnabled, TitleBarAreaType::BACK_BUTTON_AND_TEXT);
+    }
     auto context = host->GetContextRefPtr();
     CHECK_NULL_RETURN(context, false);
     const auto colors = GetOrCreateTitleBarTokenColors(context, colorMode);
