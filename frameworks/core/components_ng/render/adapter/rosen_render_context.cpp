@@ -52,6 +52,7 @@
 #include "base/geometry/calc_dimension.h"
 #include "base/geometry/dimension.h"
 #include "base/geometry/matrix4.h"
+#include "base/image/image_color_filter.h"
 #include "base/log/dump_log.h"
 #include "base/utils/multi_thread.h"
 #include "base/utils/utils.h"
@@ -448,6 +449,18 @@ std::string VibrancyModeToString(VibrancyMode mode)
         default:
             return "UNKNOWN";
     }
+}
+
+std::string FormatColorFilterMatrix(const std::vector<float>& filter)
+{
+    std::string result = "[";
+    for (size_t i = 0; i < filter.size(); ++i) {
+        if (i > 0) {
+            result += ", ";
+        }
+        result += std::to_string(filter[i]);
+    }
+    return result + "]";
 }
 } // namespace
 
@@ -6211,6 +6224,20 @@ void RosenRenderContext::OnFrontColorBlendUpdate(const Color& colorBlend)
     RequestNextFrame();
 }
 
+void RosenRenderContext::OnFrontColorFilterEffectUpdate(const std::vector<float>& matrix)
+{
+    FREE_RS_CONTEXT_CHECK(OnFrontColorFilterEffectUpdate, matrix);
+    CHECK_NULL_VOID(rsNode_);
+    if (matrix.size() == Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        Rosen::Drawing::ColorMatrix colorMatrix;
+        colorMatrix.SetArray(matrix.data());
+        rsNode_->SetColorMatrix(std::optional<Rosen::Drawing::ColorMatrix>(colorMatrix));
+    } else {
+        rsNode_->SetColorMatrix(std::nullopt);
+    }
+    RequestNextFrame();
+}
+
 void RosenRenderContext::OnLinearGradientBlurUpdate(const NG::LinearGradientBlurPara& blurPara)
 {
     FREE_RS_CONTEXT_CHECK(OnLinearGradientBlurUpdate, blurPara);
@@ -7446,6 +7473,11 @@ void RosenRenderContext::DumpInfo()
                                                .append(anchor->GetX().ToString().c_str())
                                                .append(std::string(",anchorY :"))
                                                .append(anchor->GetY().ToString().c_str()));
+        }
+        if (HasFrontColorFilterEffect()) {
+            auto colorFilter = GetFrontColorFilterEffectValue({});
+            DumpLog::GetInstance().AddDesc(
+                std::string("colorFilterEffect :").append(FormatColorFilterMatrix(colorFilter)));
         }
 
         auto rsBlendMode = static_cast<int16_t>(rsNode_->GetStagingProperties().GetColorBlendMode());

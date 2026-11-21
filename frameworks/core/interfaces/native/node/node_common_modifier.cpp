@@ -15,6 +15,7 @@
 #include "core/interfaces/native/node/node_common_modifier.h"
 #include "core/components_ng/event/event_constants.h"
 
+#include "base/image/image_color_filter.h"
 #include "base/log/log_wrapper.h"
 #include "core/common/application_shortcut.h"
 #include "core/common/container.h"
@@ -2411,6 +2412,25 @@ void ResetGrayscale(ArkUINodeHandle node)
     CHECK_NULL_VOID(frameNode);
     CalcDimension value(0.0, DimensionUnit::VP);
     ViewAbstract::SetGrayScale(frameNode, value);
+}
+
+void SetColorFilterEffect(ArkUINodeHandle node, const ArkUI_Float32* matrix, int32_t size)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (matrix == nullptr || size != Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        ViewAbstract::ResetColorFilterEffect(frameNode);
+        return;
+    }
+    std::vector<float> matrixVec(matrix, matrix + size);
+    ViewAbstract::SetColorFilterEffect(frameNode, matrixVec);
+}
+
+void ResetColorFilterEffect(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetColorFilterEffect(frameNode);
 }
 
 void SetContrast(ArkUINodeHandle node, ArkUI_Float64 contrast)
@@ -12187,6 +12207,8 @@ const ArkUICommonModifier* GetCommonModifier()
         .unregisterApplicationShortcut = UnregisterApplicationShortcut,
         .registerNodeKeyboardShortcut = RegisterNodeKeyboardShortcut,
         .unregisterNodeKeyboardShortcut = UnregisterNodeKeyboardShortcut,
+        .setColorFilterEffect = SetColorFilterEffect,
+        .resetColorFilterEffect = ResetColorFilterEffect,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

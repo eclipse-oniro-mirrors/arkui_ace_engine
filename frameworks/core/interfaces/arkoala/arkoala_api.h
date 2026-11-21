@@ -3970,6 +3970,8 @@ struct ArkUICommonModifier {
     void (*registerNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys,
         std::function<void()>&& callback);
     void (*unregisterNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys);
+    void (*setColorFilterEffect)(ArkUINodeHandle node, const ArkUI_Float32* matrix, ArkUI_Int32 size);
+    void (*resetColorFilterEffect)(ArkUINodeHandle node);
 };
 
 struct ArkUICommonShapeModifier {

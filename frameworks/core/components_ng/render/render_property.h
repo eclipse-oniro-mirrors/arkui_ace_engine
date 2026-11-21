@@ -237,6 +237,7 @@ struct GraphicsProperty {
     ACE_DEFINE_PROPERTY_GROUP_ITEM(SystemBarEffect, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(FrontHueRotate, float);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(FrontColorBlend, Color);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(FrontColorFilterEffect, std::vector<float>);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(FrontBlurRadius, Dimension);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(LinearGradientBlur, NG::LinearGradientBlurPara);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(Magnifier, MagnifierParams);
