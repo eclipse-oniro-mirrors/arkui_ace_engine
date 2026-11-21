@@ -421,7 +421,7 @@ private:
     void RegisterUIExtensionManagerEvent(int32_t instanceId);
     void RegisterBrandColorChangeListener();
     void UnRegisterBrandColorChangeListener();
-    void UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId, uint32_t newHostWindowId);
+    void UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId, uint32_t newHostWindowId, uint32_t newHostWindowId);
 
     void RegisterVisibleAreaChange();
     void MountPlaceholderNode(PlaceholderType type);

@@ -119,6 +119,7 @@ private:
     void DispatchExtensionDataToHostWindow(uint32_t customId, const AAFwk::Want& data);
     void UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr);
     int32_t GetCallerPersistentId();
+    int32_t GetWindowSceneId();
     void SetConnectToRenderInner(
         const RefPtr<Platform::AceContainer>& container, Rosen::SessionInfo& sessionInfo);
     AceLogTag tag_ = AceLogTag::ACE_SECURITYUIEXTENSION;

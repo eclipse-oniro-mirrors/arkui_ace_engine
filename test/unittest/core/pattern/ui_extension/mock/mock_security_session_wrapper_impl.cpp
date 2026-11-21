@@ -291,6 +291,18 @@ void SecuritySessionWrapperImpl::ReDispatchWantParams() {}
 
 void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId) {}
 
+int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
+{
+    return 1;
+}
+
+int32_t SecuritySessionWrapperImpl::GetWindowSceneId()
+{
+    return 1;
+}
+
+void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId) {}
+
 void SecuritySessionWrapperImpl::DispatchExtensionDataToHostWindow(uint32_t customId, const AAFwk::Want& data)
 {
 }

@@ -297,4 +297,14 @@ void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t ne
 {
     instanceId_ = instanceId;
 }
+
+int32_t PreviewSessionWrapperImpl::GetCallerPersistentId()
+{
+    return 1;
+}
+
+int32_t PreviewSessionWrapperImpl::GetWindowSceneId()
+{
+    return 1;
+}
 } // namespace OHOS::Ace::NG

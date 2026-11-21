@@ -174,6 +174,8 @@ public:
 
     void FlushHostWindowInfoChangedCallback(uint32_t hostWindowId) override {}
 
+    void FlushHostWindowInfoChangedCallback(uint32_t hostWindowId) override {}
+
 protected:
     float fontScale_ = 1.0f;
     bool isDeclarative_ = false;

@@ -169,6 +169,11 @@ int32_t SessionWrapperImpl::GetWindowSceneId()
     return 1;
 }
 
+int32_t SessionWrapperImpl::GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline)
+{
+    return 1;
+}
+
 Rosen::WSRect SessionWrapperImpl::GetWindowSceneRect()
 {
     Rosen::WSRect rect = {0, 0, 0, 0};
