@@ -798,6 +798,76 @@ HWTEST_F(GridScrollLayoutTestNg, SupplyAllData2ZeroIndex002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SupplyAllData2ZeroIndex003
+ * @tc.desc: Test supplying data with a multi-line first item and an empty recorded matrix
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, SupplyAllData2ZeroIndex003, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    CreateBigItem(0, 1, NULL_VALUE, NULL_VALUE, FILL_VALUE, ITEM_MAIN_SIZE);
+    CreateFixedItems(19);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = frameNode_->GetLayoutAlgorithm();
+    auto algorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_TRUE(algorithm);
+    auto& info = algorithm->info_;
+    info.gridMatrix_.clear();
+    info.lineHeightMap_.clear();
+    info.startIndex_ = 3;
+    info.startMainLineIndex_ = 1;
+    info.endIndex_ = 2;
+    info.endMainLineIndex_ = 1;
+    info.targetIndex_ = 2;
+
+    algorithm->SupplyAllData2ZeroIndex(HEIGHT, WIDTH, AceType::RawPtr(frameNode_));
+
+    ASSERT_TRUE(algorithm->infoCopy_);
+    EXPECT_EQ(algorithm->infoCopy_->startIndex_, 0);
+    EXPECT_EQ(algorithm->infoCopy_->startMainLineIndex_, 0);
+    EXPECT_EQ(algorithm->infoCopy_->endIndex_, 2);
+    EXPECT_EQ(algorithm->infoCopy_->endMainLineIndex_, 2);
+    ASSERT_GT(algorithm->infoCopy_->gridMatrix_.count(0), 0);
+    ASSERT_GT(algorithm->infoCopy_->gridMatrix_.count(1), 0);
+    EXPECT_EQ(algorithm->infoCopy_->gridMatrix_.at(0).at(2), 2);
+    EXPECT_EQ(algorithm->infoCopy_->gridMatrix_.at(1).at(0), 0);
+    EXPECT_EQ(info.startIndex_, 3);
+    EXPECT_EQ(info.startMainLineIndex_, 1);
+    EXPECT_EQ(info.endIndex_, 2);
+    EXPECT_EQ(info.endMainLineIndex_, 1);
+    EXPECT_TRUE(info.gridMatrix_.empty());
+}
+
+/**
+ * @tc.name: AnimateToIndexDuringReload
+ * @tc.desc: The animated target is aligned using the new columns when the viewport is reset off the first page.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexDuringReload, TestSize.Level1)
+{
+    MockAnimationManager::GetInstance().Reset();
+    MockAnimationManager::GetInstance().SetTicks(3);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    CreateFixedItems(60);
+    CreateDone();
+
+    ScrollToIndex(18, false, ScrollAlign::START);
+    ASSERT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 18);
+    layoutProperty_->UpdateColumnsTemplate("1fr 1fr");
+    ASSERT_TRUE(pattern_->GetGridLayoutInfo().IsResetted());
+
+    ScrollToIndex(36, true, ScrollAlign::START);
+    EXPECT_FALSE(MockAnimationManager::GetInstance().AllFinished());
+    TickToFinish();
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 36);
+    EXPECT_EQ(pattern_->GetTotalOffset(), 18 * ITEM_MAIN_SIZE);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRect(36).Top(), 0.0f);
+}
+
+/**
  * @tc.name: OnModifyDone001
  * @tc.desc: Test OnModifyDone
  * @tc.type: FUNC

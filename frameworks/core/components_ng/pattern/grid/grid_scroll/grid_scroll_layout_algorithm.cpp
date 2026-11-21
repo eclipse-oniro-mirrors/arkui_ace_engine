@@ -1693,6 +1693,8 @@ void GridScrollLayoutAlgorithm::AddForwardLines(
     if (!addLine) {
         return;
     }
+    // An empty recorded matrix means there are no old rows to merge back.
+    const auto lastRecordedLine = gridMatrix.empty() ? info_.startMainLineIndex_ : gridMatrix.rbegin()->first;
     // merge matrix
     auto forwardLines = info_.endMainLineIndex_ - info_.startMainLineIndex_;
     if (forwardLines >= 0) {
@@ -1707,7 +1709,7 @@ void GridScrollLayoutAlgorithm::AddForwardLines(
 
             MergeRemainingLines(gridMatrix, forwardLines);
         } else {
-            for (auto i = info_.startMainLineIndex_ + 1; i <= gridMatrix.rbegin()->first; i++) {
+            for (auto i = info_.startMainLineIndex_ + 1; i <= lastRecordedLine; i++) {
                 info_.gridMatrix_.emplace(forwardLines + i, std::move(gridMatrix[i]));
                 info_.lineHeightMap_.emplace(forwardLines + i, gridLineHeightMap[i]);
             }
@@ -1716,7 +1718,7 @@ void GridScrollLayoutAlgorithm::AddForwardLines(
         }
     } else {
         // delete more than one line items
-        for (auto i = info_.startMainLineIndex_ + 1; i <= gridMatrix.rbegin()->first; i++) {
+        for (auto i = info_.startMainLineIndex_ + 1; i <= lastRecordedLine; i++) {
             info_.gridMatrix_.emplace(forwardLines + i, std::move(gridMatrix[i]));
             info_.lineHeightMap_.emplace(forwardLines + i, gridLineHeightMap[i]);
         }
