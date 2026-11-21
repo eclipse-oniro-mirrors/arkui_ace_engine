@@ -849,7 +849,7 @@ HWTEST_F(SecuritySessionWrapperImplTestNg, SecuritySessionWrapperImplTestNg019, 
     /**
      * @tc.steps: step2. test UpdateInstanceId
      */
-    sessionWrapper->UpdateInstanceId(10);
+    sessionWrapper->UpdateInstanceId(10, 0);
     EXPECT_EQ(sessionWrapper->patternInstanceId_, 10);
 #endif
 }

@@ -41,6 +41,7 @@
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/render/adapter/rosen_window.h"
 #include "render_service_client/core/ui/rs_ui_director.h"
 #include "render_service_client/core/ui/rs_ui_context.h"
 
@@ -391,6 +392,7 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
         extensionSessionInfo.connectToRenderToken_  = rsUIContext->GetConnectToRender();
     };
     setConnectToRender();
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId();
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
     pattern->SetLastSentBrandColorStr(brandColorStr);
@@ -425,6 +427,17 @@ void SecuritySessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wan
     wantPtr->SetParams(wantParam);
 }
 
+int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
+{
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_RETURN(container, 0);
+    auto window = static_cast<RosenWindow*>(container->GetWindow());
+    CHECK_NULL_RETURN(window, 0);
+    auto rsWindow = window->GetRSWindow();
+    CHECK_NULL_RETURN(rsWindow, 0);
+    return static_cast<int32_t>(rsWindow->GetWindowId());
+}
+
 void SecuritySessionWrapperImpl::ReDispatchWantParams()
 {
     CHECK_NULL_VOID(session_);
@@ -457,7 +470,7 @@ const std::shared_ptr<AAFwk::Want> SecuritySessionWrapperImpl::GetWant()
     return session_ ? customWant_ : nullptr;
 }
 
-void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
+void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
 {
     if (patternInstanceId_ == instanceId) {
         PLATFORM_LOGW("patternInstanceId(%{public}d) has not changed when UpdateInstanceId.", instanceId);
@@ -466,7 +479,45 @@ void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 
     PLATFORM_LOGI("Update patternInstanceId %{public}d to %{public}d.", patternInstanceId_, instanceId);
     patternInstanceId_ = instanceId;
+    if (IsSessionValid()) {
+        UpdateExtensionParent(newHostWindowId);
+        ReDispatchWantParams();
+    }
     PLATFORM_LOGI("Update instanceId success.");
+}
+
+void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+
+    uint32_t parentWindowType = 0;
+    if (container->IsUIExtensionWindow()) {
+        parentWindowType = container->GetParentWindowType();
+    } else {
+        parentWindowType = container->GetWindowType();
+    }
+    auto callerToken = container->GetToken();
+    auto parentToken = container->GetParentToken();
+
+    Rosen::SessionInfo sessionInfo = session_->GetSessionInfo();
+    sessionInfo.callerToken_ = callerToken;
+    sessionInfo.rootToken_ = (isTransferringCaller_ && parentToken) ? parentToken : callerToken;
+    sessionInfo.parentWindowType_ = parentWindowType;
+    sessionInfo.realParentId_ = static_cast<int32_t>(pipeline->GetRealHostWindowId());
+    sessionInfo.brandColorStr_ = pattern->GetBrandColorStr();
+    sessionInfo.callerPersistentId_ = GetCallerPersistentId();
+
+    PLATFORM_LOGI("UpdateExtensionParent, persistentId=%{public}d, newHostWindowId=%{public}u, "
+        "callerPersistentId=%{public}d.",
+        session_->GetPersistentId(), newHostWindowId, sessionInfo.callerPersistentId_);
+    Rosen::ExtensionSessionManager::GetInstance().UpdateExtensionSessionParent(
+        session_, newHostWindowId, sessionInfo);
 }
 /******************************* End: About session ***************************************/
 

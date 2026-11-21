@@ -189,7 +189,7 @@ public:
     }
 
 protected:
-    void UpdateSessionInstanceId(int32_t instanceId);
+    void UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId);
     void Initialize();
     void InitializeAccessibility() override;
     bool HandleKeyEvent(const KeyEvent& event) override;

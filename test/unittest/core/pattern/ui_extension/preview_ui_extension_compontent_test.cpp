@@ -1496,11 +1496,11 @@ HWTEST_F(PreviewUIExtensionComponentTestNg, UpdateSessionInstanceId001, TestSize
      * @tc.steps: step2. test UpdateSessionInstanceId
      */
     pattern->hasAttachContext_ = false;
-    pattern->UpdateSessionInstanceId(1);
+    pattern->UpdateSessionInstanceId(1, 0);
     EXPECT_NE(pattern->sessionWrapper_, nullptr);
 
     InvalidSessionWrapper(pattern);
-    pattern->UpdateSessionInstanceId(1);
+    pattern->UpdateSessionInstanceId(1, 0);
     EXPECT_EQ(pattern->sessionWrapper_, nullptr);
 }
 
