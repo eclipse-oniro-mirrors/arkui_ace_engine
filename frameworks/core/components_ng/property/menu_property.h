@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MENU_PROPERTY_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MENU_PROPERTY_H
 
+#include <vector>
+
 #include "base/geometry/dimension.h"
 #include "core/components/common/properties/blur_style_option.h"
 #include "core/components/common/properties/color.h"
@@ -166,6 +168,7 @@ struct ACE_FORCE_EXPORT MenuParam {
     std::optional<OffsetF> targetOffset;
     std::optional<SizeF> targetSize;
     RefPtr<UiMaterial> systemMaterial;
+    std::optional<std::vector<float>> colorFilterEffect;
     std::optional<DisplayMode> scrollBar;
     std::optional<Dimension> maxHeight;
     std::optional<MenuGridStyleOptions> gridStyle;

@@ -888,6 +888,7 @@ public:
     void UpdateSheetBackgroundColor();
     void UpdateSheetBackgroundBlurStyle();
     void UpdateTitleBarVibrancy(const SheetStyle& sheetStyle);
+    void UpdateColorFilterEffect(const SheetStyle& sheetStyle);
 
     Color GetMaskBackgroundColor() const
     {

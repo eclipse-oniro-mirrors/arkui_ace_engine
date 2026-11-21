@@ -2984,6 +2984,8 @@
       "OHOS::Ace::NG::ViewAbstract::SetClipEdge(bool)";
       "OHOS::Ace::NG::ViewAbstract::SetClipEdge(OHOS::Ace::NG::FrameNode*, bool)";
       "OHOS::Ace::NG::ViewAbstract::SetClipShape(OHOS::Ace::NG::FrameNode*, OHOS::Ace::RefPtr<OHOS::Ace::BasicShape> const&)";
+      "OHOS::Ace::NG::ViewAbstract::SetColorFilterEffect(OHOS::Ace::NG::FrameNode*, std::__h::vector<float, std::__h::allocator<float>> const&)";
+      "OHOS::Ace::NG::ViewAbstract::ResetColorFilterEffect(OHOS::Ace::NG::FrameNode*)";
       "OHOS::Ace::NG::ViewAbstract::SetFocusable(OHOS::Ace::NG::FrameNode*, bool)";
       "OHOS::Ace::NG::ViewAbstract::SetHeight(OHOS::Ace::NG::CalcLength const&)";
       "OHOS::Ace::NG::ViewAbstract::SetHeight(OHOS::Ace::NG::FrameNode*, OHOS::Ace::NG::CalcLength const&)";

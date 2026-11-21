@@ -28,6 +28,8 @@
 #include "core/interfaces/native/implementation/dialog_common.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
+#include "core/interfaces/native/implementation/color_filter_peer.h"
+#include "base/image/image_color_filter.h"
 #include "frameworks/base/error/error_code.h"
 #include "frameworks/base/utils/utils.h"
 #include "frameworks/base/utils/system_properties.h"
@@ -318,6 +320,13 @@ auto g_bindMenuOptionsParam = [](const auto& menuOptions, MenuParam& menuParam) 
     auto material =
         OptConvert<UiMaterial*>(menuOptions.systemMaterial).value_or(AceType::RawPtr(menuParam.systemMaterial));
     menuParam.systemMaterial = material ? material->Copy() : nullptr;
+    auto colorFilter = OptConvert<Ark_ColorFilter>(menuOptions.colorFilterEffect).value_or(nullptr);
+    if (colorFilter) {
+        const auto& matrix = colorFilter->GetColorFilterMatrix();
+        if (matrix.size() == Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+            menuParam.colorFilterEffect = matrix;
+        }
+    }
     auto scrollBarOpt = OptConvert<DisplayMode>(menuOptions.scrollBar);
     if (scrollBarOpt.has_value()) {
         menuParam.scrollBar = scrollBarOpt.value();

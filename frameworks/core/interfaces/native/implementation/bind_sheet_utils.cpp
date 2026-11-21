@@ -16,9 +16,11 @@
 
 #include "core/common/container.h"
 #include "core/components/common/properties/ui_material.h"
+#include "core/components/image/image_component.h"
 #include "core/components_ng/pattern/overlay/modal_style.h"
 #include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/sheet/sheet_theme.h"
+#include "core/interfaces/native/implementation/color_filter_peer.h"
 #include "core/interfaces/native/implementation/spring_back_action_peer.h"
 #include "core/interfaces/native/implementation/sheet_dismiss_peer.h"
 #include "core/interfaces/native/implementation/dismiss_sheet_action_peer.h"
@@ -219,6 +221,11 @@ void BindSheetUtil::ParseSheetParams(SheetStyle& sheetStyle, const Ark_SheetOpti
     sheetStyle.bottomOffset = sheetOffset;
     sheetStyle.titleBarHoverMode = OptConvert<SheetTitleBarHoverMode>(sheetOptions.titleBarHoverMode);
     sheetStyle.adaptToHandedness = OptConvert<HandednessFollowMode>(sheetOptions.adaptToHandedness);
+    auto colorFilterOpt = OptConvert<Ark_ColorFilter>(sheetOptions.colorFilterEffect);
+    if (colorFilterOpt.has_value() && colorFilterOpt.value() &&
+        colorFilterOpt.value()->GetColorFilterMatrix().size() == COLOR_FILTER_MATRIX_SIZE) {
+        sheetStyle.colorFilterEffect = colorFilterOpt.value()->GetColorFilterMatrix();
+    }
 }
 
 void BindSheetUtil::ModifySheetStyle(

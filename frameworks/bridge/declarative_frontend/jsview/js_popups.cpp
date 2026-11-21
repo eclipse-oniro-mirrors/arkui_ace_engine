@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "base/image/image_color_filter.h"
 #include "base/utils/utils.h"
 #include "base/utils/string_utils.h"
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
@@ -1506,6 +1507,19 @@ void JSViewPopups::ParseMenuSystemMaterial(const JSRef<JSObject>& menuOptions, N
     }
 }
 
+void JSViewPopups::ParseMenuColorFilterEffect(const JSRef<JSObject>& menuOptions, NG::MenuParam& menuParam)
+{
+    auto colorFilterValue = menuOptions->GetProperty("colorFilterEffect");
+    if (!colorFilterValue->IsObject()) {
+        return;
+    }
+    auto* imageColorFilter = JSRef<JSObject>::Cast(colorFilterValue)->Unwrap<ImageColorFilter>();
+    if (imageColorFilter &&
+        imageColorFilter->GetColorFilterMatrix().size() == ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        menuParam.colorFilterEffect = imageColorFilter->GetColorFilterMatrix();
+    }
+}
+
 void JSViewPopups::ParseMenuDistortionMode(const JSRef<JSObject>& menuOptions, NG::MenuParam& menuParam)
 {
     auto distortionValue = menuOptions->GetProperty("distortionMode");
@@ -1839,6 +1853,7 @@ void JSViewPopups::ParseMenuParam(
     JSViewPopups::ParseMenuOutlineColor(outlineColorValue, menuParam);
     JSViewPopups::ParseMenuMaskType(menuOptions, menuParam);
     JSViewPopups::ParseMenuSystemMaterial(menuOptions, menuParam);
+    JSViewPopups::ParseMenuColorFilterEffect(menuOptions, menuParam);
     JSViewPopups::ParseMenuDistortionMode(menuOptions, menuParam);
     JSViewPopups::ParseMenuEdgeLightMode(menuOptions, menuParam);
     JSViewPopups::ParseAnchorPositionParam(menuOptions, menuParam);
@@ -3084,6 +3099,16 @@ void JSViewAbstract::ParseSheetStyle(
     JSViewPopups::ParseSheetScrollBarState(paramObj->GetProperty("scrollBarState"), sheetStyle);
     JSViewPopups::ParseSheetCloseButtonMaterial(paramObj->GetProperty("closeButtonMaterial"), sheetStyle);
     JSViewPopups::ParseSheetTitleBarVibrancyMode(paramObj->GetProperty("titleBarVibrancyMode"), sheetStyle);
+
+    // parse colorFilterEffect
+    auto colorFilterEffectValue = paramObj->GetProperty("colorFilterEffect");
+    if (colorFilterEffectValue->IsObject()) {
+        auto* imageColorFilter = JSRef<JSObject>::Cast(colorFilterEffectValue)->Unwrap<ImageColorFilter>();
+        if (imageColorFilter &&
+            imageColorFilter->GetColorFilterMatrix().size() == ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+            sheetStyle.colorFilterEffect = imageColorFilter->GetColorFilterMatrix();
+        }
+    }
 
     // parse ModalTransition
     auto modalTransitionValue = paramObj->GetProperty("modalTransition");

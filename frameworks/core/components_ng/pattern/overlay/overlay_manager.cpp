@@ -4136,6 +4136,7 @@ void OverlayManager::UpdateSheetRender(
     sheetPatternModifier->sheetSetSheetRenderMaterial(sheetPageNode);
     sheetPatternModifier->sheetSetSheetBlurSnapshotFreeze(sheetPageNode, sheetStyle, isPartialUpdate);
     sheetPatternModifier->sheetUpdateSheetScrollBar(sheetPageNode, sheetStyle);
+    sheetPatternModifier->sheetUpdateColorFilterEffect(sheetPageNode, sheetStyle);
 }
 void OverlayManager::UpdateSheetRenderProperty(const RefPtr<FrameNode>& sheetNode,
     const NG::SheetStyle& currentStyle, bool isPartialUpdate)

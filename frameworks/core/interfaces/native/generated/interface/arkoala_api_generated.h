@@ -23886,6 +23886,7 @@ typedef struct Ark_ContextMenuOptions {
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
     Opt_MenuGridStyleOptions gridStyle;
+    Opt_ColorFilter colorFilterEffect;
 } Ark_ContextMenuOptions;
 typedef struct Opt_ContextMenuOptions {
     Ark_Tag tag;
@@ -24148,6 +24149,7 @@ typedef struct Ark_MenuOptions {
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
     Opt_MenuGridStyleOptions gridStyle;
+    Opt_ColorFilter colorFilterEffect;
     Opt_ResourceStr title;
     Opt_Boolean showInSubWindow;
 } Ark_MenuOptions;
@@ -24422,6 +24424,7 @@ typedef struct Ark_SheetOptions {
     Opt_BlurSnapshotOptions blurSnapshot;
     Opt_SheetTitleBarHoverMode titleBarHoverMode;
     Opt_HandednessFollowMode adaptToHandedness;
+    Opt_ColorFilter colorFilterEffect;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;

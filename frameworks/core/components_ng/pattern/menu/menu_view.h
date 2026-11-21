@@ -117,6 +117,7 @@ public:
     static void RemoveMenuHoverScaleStatus(int32_t targetId);
     static MenuHoverScaleStatus GetMenuHoverScaleStatus(int32_t targetId);
     static void SetMenuSystemMaterial(const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam);
+    static void SetMenuColorFilterEffect(const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam);
     static void UpdateStyleOptionColorMode(const OHOS::Ace::ColorMode colorMode, BlurStyleOption& styleOption,
         bool isColorModeFollowTarget = true);
     static void UpdateMenuBorderEffect(

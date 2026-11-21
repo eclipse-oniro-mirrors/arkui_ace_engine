@@ -754,6 +754,15 @@ void MenuItemPattern::ShowSubMenu(ShowSubMenuType type)
         param.targetSize = outterMenuLayoutProps->GetTargetMenuSize();
     }
     ParseMenuRadius(param);
+    auto menuWrapper = GetMenuWrapper();
+    CHECK_NULL_VOID(menuWrapper);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    CHECK_NULL_VOID(menuWrapperPattern);
+    auto menuParam = menuWrapperPattern->GetMenuParam();
+    param.systemMaterial = menuParam.systemMaterial;
+    if (menuParam.colorFilterEffect.has_value()) {
+        param.colorFilterEffect = menuParam.colorFilterEffect;
+    }
     auto subMenu = MenuView::Create(customNode, host->GetId(), host->GetTag(), param);
     CHECK_NULL_VOID(subMenu);
     ShowSubMenuHelper(subMenu);
