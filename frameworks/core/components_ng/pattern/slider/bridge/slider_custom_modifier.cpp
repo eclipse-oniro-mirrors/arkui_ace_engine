@@ -157,5 +157,5 @@ const ArkUISliderCustomModifier* GetSliderCustomModifier()
 
     return &modifier;
 }
-}// namespace CustomModifier
-}// namespace OHOS::Ace::NG
+} // namespace CustomModifier
+} // namespace OHOS::Ace::NG
