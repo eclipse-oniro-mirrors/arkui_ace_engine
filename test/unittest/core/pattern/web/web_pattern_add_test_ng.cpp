@@ -1160,6 +1160,203 @@ HWTEST_F(WebPatternAddTestNg, OnClearRegisterFlag_001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: OnRegister_001
+ * @tc.desc: OnRegister with null web pattern returns false and keeps unregistered state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnRegister_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(nullptr, 1);
+    bool ret = accessibilityChildTreeCallback->OnRegister(1, 1);
+    EXPECT_FALSE(ret);
+    EXPECT_FALSE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 0);
+#endif
+}
+
+/**
+ * @tc.name: OnRegister_002
+ * @tc.desc: First OnRegister fails when register child tree fails, registered state stays unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnRegister_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(webPattern, 1);
+    bool ret = accessibilityChildTreeCallback->OnRegister(1, 1);
+    EXPECT_FALSE(ret);
+    EXPECT_FALSE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 0);
+#endif
+}
+
+/**
+ * @tc.name: OnRegister_003
+ * @tc.desc: OnRegister with the same registered tree id returns true directly without re-register.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnRegister_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(webPattern, 1);
+    accessibilityChildTreeCallback->isReg_ = true;
+    accessibilityChildTreeCallback->registeredTreeId_ = 1;
+    bool ret = accessibilityChildTreeCallback->OnRegister(1, 1);
+    EXPECT_TRUE(ret);
+    EXPECT_TRUE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 1);
+#endif
+}
+
+/**
+ * @tc.name: OnRegister_004
+ * @tc.desc: OnRegister with a new tree id retries register and keeps old state when retry fails.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnRegister_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(webPattern, 1);
+    accessibilityChildTreeCallback->isReg_ = true;
+    accessibilityChildTreeCallback->registeredTreeId_ = 1;
+    accessibilityChildTreeCallback->SetIsDelayed(true);
+    bool ret = accessibilityChildTreeCallback->OnRegister(1, 2);
+    EXPECT_FALSE(ret);
+    EXPECT_TRUE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 1);
+    EXPECT_TRUE(accessibilityChildTreeCallback->isDelayed_);
+#endif
+}
+
+/**
+ * @tc.name: OnDeregister_002
+ * @tc.desc: OnDeregister succeeds when treeId is zero and resets registered tree id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnDeregister_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<NWeb::TaskExecutorImpl>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+    MockContainer::Current()->pipelineContext_->SetupRootElement();
+    webPattern->treeId_ = 0;
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(webPattern, 1);
+    accessibilityChildTreeCallback->isReg_ = true;
+    accessibilityChildTreeCallback->registeredTreeId_ = 1;
+    bool ret = accessibilityChildTreeCallback->OnDeregister();
+    EXPECT_TRUE(ret);
+    EXPECT_FALSE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 0);
+    MockContainer::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: OnDeregister_003
+ * @tc.desc: OnDeregister fails and keeps registered state when deregister child tree fails.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnDeregister_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->treeId_ = 1;
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(webPattern, 1);
+    accessibilityChildTreeCallback->isReg_ = true;
+    accessibilityChildTreeCallback->registeredTreeId_ = 1;
+    bool ret = accessibilityChildTreeCallback->OnDeregister();
+    EXPECT_FALSE(ret);
+    EXPECT_TRUE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 1);
+#endif
+}
+
+/**
+ * @tc.name: OnClearRegisterFlag_002
+ * @tc.desc: OnClearRegisterFlag resets registered tree id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternAddTestNg, OnClearRegisterFlag_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    auto accessibilityChildTreeCallback = std::make_shared<WebAccessibilityChildTreeCallback>(webPattern, 1);
+    accessibilityChildTreeCallback->isReg_ = true;
+    accessibilityChildTreeCallback->registeredTreeId_ = 1;
+    accessibilityChildTreeCallback->OnClearRegisterFlag();
+    EXPECT_FALSE(accessibilityChildTreeCallback->isReg_);
+    EXPECT_EQ(accessibilityChildTreeCallback->registeredTreeId_, 0);
+#endif
+}
+
+/**
  * @tc.name: GetAccessibilityVisible_001
  * @tc.desc: GetAccessibilityVisible.
  * @tc.type: FUNC
