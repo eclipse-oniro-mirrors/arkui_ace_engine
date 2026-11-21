@@ -866,6 +866,7 @@ HWTEST_F(RadioPatternTwoTestNg, OnColorConfigurationUpdate002, TestSize.Level1)
     g_isConfigChangePerform = false;
 }
 
+
 /**
  * @tc.name: IsJsonValid001
  * @tc.desc: Test IsJsonValid.
@@ -1054,4 +1055,5 @@ HWTEST_F(RadioPatternTwoTestNg, RadioNodeTest_OnClick_Report, TestSize.Level1)
     ASSERT_NE(paintProperty, nullptr);
     EXPECT_TRUE(paintProperty->GetRadioCheckValue());
 }
+
 } // namespace OHOS::Ace::NG

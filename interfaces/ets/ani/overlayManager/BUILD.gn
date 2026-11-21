@@ -32,10 +32,15 @@ ohos_shared_library("overlayManager_ani") {
     "./src/overlayManager.cpp",
     "./src/overlay_params.cpp",
   ]
-  external_deps = [ "runtime_core:ani" ]
+
+  external_deps = [
+    "runtime_core:ani",
+  ]
+
   if (ace_engine_feature_enable_container_scope_tracking) {
     external_deps += [ "bounds_checking_function:libsec_static" ]
   }
+
   configs = [ "$ace_root:ace_config" ]
   part_name = "ace_engine"
   subsystem_name = "arkui"
@@ -45,7 +50,9 @@ ohos_shared_library("overlayManager_ani") {
 #构建abc
 generate_static_abc("overlayManager") {
   base_url = "./ets"
-  files = [ "./ets/@ohos.overlayManager.ets" ]
+  files = [
+    "./ets/@ohos.overlayManager.ets",
+  ]
   is_boot_abc = "True"
   device_dst_file = "/system/framework/overlayManager.abc"
 }

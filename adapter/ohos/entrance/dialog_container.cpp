@@ -164,7 +164,6 @@ bool DialogContainer::ShowToastDialogWindow(
     return true;
 }
 
-
 bool DialogContainer::OnBackPressed(int32_t instanceId)
 {
     return AceContainer::CloseWindow(instanceId);

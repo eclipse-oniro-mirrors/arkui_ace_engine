@@ -299,7 +299,7 @@ void RatingModelNG::SetBuilderFunc(FrameNode* frameNode, NG::RatingMakeCallback&
     CHECK_NULL_VOID(pattern);
     pattern->SetBuilderFunc(std::move(makeFunc));
 }
-
+ 
 void RatingModelNG::SetChangeValue(FrameNode* frameNode, double value)
 {
     auto pattern = frameNode->GetPattern<RatingPattern>();

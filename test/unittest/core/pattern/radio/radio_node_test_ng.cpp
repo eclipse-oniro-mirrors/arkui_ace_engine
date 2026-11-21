@@ -342,7 +342,7 @@ HWTEST_F(RadioNodeTestNg, RadioNodeTest006, TestSize.Level1)
                     AceType::MakeRefPtr<FrameNode>("", CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>());
                 return child;
             };
-
+    
     /**
      * @tc.steps: step4. Set parameters to pattern builderFunc
      */

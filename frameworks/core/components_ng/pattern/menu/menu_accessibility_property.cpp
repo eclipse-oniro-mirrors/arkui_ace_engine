@@ -61,4 +61,5 @@ void MenuAccessibilityProperty::GetExtraElementInfo(Accessibility::ExtraElementI
     extraElementInfo.SetExtraElementInfo("SideBarContainerStates", static_cast<int32_t>(isShow_));
 #endif
 }
+
 } // namespace OHOS::Ace::NG

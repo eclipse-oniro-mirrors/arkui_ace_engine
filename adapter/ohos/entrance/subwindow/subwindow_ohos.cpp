@@ -993,7 +993,7 @@ bool SubwindowOhos::GetDestroyInHide()
 {
     return destroyInHide_;
 }
-
+ 
 void SubwindowOhos::SetDestroyInHide(bool destroyInHide)
 {
     destroyInHide_ = destroyInHide;
@@ -2573,6 +2573,7 @@ bool SubwindowOhos::Close()
         TAG_LOGI(AceLogTag::ACE_SUB_WINDOW, "current window is closing.");
         return false;
     }
+
     TAG_LOGI(AceLogTag::ACE_SUB_WINDOW, "Close subwindow");
     CHECK_NULL_RETURN(window_, false);
     window_->UnregisterSwitchFreeMultiWindowListener(freeMultiWindowListener_);

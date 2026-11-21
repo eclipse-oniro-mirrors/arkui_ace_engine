@@ -407,7 +407,6 @@ public:
     {
         return defaultDialogMarginBottom_;
     }
-
     const std::string& GetMultipleDialogDisplay()
     {
         return multipleDialogDisplay_;
@@ -427,7 +426,7 @@ public:
     {
         return containerMaxWidth_;
     }
-
+    
     uint32_t GetDefaultShadowOn() const
     {
         return defaultShadowOn_;
@@ -437,6 +436,7 @@ public:
     {
         return defaultShadowOff_;
     }
+
     const DialogAlignment& GetAlignment() const
     {
         return alignment_;
@@ -501,7 +501,7 @@ public:
     {
         return dialogLandscapeHeightBoundary_;
     }
-    
+
     int32_t GetDialogDoubleBorderEnable() const
     {
         return dialogDoubleBorderEnable_;

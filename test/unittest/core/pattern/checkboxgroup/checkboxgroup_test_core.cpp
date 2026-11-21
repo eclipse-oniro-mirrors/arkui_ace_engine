@@ -15,10 +15,6 @@
 
 #include "checkboxgroup_test_min.h"
 
-#undef private
-#undef protected
-
-
 using namespace testing;
 using namespace testing::ext;
 

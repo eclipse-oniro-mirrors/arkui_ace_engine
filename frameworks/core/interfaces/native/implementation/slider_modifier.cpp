@@ -17,7 +17,6 @@
 
 #include "core/common/dynamic_module_helper.h"
 #include "core/interfaces/native/generated/interface/arkoala_api_generated.h"
- 
 namespace OHOS::Ace::NG::GeneratedModifier {
 #ifdef ARKUI_CAPI_UNITTEST
 const GENERATED_ArkUISliderModifier* GetSliderStaticModifier();

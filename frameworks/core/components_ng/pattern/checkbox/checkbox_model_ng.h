@@ -58,7 +58,6 @@ public:
     void ResetCheckMarkColor() override;
     void CreateWithColorResourceObj(const RefPtr<ResourceObject>& resObj,
         const CheckBoxColorType checkBoxColorType) override;
-
     static RefPtr<FrameNode> CreateFrameNode(int32_t nodeId);
     static void SetSelect(FrameNode* frameNode, bool isSelected);
     static void SetSelectedColor(FrameNode* frameNode, const Color& color);
@@ -105,7 +104,6 @@ public:
     static void UpdatePaintPropertyBySettingData(FrameNode* frameNode, const CheckboxSettingData& data, bool isLunar);
     static void CreateCheckbox(const std::optional<std::string>& name, const std::optional<std::string>& groupName,
         const std::string& tagName);
-
 private:
     static std::string ColorTypeToString(const CheckBoxColorType checkBoxColorType);
 };

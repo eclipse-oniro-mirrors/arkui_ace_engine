@@ -164,13 +164,14 @@ public:
         checkboxSettingData_ = checkboxSettingData;
     }
 
-    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
-
-    void DumpInfo() override;
     void SetIsUserSetMargin(bool isUserSetMargin)
     {
         isUserSetMargin_ = isUserSetMargin;
     }
+
+    bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+
+    void DumpInfo() override;
 
     bool IsEnableMatchParent() override
     {
@@ -219,8 +220,8 @@ private:
     void SetPrePageIdToLastPageId();
     // Init key event
     void InitOnKeyEvent(const RefPtr<FocusHub>& focusHub);
-    bool IsSquareStyleBox();
     bool OnKeyEvent(const KeyEvent& event);
+    bool IsSquareStyleBox();
     void GetInnerFocusPaintRect(RoundRect& paintRect);
     void AddHotZoneRect();
     void RemoveLastHotZoneRect() const;
@@ -277,9 +278,9 @@ private:
     RefPtr<FrameNode> builderNode_;
     std::optional<std::function<void()>> builder_;
     std::function<void(bool)> isFocusActiveUpdateEvent_;
-
     RefPtr<CheckBoxPaintMethod> paintMethod_;
     WeakPtr<GroupManager> groupManager_;
+
     ACE_DISALLOW_COPY_AND_MOVE(CheckBoxPattern);
 };
 } // namespace OHOS::Ace::NG

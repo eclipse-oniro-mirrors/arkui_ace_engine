@@ -15,7 +15,6 @@
 
 #include "core/components_ng/pattern/bubble/bridge/bubble_dynamic_module.h"
 #include "core/components_ng/pattern/bubble/bridge/inner_modifier/bubble_inner_modifier.h"
-
 #include "ecmascript/napi/include/jsnapi.h"
 
 extern "C" ACE_FORCE_EXPORT void* OHOS_ACE_DynamicModule_Create_Bubble()

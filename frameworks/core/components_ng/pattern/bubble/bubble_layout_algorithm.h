@@ -393,10 +393,10 @@ private:
     OffsetF childOffset_;
     // Offset from upper left corner of the screen
     OffsetF childOffsetForPaint_;
-    // top right bottom left
-    std::vector<float> arrowOffsetByClips_ = { 0.0f, 0.0f, 0.0f, 0.0f };
     OffsetF arrowPosition_;
     OffsetF arrowPositionForPaint_;
+    // top right bottom left
+    std::vector<float> arrowOffsetByClips_ = { 0.0f, 0.0f, 0.0f, 0.0f };
     SizeF selfSize_;
     RectF touchRegion_;
     Rect hostWindowRect_;
@@ -465,7 +465,6 @@ private:
     bool doubleBorderEnable_ = false;
     bool expandDisplay_ = false;
     bool isUserSetMaterial_ = false;
-
     float floatButtonsHeight_ = 0.0f;
     Rect windowBoundsRect_;
     // param to generate arrow shape.

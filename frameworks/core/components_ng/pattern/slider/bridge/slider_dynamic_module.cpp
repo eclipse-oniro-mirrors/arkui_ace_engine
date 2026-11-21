@@ -82,7 +82,7 @@ void* SliderDynamicModule::GetModel()
 
 const void* SliderDynamicModule::GetCustomModifier(const std::string& name)
 {
-    if (name == NG::CustomModifier::CUSTOM_MODIFIER) {
+    if(name == NG::CustomModifier::CUSTOM_MODIFIER){
         return NG::CustomModifier::GetSliderCustomModifier();
     }
 #ifdef INCLUDE_GENERATED_SOURCES

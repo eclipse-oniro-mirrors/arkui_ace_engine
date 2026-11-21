@@ -571,7 +571,7 @@ HWTEST_F(ButtonEventTestNg, ButtonEventTest006, TestSize.Level1)
     buttonPattern->InitTouchEvent();
     auto eventHub = frameNode->GetEventHub<ButtonEventHub>();
     ASSERT_NE(eventHub, nullptr);
-    std::function<void(UIState)>& touchListener = buttonPattern->GetTouchListener();
+    std::function<void(UIState)> touchListener = buttonPattern->GetTouchListener();
     ASSERT_NE(touchListener, nullptr);
     /**
      * @tc.steps: step3. change button params.

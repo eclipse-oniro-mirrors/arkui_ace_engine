@@ -221,6 +221,7 @@ void ContentModifierCheckboxImpl(
         arkConfig.enabled = Converter::ArkValue<Ark_Boolean>(config.enabled_);
         arkConfig.name = Converter::ArkValue<Ark_String>(config.name_, Converter::FC);
         arkConfig.selected = Converter::ArkValue<Ark_Boolean>(config.selected_);
+
         auto handler = [frameNode](Ark_Boolean retValue) {
             CheckBoxModelStatic::TriggerChange(frameNode, Converter::Convert<bool>(retValue));
         };

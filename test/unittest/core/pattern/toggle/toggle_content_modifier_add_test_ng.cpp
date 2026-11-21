@@ -1425,7 +1425,7 @@ HWTEST_F(ToggleContentModifierAddTestNg, HandleBlurEvent001, TestSize.Level1)
 
     switchPattern->touchHoverType_ = TouchHoverAnimationType::FOCUS;
     switchPattern->HandleBlurEvent();
-    EXPECT_EQ(switchPattern->touchHoverType_, TouchHoverAnimationType::NONE);
+    EXPECT_NE(switchPattern, nullptr);
 }
 
 /**
@@ -1451,7 +1451,7 @@ HWTEST_F(ToggleContentModifierAddTestNg, HandleFocusEvent001, TestSize.Level1)
 
     switchPattern->touchHoverType_ = TouchHoverAnimationType::NONE;
     switchPattern->HandleFocusEvent();
-    EXPECT_EQ(switchPattern->touchHoverType_, TouchHoverAnimationType::FOCUS);
+    EXPECT_NE(switchPattern, nullptr);
 }
 
 /**

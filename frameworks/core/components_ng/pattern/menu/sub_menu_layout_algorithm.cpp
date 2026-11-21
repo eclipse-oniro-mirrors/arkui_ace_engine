@@ -23,7 +23,6 @@
 #include "core/components_ng/pattern/menu/menu_tag_constants.h"
 namespace OHOS::Ace::NG {
 constexpr double MOUNT_MENU_FINAL_SCALE = 0.95f;
-
 void SubMenuLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 {
     CHECK_NULL_VOID(layoutWrapper);
