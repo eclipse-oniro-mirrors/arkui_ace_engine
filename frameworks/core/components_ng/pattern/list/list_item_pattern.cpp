@@ -61,7 +61,8 @@ constexpr float SWIPE_SPRING_STIFFNESS = 228.f;
 constexpr float SWIPE_SPRING_DAMPING = 30.f;
 constexpr int32_t DELETE_ANIMATION_DURATION = 400;
 
-void TraceSwipeGestureFailure(int32_t nodeId, const char* action, const char* reason, const char* result, float oldOffset)
+void TraceSwipeGestureFailure(int32_t nodeId, const char* action, const char* reason,
+    const char* result, float oldOffset)
 {
     TAG_LOGI(AceLogTag::ACE_LIST, "ListItem:%{public}d swipe %{public}s reason:%{public}s "
         "result:%{public}s oldOffset:%{public}f", nodeId, action, reason, result, oldOffset);
