@@ -81,7 +81,7 @@ public:
             return;
         }
         if (hasFinished_ || !finishCallback_) {
-            TAG_LOGE(AceLogTag::ACE_NAVIGATION, "not support to finish custom animation more than once");
+            TAG_LOGD(AceLogTag::ACE_NAVIGATION, "not support to finish custom animation more than once");
             return;
         }
         hasFinished_ = true;
@@ -181,7 +181,7 @@ public:
     void FinishInteractiveAnimation()
     {
         if (!interactive_ || hasFinished_) {
-            TAG_LOGE(AceLogTag::ACE_NAVIGATION, "not support to finish interactive animation more than once");
+            TAG_LOGE(AceLogTag::ACE_NAVIGATION, "finish interactive animation more than once");
             return;
         }
         hasFinished_ = true;
@@ -199,7 +199,7 @@ public:
     void CancelInteractiveAnimation()
     {
         if (!interactive_ || hasFinished_) {
-            TAG_LOGE(AceLogTag::ACE_NAVIGATION, "not support to cancel interactive animation more than once");
+            TAG_LOGE(AceLogTag::ACE_NAVIGATION, "cancel interactive animation more than once");
             return;
         }
         hasFinished_ = true;

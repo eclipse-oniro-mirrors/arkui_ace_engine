@@ -1393,8 +1393,7 @@ void NavigationPattern::NotifyForceFullScreenChangeIfNeeded(const std::vector<st
 void NavigationPattern::SyncWithJsStackIfNeeded()
 {
     if (!needSyncWithJsStack_) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
-            "not need SyncWithJsStack, needSyncWithJsStack_ %{public}d", needSyncWithJsStack_);
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "no need sync js stack");
         return;
     }
     CHECK_NULL_VOID(navigationStack_);
@@ -1405,8 +1404,7 @@ void NavigationPattern::SyncWithJsStackIfNeeded()
     }
     auto hostNode = AceType::DynamicCast<NavigationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
-    TAG_LOGI(AceLogTag::ACE_NAVIGATION,
-        "sync with js stack, id: %{public}s, UINodeId: %{public}d, preStackSize: %{public}d, newStackSize: %{public}d",
+    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "sync stack, %{public}s,%{public}d,%{public}d->%{public}d",
         hostNode->GetCurId().c_str(), hostNode->GetId(), navigationStack_->PreSize(),
         static_cast<int32_t>(navigationStack_->GetAllPathName().size()));
     GetVisibleNodes(true, preVisibleNodes_);
@@ -1898,7 +1896,7 @@ void NavigationPattern::UpdateNavPathList()
             navPathList.emplace_back(std::make_pair(pathName, uiNode));
             continue;
         }
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "find in nowhere, navigation stack create new node, "
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "create new node, "
             "index: %{public}d, removeSize: %{public}d, name: %{public}s.", index, removeSize, pathName.c_str());
         if (!GenerateUINodeByIndex(arrayIndex, uiNode, false)) {
             std::string replacedName = "";
@@ -2381,8 +2379,8 @@ void NavigationPattern::CheckTopNavPathChange(
     bool disableAllAnimation = navigationStack_->GetDisableAnimation();
     bool animated = navigationStack_->GetAnimatedValue();
     TAG_LOGI(AceLogTag::ACE_NAVIGATION,
-        "transition start, disableAllAnimation: %{public}d, animated: %{public}d, isPopPage: %{public}d, isDialog: "
-        "%{public}d, isReplace: %{public}d, isCustomAnimation: %{public}d",
+        "transition start, disableAnim: %{public}d, animated: %{public}d, isPopPage: %{public}d, isDialog: "
+        "%{public}d, isReplace: %{public}d, isCustomAnim: %{public}d",
         disableAllAnimation, animated, isPopPage, isDialog, isReplace_, isCustomAnimation_);
     if (disableAllAnimation || !animated) {
         // transition without animation need to run before layout for geometryTransition.
@@ -4451,7 +4449,7 @@ void NavigationPattern::DumpInfo()
 bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> preTopNavDestination,
     RefPtr<NavDestinationGroupNode> newTopNavDestination, bool isPopPage)
 {
-    TAG_LOGI(AceLogTag::ACE_NAVIGATION, "will trigger navigation custom animation");
+    TAG_LOGD(AceLogTag::ACE_NAVIGATION, "will trigger navigation custom animation");
     if ((!preTopNavDestination && !newTopNavDestination) || !onTransition_) {
         return false;
     }
@@ -4480,7 +4478,7 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
     proxyList_.emplace_back(proxy);
     auto navigationTransition = ExecuteTransition(preTopNavDestination, newTopNavDestination, isPopPage);
     if (!navigationTransition.isValid) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "custom transition value is invalid, do default animation");
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "invalid transition, do default anim");
         return false;
     }
     ExecuteAddAnimation(preTopNavDestination, newTopNavDestination, isPopPage, proxy, navigationTransition);
@@ -6185,7 +6183,7 @@ bool NavigationPattern::ExecuteAddAnimation(RefPtr<NavDestinationGroupNode> preT
             TAG_LOGW(AceLogTag::ACE_NAVIGATION, "custom animation proxy is empty or is finished");
             return;
         }
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "custom animation finish end");
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "custom anim finished");
         proxy->SetIsFinished(true);
         // update pre navigation stack
         ACE_SCOPED_TRACE_COMMERCIAL("navigation page custom transition end");
@@ -6903,7 +6901,7 @@ void NavigationPattern::UpdatePageViewportConfigIfNeeded(const RefPtr<NavDestina
     const RefPtr<NavDestinationGroupNode>& topDestination)
 {
     if (!IsPageLevelConfigEnabled()) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't update PageViewportConfig");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't update PageViewportConfig");
         return;
     }
 
@@ -7117,7 +7115,7 @@ void NavigationPattern::SetRequestedOrientationIfNeeded()
     enableLockOrientation_ = false;
     windowSizeChangedDuringTransition_ = false;
     if (!IsPageLevelConfigEnabled() || !enableLockOrientation) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't set Orientation");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't set Orientation");
         ClearPageAndNavigationConfig();
         return;
     }
@@ -7281,7 +7279,7 @@ RefPtr<NavDestinationNodeBase> NavigationPattern::GetLastStandardNodeOrNavBar()
 void NavigationPattern::HideSystemBarIfNeeded()
 {
     if (!IsPageLevelConfigEnabled()) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't enable/disable SystemBar");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't enable/disable SystemBar");
         return;
     }
 
@@ -7307,7 +7305,7 @@ void NavigationPattern::HideSystemBarIfNeeded()
 void NavigationPattern::ShowOrRestoreSystemBarIfNeeded()
 {
     if (!IsPageLevelConfigEnabled()) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't enable/disable SystemBar");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "conditions are not met, don't enable/disable SystemBar");
         return;
     }
 
