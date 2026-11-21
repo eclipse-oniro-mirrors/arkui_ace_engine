@@ -92,7 +92,7 @@ const std::shared_ptr<AAFwk::Want> SessionWrapperImpl::GetWant()
     return std::make_shared<AAFwk::Want>(want);
 }
 
-void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId) {}
+void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId) {}
 
 bool SessionWrapperImpl::NotifyFocusEventSync(bool isFocus)
 {
@@ -165,6 +165,11 @@ RefPtr<SystemWindowScene> SessionWrapperImpl::GetWindowScene()
 }
 
 int32_t SessionWrapperImpl::GetWindowSceneId()
+{
+    return 1;
+}
+
+int32_t SessionWrapperImpl::GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline)
 {
     return 1;
 }
@@ -300,6 +305,8 @@ bool SessionWrapperImpl::SendBusinessData(
 }
 
 void SessionWrapperImpl::NotifyHostWindowMode(int32_t mode) {}
+
+void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId) {}
 
 void SessionWrapperImpl::ReDispatchWantParams() {}
 

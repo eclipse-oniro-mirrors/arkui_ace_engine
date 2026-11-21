@@ -41,7 +41,7 @@
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
 #include "core/pipeline_ng/pipeline_context.h"
-
+#include "core/components_ng/render/adapter/rosen_window.h"
 #include "render_service_client/core/ui/rs_ui_director.h"
 #include "render_service_client/core/ui/rs_ui_context.h"
  
@@ -364,6 +364,7 @@ void PreviewSessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Ses
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.brandColorStr_ = brandColorStr;
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId();
     SetConnectToRenderInner(container, extensionSessionInfo);
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
@@ -413,7 +414,42 @@ void PreviewSessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& want
     wantParam.SetParam(UIEXTENSION_CONFIG_FIELD, AAFwk::WantParamWrapper::Box(configParam));
     wantPtr->SetParams(wantParam);
 }
- 
+
+int32_t PreviewSessionWrapperImpl::GetCallerPersistentId()
+{
+    auto container = Platform::AceContainer::GetContainer(GetInstanceId());
+    CHECK_NULL_RETURN(container, 0);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_RETURN(pipeline, 0);
+    if (container->IsDynamicRender() &&
+        container->GetUIContentType() == UIContentType::DYNAMIC_COMPONENT) {
+        return static_cast<int32_t>(pipeline->GetFocusWindowId());
+    }
+    if (container->IsSceneBoardWindow()) {
+        return GetWindowSceneId();
+    }
+    auto window = static_cast<RosenWindow*>(container->GetWindow());
+    CHECK_NULL_RETURN(window, 0);
+    auto rsWindow = window->GetRSWindow();
+    CHECK_NULL_RETURN(rsWindow, 0);
+    return static_cast<int32_t>(rsWindow->GetWindowId());
+}
+
+int32_t PreviewSessionWrapperImpl::GetWindowSceneId()
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_RETURN(pattern, 0);
+    auto hostWindowNode = WindowSceneHelper::FindWindowScene(pattern->GetHost());
+    CHECK_NULL_RETURN(hostWindowNode, 0);
+    auto hostNode = AceType::DynamicCast<FrameNode>(hostWindowNode);
+    CHECK_NULL_RETURN(hostNode, 0);
+    auto hostPattern = hostNode->GetPattern<SystemWindowScene>();
+    CHECK_NULL_RETURN(hostPattern, 0);
+    auto hostSession = hostPattern->GetSession();
+    CHECK_NULL_RETURN(hostSession, 0);
+    return hostSession->GetPersistentId();
+}
+
 void PreviewSessionWrapperImpl::ReDispatchWantParams()
 {
     CHECK_NULL_VOID(session_);
@@ -838,7 +874,7 @@ int32_t PreviewSessionWrapperImpl::GetInstanceId() const
     return instanceId_;
 }
 
-void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
+void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
 {
     if (instanceId_ == instanceId) {
         PLATFORM_LOGW("InstanceId(%{public}d) has not changed when UpdateInstanceId.", instanceId);

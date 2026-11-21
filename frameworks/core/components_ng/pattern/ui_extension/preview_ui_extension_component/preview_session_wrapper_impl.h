@@ -103,7 +103,7 @@ public:
     uint32_t GetReasonDump() const override;
     void NotifyUieDump(const std::vector<std::string>& params, std::vector<std::string>& info) override;
     int32_t GetInstanceId() const;
-    void UpdateInstanceId(int32_t instanceId) override;
+    void UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId) override;
     bool SendBusinessDataSyncReply(UIContentBusinessCode code, const AAFwk::Want& data, AAFwk::Want& reply,
         RSSubsystemId subSystemId = RSSubsystemId::ARKUI_UIEXT) override;
     bool SendBusinessData(UIContentBusinessCode code, const AAFwk::Want& data, BusinessDataSendType type,
@@ -118,6 +118,8 @@ private:
         uint32_t customId, const AAFwk::Want& data, std::optional<AAFwk::Want>& reply);
     void DispatchExtensionDataToHostWindow(uint32_t customId, const AAFwk::Want& data);
     void UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr);
+    int32_t GetCallerPersistentId();
+    int32_t GetWindowSceneId();
     void SetConnectToRenderInner(
         const RefPtr<Platform::AceContainer>& container, Rosen::SessionInfo& sessionInfo);
     AceLogTag tag_ = AceLogTag::ACE_SECURITYUIEXTENSION;

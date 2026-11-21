@@ -580,7 +580,7 @@ HWTEST_F(PreviewUIExtensionComponentTestNgTwo, PreviewSessionWrapperUpdateInstan
     auto wrapper = CreatePreviewSessionWrapperImpl(pattern);
     ASSERT_NE(wrapper, nullptr);
     auto oldId = wrapper->GetInstanceId();
-    wrapper->UpdateInstanceId(oldId);
+    wrapper->UpdateInstanceId(oldId, 0);
     EXPECT_EQ(wrapper->GetInstanceId(), oldId);
 #endif
 }
@@ -823,7 +823,7 @@ HWTEST_F(PreviewUIExtensionComponentTestNgTwo, PreviewSessionWrapperUpdateInstan
     auto wrapper = CreatePreviewSessionWrapperImpl(pattern);
     ASSERT_NE(wrapper, nullptr);
     int32_t oldId = wrapper->GetInstanceId();
-    wrapper->UpdateInstanceId(oldId + 1);
+    wrapper->UpdateInstanceId(oldId + 1, 0);
     if (wrapper->GetInstanceId() != oldId + 1) {
         EXPECT_EQ(wrapper->GetInstanceId(), oldId);
     } else {
@@ -840,8 +840,8 @@ HWTEST_F(PreviewUIExtensionComponentTestNgTwo, PreviewSessionWrapperUpdateInstan
     auto wrapper = CreatePreviewSessionWrapperImpl(pattern);
     ASSERT_NE(wrapper, nullptr);
     int32_t id0 = wrapper->GetInstanceId();
-    wrapper->UpdateInstanceId(id0 + 2);
-    wrapper->UpdateInstanceId(id0 + 3);
+    wrapper->UpdateInstanceId(id0 + 2, 0);
+    wrapper->UpdateInstanceId(id0 + 3, 0);
     EXPECT_TRUE(wrapper->GetInstanceId() == id0 || wrapper->GetInstanceId() == id0 + 2 ||
         wrapper->GetInstanceId() == id0 + 3);
 #endif
@@ -1889,8 +1889,8 @@ HWTEST_F(PreviewUIExtensionComponentTestNgTwo, PreviewSessionWrapperBulk021, Tes
     auto wrapper = CreatePreviewSessionWrapperImpl(pattern);
     ASSERT_NE(wrapper, nullptr);
     auto oldId = wrapper->GetInstanceId();
-    wrapper->UpdateInstanceId(oldId);
-    wrapper->UpdateInstanceId(oldId + 10);
+    wrapper->UpdateInstanceId(oldId, 0);
+    wrapper->UpdateInstanceId(oldId + 10, 0);
     EXPECT_TRUE(wrapper->GetInstanceId() == oldId || wrapper->GetInstanceId() == oldId + 10);
 #endif
 }

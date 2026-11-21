@@ -701,6 +701,13 @@ public:
      */
     virtual void SetUIExtensionDensityFollowHost(Rosen::DpiFollowStrategy dpiFollowStrategy) {};
 
+    /**
+     * @brief Called by window manager when UIExtension parent window changed.
+     *        Updates host window info and notifies registered Pipeline listeners.
+     * @param hostWindowId The latest host window id from window manager.
+     */
+    virtual void UpdateHostWindowInfo(uint32_t hostWindowId) {};
+
 private:
     static std::atomic<bool> successFlag_;
     static std::mutex mtx_;

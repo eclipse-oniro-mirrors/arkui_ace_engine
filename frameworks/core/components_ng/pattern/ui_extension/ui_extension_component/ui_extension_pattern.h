@@ -131,6 +131,7 @@ public:
     void RegisterWindowSceneVisibleChangeCallback(const RefPtr<Pattern>& windowScenePattern);
     void UnRegisterWindowSceneVisibleChangeCallback(int32_t nodeId);
     void OnWindowSceneVisibleChange(bool visible);
+    void OnHostWindowInfoChanged(uint32_t hostWindowId);
     void OnAttachToMainTree() override;
     void OnDetachFromMainTree() override;
     void OnAttachContext(PipelineContext *context) override;
@@ -418,7 +419,7 @@ private:
     void RegisterPipelineEvent(int32_t instanceId);
     void RegisterPipelineEvent(const RefPtr<PipelineContext>& pipeline);
     void RegisterUIExtensionManagerEvent(int32_t instanceId);
-    void UpdateSessionInstanceId(int32_t instanceId);
+    void UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId);
 
     void RegisterVisibleAreaChange();
     void MountPlaceholderNode(PlaceholderType type);
@@ -520,6 +521,7 @@ private:
     bool needReSendFocusToUIExtension_ = false;
     int32_t surfacePositionCallBackId_ = -1;
     int32_t foldDisplayCallBackId_ = -1;
+    int32_t hostWindowInfoCallbackId_ = -1;
     RectF displayArea_;
     // StartUIExtension should after mountToParent
     bool hasMountToParent_ = false;
