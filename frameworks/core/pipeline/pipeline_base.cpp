@@ -1156,7 +1156,7 @@ bool PipelineBase::MaybeRelease()
 {
     CHECK_NULL_RETURN(taskExecutor_, true);
     if (taskExecutor_->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
-        LOGI("Destroy Pipeline on UI thread.");
+        LOGD("Destroy Pipeline on UI thread.");
         return true;
     } else {
         std::lock_guard lock(destructMutex_);

@@ -3259,8 +3259,7 @@ void UIContentImpl::InitializeDisplayAvailableRect(const RefPtr<Platform::AceCon
 
 void UIContentImpl::Foreground()
 {
-    LOGI("[%{public}s][%{public}s][%{public}d]: window foreground", bundleName_.c_str(), moduleName_.c_str(),
-        instanceId_);
+    LOGI("[%{public}d]: window foreground", instanceId_);
     if (window_ != nullptr && window_->GetType() == Rosen::WindowType::WINDOW_TYPE_APP_MAIN_WINDOW) {
         PerfMonitor::GetPerfMonitor()->SetAppStartStatus();
         PerfMonitor::GetPerfMonitor()->NotifyAppJankStatsBegin();
@@ -3287,8 +3286,7 @@ void UIContentImpl::Foreground()
 
 void UIContentImpl::Background()
 {
-    LOGI("[%{public}s][%{public}s][%{public}d]: window background", bundleName_.c_str(), moduleName_.c_str(),
-        instanceId_);
+    LOGI("[%{public}d]: window background", instanceId_);
     PerfMonitor::GetPerfMonitor()->NotifyAppJankStatsEnd();
     if (!isFormRender_ && !isDynamicRender_) {
         // Register instanceId from pre-freeze flush when app goes to background.
@@ -3572,8 +3570,7 @@ uint32_t UIContentImpl::GetBackgroundColor()
 
 void UIContentImpl::SetBackgroundColor(uint32_t color)
 {
-    LOGI("[%{public}s][%{public}s][%{public}d]: SetBackgroundColor:%{public}u",
-        bundleName_.c_str(), moduleName_.c_str(), instanceId_, color);
+    LOGI("[%{public}d]: SetBackgroundColor:%{public}u", instanceId_, color);
     auto container = AceEngine::Get().GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
     auto aceContainer = AceType::DynamicCast<Platform::AceContainer>(container);
@@ -3595,10 +3592,8 @@ void UIContentImpl::SetBackgroundColor(uint32_t color)
 
 void UIContentImpl::SetWindowContainerColor(uint32_t activeColor, uint32_t inactiveColor)
 {
-    TAG_LOGI(AceLogTag::ACE_APPBAR,
-        "[%{public}s][%{public}s][%{public}d]: SetWindowContainerColor:"
-        "active color %{public}u, inactive color %{public}u",
-        bundleName_.c_str(), moduleName_.c_str(), instanceId_, activeColor, inactiveColor);
+    TAG_LOGI(AceLogTag::ACE_APPBAR, "[%{public}d]: SetWindowContainerColor:"
+        "active color %{public}u, inactive color %{public}u", instanceId_, activeColor, inactiveColor);
     auto container = AceEngine::Get().GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
     ContainerScope scope(instanceId_);
@@ -4727,8 +4722,7 @@ void UIContentImpl::UpdateWindowMode(OHOS::Rosen::WindowMode mode, bool hasDecor
 
 void UIContentImpl::NotifyWindowMode(OHOS::Rosen::WindowMode mode)
 {
-    LOGI("[%{public}s][%{public}s][%{public}d]: NotifyWindowMode mode = %{public}d",
-        bundleName_.c_str(), moduleName_.c_str(), instanceId_, mode);
+    LOGI("[%{public}d]: NotifyWindowMode mode = %{public}d", instanceId_, mode);
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
     auto taskExecutor = container->GetTaskExecutor();
