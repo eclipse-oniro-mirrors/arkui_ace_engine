@@ -1307,6 +1307,10 @@ void GestureEventHub::HandleStartDragFailure(const DragStartContext& ctx)
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     DragDropBehaviorReporter::GetInstance().UpdateDragStartResult(DragStartResult::DRAGFWK_START_FAIL);
 #endif
+    if (ctx.dragDropManager) {
+        // Drag start failed, drop the developer drag window hide state recorded in onDragStart.
+        ctx.dragDropManager->ResetDragWindowHiddenByDeveloper();
+    }
     if (ctx.subWindow) {
         SubwindowManager::GetInstance()->HidePreviewNG();
         CHECK_NULL_VOID(ctx.overlayManager);
@@ -1372,7 +1376,15 @@ bool GestureEventHub::UpdateDragStartManagerState(const DragStartContext& ctx)
 
 void GestureEventHub::PostTouchDragWindowVisibleTask(const RefPtr<PipelineContext>& pipeline)
 {
-    pipeline->AddAfterRenderTask([]() {
+    pipeline->AddAfterRenderTask([weakPipeline = WeakClaim(RawPtr(pipeline))]() {
+        auto pipeline = weakPipeline.Upgrade();
+        CHECK_NULL_VOID(pipeline);
+        auto dragDropManager = pipeline->GetDragDropManager();
+        if (dragDropManager && dragDropManager->IsDragWindowHiddenByDeveloper()) {
+            ACE_SCOPED_TRACE("drag: skip set drag window visible, touch");
+            TAG_LOGI(AceLogTag::ACE_DRAG, "Skip set drag window visible, hidden by developer");
+            return;
+        }
         ACE_SCOPED_TRACE("drag: set drag window visible, touch");
         InteractionInterface::GetInstance()->SetDragWindowVisible(true);
     });
@@ -1387,7 +1399,9 @@ void GestureEventHub::ShowSceneBoardTouchDragWindow(DragStartContext& ctx)
     if (ctx.preparedInfo.sizeChangeEffect == DraggingSizeChangeEffect::DEFAULT) {
         ACE_SCOPED_TRACE("drag: set drag window visible, touch");
         auto rsTransaction = ctx.dragDropManager->GetRSTransaction();
-        InteractionInterface::GetInstance()->SetDragWindowVisible(true, rsTransaction);
+        if (!ctx.dragDropManager || !ctx.dragDropManager->IsDragWindowHiddenByDeveloper()) {
+            InteractionInterface::GetInstance()->SetDragWindowVisible(true, rsTransaction);
+        }
         ctx.dragDropManager->CloseSyncTransaction();
         ctx.dragDropManager->ResetSyncTransaction();
         return;
@@ -1421,7 +1435,15 @@ void GestureEventHub::ShowMouseDragWindow(DragStartContext& ctx)
         DragDropGlobalController::GetInstance().SetDragStartRequestStatus(DragStartRequestStatus::READY);
         CHECK_NULL_VOID(dragEventActuator_);
         dragEventActuator_->NotifyTransDragWindowToFwk();
-        ctx.pipeline->AddDragWindowVisibleTask([]() {
+        ctx.pipeline->AddDragWindowVisibleTask([weakPipeline = WeakClaim(RawPtr(ctx.pipeline))]() {
+            auto pipeline = weakPipeline.Upgrade();
+            CHECK_NULL_VOID(pipeline);
+            auto dragDropManager = pipeline->GetDragDropManager();
+            if (dragDropManager && dragDropManager->IsDragWindowHiddenByDeveloper()) {
+                ACE_SCOPED_TRACE("drag: skip set drag window visible, mouse");
+                TAG_LOGI(AceLogTag::ACE_DRAG, "Skip set drag window visible, hidden by developer");
+                return;
+            }
             ACE_SCOPED_TRACE("drag: set drag window visible, mouse");
             InteractionInterface::GetInstance()->SetDragWindowVisible(true);
         });
@@ -1703,6 +1725,35 @@ OnDragCallbackCore GestureEventHub::GetDragCallback(const RefPtr<PipelineBase>& 
     return callback;
 }
 
+void GestureEventHub::ResetStaleDragWindowHideState(const RefPtr<FrameNode>& frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pipeline = frameNode->GetContextRefPtr();
+    CHECK_NULL_VOID(pipeline);
+    auto dragDropManager = pipeline->GetDragDropManager();
+    CHECK_NULL_VOID(dragDropManager);
+    // Clear the stale hide state of a previous drag session before the onDragStart callback runs,
+    // so a hide requested inside the callback is not wiped afterwards.
+    dragDropManager->ResetDragWindowHiddenByDeveloper();
+}
+
+void GestureEventHub::RecordDragWindowHideOnDragStart(
+    const RefPtr<OHOS::Ace::DragEvent>& dragEvent, const RefPtr<FrameNode>& frameNode)
+{
+    CHECK_NULL_VOID(dragEvent);
+    CHECK_NULL_VOID(frameNode);
+    if (!dragEvent->IsDragWindowVisibleChanged() || dragEvent->GetDragWindowVisible()) {
+        return;
+    }
+    auto pipeline = frameNode->GetContextRefPtr();
+    CHECK_NULL_VOID(pipeline);
+    auto dragDropManager = pipeline->GetDragDropManager();
+    CHECK_NULL_VOID(dragDropManager);
+    // Developer requested hiding the drag window on drag start, record it before StartDrag so
+    // the drag start animation and the transfer-to-framework showing are suppressed.
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+}
+
 DragDropInfo GestureEventHub::GetDragDropInfo(const GestureEvent& info, const RefPtr<FrameNode> frameNode,
     DragDropInfo& dragPreviewInfo, const RefPtr<OHOS::Ace::DragEvent>& dragEvent)
 {
@@ -1722,7 +1773,9 @@ DragDropInfo GestureEventHub::GetDragDropInfo(const GestureEvent& info, const Re
         GenerateMousePixelMap(info);
     }
     dragEvent->SetPressedKeyCodes(info.GetPressedKeyCodes());
+    ResetStaleDragWindowHideState(frameNode);
     dragDropInfo = onDragStart(dragEvent, extraParams);
+    RecordDragWindowHideOnDragStart(dragEvent, frameNode);
 
     auto frameTag = frameNode->GetTag();
     if (GetTextDraggable() && IsTextCategoryComponent(frameTag)) {

@@ -282,7 +282,10 @@ std::function<void()> GetTextAnimationFinishCallback(
         auto gestureHub = weakEvent.Upgrade();
         CHECK_NULL_VOID(gestureHub);
         auto dragDropManager = pipeline->GetDragDropManager();
-        if (!gestureHub->IsPixelMapNeedScale() && dragDropManager && dragDropManager->IsDragging()) {
+        if (!gestureHub->IsPixelMapNeedScale() && dragDropManager && dragDropManager->IsDragging() &&
+            !dragDropManager->IsDragWindowHiddenByDeveloper()) {
+            // Guard against the developer hide state: this finish callback can outlive the
+            // initiating gesture that started it and fire while a new drag session is active.
             InteractionInterface::GetInstance()->SetDragWindowVisible(true);
         }
         gestureHub->SetPixelMap(nullptr);

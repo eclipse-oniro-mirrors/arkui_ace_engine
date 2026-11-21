@@ -2606,4 +2606,38 @@ HWTEST_F(DragEventTestNg, DragSpringLoadingContextSummaryInfo001, TestSize.Level
     EXPECT_EQ(context->GetSummaryInfo().summary, legacySummary);
 }
 
+/**
+ * @tc.name: DragEventDragWindowVisible001
+ * @tc.desc: Test DragEvent drag window visible flag read/write.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragEventTestNg, DragEventDragWindowVisible001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct a DragEvent and check the flag defaults.
+     * @tc.expected: step1. the window is visible by default and the flag is unchanged.
+     */
+    auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(dragEvent, nullptr);
+    EXPECT_TRUE(dragEvent->GetDragWindowVisible());
+    EXPECT_FALSE(dragEvent->IsDragWindowVisibleChanged());
+
+    /**
+     * @tc.steps: step2. hide the drag window via the flag.
+     * @tc.expected: step2. the value is false and the changed flag is set.
+     */
+    dragEvent->SetDragWindowVisible(false);
+    EXPECT_FALSE(dragEvent->GetDragWindowVisible());
+    EXPECT_TRUE(dragEvent->IsDragWindowVisibleChanged());
+
+    /**
+     * @tc.steps: step3. restore the drag window via the flag.
+     * @tc.expected: step3. the value is true and the changed flag stays set so the reader in
+     *               DragDropManager picks the restore up after the next enter/move dispatch.
+     */
+    dragEvent->SetDragWindowVisible(true);
+    EXPECT_TRUE(dragEvent->GetDragWindowVisible());
+    EXPECT_TRUE(dragEvent->IsDragWindowVisibleChanged());
+}
+
 } // namespace OHOS::Ace::NG

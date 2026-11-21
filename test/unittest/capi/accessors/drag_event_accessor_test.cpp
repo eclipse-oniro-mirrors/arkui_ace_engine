@@ -319,6 +319,20 @@ HWTEST_F(DragEventAccessorTest, setUseCustomDropAnimationTest, TestSize.Level1)
 }
 
 /**
+ * @tc.name: setDragWindowVisibleTest
+ * @tc.desc: Verify the static-frontend accessor sets the drag window visibility flag on DragEvent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragEventAccessorTest, setDragWindowVisibleTest, TestSize.Level1)
+{
+    for (auto& [input, value, expected] : testFixtureBooleanValues) {
+        accessor_->setDragWindowVisible(peer_, value);
+        EXPECT_EQ(dragEvent_->GetDragWindowVisible(), expected) <<
+            "Input value is: " << input << ", method: setDragWindowVisibleTest";
+    }
+}
+
+/**
  * @tc.name: getDisplayXTest
  * @tc.desc:
  * @tc.type: FUNC

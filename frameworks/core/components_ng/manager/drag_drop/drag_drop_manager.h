@@ -143,6 +143,10 @@ public:
         const Point& point);
     void HandleOnDragMove(const DragPointerEvent& pointerEvent, const std::string& extraInfo,
         const RefPtr<FrameNode>& dragFrameNode);
+    void HandleOnDragMoveNoTarget(
+        const DragPointerEvent& pointerEvent, const std::string& extraInfo, int32_t windowId);
+    void RunDropAnimationAndCleanupOverlay(
+        const RefPtr<OHOS::Ace::DragEvent>& event, const RefPtr<PipelineContext>& pipeline);
     void HandleOnDragEnd(const DragPointerEvent& pointerEvent, const std::string& extraInfo,
         const RefPtr<FrameNode>& dragFrameNode);
     void OnDragThrow(const DragPointerEvent& pointerEvent);
@@ -302,6 +306,18 @@ public:
     bool IsDragWindowShow() const
     {
         return isDragWindowShow_;
+    }
+
+    // Developer hides the MSDP drag window via DragEvent::SetDragWindowVisible(false). The hide
+    // state only takes effect while the pointer stays within the range of the node that requested
+    // it; leaving the range (or destroying the node) restores the default visibility automatically.
+    void NotifyDragWindowVisibleByDeveloper(const RefPtr<FrameNode>& frameNode, bool visible);
+
+    void ResetDragWindowHiddenByDeveloper();
+
+    bool IsDragWindowHiddenByDeveloper() const
+    {
+        return isDragWindowHiddenByDeveloper_;
     }
 
     void SetPreviewRect(const Rect& rect)
@@ -797,6 +813,10 @@ private:
     void PrintGridDragFrameNode(const float globalX, const float globalY, const RefPtr<FrameNode>& dragFrameNode);
     void FireOnDragEventWithDragType(const RefPtr<EventHub>& eventHub, DragEventType type,
         RefPtr<OHOS::Ace::DragEvent>& event, const std::string& extraParams);
+    void HandleDragWindowVisibleByDeveloper(
+        const RefPtr<OHOS::Ace::DragEvent>& event, const RefPtr<FrameNode>& frameNode);
+    void UpdateDragWindowVisibleByDeveloper(const Point& point);
+    void RestoreDragWindowVisibleFromDeveloper();
     void FireOnDragSpringLoadingEventWithDragType(const RefPtr<FrameNode>& frameNode, const RefPtr<EventHub>& eventHub,
         DragEventType type, const std::string& extraParams);
     void NotifyDragFrameNode(
@@ -836,6 +856,11 @@ private:
     std::map<int32_t, WeakPtr<FrameNode>> textFieldDragFrameNodes_;
     RefPtr<FrameNode> draggedFrameNode_;
     RefPtr<FrameNode> preTargetFrameNode_;
+    bool isDragWindowHiddenByDeveloper_ = false;
+    WeakPtr<FrameNode> dragWindowHideNode_;
+    // A hide requested in onDragStart survives the first (framework-synthesized) drag move, whose
+    // position is the drag start point and may already be outside the hide node bounds.
+    bool skipInitialDragMoveVisibleCheck_ = false;
     RefPtr<FrameNode> draggedGridFrameNode_;
     RefPtr<FrameNode> preGridTargetFrameNode_;
     RefPtr<FrameNode> itemDragOverlayNode_;

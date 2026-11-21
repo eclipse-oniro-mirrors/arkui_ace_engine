@@ -4748,6 +4748,8 @@ export class ArkUIGeneratedNativeModule {
     native static _DragEvent_getGlobalDisplayX(ptr: KPointer): KDouble
     @ani.unsafe.Direct
     native static _DragEvent_getGlobalDisplayY(ptr: KPointer): KDouble
+    @ani.unsafe.Quick
+    native static _DragEvent_setDragWindowVisible(ptr: KPointer, visible: boolean): void
     @ani.unsafe.Direct
     native static _DragEvent_getDragBehavior(ptr: KPointer): KInt
     @ani.unsafe.Direct
