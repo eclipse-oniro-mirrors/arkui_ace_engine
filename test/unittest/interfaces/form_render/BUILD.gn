@@ -105,7 +105,6 @@ ohos_unittest("form_render_group_test") {
     "$ace_root/test/mock/frameworks/core/common/mock_container.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_raw_recognizer.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_source_info.cpp",
-    "$ace_root/test/mock/frameworks/core/event/package/mock_package_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/pipeline/mock_element_register.cpp",
     "$ace_root/test/mock/frameworks/core/pipeline/mock_pipeline_context.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_animation_utils.cpp",
