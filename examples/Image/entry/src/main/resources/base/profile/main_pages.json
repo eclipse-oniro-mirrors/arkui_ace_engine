@@ -36,6 +36,10 @@
     "pages/example/SendableImageTaskPoolExample",
     "pages/example/VideoProcessingEngineExample",
     "pages/example/ImageComponentAttributeGapExample",
-    "pages/example/ImageSpanAnimatorGapExample"
+    "pages/example/ImageSpanAnimatorGapExample",
+    "pages/example/ImageSvg2FeatureWalkthroughExample",
+    "pages/example/ImageFillColorFormsExample",
+    "pages/example/ImageRenderModeConstraintsExample",
+    "pages/example/ImageResizableSliceLatticeExample"
   ]
 }
