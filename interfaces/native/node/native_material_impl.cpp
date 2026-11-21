@@ -92,6 +92,25 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_GetMaterialColor(ArkUI_I
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
 
+ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_SetColorMode(ArkUI_ImmersiveMaterialHandle material,
+    ArkUI_ColorMode colorMode)
+{
+    CHECK_NULL_RETURN(material, ARKUI_ERROR_CODE_PARAM_INVALID);
+    if (colorMode < ARKUI_COLOR_MODE_SYSTEM || colorMode > ARKUI_COLOR_MODE_DARK) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    material->colorMode = colorMode;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_GetColorMode(ArkUI_ImmersiveMaterialHandle material,
+    ArkUI_ColorMode* colorMode)
+{
+    CHECK_NULL_RETURN(material && colorMode, ARKUI_ERROR_CODE_PARAM_INVALID);
+    *colorMode = material->colorMode;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
 ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_SetApplyShadow(ArkUI_ImmersiveMaterialHandle material,
     bool applyShadow)
 {

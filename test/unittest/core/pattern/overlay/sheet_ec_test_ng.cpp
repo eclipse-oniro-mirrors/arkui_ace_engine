@@ -1234,20 +1234,26 @@ HWTEST_F(SheetECTestNg, SheetECSheetPresentationProperty001, TestSize.Level1)
 HWTEST_F(SheetECTestNg, SheetECIsNotBottomStyleInSubwindow001, TestSize.Level1)
 {
     auto targetNode = CreateTargetNode();
+
     auto stageNode = FrameNode::CreateFrameNode(
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+
     stageNode->MountToParent(rootNode);
+
     targetNode->MountToParent(stageNode);
+
     rootNode->MarkDirtyNode();
 
     SheetStyle sheetStyle;
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
+
     sheetStyle.showDragBar = true;
     sheetStyle.sheetType = SheetType::SHEET_CENTER;
 
     auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
     CreateSheetBuilder();
+
     overlayManager->OnBindSheet(true, nullptr, std::move(builderFunc_), std::move(titleBuilderFunc_), sheetStyle,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, targetNode);
 
@@ -1309,19 +1315,14 @@ HWTEST_F(SheetECTestNg, SheetECSheetMaskInit001, TestSize.Level1)
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
     stageNode->MountToParent(rootNode);
-
     targetNode->MountToParent(stageNode);
     rootNode->MarkDirtyNode();
-
     SheetStyle sheetStyle;
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
-
     sheetStyle.showDragBar = true;
     sheetStyle.maskColor = Color(0x80000000);
-
     auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
     CreateSheetBuilder();
-
     overlayManager->OnBindSheet(true, nullptr, std::move(builderFunc_), std::move(titleBuilderFunc_), sheetStyle,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, targetNode);
 
@@ -1342,6 +1343,7 @@ HWTEST_F(SheetECTestNg, SheetECSheetPresentationPropertyUpdate001, TestSize.Leve
     auto stageNode = FrameNode::CreateFrameNode(
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+
     stageNode->MountToParent(rootNode);
     targetNode->MountToParent(stageNode);
     rootNode->MarkDirtyNode();
