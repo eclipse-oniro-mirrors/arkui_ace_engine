@@ -1915,6 +1915,8 @@ frameworks/core/common/task_runners.cpp @arkui_framework_xnode
 frameworks/core/common/task_runners.h @arkui_framework_xnode
 frameworks/core/common/text_field_manager.cpp @huawei_g_five
 frameworks/core/common/text_field_manager.h @huawei_g_five
+frameworks/core/common/text_field_manager_ng.cpp @huawei_g_five
+frameworks/core/common/text_field_manager_ng.h @huawei_g_five
 frameworks/core/common/thread_checker.cpp @arkui_framework_xnode
 frameworks/core/common/thread_checker.h @arkui_framework_xnode
 frameworks/core/common/thread_container.cpp @arkui_framework_xnode
