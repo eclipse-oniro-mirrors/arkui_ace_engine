@@ -14,12 +14,15 @@
  */
 
 #include "test/unittest/core/pipeline/pipeline_context_test_ng.h"
+#include "core/common/font_loader.h"
 // Add the following two macro definitions to test the private and protected method.
 #define private public
 #define protected public
 #include "core/common/event_manager.h"
 #include "core/pipeline/container_window_manager.h"
 #include <cstdio>
+#include "base/utils/system_properties.h"
+#include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/base/mousestyle/mock_mouse_style.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
@@ -271,6 +274,72 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg002, TestSize.Level1)
     context_->onFocus_ = true;
     context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
     EXPECT_NE(context_->drawDelegate_, nullptr);
+}
+
+/**
+ * @tc.name: PipelineContextTestNgOnAreaChangeCallbackFlag002
+ * @tc.desc: Test FlushVsync OnAreaChange callback path no longer depends on GetContainerDeleteFlag:
+ *           isNeedCallbackAreaChange_ should be reset after FlushVsync regardless of the flag value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNgOnAreaChangeCallbackFlag002, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+
+    context_->onAreaChangeNodeIds_.clear();
+    context_->onVisibleAreaChangeNodeIds_.clear();
+    context_->AddOnAreaChangeNode(frameNode_->GetId());
+
+    SystemProperties::containerDeleteFlag_ = false;
+    context_->isNeedCallbackAreaChange_ = true;
+    context_->onShow_ = false;
+    context_->SetIsFormRender(false);
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_FALSE(context_->isNeedCallbackAreaChange_);
+
+    SystemProperties::containerDeleteFlag_ = true;
+    context_->isNeedCallbackAreaChange_ = true;
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_FALSE(context_->isNeedCallbackAreaChange_);
+
+    SystemProperties::containerDeleteFlag_ = false;
+
+    context_->onAreaChangeNodeIds_.clear();
+    context_->onVisibleAreaChangeNodeIds_.clear();
+}
+
+/**
+ * @tc.name: PipelineContextTestNgOnAreaChangeCallbackFlag003
+ * @tc.desc: Test FlushVsync skips OnAreaChange callback when isNeedCallbackAreaChange_ is false,
+ *           regardless of GetContainerDeleteFlag value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNgOnAreaChangeCallbackFlag003, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+
+    context_->onAreaChangeNodeIds_.clear();
+    context_->onVisibleAreaChangeNodeIds_.clear();
+    context_->AddOnAreaChangeNode(frameNode_->GetId());
+
+    SystemProperties::containerDeleteFlag_ = false;
+    context_->isNeedCallbackAreaChange_ = false;
+    context_->onShow_ = false;
+    context_->SetIsFormRender(false);
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_FALSE(context_->isNeedCallbackAreaChange_);
+
+    SystemProperties::containerDeleteFlag_ = true;
+    context_->isNeedCallbackAreaChange_ = false;
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_FALSE(context_->isNeedCallbackAreaChange_);
+
+    SystemProperties::containerDeleteFlag_ = false;
+
+    context_->onAreaChangeNodeIds_.clear();
+    context_->onVisibleAreaChangeNodeIds_.clear();
 }
 
 /**

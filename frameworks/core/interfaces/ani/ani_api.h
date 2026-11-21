@@ -712,6 +712,7 @@ struct ArkUIAniCommonModifier {
     ani_long (*getPageRootNode)();
     ani_boolean(*isEasySplit)(ArkUI_Int32 instanceId);
     ani_boolean(*isTransPageEnabled)(ArkUI_Int32 instanceId);
+    void(*setDynamicDimming)(const std::string& key, double dimming, ArkUI_Int32 instanceId);
     void(*dumpLogPrint)(int32_t depth, const char* content);
     int32_t (*getBuilderNodeParentViewId)(ani_long nodePtr);
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
@@ -776,6 +777,8 @@ struct ArkUIAniLazyForEachNodeModifier {
     ani_boolean (*isChildOnMainTree)(ani_long, ani_int);
     ani_boolean (*isAllowAnimation)(ani_long);
     ani_boolean (*isImplicitAnimationOpen)(ani_long);
+    void (*setAllowReuseInAnimation)(ani_long, ani_boolean);
+    ani_boolean (*hasCustomComponent)(ani_long);
 };
 struct ArkUIAniWaterFlowModifier {
     void (*setWaterFlowSection)(

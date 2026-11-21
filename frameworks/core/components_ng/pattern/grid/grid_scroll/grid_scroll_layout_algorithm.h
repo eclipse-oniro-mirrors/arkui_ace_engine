@@ -170,10 +170,57 @@ private:
 
     void FillCacheLineAtEnd(float mainSize, float crossSize, LayoutWrapper* layoutWrapper);
     float FillNewCacheLineBackward(float crossSize, float mainSize, LayoutWrapper* layoutWrapper, int32_t currentLine);
+    // Sync-cache-in-layout rework of Step 1 in FillNewCacheLineBackward: resolves the
+    // wrapper of the cache item, building and measuring it in the current frame when
+    // syncCacheBuild_ is set; when the item cannot be built now, defers the remaining
+    // cells of the line to predictBuildList_ and returns null (the caller fails the fill
+    // with -1.0f).
+    RefPtr<LayoutWrapper> GetSyncCacheItemOrDeferRest(
+        LayoutWrapper* layoutWrapper, int32_t currentIndex, int32_t startCross, int32_t currentLine);
+    // In sync-build mode, checks every item of a fully recorded line and rebuilds the
+    // missing nodes in the current frame.
+    void RebuildRecordedLineItems(LayoutWrapper* layoutWrapper, const std::map<int32_t, int32_t>& lineItems);
     int32_t MeasureCachedChild(const SizeF& frameSize, int32_t itemIndex, LayoutWrapper* layoutWrapper,
         const RefPtr<LayoutWrapper>& childLayoutWrapper);
 
     void CreateCachedChildConstraint(LayoutWrapper* layoutWrapper, float mainSize, float crossSize);
+
+    /**
+     * @brief Sync-cache-in-layout strategy: build, measure and deactivate cache-range items
+     *        synchronously inside the current-frame Layout when showCache is false.
+     *
+     *        The tail re-runs FillCacheLineAtEnd in sync-build mode so unbuilt cache items are
+     *        built, measured and placed into gridMatrix_ in the same frame — including lines
+     *        already fully recorded in gridMatrix_ whose nodes were recycled by a jump or a
+     *        fast swipe (FillNewCacheLineBackward now checks and rebuilds each item of a
+     *        fully recorded line instead of trusting the records);
+     *        the front fills and records the cache lines above the start line (the head fill
+     *        in SyncPreload, guarded by TempLayoutRange), because after a data change reset
+     *        those lines have no matrix records and the main positioning loop would
+     *        skip them. The main positioning loop then layouts and syncs them like any
+     *        other item in the cache range.
+     */
+    void SyncLayoutCacheItems(LayoutWrapper* layoutWrapper);
+
+    /**
+     * @brief Builds one cache item for the sync-cache-in-layout strategy: cache build (not
+     *        attached to the render tree), deactivate, then measure with the span-adjusted
+     *        cache constraint. Returns null when the build fails; the caller falls back to
+     *        the predict defer.
+     */
+    RefPtr<LayoutWrapper> BuildSyncCacheItem(LayoutWrapper* layoutWrapper, int32_t itemIndex);
+
+    /**
+     * @brief Constraint used by BuildSyncCacheItem to measure one sync-built cache item.
+     *        Virtual because the cross span source differs per algorithm: the base reads it
+     *        from GridItemLayoutProperty (the same source as the base PredictBuildItem on
+     *        the async predict path), while GridScrollWithOptionsLayoutAlgorithm resolves it
+     *        from GridLayoutOptions (irregularIndexes / onGetIrregularSizeByIndex), mirroring
+     *        its PreloadItems override. Without the override an irregular cache item is
+     *        measured with the regular single-cell constraint.
+     */
+    virtual LayoutConstraintF GenerateSyncCacheItemConstraint(
+        const GridItemLayoutProperty& itemProperty, LayoutWrapper* layoutWrapper, int32_t itemIndex);
 
     static bool PredictBuildItem(FrameNode& host, int32_t itemIdx, const GridPredictLayoutParam& param);
     static void SyncGeometry(RefPtr<LayoutWrapper>& wrapper);
@@ -256,6 +303,10 @@ protected:
     float crossGap_ = 0;
     std::map<int32_t, float> itemsCrossSize_; // grid item's size in cross axis.
     std::list<GridPreloadItem> predictBuildList_;
+    // Sync-cache-in-layout mode: FillNewCacheLineBackward builds and measures unbuilt cache
+    // items in-frame instead of deferring them to predictBuildList_. Only set during
+    // SyncLayoutCacheItems.
+    bool syncCacheBuild_ = false;
     LayoutConstraintF cachedChildConstraint_;
     std::map<int32_t, float> unLayoutedItems_;
 

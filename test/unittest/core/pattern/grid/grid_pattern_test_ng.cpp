@@ -30,6 +30,7 @@
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_with_options_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/irregular/grid_irregular_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/grid_utils.h"
+#include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 
 namespace OHOS::Ace::NG {
@@ -2081,4 +2082,64 @@ HWTEST_F(GridPatternTestNg, FastScrollCatalogRepeatedCycles, TestSize.Level1)
     RecordProperty("scope_limit", "request-state cleanup only; allocator/cache memory trend not measured");
 }
 
+
+/**
+ * @tc.name: SyncCacheLayoutChildCount001
+ * @tc.desc: Test GridPattern sync-cache-in-layout reference counting
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridPatternTestNg, SyncCacheLayoutChildCount001, TestSize.Level1)
+{
+    // Arrange
+    CreateGrid();
+    CreateDone();
+
+    // Act & Assert: no reference held, strategy disabled by default
+    EXPECT_FALSE(pattern_->IsSyncCacheLayoutEnabled());
+    // each attached Repeat child holds one reference
+    pattern_->AddSyncCacheLayoutChild();
+    EXPECT_TRUE(pattern_->IsSyncCacheLayoutEnabled());
+    pattern_->AddSyncCacheLayoutChild();
+    EXPECT_TRUE(pattern_->IsSyncCacheLayoutEnabled());
+    // releasing one reference keeps the other one active
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_TRUE(pattern_->IsSyncCacheLayoutEnabled());
+    // last reference released: strategy disabled, counter clamped at zero
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_FALSE(pattern_->IsSyncCacheLayoutEnabled());
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_FALSE(pattern_->IsSyncCacheLayoutEnabled());
+}
+
+/**
+ * @tc.name: IsSyncCacheLayoutEnabledWrapper001
+ * @tc.desc: Test GridLayoutBaseAlgorithm::IsSyncCacheLayoutEnabled wrapper resolution chain
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridPatternTestNg, IsSyncCacheLayoutEnabledWrapper001, TestSize.Level1)
+{
+    // Arrange
+    GridLayoutInfo info;
+    GridScrollLayoutAlgorithm algorithm(info);
+
+    // Act & Assert: null wrapper
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(nullptr));
+
+    // host without a GridPattern
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 901, AceType::MakeRefPtr<Pattern>());
+    auto columnWrapper = columnNode->CreateLayoutWrapper();
+    ASSERT_NE(columnWrapper, nullptr);
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(columnWrapper.GetRawPtr()));
+
+    // grid host: disabled by default, enabled while the pattern holds a reference
+    CreateGrid();
+    CreateDone();
+    auto gridWrapper = pattern_->GetHost()->CreateLayoutWrapper();
+    ASSERT_NE(gridWrapper, nullptr);
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(gridWrapper.GetRawPtr()));
+    pattern_->AddSyncCacheLayoutChild();
+    EXPECT_TRUE(algorithm.IsSyncCacheLayoutEnabled(gridWrapper.GetRawPtr()));
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(gridWrapper.GetRawPtr()));
+}
 } // namespace OHOS::Ace::NG

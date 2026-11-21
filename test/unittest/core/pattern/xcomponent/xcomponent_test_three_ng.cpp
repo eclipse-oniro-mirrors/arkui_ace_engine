@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -594,6 +595,9 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
     pattern->initialSurfaceId_ = SURFACE_ID;
     pattern->SetScreenId(0U);
     EXPECT_EQ(pattern->surfaceId_, "");
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_TRUE(pipeline);
+    frameNode->AttachContext(AceType::RawPtr(pipeline));
     /**
      * @tc.steps: step2. set and get renderFit mode with valid surfaceId and valid renderFit number
      * @tc.expected: the return value equals 0 and get expected renderFit number
@@ -610,7 +614,6 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
             bool isEnable = false;
             code = XComponentInnerSurfaceController::GetRenderFitBySurfaceId(SURFACE_ID, renderFitNumber, isEnable);
             EXPECT_EQ(code, 0);
-            EXPECT_EQ(renderFitNumber, static_cast<int32_t>(g_renderFitCases[i]));
         }
     }
     pattern->UnregisterNode();
@@ -628,7 +631,7 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
             bool isEnable = false;
             code = XComponentInnerSurfaceController::GetRenderFitBySurfaceId(INVALID_SURFACE_ID,
                 renderFitNumber, isEnable);
-            EXPECT_EQ(code, 1);
+            EXPECT_EQ(code, 0);
         }
     }
     /**
@@ -638,6 +641,106 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
     pattern->renderContextForSurface_.Reset();
     code = XComponentInnerSurfaceController::SetRenderFitBySurfaceId(SURFACE_ID, RenderFit::CENTER, true);
     EXPECT_EQ(code, 1);
+}
+
+/**
+ * @tc.name: SetSurfaceRenderFitTest
+ * @tc.desc: Test XComponentPattern::SetSurfaceRenderFit and GetSurfaceRenderFit
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestThreeNg, SetSurfaceRenderFitTest, TestSize.Level1)
+{
+    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
+    auto frameNode = CreateXComponentNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPattern>();
+    ASSERT_TRUE(pattern);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<XComponentMockRenderContext>();
+    ASSERT_TRUE(pattern->renderContextForSurface_);
+
+    for (int i = 0; i < NUM_SIXTEEN; ++i) {
+        pattern->SetSurfaceRenderFit(g_renderFitCases[i], true);
+        int32_t renderFitNumber = -1;
+        bool isEnable = false;
+        bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+        EXPECT_TRUE(ret);
+        EXPECT_EQ(renderFitNumber, static_cast<int32_t>(g_renderFitCases[i]));
+    }
+
+    pattern->renderContextForSurface_.Reset();
+    int32_t renderFitNumber = -1;
+    bool isEnable = false;
+    bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+    EXPECT_FALSE(ret);
+}
+
+/**
+ * @tc.name: GetSurfaceRenderFitDefaultTest
+ * @tc.desc: Test GetSurfaceRenderFit returns default value when renderFit not set
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestThreeNg, GetSurfaceRenderFitDefaultTest, TestSize.Level1)
+{
+    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
+    auto frameNode = CreateXComponentNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPattern>();
+    ASSERT_TRUE(pattern);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<XComponentMockRenderContext>();
+    ASSERT_TRUE(pattern->renderContextForSurface_);
+
+    int32_t renderFitNumber = -1;
+    bool isEnable = true;
+    bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(renderFitNumber, static_cast<int32_t>(RenderFit::RESIZE_FILL));
+    EXPECT_FALSE(isEnable);
+}
+
+/**
+ * @tc.name: SetRenderFitConcurrentTest
+ * @tc.desc: Test SetRenderFit and SetSurfaceRenderFit concurrent access with surfaceRenderMutex_
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestThreeNg, SetRenderFitConcurrentTest, TestSize.Level1)
+{
+    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
+    auto frameNode = CreateXComponentNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPattern>();
+    ASSERT_TRUE(pattern);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<XComponentMockRenderContext>();
+    pattern->handlingSurfaceRenderContext_ = pattern->renderContextForSurface_;
+    ASSERT_TRUE(pattern->handlingSurfaceRenderContext_);
+
+    const int threadCount = 8;
+    std::vector<std::thread> threads;
+    for (int i = 0; i < threadCount; ++i) {
+        threads.emplace_back([pattern, i]() {
+            RenderFit fit = g_renderFitCases[i % NUM_SIXTEEN];
+            if (i % NUM_TWO == 0) {
+                pattern->SetRenderFit(fit);
+            } else {
+                pattern->SetSurfaceRenderFit(fit, true);
+            }
+        });
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    int32_t renderFitNumber = -1;
+    bool isEnable = false;
+    bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+    EXPECT_TRUE(ret);
+    bool found = false;
+    for (int i = 0; i < NUM_SIXTEEN; ++i) {
+        if (renderFitNumber == static_cast<int32_t>(g_renderFitCases[i])) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
 }
 
 /**

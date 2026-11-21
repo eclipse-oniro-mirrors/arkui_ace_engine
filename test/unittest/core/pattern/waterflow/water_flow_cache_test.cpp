@@ -21,6 +21,10 @@
 #include "water_flow_test_ng.h"
 
 #include "core/common/container.h"
+#include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h"
+#ifdef TEST_WATER_FLOW_SW
+#include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_info_sw.h"
+#endif
 
 namespace OHOS::Ace::NG {
 /**
@@ -491,4 +495,450 @@ HWTEST_F(WaterFlowTestNg, ParseResObjScrollBarColor001, TestSize.Level1)
     ResetMockResourceData();
     g_isConfigChangePerform = false;
 }
+
+/**
+ * @tc.name: SyncCacheLayoutChildCount001
+ * @tc.desc: Test WaterFlowPattern sync-cache-in-layout reference counting
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayoutChildCount001, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(10, [](int32_t i) { return 100.0f; });
+    model.SetCachedCount(1);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+
+    // no reference held, strategy disabled by default
+    EXPECT_FALSE(pattern_->IsSyncCacheLayoutEnabled());
+    // each attached Repeat child holds one reference
+    pattern_->AddSyncCacheLayoutChild();
+    EXPECT_TRUE(pattern_->IsSyncCacheLayoutEnabled());
+    pattern_->AddSyncCacheLayoutChild();
+    EXPECT_TRUE(pattern_->IsSyncCacheLayoutEnabled());
+    // releasing one reference keeps the other one active
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_TRUE(pattern_->IsSyncCacheLayoutEnabled());
+    // last reference released: strategy disabled, counter clamped at zero
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_FALSE(pattern_->IsSyncCacheLayoutEnabled());
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_FALSE(pattern_->IsSyncCacheLayoutEnabled());
+}
+
+/**
+ * @tc.name: IsSyncCacheLayoutEnabledWrapper001
+ * @tc.desc: Test WaterFlowLayoutBase::IsSyncCacheLayoutEnabled wrapper resolution chain
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, IsSyncCacheLayoutEnabledWrapper001, TestSize.Level1)
+{
+    WaterFlowLayoutAlgorithm algorithm(AceType::MakeRefPtr<WaterFlowLayoutInfo>());
+    // null wrapper
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(nullptr));
+
+    // host without a WaterFlowPattern
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 902, AceType::MakeRefPtr<Pattern>());
+    auto columnWrapper = columnNode->CreateLayoutWrapper();
+    ASSERT_NE(columnWrapper, nullptr);
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(columnWrapper.GetRawPtr()));
+
+    // waterflow host: disabled by default, enabled while the pattern holds a reference
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(10, [](int32_t i) { return 100.0f; });
+    model.SetCachedCount(1);
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateDone();
+    auto waterFlowWrapper = pattern_->GetHost()->CreateLayoutWrapper();
+    ASSERT_NE(waterFlowWrapper, nullptr);
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(waterFlowWrapper.GetRawPtr()));
+    pattern_->AddSyncCacheLayoutChild();
+    EXPECT_TRUE(algorithm.IsSyncCacheLayoutEnabled(waterFlowWrapper.GetRawPtr()));
+    pattern_->RemoveSyncCacheLayoutChild();
+    EXPECT_FALSE(algorithm.IsSyncCacheLayoutEnabled(waterFlowWrapper.GetRawPtr()));
+}
+
+// The sync-cache-in-layout strategy is implemented by the TOP_DOWN and SLIDING_WINDOW
+// layout algorithms only; WaterFlowSegmentedLayout still fills its cache through the
+// asynchronous preload task, so these tests are excluded from the segmented build.
+#ifndef TEST_SEGMENTED_WATER_FLOW
+/**
+ * @tc.name: SyncCacheLayout001
+ * @tc.desc: Test sync-cache-in-layout: cache items are built in the same frame instead of
+ *           being preloaded asynchronously on idle
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayout001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Same setup as Cache001, but hold the sync-cache-in-layout reference
+     *             on the pattern (as an attached Repeat with allowReuseInAnimation=false
+     *             does via ToggleParentSyncCacheLayout)
+     * @tc.expected: the cache items below the view are built, measured and deactivated
+     *               within the same frame and no idle preload task is pending
+     */
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return i % 2 ? 100.0f : 200.0f; });
+
+    model.SetCachedCount(3);
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(10));
+    model.SetColumnsGap(Dimension(10));
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 10);
+
+    // async strategy would leave preloadItems_ = { 11, 12, 13 } and child 11 unbuilt
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+    auto item = GetChildFrameNode(frameNode_, 11);
+    ASSERT_NE(item, nullptr);
+    EXPECT_FALSE(item->IsActive());
+    EXPECT_EQ(GetChildHeight(frameNode_, 12), 200.0f);
+    EXPECT_EQ(GetChildWidth(frameNode_, 13), (WATER_FLOW_WIDTH - 10.0f) / 2.0f);
+    // the anchor at endIndex_ stays active: the tail fill deactivates every item it
+    // re-measures (MeasureToTarget cache branch), the anchor re-activation restores it
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 10)->IsActive());
+
+    /**
+     * @tc.steps: step2. Scroll down with the sync strategy still held
+     * @tc.expected: the new cache items below the view are again built in the same frame
+     */
+    UpdateCurrentOffset(-500.0f);
+    EXPECT_EQ(info->startIndex_, 4);
+    EXPECT_EQ(info->endIndex_, 17);
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 18));
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 18)->IsActive());
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 17)->IsActive());
+
+    /**
+     * @tc.steps: step3. Release the reference and scroll again
+     * @tc.expected: cache filling falls back to the asynchronous preload strategy
+     */
+    pattern_->RemoveSyncCacheLayoutChild();
+    UpdateCurrentOffset(-200.0f);
+    EXPECT_FALSE(pattern_->preloadItems_.empty());
+}
+
+/**
+ * @tc.name: SyncCacheLayout002
+ * @tc.desc: Test the tail-scan skip path of SyncLayoutCacheItems: after a small scroll the
+ *           new cache window overlaps the previously cached items, which are skipped
+ *           (both record and node exist) and the fill chains MeasureToTarget from the last
+ *           recorded anchor, building only the first unknown item in the same frame
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayout002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Same setup as SyncCacheLayout001
+     * @tc.expected: cache items 11-13 are built in the first frame
+     */
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return i % 2 ? 100.0f : 200.0f; });
+
+    model.SetCachedCount(3);
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(10));
+    model.SetColumnsGap(Dimension(10));
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 10);
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 11));
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 12));
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 13));
+
+    /**
+     * @tc.steps: step2. Scroll slightly (only item 11 enters the viewport), keeping the
+     *             sync strategy held
+     * @tc.expected: items 12 and 13 are skipped by the tail scan (record + node both
+     *               exist), the fill anchors at item 13 and builds item 14 in-frame;
+     *               skipped items keep their nodes
+     */
+    UpdateCurrentOffset(-100.0f);
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 11);
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 12));
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 13));
+    auto item = GetChildFrameNode(frameNode_, 14);
+    ASSERT_NE(item, nullptr);
+    EXPECT_FALSE(item->IsActive());
+    // the skipped items (record and node both exist) are laid out and deactivated by
+    // the tail scan in the same frame
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 12)->IsActive());
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 13)->IsActive());
+}
+
+/**
+ * @tc.name: SyncCacheLayout003
+ * @tc.desc: Test the early-return branch of SyncLayoutCacheItems: with cachedCount == 0
+ *           nothing is built beyond the viewport, and the sync strategy still suppresses
+ *           the asynchronous preload task
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayout003, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return i % 2 ? 100.0f : 200.0f; });
+
+    model.SetCachedCount(0);
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(10));
+    model.SetColumnsGap(Dimension(10));
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 10);
+
+    // no cache count: no item is built beyond the viewport and no preload task is queued
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 11));
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+}
+
+#ifndef TEST_WATER_FLOW_SW
+/**
+ * @tc.name: SyncCacheLayout004
+ * @tc.desc: When only the size of the last visible item changes (same viewport range,
+ *           no rerender, so the Repeat node skips its range update and nothing outside
+ *           the layout algorithm re-activates nodes), the tail refill anchors at
+ *           endIndex_ and the anchor keeps its active state
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayout004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Single column of 100px items, cachedCount 2, sync strategy held:
+     *            viewport items 0-7, tail cache 8-9
+     * @tc.expected: the last visible item is active, the tail cache items are not
+     */
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(20, [](int32_t i) { return 100.0f; });
+    model.SetCachedCount(2);
+    model.SetColumnsTemplate("1fr");
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 7);
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 7)->IsActive());
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 8)->IsActive());
+
+    /**
+     * @tc.steps: step2. Grow the last visible item's height via a direct layout
+     *             property change: the visible range stays 0-7, so the syntax node
+     *             skips its range update (no reactivation outside the layout)
+     * @tc.expected: the tail records are cleared by the size change, the tail refill
+     *               re-measures from the anchor at endIndex_ (deactivating it on the
+     *               cache path), and the anchor re-activation keeps item 7 active
+     */
+    auto item7 = GetChildFrameNode(frameNode_, 7);
+    ASSERT_NE(item7, nullptr);
+    item7->GetLayoutProperty()->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(110.0f)));
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);
+    FlushUITasks();
+
+    EXPECT_EQ(info->endIndex_, 7);
+    item7 = GetChildFrameNode(frameNode_, 7);
+    ASSERT_NE(item7, nullptr);
+    EXPECT_TRUE(item7->IsActive()) << "anchor at endIndex_ must survive the tail refill";
+    EXPECT_EQ(GetChildHeight(frameNode_, 7), 110.0f);
+    // tail cache rebuilt at the shifted positions stays inactive
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 8));
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 8)->IsActive());
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 9));
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 9)->IsActive());
+}
+
+/**
+ * @tc.name: SyncCacheLayout005
+ * @tc.desc: After scrolling down and back up, the head cache items above the viewport
+ *           (position recorded, node still existing) are laid out and deactivated by
+ *           the head loop of SyncLayoutCacheItems in the same frame
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayout005, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return i % 2 ? 100.0f : 200.0f; });
+    model.SetCachedCount(3);
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(10));
+    model.SetColumnsGap(Dimension(10));
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 10);
+
+    // scroll down twice so the head cache range holds items that were dropped from the
+    // Repeat L1 cache (recycled) while their position records survive
+    UpdateCurrentOffset(-500.0f);
+    UpdateCurrentOffset(-500.0f);
+    EXPECT_GT(info->startIndex_, 0);
+    // scroll back up: the head loop rebuilds the farthest recycled head items
+    // (record kept, node missing: measured on first build) and re-lays out the nearer
+    // ones (record and node kept), deactivating both in the same frame
+    UpdateCurrentOffset(250.0f);
+    EXPECT_GT(info->startIndex_, 0);
+    const int32_t headNear = info->startIndex_ - 1;
+    ASSERT_GE(headNear, 0);
+    auto headItem = GetChildFrameNode(frameNode_, headNear);
+    ASSERT_NE(headItem, nullptr) << "head cache node kept in-frame";
+    EXPECT_FALSE(headItem->IsActive());
+    const int32_t headFar = std::max(0, info->startIndex_ - 3);
+    auto rebuiltHead = GetChildFrameNode(frameNode_, headFar);
+    ASSERT_NE(rebuiltHead, nullptr) << "recycled head cache node rebuilt in-frame";
+    EXPECT_FALSE(rebuiltHead->IsActive());
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+}
+#endif // !TEST_WATER_FLOW_SW
+
+#ifdef TEST_WATER_FLOW_SW
+/**
+ * @tc.name: SyncCacheLayoutSW001
+ * @tc.desc: [SLIDING_WINDOW mode] sync-cache-in-layout: cache items are built, measured
+ *           and deactivated in the same frame instead of being preloaded asynchronously
+ *           on idle
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayoutSW001, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return i % 2 ? 100.0f : 200.0f; });
+
+    model.SetCachedCount(3);
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(10));
+    model.SetColumnsGap(Dimension(10));
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+    EXPECT_EQ(info->endIndex_, 10);
+
+    // async strategy would leave preloadItems_ = { 11, 12, 13 } and child 11 unbuilt
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+    auto item = GetChildFrameNode(frameNode_, 11);
+    ASSERT_NE(item, nullptr);
+    EXPECT_FALSE(item->IsActive());
+    EXPECT_EQ(GetChildHeight(frameNode_, 12), 200.0f);
+    EXPECT_EQ(GetChildWidth(frameNode_, 13), (WATER_FLOW_WIDTH - 10.0f) / 2.0f);
+
+    // scrolling extends the cache in the same frame as well
+    UpdateCurrentOffset(-500.0f);
+    EXPECT_EQ(info->startIndex_, 4);
+    EXPECT_EQ(info->endIndex_, 17);
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, 18));
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, 18)->IsActive());
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+
+    // releasing the reference falls back to the asynchronous preload strategy
+    pattern_->RemoveSyncCacheLayoutChild();
+    UpdateCurrentOffset(-200.0f);
+    EXPECT_FALSE(pattern_->preloadItems_.empty());
+}
+
+/**
+ * @tc.name: SyncCacheLayoutSW002
+ * @tc.desc: [SLIDING_WINDOW mode] a jump sets needFixOffsetCache_ to prime the
+ *           clip-extended cache side; while the sync-cache strategy is held the
+ *           fix-offset preload is skipped (the sync pass fills the same range), so the
+ *           flag survives and is honored by the first frame without the strategy
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayoutSW002, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return 100.0f; });
+
+    model.SetCachedCount(2);
+    model.SetColumnsTemplate("1fr 1fr");
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto swInfo = AceType::DynamicCast<WaterFlowLayoutInfoSW>(pattern_->layoutInfo_);
+    ASSERT_NE(swInfo, nullptr);
+    EXPECT_FALSE(swInfo->needFixOffsetCache_);
+
+    // jump far outside the view: the jump path sets needFixOffsetCache_, but the sync
+    // strategy fills the cache range in this very frame, so the fix-offset preload is
+    // skipped and the flag stays set
+    pattern_->ScrollToIndex(40, false, ScrollAlign::START);
+    FlushUITasks();
+    // the SW window shifts up from item 40 so the viewport plus its cache stays filled
+    EXPECT_EQ(pattern_->layoutInfo_->startIndex_, 34);
+    EXPECT_TRUE(swInfo->needFixOffsetCache_) << "flag kept while the sync strategy covers the range";
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+    // the item just above the window head is built by the sync pass and deactivated
+    auto cacheItem = GetChildFrameNode(frameNode_, 33);
+    ASSERT_NE(cacheItem, nullptr);
+    EXPECT_FALSE(cacheItem->IsActive());
+
+    // releasing the reference: the next frame consumes the surviving flag through the
+    // fix-offset preload instead of losing it
+    pattern_->RemoveSyncCacheLayoutChild();
+    UpdateCurrentOffset(-100.0f);
+    EXPECT_FALSE(swInfo->needFixOffsetCache_) << "flag consumed by the fix-offset preload";
+}
+#endif // TEST_WATER_FLOW_SW
+#endif // !TEST_SEGMENTED_WATER_FLOW
+
+#ifdef TEST_SEGMENTED_WATER_FLOW
+/**
+ * @tc.name: SyncCacheLayoutSegmented001
+ * @tc.desc: [SEGMENTED layout] sync-cache-in-layout: cache items on both sides of the
+ *           viewport are built, laid out and deactivated in the same frame instead of
+ *           being preloaded asynchronously on idle
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SyncCacheLayoutSegmented001, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    CreateItemsInRepeat(50, [](int32_t i) { return 100.0f; });
+
+    model.SetCachedCount(2);
+    model.SetColumnsTemplate("1fr 1fr");
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startIndex_, 0);
+
+    // tail cache built, laid out and deactivated in-frame; the async preload list of the
+    // segmented layout stays empty
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+    const int32_t tailIdx = info->endIndex_ + 1;
+    ASSERT_LT(tailIdx, 50);
+    auto tail = GetChildFrameNode(frameNode_, tailIdx);
+    ASSERT_NE(tail, nullptr) << "tail cache built synchronously during Layout";
+    EXPECT_FALSE(tail->IsActive());
+    EXPECT_EQ(GetChildHeight(frameNode_, tailIdx), 100.0f);
+
+    // scrolling down: the new tail cache is built in-frame as well
+    UpdateCurrentOffset(-300.0f);
+    const int32_t newTailIdx = info->endIndex_ + 1;
+    ASSERT_LT(newTailIdx, 50);
+    EXPECT_TRUE(GetChildFrameNode(frameNode_, newTailIdx));
+    EXPECT_FALSE(GetChildFrameNode(frameNode_, newTailIdx)->IsActive());
+    EXPECT_TRUE(pattern_->preloadItems_.empty());
+
+    // scrolling back up (partially): the head cache items above the viewport (nodes
+    // kept from the earlier frames) are laid out and deactivated in-frame
+    UpdateCurrentOffset(100.0f);
+    const int32_t headIdx = info->startIndex_ - 1;
+    ASSERT_GE(headIdx, 0);
+    auto headItem = GetChildFrameNode(frameNode_, headIdx);
+    ASSERT_NE(headItem, nullptr) << "head cache kept in-frame";
+    EXPECT_FALSE(headItem->IsActive());
+
+    // releasing the reference falls back to the asynchronous preload strategy
+    pattern_->RemoveSyncCacheLayoutChild();
+    UpdateCurrentOffset(-300.0f);
+    EXPECT_FALSE(pattern_->preloadItems_.empty());
+}
+#endif // TEST_SEGMENTED_WATER_FLOW
 } // namespace OHOS::Ace::NG

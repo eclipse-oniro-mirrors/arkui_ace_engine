@@ -17,9 +17,13 @@
 #include "custom_node_module.h"
 #include "load.h"
 #include "ani_measure_layout.h"
+#include "base/utils/string_utils.h"
+#include "core/components_ng/base/async_load_config.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_param.h"
+#include "core/components_ng/pattern/custom/custom_node.h"
+#include "core/components_ng/pattern/custom/custom_node_base.h"
 #include "core/components_ng/pattern/custom/custom_node_static.h"
 #include "arkoala_api_generated.h"
 
@@ -76,6 +80,11 @@ ani_status NativeCustomComponent::BindNativeCustomComponent(ani_env *env)
             nullptr,
             reinterpret_cast<void*>(EnvBuildFunction)
         },
+        ani_native_function {
+            "_CustomNode_SetAsyncLoadConfig",
+            nullptr,
+            reinterpret_cast<void*>(CustomNodeSetAsyncLoadConfig)
+        },
     };
 
     if (ANI_OK != env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size())) {
@@ -106,6 +115,35 @@ void NativeCustomComponent::CustomNodeCallDefaultLayout(
     CHECK_NULL_VOID(frameNode);
     NG::CustomNodeStatic::DidDefaultLayout(frameNode);
     return;
+}
+
+void NativeCustomComponent::CustomNodeSetAsyncLoadConfig(
+    ani_env *env, [[maybe_unused]] ani_object aniClass, ani_long ptr, ani_string configJson)
+{
+    // Reached from ArkComponentRoot right after the native node of a custom
+    // component is created, before its first build is driven. The payload is the
+    // same JSON string the dynamic bridge carries, so parsing is shared
+    // (CustomNodeBase::ParseAsyncLoadConfigJson: one format, one converter);
+    // a malformed payload leaves the node untouched.
+    auto* uiNode = reinterpret_cast<NG::UINode *>(ptr);
+    CHECK_NULL_VOID(uiNode);
+    auto payload = (configJson != nullptr) ? AniUtils::ANIStringToStdString(env, configJson) : std::string();
+    auto config = NG::CustomNodeBase::ParseAsyncLoadConfigJson(payload);
+    CHECK_NULL_VOID(config);
+    // The pointer may address either node flavor created by _CustomNode_Construct:
+    // a CustomNode (regular components) or a CustomMeasureLayoutNode (components
+    // with onMeasureSize/onPlaceChildren). Both share the asynchronous-loading
+    // state machine through CustomNodeBase; dispatch through the concrete types,
+    // whose registered type ids let SafeCastById resolve the virtual-base offset.
+    if (auto* customNode = AceType::DynamicCast<NG::CustomNode>(uiNode)) {
+        customNode->SetAsyncLoadConfig(std::move(config));
+        return;
+    }
+    if (auto* measureNode = AceType::DynamicCast<NG::CustomMeasureLayoutNode>(uiNode)) {
+        measureNode->SetAsyncLoadConfig(std::move(config));
+        return;
+    }
+    TAG_LOGW(AceLogTag::ACE_STATE_MGMT, "SetAsyncLoadConfig: ptr is not a custom component node, ignored");
 }
 
 struct WeakRefGuard {

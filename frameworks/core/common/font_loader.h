@@ -16,11 +16,20 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_FONT_LOADER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_FONT_LOADER_H
 
+#include <functional>
+#include <map>
+#include <string>
+#include <vector>
+
 #include "base/memory/ace_type.h"
-#include "core/pipeline/pipeline_base.h"
 
 namespace OHOS::Ace {
+class PipelineBase;
 class RenderNode;
+
+namespace NG {
+class UINode;
+} // namespace NG
 
 class FontLoader : public AceType {
     DECLARE_ACE_TYPE(FontLoader, AceType);

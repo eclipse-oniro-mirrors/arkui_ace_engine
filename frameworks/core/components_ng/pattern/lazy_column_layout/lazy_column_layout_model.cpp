@@ -20,7 +20,7 @@
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_property.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 
 namespace OHOS::Ace::NG {
 

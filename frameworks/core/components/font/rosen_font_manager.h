@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_FONT_ROSEN_FONT_MANAGER_H
 
 #include "core/common/font_manager.h"
+#include "core/common/font_loader.h"
 
 namespace OHOS::Ace {
 

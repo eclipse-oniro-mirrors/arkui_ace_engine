@@ -46,6 +46,9 @@ public:
     static void IsImplicitAnimationOpen(const JSCallbackInfo& info);
     static void IsChildInAnimation(const JSCallbackInfo& info);
     static void GetActiveRange(const JSCallbackInfo& info);
+    // signature is
+    // value: boolean
+    static void SetAllowReuseInAnimation(const JSCallbackInfo& info);
 };
 
 } // namespace OHOS::Ace::Framework

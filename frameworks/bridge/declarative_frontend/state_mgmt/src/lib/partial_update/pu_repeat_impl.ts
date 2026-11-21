@@ -30,6 +30,9 @@ class __RepeatImpl<T> {
     private onMoveHandler_?: OnMoveHandler;
     private itemDragEventHandler?: ItemDragEventHandler;
 
+    // from RepeatOptions.allowReuseInAnimation (creation-time option), see pu_repeat.ts
+    private allowReuseInAnimation_?: boolean;
+
     private key2Item_ = new Map<string, __RepeatItemInfo<T>>();
 
     /**/
@@ -45,6 +48,7 @@ class __RepeatImpl<T> {
         this.mkRepeatItem_ = config.mkRepeatItem;
         this.onMoveHandler_ = config.onMoveHandler;
         this.itemDragEventHandler = config.itemDragEventHandler;
+        this.allowReuseInAnimation_ = config.allowReuseInAnimation;
 
         isInitialRender ? this.initialRender() : this.reRender();
     }
@@ -77,6 +81,12 @@ class __RepeatImpl<T> {
         this.key2Item_ = this.genKeys();
 
         RepeatNative.startRender();
+
+        // forward RepeatOptions.allowReuseInAnimation once at creation; undefined keeps
+        // the native tri-state unset (defaults: false for a List parent, true otherwise)
+        if (this.allowReuseInAnimation_ !== undefined) {
+            RepeatNative.setAllowReuseInAnimation(this.allowReuseInAnimation_);
+        }
 
         let index = 0;
         this.key2Item_.forEach((itemInfo, key) => {

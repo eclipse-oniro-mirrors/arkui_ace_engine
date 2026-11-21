@@ -22,6 +22,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -79,6 +80,12 @@ public:
     virtual bool IsImplicitAnimationOpen() = 0;
     virtual bool IsChildInAnimation(int32_t repeatElmtId, uint32_t rid) = 0;
     virtual bool IsChildOnMainTree(int32_t repeatElmtId, uint32_t rid) = 0;
+    // RepeatOptions.allowReuseInAnimation (creation-time option): sets the tri-state
+    // reuse-in-animation permission on the node resolved by repeatElmtId; explicitly
+    // false switches its direct Grid / WaterFlow parent to the sync-cache-in-layout
+    // strategy while the node is attached, nullopt / true keep the default behavior.
+    // Node not found: safe no-op.
+    virtual void SetAllowReuseInAnimation(int32_t repeatElmtId, std::optional<bool> allowReuseInAnimation) = 0;
 
 private:
     static std::unique_ptr<RepeatVirtualScroll2Model> instance_;

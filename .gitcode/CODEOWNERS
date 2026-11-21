@@ -707,6 +707,8 @@ frameworks/bridge/declarative_frontend/ark_direct_component/src/arktextclock.ts 
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktextpicker.ts @huawei_g_five
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktoggle.ts @arkuipopupwindow_all
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktoolbaritem.ts @ArkUI_ability_group
+frameworks/bridge/declarative_frontend/ark_direct_component/src/arktabs.ts @arkui_navigation
+frameworks/bridge/declarative_frontend/ark_direct_component/src/arktabcontent.ts @arkui_navigation
 frameworks/bridge/declarative_frontend/ark_layoutalgorithm/ @arkuilayout1
 frameworks/bridge/declarative_frontend/ark_lazylayoutalgorithm/ @arkuiscroll
 frameworks/bridge/declarative_frontend/ark_mock/ @arkuieco3
@@ -3755,6 +3757,7 @@ test/unittest/core/pattern/overlay/sheet_popup_test_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_five_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_four_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_ng.cpp @arkuicodepulse
+test/unittest/core/pattern/overlay/sheet_presentation_test_nine_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_seven_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_six_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_three_ng.cpp @arkuicodepulse

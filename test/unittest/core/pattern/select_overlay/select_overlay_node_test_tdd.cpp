@@ -677,6 +677,199 @@ HWTEST_F(SelectOverlayNodeTddTest, UpdateSubMenuOptions001, TestSize.Level1)
     EXPECT_NE(node, nullptr);
 }
 
+
+namespace {
+RefPtr<Theme> CreateFontAwareTestTheme(ThemeType type)
+{
+    if (type == SelectTheme::TypeId()) {
+        return AceType::MakeRefPtr<SelectTheme>();
+    }
+    return AceType::MakeRefPtr<TextOverlayTheme>();
+}
+} // namespace
+
+/**
+ * @tc.name: SelectOverlayNode_FontAwareMeasure001
+ * @tc.desc: Test paste button width measured via font-aware API in PreparePasteButtonLayoutProperty
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayNodeTddTest, FontAwareMeasure001, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto originalThemeManager = pipeline->themeManager_;
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ON_CALL(*themeManager, GetTheme(_)).WillByDefault(&CreateFontAwareTestTheme);
+    ON_CALL(*themeManager, GetTheme(_, _))
+        .WillByDefault([](ThemeType type, int32_t scopeId) -> RefPtr<Theme> {
+            return CreateFontAwareTestTheme(type);
+        });
+    pipeline->themeManager_ = themeManager;
+
+    auto infoPtr = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
+    infoPtr->menuInfo.showPaste = true;
+    infoPtr->menuCallback.onPaste = []() {};
+    auto frameNode = SelectOverlayNode::CreateSelectOverlayNode(infoPtr);
+    auto node = AceType::DynamicCast<SelectOverlayNode>(frameNode);
+    ASSERT_NE(node, nullptr);
+    float allocatedSize = 0.0f;
+    bool optionsAdded = node->AddSystemDefaultOptions(2000.0f, allocatedSize);
+    bool pasteShown = node->isShowInDefaultMenu_[2]; // OPTION_INDEX_PASTE
+
+    pipeline->themeManager_ = originalThemeManager;
+    EXPECT_FALSE(optionsAdded); // false means no button overflowed maxWidth
+    EXPECT_TRUE(pasteShown);
+}
+
+/**
+ * @tc.name: SelectOverlayNode_FontAwareMeasure002
+ * @tc.desc: Test copy button width measured via font-aware API in PrepareButtonTextProp
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayNodeTddTest, FontAwareMeasure002, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto originalThemeManager = pipeline->themeManager_;
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ON_CALL(*themeManager, GetTheme(_)).WillByDefault(&CreateFontAwareTestTheme);
+    ON_CALL(*themeManager, GetTheme(_, _))
+        .WillByDefault([](ThemeType type, int32_t scopeId) -> RefPtr<Theme> {
+            return CreateFontAwareTestTheme(type);
+        });
+    pipeline->themeManager_ = themeManager;
+
+    auto infoPtr = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
+    infoPtr->menuInfo.showCopy = true;
+    infoPtr->menuCallback.onCopy = []() {};
+    auto frameNode = SelectOverlayNode::CreateSelectOverlayNode(infoPtr);
+    auto node = AceType::DynamicCast<SelectOverlayNode>(frameNode);
+    ASSERT_NE(node, nullptr);
+    float allocatedSize = 0.0f;
+    bool optionsAdded = node->AddSystemDefaultOptions(2000.0f, allocatedSize);
+    bool copyShown = node->isShowInDefaultMenu_[1]; // OPTION_INDEX_COPY
+
+    pipeline->themeManager_ = originalThemeManager;
+    EXPECT_FALSE(optionsAdded); // false means no button overflowed maxWidth
+    EXPECT_TRUE(copyShown);
+}
+
+/**
+ * @tc.name: SelectOverlayNode_FontAwareMeasure003
+ * @tc.desc: Test createMenu AI option and paste item measured via font-aware APIs
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayNodeTddTest, FontAwareMeasure003, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto originalThemeManager = pipeline->themeManager_;
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ON_CALL(*themeManager, GetTheme(_)).WillByDefault(&CreateFontAwareTestTheme);
+    ON_CALL(*themeManager, GetTheme(_, _))
+        .WillByDefault([](ThemeType type, int32_t scopeId) -> RefPtr<Theme> {
+            return CreateFontAwareTestTheme(type);
+        });
+    pipeline->themeManager_ = themeManager;
+
+    auto infoPtr = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
+    infoPtr->onCreateCallback.onPrepareMenuCallback =
+        [](const std::vector<NG::MenuItemParam>& params) -> std::vector<NG::MenuOptionsParam> {
+            std::vector<NG::MenuOptionsParam> items;
+            NG::MenuOptionsParam aiItem;
+            aiItem.id = OH_DEFAULT_AI_MENU_PHONE;
+            aiItem.content = std::string("AI option");
+            items.push_back(aiItem);
+            NG::MenuOptionsParam pasteItem;
+            pasteItem.id = OH_DEFAULT_PASTE;
+            pasteItem.content = std::string("Paste");
+            items.push_back(pasteItem);
+            return items;
+        };
+    auto frameNode = SelectOverlayNode::CreateSelectOverlayNode(infoPtr);
+    auto node = AceType::DynamicCast<SelectOverlayNode>(frameNode);
+    ASSERT_NE(node, nullptr);
+    size_t childrenBefore = node->selectMenuInner_->GetChildren().size();
+    node->AddMenuItemByCreateMenuCallback(infoPtr, 2000.0f);
+    size_t childrenAfter = node->selectMenuInner_->GetChildren().size();
+
+    pipeline->themeManager_ = originalThemeManager;
+    EXPECT_GT(childrenAfter, childrenBefore);
+}
+
+/**
+ * @tc.name: SelectOverlayNode_FontAwareMeasure004
+ * @tc.desc: Test landscape extension option width measured via font-aware API in BuildButton
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayNodeTddTest, FontAwareMeasure004, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto originalThemeManager = pipeline->themeManager_;
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ON_CALL(*themeManager, GetTheme(_)).WillByDefault(&CreateFontAwareTestTheme);
+    ON_CALL(*themeManager, GetTheme(_, _))
+        .WillByDefault([](ThemeType type, int32_t scopeId) -> RefPtr<Theme> {
+            return CreateFontAwareTestTheme(type);
+        });
+    pipeline->themeManager_ = themeManager;
+
+    auto infoPtr = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
+    NG::MenuOptionsParam item;
+    item.id = "CustomExtension";
+    item.content = std::string("Extension option");
+    infoPtr->menuOptionItems.push_back(item);
+    auto frameNode = SelectOverlayNode::CreateSelectOverlayNode(infoPtr);
+    auto node = AceType::DynamicCast<SelectOverlayNode>(frameNode);
+    ASSERT_NE(node, nullptr);
+    size_t childrenBefore = node->selectMenuInner_->GetChildren().size();
+    int32_t extensionOptionStartIndex = -1;
+    float allocatedSize = 0.0f;
+    node->LandscapeMenuAddMenuOptions(false, 2000.0f, allocatedSize, extensionOptionStartIndex, infoPtr);
+    size_t childrenAfter = node->selectMenuInner_->GetChildren().size();
+
+    pipeline->themeManager_ = originalThemeManager;
+    EXPECT_GT(childrenAfter, childrenBefore);
+}
+
+/**
+ * @tc.name: SelectOverlayNode_FontAwareMeasure005
+ * @tc.desc: Test right-click menu AI option text measured via font-aware API in CreateMenuTextNode
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectOverlayNodeTddTest, FontAwareMeasure005, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto originalThemeManager = pipeline->themeManager_;
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ON_CALL(*themeManager, GetTheme(_)).WillByDefault(&CreateFontAwareTestTheme);
+    ON_CALL(*themeManager, GetTheme(_, _))
+        .WillByDefault([](ThemeType type, int32_t scopeId) -> RefPtr<Theme> {
+            return CreateFontAwareTestTheme(type);
+        });
+    pipeline->themeManager_ = themeManager;
+
+    auto infoPtr = std::make_shared<SelectOverlayInfo>(CreateDefaultInfo());
+    infoPtr->onCreateCallback.onPrepareMenuCallback =
+        [](const std::vector<NG::MenuItemParam>& params) -> std::vector<NG::MenuOptionsParam> {
+            std::vector<NG::MenuOptionsParam> items;
+            NG::MenuOptionsParam aiItem;
+            aiItem.id = OH_DEFAULT_AI_MENU_PHONE;
+            aiItem.content = std::string("AI entry");
+            items.push_back(aiItem);
+            return items;
+        };
+    auto frameNode = SelectOverlayNode::CreateSelectOverlayNode(infoPtr);
+    auto node = AceType::DynamicCast<SelectOverlayNode>(frameNode);
+    ASSERT_NE(node, nullptr);
+    auto menuNode = node->CreateMenuNode(infoPtr);
+
+    pipeline->themeManager_ = originalThemeManager;
+    EXPECT_NE(menuNode, nullptr);
+}
+
 class SelectOverlayAccessibilityTddTest : public SelectOverlayNodeTddTest {
 public:
     void SetUp() override

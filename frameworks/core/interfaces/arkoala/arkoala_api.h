@@ -5980,6 +5980,8 @@ struct ArkUITabContentModifier {
     void (*setSidebarSection)(ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
         ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr);
     void (*resetSidebarSection)(ArkUINodeHandle node);
+    void (*setKeepAlive)(ArkUINodeHandle node, ArkUI_Bool keepAlive);
+    void (*resetKeepAlive)(ArkUINodeHandle node);
 };
 
 struct ArkUITabsControllerModifier {

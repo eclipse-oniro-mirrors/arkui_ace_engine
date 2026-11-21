@@ -20,6 +20,8 @@
 #include "base/i18n/localization.h"
 #include "base/log/event_report.h"
 #include "core/common/font_manager.h"
+#include "core/pipeline/pipeline_base.h"
+#include "core/common/ace_application_info.h"
 #include "compatible/components/swiper/swiper_modifier.h"
 #include "core/common/dynamic_module_helper.h"
 

@@ -920,6 +920,14 @@ void SwiperPattern::HandleTabsCachedMaxCount(int32_t startIndex, int32_t endInde
                 }
         }
 
+        auto child = AceType::DynamicCast<FrameNode>(host->GetChildByIndex(index));
+        if (child) {
+            auto tabContentPattern = child->GetPattern<TabContentPattern>();
+            if (tabContentPattern && tabContentPattern->GetKeepAlive()) {
+                continue;
+            }
+        }
+
         itemsNeedClean_.insert(index);
     }
 

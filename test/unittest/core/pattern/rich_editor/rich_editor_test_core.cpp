@@ -34,4 +34,66 @@ HWTEST_F(RichEditorLayoutAlgorithmTestCore, RichEditorTestPlaceholder, TestSize.
     EXPECT_TRUE(true);
 }
 
+/**
+ * @tc.name: RichEditorUpdateCaretInfoNoFocus001
+ * @tc.desc: Test UpdateCaretInfoToController returns early when not focused
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPatternTestCore, UpdateCaretInfoNoFocus001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HasFocus());
+    pattern->UpdateCaretInfoToController();
+    EXPECT_FALSE(pattern->HasFocus());
+}
+
+/**
+ * @tc.name: RichEditorUpdateCaretInfoFocused001
+ * @tc.desc: Test UpdateCaretInfoToController pushes caret info to input method when focused
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPatternTestCore, UpdateCaretInfoFocused001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    EXPECT_TRUE(pattern->HasFocus());
+    pattern->UpdateCaretInfoToController();
+    EXPECT_TRUE(pattern->HasFocus());
+}
+
+/**
+ * @tc.name: RichEditorPushCaretInfoNoFocus001
+ * @tc.desc: Test PushCaretInfoToInputMethod returns early when not focused
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPatternTestCore, PushCaretInfoNoFocus001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->HasFocus());
+    pattern->PushCaretInfoToInputMethod();
+    EXPECT_FALSE(pattern->HasFocus());
+}
+
+/**
+ * @tc.name: RichEditorPushCaretInfoFocused001
+ * @tc.desc: Test PushCaretInfoToInputMethod pushes caret info on the standard input path
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPatternTestCore, PushCaretInfoFocused001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto focusHub = richEditorNode_->GetOrCreateFocusHub();
+    ASSERT_NE(focusHub, nullptr);
+    focusHub->RequestFocusImmediately();
+    EXPECT_TRUE(pattern->HasFocus());
+    pattern->PushCaretInfoToInputMethod();
+    EXPECT_TRUE(pattern->HasFocus());
+}
+
 } // namespace OHOS::Ace::NG

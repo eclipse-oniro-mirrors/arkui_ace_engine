@@ -26,6 +26,7 @@
 #include "core/components_ng/manager/event/json_child_report.h"
 #include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include <string>
 
 namespace OHOS::Ace::NG {
@@ -461,6 +462,11 @@ void TouchEventActuator::PublishDeveloperResponse(TouchEventInfo& event)
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
 void TouchEventActuator::ReportTouchEventToUISession(const TouchEventInfo& event)
 {
+    auto uiSessionManager = UiSessionManager::GetInstance();
+    if (uiSessionManager == nullptr || !uiSessionManager->GetComponentChangeEventRegistered() ||
+        !uiSessionManager->NeedComponentChangeTypeReporting(ComponentEventType::COMPONENT_EVENT_GESTURE)) {
+        return;
+    }
     const auto& changedTouches = event.GetChangedTouches();
     if (changedTouches.empty()) {
         return;

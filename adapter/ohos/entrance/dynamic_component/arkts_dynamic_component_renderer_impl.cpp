@@ -185,7 +185,7 @@ void ArktsDynamicComponentRendererImpl::DeleteWorkerUsing(int32_t workerId)
         return;
     }
 
-    iter->second++;
+    iter->second--;
 }
 
 void ArktsDynamicComponentRendererImpl::CreateContent()

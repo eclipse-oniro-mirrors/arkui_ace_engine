@@ -491,6 +491,11 @@ private:
     void OnAfterModifyDone() override;
     void OnUpdateShowDivider();
     WeakPtr<FocusHub> GetNextFocusNode(FocusStep step, const WeakPtr<FocusHub>& currentFocusNode);
+    // Sidebar display mode: the TabBar is hidden (GONE) and the sidebar tab list takes its place
+    // in the Tabs focus chain. `handled` is set to true when the sidebar tab list focus hub exists,
+    // meaning the caller must NOT fall back to the legacy TabBar logic.
+    WeakPtr<FocusHub> GetNextFocusNodeInSideBarMode(FocusStep step, const RefPtr<FocusHub>& curFocusNode,
+        const RefPtr<FocusHub>& swiperFocusNode, const RefPtr<TabsLayoutProperty>& property, bool& handled);
     void BeforeCreateLayoutWrapper() override;
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     std::string GetTabBarTextByIndex(int32_t index) const;
@@ -516,6 +521,10 @@ private:
         const RefPtr<FrameNode>& swiperNode, const RefPtr<TabsLayoutProperty>& tabsLayoutProperty);
     void InitFocusEvent();
     RefPtr<FocusHub> GetCurrentFocusNode(FocusIntension intension);
+    // Sidebar display mode: entry focus hub selection between the sidebar tab list and the Swiper.
+    RefPtr<FocusHub> GetCurrentFocusNodeInSideBarMode(FocusIntension intension,
+        const RefPtr<FocusHub>& sideBarFocusHub, const RefPtr<FocusHub>& swiperFocusHub,
+        const RefPtr<TabsLayoutProperty>& property);
     void InitAccessibilityZIndex();
 
     void InitFloatingBar();

@@ -17,6 +17,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 
@@ -209,6 +210,26 @@ std::optional<ViewPosReference> LazyLayoutUtils::GetViewPosReference(
     CHECK_NULL_RETURN(viewPosRefOpt, std::nullopt);
     layoutProperty->ConstraintViewPosRef(viewPosRefOpt.value());
     return viewPosRefOpt;
+}
+
+RefPtr<StickyHeaderPattern> LazyLayoutUtils::GetStickyHeaderPattern(const RefPtr<UINode>& node)
+{
+    auto child = node;
+    while (child) {
+        auto frame = AceType::DynamicCast<FrameNode>(child);
+        if (frame) {
+            auto pattern = frame->GetPattern<StickyHeaderPattern>();
+            if (pattern) {
+                return pattern;
+            }
+            auto property = frame->GetLayoutProperty();
+            if (!IsAllowedIntermediateNode(frame) && (!property || !property->GetNeedLazyLayout())) {
+                return nullptr;
+            }
+        }
+        child = child->GetFirstChild();
+    }
+    return nullptr;
 }
 
 RefPtr<LazyLayoutPattern> LazyLayoutUtils::GetLazyLayoutPattern(const RefPtr<UINode>& node)

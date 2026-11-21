@@ -2689,9 +2689,59 @@ void XComponentPattern::SetSurfaceRotation(bool isLock)
 
 void XComponentPattern::SetRenderFit(RenderFit renderFit)
 {
+    std::unique_lock<std::shared_mutex> lock(surfaceRenderMutex_);
     CHECK_NULL_VOID(handlingSurfaceRenderContext_);
     renderFit_ = renderFit;
     handlingSurfaceRenderContext_->SetRenderFit(renderFit);
+}
+
+// Set renderFit and frameGravityNewVersion flag on renderContextForSurface_
+// under surfaceRenderMutex_. The caller (XComponentInnerSurfaceController::SetRenderFitBySurfaceId)
+// is responsible for posting this to the UI thread.
+// Called by XComponentInnerSurfaceController::SetRenderFitBySurfaceId, which is
+// the inner API entry point for OHOS_ACE_SetRenderFitBySurfaceId.
+void XComponentPattern::SetSurfaceRenderFit(RenderFit renderFit, bool isRenderFitNewVersionEnabled)
+{
+    std::unique_lock<std::shared_mutex> lock(surfaceRenderMutex_);
+    CHECK_NULL_VOID(renderContextForSurface_);
+    renderContextForSurface_->SetRenderFit(renderFit);
+#ifdef ENABLE_ROSEN_BACKEND
+    auto rosenRenderContext = AceType::DynamicCast<NG::RosenRenderContext>(renderContextForSurface_);
+    CHECK_NULL_VOID(rosenRenderContext);
+    auto rsNode = rosenRenderContext->GetRSNode();
+    CHECK_NULL_VOID(rsNode);
+    auto rsSurfaceNode = rsNode->ReinterpretCastTo<Rosen::RSSurfaceNode>();
+    CHECK_NULL_VOID(rsSurfaceNode);
+    rsSurfaceNode->SetFrameGravityNewVersionEnabled(isRenderFitNewVersionEnabled);
+#endif
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "SetSurfaceRenderFit renderFit: %{public}d, isRenderFitNewVersionEnabled: %{public}d",
+        static_cast<int32_t>(renderFit), isRenderFitNewVersionEnabled);
+}
+
+// Read current renderFit and frameGravityNewVersion flag from
+// renderContextForSurface_ under surfaceRenderMutex_ to get a consistent
+// (fit, flag) snapshot. Returns true on success, false when the render context
+// or RS surface node is unavailable.
+// Called by XComponentInnerSurfaceController::GetRenderFitBySurfaceId, which is
+// the inner API entry point for OHOS_ACE_GetRenderFitBySurfaceId.
+bool XComponentPattern::GetSurfaceRenderFit(int32_t& renderFitNumber, bool& isRenderFitNewVersionEnabled)
+{
+    std::shared_lock<std::shared_mutex> lock(surfaceRenderMutex_);
+    CHECK_NULL_RETURN(renderContextForSurface_, false);
+    RenderFit renderFit = renderContextForSurface_->GetRenderFit().value_or(RenderFit::RESIZE_FILL);
+    renderFitNumber = static_cast<int32_t>(renderFit);
+    isRenderFitNewVersionEnabled = false;
+#ifdef ENABLE_ROSEN_BACKEND
+    auto rosenRenderContext = AceType::DynamicCast<NG::RosenRenderContext>(renderContextForSurface_);
+    CHECK_NULL_RETURN(rosenRenderContext, false);
+    auto rsNode = rosenRenderContext->GetRSNode();
+    CHECK_NULL_RETURN(rsNode, false);
+    auto rsSurfaceNode = rsNode->ReinterpretCastTo<Rosen::RSSurfaceNode>();
+    CHECK_NULL_RETURN(rsSurfaceNode, false);
+    isRenderFitNewVersionEnabled = rsSurfaceNode->GetFrameGravityNewVersionEnabled();
+#endif
+    return true;
 }
 
 void XComponentPattern::DumpInfo(std::unique_ptr<JsonValue>& json)

@@ -894,8 +894,8 @@ std::string CalendarPickerModelNG::AddLeadingZeroToYear(uint32_t year)
 std::string CalendarPickerModelNG::AddLeadingZeroToDate(uint32_t value, int32_t minDigits)
 {
     std::string str = std::to_string(value);
-    if (static_cast<int32_t>(str.length()) < minDigits) {
-        str = std::string(minDigits - str.length(), '0') + str;
+    if (minDigits > 0 && str.length() < static_cast<size_t>(minDigits)) {
+        str = std::string(static_cast<size_t>(minDigits) - str.length(), '0') + str;
     }
     return str;
 }

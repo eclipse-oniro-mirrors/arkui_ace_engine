@@ -187,6 +187,8 @@ export class ArkUIAniModule {
     native static _Repeat_IsChildOnMainTree(lazyNodePtr: KPointer, rid: KInt): KBoolean
     native static _Repeat_IsAllowAnimation(lazyNodePtr: KPointer): KBoolean
     native static _Repeat_IsImplicitAnimationOpen(lazyNodePtr: KPointer): KBoolean
+    native static _Repeat_SetAllowReuseInAnimation(lazyNodePtr: KPointer, allow: KBoolean): void
+    native static _Repeat_HasCustomComponent(lazyNodePtr: KPointer): KBoolean
     native static _SetOverlay_ComponentContent(node: KPointer, buildNodePtr: KPointer, options?: OverlayOptions): void
 
     native static _TransferKeyEventPointer(input: KPointer): KPointer
@@ -468,6 +470,7 @@ export class ArkUIAniModule {
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
     native static _Common_IsTransPageEnabled(instanceId: KInt): boolean
+    native static _Common_SetDynamicDimming(id: string, value: double, instanceId: KInt): void
 
     // for transfer
     native static _createTouchEventAccessorWithPointer(input: KPointer): KPointer

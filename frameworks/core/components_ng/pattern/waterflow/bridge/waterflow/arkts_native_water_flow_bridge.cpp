@@ -29,6 +29,8 @@
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_ng/pattern/waterflow/water_flow_sections.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -481,7 +483,7 @@ RefPtr<NG::UINode> SetWaterFlowBuilderNode(EcmaVM* vm, const Local<ObjectRef>& f
     if (builderNodeParam->IsObject(vm)) {
         auto builderNodeObject = builderNodeParam->ToObject(vm);
         auto nodePtr = ArkTSUtils::GetProperty(vm, builderNodeObject, "nodePtr_");
-        if (!(nodePtr.IsEmpty() || nodePtr->IsNull() || nodePtr->IsUndefined())) {
+        if (IsNativePointerArg(vm, nodePtr)) {
             auto* node = nodePtr->ToNativePointer(vm)->Value();
             auto* myUINode = reinterpret_cast<NG::UINode*>(node);
             if (!myUINode) {
@@ -678,6 +680,111 @@ void SetWaterFlowParams(EcmaVM* vm, const Local<ObjectRef>& obj)
 }
 } // namespace
 
+namespace {
+FrameNode* GetWaterFlowEdgeHost(ArkUIRuntimeCallInfo* info)
+{
+    ArkUINodeHandle nativeNode = nullptr;
+    if (!GetNativeNode(nativeNode, info->GetCallArgRef(0), info->GetVM())) {
+        return nullptr;
+    }
+    return nativeNode ? reinterpret_cast<FrameNode*>(nativeNode)
+                      : ViewStackProcessor::GetInstance()->GetMainFrameNode();
+}
+
+ArkUINativeModuleValue SetWaterFlowEdge(ArkUIRuntimeCallInfo* info, bool header, bool reset)
+{
+    auto vm = info->GetVM();
+    CHECK_NULL_RETURN(vm, panda::Local<panda::JSValueRef>());
+    auto host = GetWaterFlowEdgeHost(info);
+    CHECK_NULL_RETURN(host, panda::JSValueRef::Undefined(vm));
+    auto pattern = host->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_RETURN(pattern, panda::JSValueRef::Undefined(vm));
+    auto value = info->GetCallArgRef(1);
+    if (!reset && !value.IsEmpty() && value->IsObject(vm) && !value->IsFunction(vm)) {
+        auto content = SetWaterFlowBuilderNode(vm, value->ToObject(vm));
+        pattern->SetEdgeContent(header, content);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    const auto generation = WaterFlowModelNG::BeginEdgeUpdate(host, header);
+    auto keepAlive = AceType::Claim(host);
+    RefPtr<UINode> content;
+    if (!reset && !value.IsEmpty() && value->IsFunction(vm)) {
+        auto stack = ViewStackProcessor::GetInstance();
+        const bool isBuilderNode = stack->IsBuilderNode();
+        const bool isExportTexture = stack->IsExportTexture();
+        ScopedViewStackProcessor scope;
+        stack = ViewStackProcessor::GetInstance();
+        stack->SetIsBuilderNode(isBuilderNode);
+        stack->SetIsExportTexture(isExportTexture);
+        panda::LocalScope localScope(vm);
+        panda::TryCatch trycatch(vm);
+        panda::Local<panda::FunctionRef> builder = value->ToObject(vm);
+        auto result = builder->Call(vm, builder, nullptr, 0);
+        bool failed = result.IsEmpty() || trycatch.HasCaught();
+        if (ArkTSUtils::IsJsView(info->GetCallArgRef(0), vm)) {
+            failed = !ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        }
+        if (failed) {
+            return panda::JSValueRef::Undefined(vm);
+        }
+        content = stack->Finish();
+    }
+    WaterFlowModelNG::SetEdge(AceType::RawPtr(keepAlive), header, content, generation);
+    return panda::JSValueRef::Undefined(vm);
+}
+} // namespace
+
+ArkUINativeModuleValue WaterFlowBridge::SetHeader(ArkUIRuntimeCallInfo* info)
+{
+    return SetWaterFlowEdge(info, true, false);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetHeader(ArkUIRuntimeCallInfo* info)
+{
+    return SetWaterFlowEdge(info, true, true);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::SetFooter(ArkUIRuntimeCallInfo* info)
+{
+    return SetWaterFlowEdge(info, false, false);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetFooter(ArkUIRuntimeCallInfo* info)
+{
+    return SetWaterFlowEdge(info, false, true);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::SetSticky(ArkUIRuntimeCallInfo* info)
+{
+    auto vm = info->GetVM();
+    CHECK_NULL_RETURN(vm, panda::Local<panda::JSValueRef>());
+    auto host = GetWaterFlowEdgeHost(info);
+    CHECK_NULL_RETURN(host, panda::JSValueRef::Undefined(vm));
+    auto pattern = host->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_RETURN(pattern, panda::JSValueRef::Undefined(vm));
+    auto value = info->GetCallArgRef(1);
+    const bool isNumber = !value.IsEmpty() && value->IsNumber();
+    int32_t style = isNumber ? value->Int32Value(vm) : 0;
+    if (style < 0 || style > static_cast<int32_t>(StickyStyle::BOTH) ||
+        (isNumber && value->ToNumber(vm)->Value() != static_cast<double>(style))) {
+        style = 0;
+    }
+    WaterFlowModelNG::SetSticky(host, static_cast<StickyStyle>(style));
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WaterFlowBridge::ResetSticky(ArkUIRuntimeCallInfo* info)
+{
+    auto vm = info->GetVM();
+    CHECK_NULL_RETURN(vm, panda::Local<panda::JSValueRef>());
+    auto host = GetWaterFlowEdgeHost(info);
+    auto pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
+    if (pattern) {
+        WaterFlowModelNG::SetSticky(host, StickyStyle::NONE);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue WaterFlowBridge::SetScrollSnapStrategy(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     auto vm = runtimeCallInfo->GetVM();
@@ -716,6 +823,12 @@ ArkUINativeModuleValue WaterFlowBridge::ResetScrollSnapStrategy(ArkUIRuntimeCall
 void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object, EcmaVM* vm)
 {
     const char* functionNames[] = {
+        "setHeader",
+        "resetHeader",
+        "setFooter",
+        "resetFooter",
+        "setSticky",
+        "resetSticky",
         "create",
         "resetColumnsTemplate",
         "setColumnsTemplate",
@@ -771,6 +884,12 @@ void WaterFlowBridge::RegisterWaterFlowAttributes(Local<panda::ObjectRef> object
         "resetScrollSnapStrategy",
     };
     Local<JSValueRef> funcValues[] = {
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetHeader),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetHeader),
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetFooter),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetFooter),
+        panda::FunctionRef::New(vm, WaterFlowBridge::SetSticky),
+        panda::FunctionRef::New(vm, WaterFlowBridge::ResetSticky),
         panda::FunctionRef::New(vm, WaterFlowBridge::CreateWaterFlow),
         panda::FunctionRef::New(vm, WaterFlowBridge::ResetColumnsTemplate),
         panda::FunctionRef::New(vm, WaterFlowBridge::SetColumnsTemplate),

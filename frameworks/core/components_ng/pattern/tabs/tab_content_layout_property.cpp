@@ -65,4 +65,14 @@ void TabContentLayoutProperty::SidebarSectionToJsonValue(
     json->PutExtAttr("sidebarSection", sectionJson->ToString().c_str(), filter);
 }
 
+void TabContentLayoutProperty::KeepAliveToJsonValue(
+    std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pattern = host->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    json->PutExtAttr("keepAlive", pattern->GetKeepAlive(), filter);
+}
+
 } // namespace OHOS::Ace::NG

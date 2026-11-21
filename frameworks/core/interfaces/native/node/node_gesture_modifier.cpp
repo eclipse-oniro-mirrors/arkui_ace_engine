@@ -1002,6 +1002,10 @@ void setGestureInterrupterToNodeWithUserData(
         ArkUIGestureEvent arkUIGestureEvent { gestureEvent, nullptr };
         interruptInfo.inputEvent = &inputEvent;
         interruptInfo.gestureEvent = &arkUIGestureEvent;
+        if (!interrupter) {
+            TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "setGestureInterrupterToNode interrupter is null");
+            return GestureJudgeResult::CONTINUE;
+        }
         auto touchRecognizers = CreateTouchRecognizers(AceType::RawPtr(node), info, interruptInfo);
         ArkUI_Int32 result {};
         {
@@ -1045,11 +1049,17 @@ ArkUI_Int32 setInnerGestureParallelTo(ArkUINodeHandle node, void* userData,
         parallelInnerGestureEvent.userData = userData;
         parallelInnerGestureEvent.count = count;
         ArkUIGestureRecognizer* result {};
+        if (!parallelInnerGesture) {
+            TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "setInnerGestureParallelTo parallelInnerGesture is null");
+            delete[] othersArkUIGestureRecognizer;
+            return nullptr;
+        }
         {
             LOG_CALLBACK("ArkUI_NativeGestureAPI_1.setInnerGestureParallelTo", parallelInnerGesture);
             result = parallelInnerGesture(&parallelInnerGestureEvent);
         }
         if (!result || !result->recognizer) {
+            delete[] othersArkUIGestureRecognizer;
             return nullptr;
         }
         delete[] othersArkUIGestureRecognizer;
@@ -1459,6 +1469,10 @@ ArkUI_Int32 setArkUIGestureRecognizerDisposeNotify(ArkUIGestureRecognizer* recog
     auto gestureRecognizer = AceType::Claim(rawRecognizer);
     auto disposeNotify = [userData, callback](void* recognizer) {
         auto* arkuiGestureRecognizer = reinterpret_cast<ArkUIGestureRecognizer*>(recognizer);
+        if (!callback) {
+            TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "setArkUIGestureRecognizerDisposeNotify callback is null");
+            return;
+        }
         callback(arkuiGestureRecognizer, userData);
     };
     gestureRecognizer->SetDisposeNotifyCallback(std::move(disposeNotify));

@@ -34,6 +34,21 @@ class LazyArkWaterFlowComponent extends ArkScrollable {
     return this;
   }
 
+  header(value: CustomBuilder | ComponentContent | undefined): this {
+    this.lazyComponent.header(value);
+    return this;
+  }
+
+  footer(value: CustomBuilder | ComponentContent | undefined): this {
+    this.lazyComponent.footer(value);
+    return this;
+  }
+
+  sticky(value: StickyStyle | undefined): this {
+    this.lazyComponent.sticky(value);
+    return this;
+  }
+
   columnsGap(value: Length): this {
    this.lazyComponent.columnsGap(value);
    return this;

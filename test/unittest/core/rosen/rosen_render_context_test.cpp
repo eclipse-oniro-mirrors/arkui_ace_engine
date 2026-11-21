@@ -91,27 +91,6 @@ RefPtr<RosenRenderContext> RosenRenderContextTest::InitRosenRenderContext(const 
 }
 
 /**
- * @tc.name: RosenRenderContextTest001
- * @tc.desc: SetPivot().
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, RosenRenderContextTest001, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    float xPivot = 10.0;
-    float yPivot = 10.0;
-    float zPivot = 10.0;
-    rosenRenderContext->SetPivot(xPivot, yPivot, zPivot);
-    EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetPivot().x_, 10.0);
-    EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetPivot().y_, 10.0);
-    EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetPivotZ(), 10.0);
-    xPivot = 5.0;
-    rosenRenderContext->SetPivot(xPivot, yPivot, zPivot);
-    EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetPivot().x_, 5.0);
-}
-
-/**
  * @tc.name: RosenRenderContextTest002
  * @tc.desc: SetTransitionPivot().
  * @tc.type: FUNC

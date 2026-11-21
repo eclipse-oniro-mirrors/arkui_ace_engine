@@ -28,6 +28,26 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+// Depth-first search for a custom component root in the subtree of (and including)
+// node: the static frontend creates a CustomNode (tag JsView) for every struct
+// component instance (ArkStructBase._instantiate -> ArkComponentRoot ->
+// ArkCustomComponentRootPeer -> _CustomNode_Construct), so a JsView-tagged node
+// anywhere below an item root means the item content contains a custom component.
+bool ContainsCustomComponent(const RefPtr<UINode>& node)
+{
+    CHECK_NULL_RETURN(node, false);
+    if (node->GetTag() == V2::JS_VIEW_ETS_TAG) {
+        return true;
+    }
+    for (const auto& child : node->GetChildren()) {
+        if (ContainsCustomComponent(child)) {
+            return true;
+        }
+    }
+    return false;
+}
+} // namespace
 
 ArkoalaLazyNode::ArkoalaLazyNode(int32_t nodeId, bool isRepeat) : ForEachBaseNode(
     isRepeat ? V2::JS_REPEAT_ETS_TAG : V2::JS_LAZY_FOR_EACH_ETS_TAG, nodeId), isRepeat_(isRepeat) {}
@@ -68,6 +88,9 @@ void ArkoalaLazyNode::DoSetActiveChildRange(
         "TRACE DoSetActiveChildRange(%{public}d, %{public}d, %{public}d, %{public}d, %{public}d)",
         start, end, cacheStart, cacheEnd, static_cast<int32_t>(showCache));
     SetNeedBuildAll(false);
+    // record the range of the previous run before it gets replaced: SetNodeInactive
+    // pairs a node's last L1 index with the range in effect while it was on screen
+    prevActiveRangeParam_ = activeRangeParam_;
     activeRangeParam_ = newParam;
     if (updateRange_) {
         // trigger TS-side
@@ -75,6 +98,17 @@ void ArkoalaLazyNode::DoSetActiveChildRange(
     }
     // rebuild children of arkoalaLazyNode according to new active range.
     RebuildCache();
+}
+
+std::optional<int32_t> ArkoalaLazyNode::GetPrevL1IndexOfNode(const RefPtr<UINode>& node) const
+{
+    auto child = node->GetFirstChild();
+    CHECK_NULL_RETURN(child, std::nullopt);
+    auto ridIt = repeatNode4Rid_.find(child->GetId());
+    if (ridIt == repeatNode4Rid_.end()) {
+        return std::nullopt;
+    }
+    return ridIt->second.prevL1Index;
 }
 
 void ArkoalaLazyNode::RebuildCache()
@@ -103,12 +137,25 @@ void ArkoalaLazyNode::RebuildCache()
             }
             continue;
         }
-        node->SetActive(isInActiveRange);
         if (isInActiveRange) {
-            node->SetActive(isInActiveRange);
+            // reactivation cancels a pending deferred SetActive(false): the
+            // transition-out that armed it may still finish later and would
+            // deactivate a node that is visible again
+            node->NeedSetInActiveAfterTransitionOut(false);
+            node->SetActive(true);
         } else {
-            AnimationUtils::IsImplicitAnimationOpen() ?
-                node->NeedSetInActiveAfterTransitionOut(true) : node->SetActive(false);
+            // The node stays on the render tree here (tree removal is handled in the branch
+            // above), yet removeFromTree is deliberately true: it arms SetNodeInactive's
+            // defer branch so that, while an implicit animation is open, a node that was
+            // visible at its old index under the previous active range keeps its active
+            // state instead of being deactivated mid-animation; the deferred SetActive(false)
+            // is applied by SetInActiveAfterTransitionOut once the node's transition out
+            // finishes. Unlike v2's !remainInL1 (defer only when the node actually leaves
+            // the tree), this path defers every previously-visible node that drops to the
+            // cache range during the animation. oldIndex is the L1 index recorded before
+            // this rebuild (mirrors v2 GetPrevL1Index4Node), read before the rid loop
+            // below refreshes it.
+            SetNodeInactive(node, true, GetPrevL1IndexOfNode(node));
         }
         for (auto& [rid, ridNodeInfo] : repeatNode4Rid_) {
             auto child = node->GetFirstChild();
@@ -117,6 +164,8 @@ void ArkoalaLazyNode::RebuildCache()
             }
             if (rid == child->GetId()) {
                 ridNodeInfo.isActive = isInActiveRange;
+                // keep the last L1 index fresh while the node stays in L1
+                ridNodeInfo.prevL1Index = indexMapped;
                 break;
             }
         }
@@ -128,6 +177,22 @@ void ArkoalaLazyNode::RebuildCache()
     ProcessRepeatNodeCleanup(isRepeat_);
     TAG_LOGD(AceLogTag::ACE_LAZY_FOREACH, "RebuildCache DONE. Cache nodes count: %{public}zu", node4Index_.Size());
     RequestSyncTree(); // order a resync from layout
+}
+
+void ArkoalaLazyNode::SetNodeInactive(const RefPtr<UINode>& node, bool removeFromTree,
+    const std::optional<int32_t>& oldIndex)
+{
+    CHECK_NULL_VOID(node);
+    if (AnimationUtils::IsImplicitAnimationOpen() && removeFromTree && oldIndex.has_value() &&
+        IsInActiveRange(oldIndex.value(), prevActiveRangeParam_)) {
+        // node goes off the render tree while an implicit animation is running and
+        // was visible at its last L1 index under the previous active range: keep it
+        // active until its transition out has finished, SetInActiveAfterTransitionOut
+        // then applies SetActive(false)
+        node->NeedSetInActiveAfterTransitionOut(true);
+        return;
+    }
+    node->SetActive(false);
 }
 
 void ArkoalaLazyNode::ProcessRepeatNodeCleanup(bool isRepeat)
@@ -157,8 +222,9 @@ void ArkoalaLazyNode::ProcessRepeatNodeCleanup(bool isRepeat)
         }
         if (!inL1) {
             ridNodeInfo.isActive = false;
-            AnimationUtils::IsImplicitAnimationOpen() ?
-                node->NeedSetInActiveAfterTransitionOut(true) : node->SetActive(false);
+            // the node is removed from the render tree below (OnRemoveFromParent):
+            // defer SetActive(false) only if it was visible at its last L1 index
+            SetNodeInactive(node, true, ridNodeInfo.prevL1Index);
             if (node->OnRemoveFromParent(true)) {
                 RemoveDisappearingChild(node);
             } else {
@@ -251,10 +317,8 @@ RefPtr<UINode> ArkoalaLazyNode::GetFrameChildByIndex(uint32_t index, bool needBu
     return GetFrameChildByIndexImpl(indexMapped, needBuild, isCache, addToRenderTree);
 }
 
-RefPtr<UINode> ArkoalaLazyNode::GetFrameChildByIndexImpl(
-    int32_t index, bool needBuild, bool isCache, bool addToRenderTree)
+RefPtr<UINode> ArkoalaLazyNode::GetOrCreateL1Child(int32_t index, bool needBuild, bool isCache)
 {
-    ProcessAfterDataChange();
     auto child = GetChildByIndex(index);
     if (!child && !needBuild && !AnimationUtils::IsImplicitAnimationOpen()) {
         TAG_LOGD(AceLogTag::ACE_LAZY_FOREACH,
@@ -262,12 +326,65 @@ RefPtr<UINode> ArkoalaLazyNode::GetFrameChildByIndexImpl(
         return nullptr;
     }
     if (!child && createItem_) {
-        child = createItem_(index, isCache ? AnimationUtils::IsImplicitAnimationOpen() : false);
+        // "skip create" lets the TS creator return only a reusable candidate instead of
+        // building a new node: cache-range item during an implicit animation, restricted
+        // to a direct List parent; Grid / WaterFlow keep building cache items (async
+        // preload or the sync-cache-in-layout strategy) so their cache supply is not
+        // starved during animations
+        bool skipCreate = false;
+        if (isCache && AnimationUtils::IsImplicitAnimationOpen()) {
+            auto parent = GetParentFrameNode();
+            skipCreate = parent && parent->GetTag() == V2::LIST_ETS_TAG;
+        }
+        child = createItem_(index, skipCreate);
     }
     if (!child) {
         TAG_LOGE(AceLogTag::ACE_LAZY_FOREACH, "createItem_ failed to create new node for index %{public}d", index);
         return nullptr;
     }
+    return child;
+}
+
+void ArkoalaLazyNode::RemoveDuplicatedItem(const RefPtr<UINode>& child, int32_t index)
+{
+    // The frontend reuse pool can return the same real item (the first node below
+    // the wrapper, the rid node) for a different index: same-template cross-key
+    // reuse re-attaches the existing content tree, and a recycled elmtId can make
+    // a fresh item carry the id of a stale one. node4Index_ only dedups wrapper
+    // identity, so another entry may still hold this item: RebuildCache would then
+    // process it twice and the later entry whose index is outside the active range
+    // deactivates a node that is still visibly laid out at the other index (white
+    // block during fast fling). Drop every other entry holding the same item so
+    // the Put below makes index the only mapping of the item.
+    auto itemNode = child->GetFirstChild();
+    CHECK_NULL_VOID(itemNode);
+    const auto itemId = itemNode->GetId();
+    std::vector<int32_t> duplicatedIndices;
+    for (const auto& [cachedIndex, cachedNode] : node4Index_) {
+        if (cachedIndex == index || !cachedNode) {
+            continue;
+        }
+        auto cachedFirst = cachedNode->GetFirstChild();
+        if (!cachedFirst || cachedFirst->GetId() != itemId) {
+            continue;
+        }
+        duplicatedIndices.push_back(cachedIndex);
+    }
+    for (auto duplicatedIndex : duplicatedIndices) {
+        TAG_LOGW(AceLogTag::ACE_LAZY_FOREACH,
+            "item %{public}d of index %{public}d is still mapped at index %{public}d, remove the duplicate",
+            itemId, index, duplicatedIndex);
+        node4Index_.Remove(duplicatedIndex);
+    }
+}
+
+RefPtr<UINode> ArkoalaLazyNode::GetFrameChildByIndexImpl(
+    int32_t index, bool needBuild, bool isCache, bool addToRenderTree)
+{
+    ProcessAfterDataChange();
+    auto child = GetOrCreateL1Child(index, needBuild, isCache);
+    CHECK_NULL_RETURN(child, nullptr);
+    RemoveDuplicatedItem(child, index);
     node4Index_.Put(index, child);
     sparedIdx_.insert(index);
     // Keep a rid-scoped handle even after index mappings change, so frontend can query this node by rid.
@@ -283,6 +400,9 @@ RefPtr<UINode> ArkoalaLazyNode::GetFrameChildByIndexImpl(
             return child->GetFrameChildByIndex(0, needBuild);
         }
     } else if (addToRenderTree) {
+        // back on the render tree (scroll back into view or reuse): drop a deferred
+        // SetActive(false) left over from an unfinished or cancelled transition-out
+        child->NeedSetInActiveAfterTransitionOut(false);
         child->SetActive(true);
         if (syntaxNode) {
             repeatNode4Rid_[syntaxNode->GetId()].isActive = true;
@@ -306,6 +426,7 @@ RefPtr<UINode> ArkoalaLazyNode::GetFrameChildByIndexImpl(
     if (onMoveEvent_) {
         InitDragManager(AceType::DynamicCast<FrameNode>(childNode));
     }
+    hasCustomComponent_ = hasCustomComponent_ || ContainsCustomComponent(child);
     return childNode;
 }
 
@@ -329,13 +450,17 @@ void ArkoalaLazyNode::ProcessOldNode(RefPtr<UINode> child, RefPtr<UINode> syntax
 
     auto rid = syntaxNode->GetId();
     auto it = repeatNode4Rid_.find(rid);
+    // prevL1Index is rid-scoped history (mirrors v2 prevL1Rid4Index_): a re-created
+    // node with the same rid carries over the L1 index recorded for that rid
+    std::optional<int32_t> prevL1Index;
     if (it != repeatNode4Rid_.end()) {
         auto oldNode = it->second.rootNode.Upgrade();
         if (oldNode) {
             RemoveDisappearingChild(oldNode);
         }
+        prevL1Index = it->second.prevL1Index;
     }
-    repeatNode4Rid_[rid] = { child, syntaxNode, false };
+    repeatNode4Rid_[rid] = { child, syntaxNode, false, prevL1Index };
 }
 
 RefPtr<UINode> ArkoalaLazyNode::GetChildByIndex(int32_t index)
@@ -360,6 +485,11 @@ RefPtr<UINode> ArkoalaLazyNode::GetRepeatNodeByRid(int32_t rid)
 
 bool ArkoalaLazyNode::IsAllowAnimation()
 {
+    // RepeatOptions.allowReuseInAnimation explicitly set (highest priority):
+    // animation is allowed iff reuse during animation is disallowed
+    if (isAllowReuseInAnimation_.has_value()) {
+        return !isAllowReuseInAnimation_.value();
+    }
     auto parent = GetParentFrameNode();
     if (!parent) {
         TAG_LOGI(AceLogTag::ACE_REPEAT,
@@ -367,6 +497,52 @@ bool ArkoalaLazyNode::IsAllowAnimation()
         return false;
     }
     return parent->GetTag() == V2::LIST_ETS_TAG;
+}
+
+bool ArkoalaLazyNode::HasCustomComponent()
+{
+    return hasCustomComponent_;
+}
+
+void ArkoalaLazyNode::ClearCacheAfterAnimation()
+{
+    if (needClearCacheAfterAnimation_) {
+        CleanCache(false, true);
+        needClearCacheAfterAnimation_ = false;
+    }
+}
+
+void ArkoalaLazyNode::OnAttachToMainTree(bool recursive)
+{
+    ForEachBaseNode::OnAttachToMainTree(recursive);
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), true, isAllowReuseInAnimation_, isRepeat_, syncCacheHost_);
+}
+
+void ArkoalaLazyNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
+{
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), false, isAllowReuseInAnimation_, isRepeat_, syncCacheHost_);
+    ForEachBaseNode::OnDetachFromMainTree(recursive, context);
+}
+
+void ArkoalaLazyNode::SetAllowReuseInAnimation(std::optional<bool> allow)
+{
+    if (isAllowReuseInAnimation_ == allow) {
+        return;
+    }
+    // The option can arrive after the node is already attached: createLazyNode
+    // attaches inside NodeAttach, the static frontend sets the option in the
+    // onNodeCreated callback afterwards, so the attach-time toggle above may have
+    // run with the previous value (unset). Re-run the toggle for the transition
+    // while attached: release the reference held for the old value, register for
+    // the new one when it now qualifies.
+    if (IsOnMainTree()) {
+        LazyForEachUtils::ToggleParentSyncCacheLayout(
+            Claim(this), false, isAllowReuseInAnimation_, isRepeat_, syncCacheHost_);
+        LazyForEachUtils::ToggleParentSyncCacheLayout(Claim(this), true, allow, isRepeat_, syncCacheHost_);
+    }
+    isAllowReuseInAnimation_ = allow;
 }
 
 bool ArkoalaLazyNode::IsChildInAnimation(int32_t rid)
@@ -417,6 +593,7 @@ void ArkoalaLazyNode::RequestSyncTree()
     children_.clear();
     // re-assemble children_
     PostIdleTask();
+    needClearCacheAfterAnimation_ = AnimationUtils::IsImplicitAnimationOpen() && IsAllowAnimation();
 }
 
 RefPtr<FrameNode> ArkoalaLazyNode::GetFrameNode(int32_t index)
@@ -515,6 +692,7 @@ void ArkoalaLazyNode::PostIdleTask()
         if (!node->removingNodeList_.empty()) {
             node->PostIdleTask();
         }
+        node->ClearCacheAfterAnimation();
     });
 }
 

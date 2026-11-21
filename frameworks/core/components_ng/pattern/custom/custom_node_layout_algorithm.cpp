@@ -25,7 +25,20 @@ void CustomNodeLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 {
     auto host = DynamicCast<CustomMeasureLayoutNode>(layoutWrapper->GetHostNode());
     CHECK_NULL_VOID(host);
-    if (renderFunction_ && host) {
+    // Asynchronous loading for deferred custom components: the Measure entry is the
+    // deferral hook for this node kind. The first-build gate is evaluated inside
+    // TryStartAsyncLoad (single source of truth); while deferred neither the
+    // content build block below nor the JS measure callback runs - the placeholder
+    // subtree is measured by the default path.
+    host->TryStartAsyncLoad();
+    const bool asyncDeferred = host->IsAsyncLoadDeferred();
+    if (asyncDeferred) {
+        // The pattern keeps the single master copy of the render function; dropping
+        // this wrapper's copy avoids a stale double build once the async path has
+        // consumed the master.
+        renderFunction_ = nullptr;
+    }
+    if (!asyncDeferred && renderFunction_ && host) {
         {
             ACE_SCOPED_TRACE("CustomNode:OnAppear");
             host->FireOnAppear();
@@ -64,6 +77,10 @@ void CustomNodeLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
                 }
             }
         }
+        // The build finished here (children mounted, or legitimately none):
+        // an empty component must not look "unbuilt" to the deferral gate on a
+        // later mount.
+        host->MarkContentBuilt();
         host->CustomNodeBase::FireTriggerLifecycleFunc(CustomNodeBase::LifeCycleEvent::ON_BUILD);
     }
     {
@@ -74,7 +91,9 @@ void CustomNodeLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     }
 
     // call js measure
-    if (!host->FireOnMeasure(layoutWrapper)) {
+    // While the asynchronous build is deferred the custom measure
+    // callback is suppressed (first dispatch happens on the load-complete frame).
+    if (asyncDeferred || !host->FireOnMeasure(layoutWrapper)) {
         // use normal measure step.
         auto layoutConstraint = layoutWrapper->GetLayoutProperty()->CreateChildConstraint();
         const auto& children = layoutWrapper->GetAllChildrenWithBuild();
@@ -93,7 +112,10 @@ void CustomNodeLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 void CustomNodeLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 {
     auto host = DynamicCast<CustomMeasureLayoutNode>(layoutWrapper->GetHostNode());
-    if (!host->FireOnLayout(layoutWrapper)) {
+    CHECK_NULL_VOID(host);
+    // The custom layout callback is suppressed while the asynchronous
+    // build is deferred; the default path lays out the placeholder subtree.
+    if (host->IsAsyncLoadDeferred() || !host->FireOnLayout(layoutWrapper)) {
         PerformLayout(layoutWrapper);
         for (auto&& child : layoutWrapper->GetAllChildrenWithBuild()) {
             child->Layout();

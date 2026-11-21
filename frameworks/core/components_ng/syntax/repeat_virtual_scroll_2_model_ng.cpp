@@ -102,6 +102,10 @@ void RepeatVirtualScroll2ModelNG::UpdateL1Rid4Index(int32_t repeatElmtId, uint32
         repeatNode = ElementRegister::GetInstance()->GetSpecificItemById<RepeatVirtualScroll2Node>(repeatElmtId);
     }
     CHECK_NULL_VOID(repeatNode);
+    repeatNode->FireOnUpdateDirty();
+    // record the pre-rerender L1 mapping before UpdateTotalCount: it may run a
+    // DoSetActiveChildRange (totalCount 0) that needs the old L1 indices
+    repeatNode->RecordPrevL1Rid4Index();
     repeatNode->UpdateTotalCount(totalCount);
     repeatNode->UpdateArrLen(arrLen);
     repeatNode->UpdateL1Rid4Index(l1Rd4Index);
@@ -133,6 +137,18 @@ void RepeatVirtualScroll2ModelNG::SetController(int32_t repeatElmtId,
     if (repeatNode->TryBindController()) {
         bindController(repeatNode);
     }
+}
+
+void RepeatVirtualScroll2ModelNG::SetAllowReuseInAnimation(
+    int32_t repeatElmtId, std::optional<bool> allowReuseInAnimation)
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto repeatNode = AceType::DynamicCast<RepeatVirtualScroll2Node>(stack->GetMainElementNode());
+    if (repeatNode == nullptr) {
+        repeatNode = ElementRegister::GetInstance()->GetSpecificItemById<RepeatVirtualScroll2Node>(repeatElmtId);
+    }
+    CHECK_NULL_VOID(repeatNode);
+    repeatNode->SetAllowReuseInAnimation(allowReuseInAnimation);
 }
 
 void RepeatVirtualScroll2ModelNG::SetItemDragHandler(int32_t repeatElmtId, std::function<void(int32_t)>&& onLongPress,

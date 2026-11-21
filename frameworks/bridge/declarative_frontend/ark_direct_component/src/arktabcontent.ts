@@ -54,6 +54,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabContentSidebarSectionModifier.identity, TabContentSidebarSectionModifier, value);
         return this;
       }
+      keepAlive(value: boolean): this {
+        modifierWithKey(this._modifiersWithKeys, TabContentKeepAliveModifier.identity, TabContentKeepAliveModifier, value);
+        return this;
+      }
     }
     
     class TabContentTabBarModifier extends ModifierWithKey<SubTabBarStyle | BottomTabBarStyle> {
@@ -195,6 +199,24 @@ function loadComponent(): ComponentObj | undefined {
           this.stageValue.titleStyle !== this.value.titleStyle;
       }
     }
+
+    class TabContentKeepAliveModifier extends ModifierWithKey<boolean> {
+      constructor(value: boolean) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabcontentkeepalive');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabContent.resetKeepAlive(node);
+        } else {
+          getUINativeModule().tabContent.setKeepAlive(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return this.stageValue !== this.value;
+      }
+    }
     
     loadComponent.componentObj = { 'component': ArkTabContentComponent };
   }
@@ -257,6 +279,10 @@ class JSTabContent extends JSContainerBase {
 
   static sidebarSection(value: any): void {
     getUINativeModule().tabContent.setSidebarSection(true, value);
+  }
+
+  static keepAlive(value: any): void {
+    getUINativeModule().tabContent.setKeepAlive(true, value);
   }
 
   static attributeModifier(modifier: any): void {

@@ -2818,17 +2818,23 @@ HWTEST_F(TabBarPatternTestNg, OnRestoreInfo, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
+    // Set restore info with index 2, indicator_ aligned to 2.
     std::string restoreInfo_ = R"({"Index":2})";
     auto info = JsonUtil::ParseJsonString(restoreInfo_);
     tabBarPattern_->indicator_ = 2;
+    // tabBarStyles_ has fewer entries than the restored index, so OnRestoreInfo
+    // should clamp/ignore the out-of-range index without crashing.
     tabBarPattern_->tabBarStyles_ = { TabBarStyle::NOSTYLE, TabBarStyle::SUBTABBATSTYLE };
     EXPECT_EQ(tabBarPattern_->tabBarStyles_.size(), 2);
     tabBarPattern_->OnRestoreInfo(restoreInfo_);
 
+    // tabBarStyles_ now covers the restored index; OnRestoreInfo should apply
+    // the animation duration from the Tabs pattern (NO_ANIMATION).
     tabBarPattern_->tabBarStyles_ = { TabBarStyle::NOSTYLE, TabBarStyle::SUBTABBATSTYLE,
     TabBarStyle::BOTTOMTABBATSTYLE };
     pattern_->SetAnimateMode(TabAnimateMode::NO_ANIMATION);
     tabBarPattern_->OnRestoreInfo(restoreInfo_);
+    // After restore, animationDuration should be populated from the Tabs config.
     EXPECT_EQ(tabBarPattern_->GetAnimationDuration().has_value(), true);
 }
 /**
@@ -2844,6 +2850,7 @@ HWTEST_F(TabBarPatternTestNg, FromJson, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
+    // Prepare indicator styles and selected modes so ToJsonValue has data to serialize.
     InspectorFilter filter;
     IndicatorStyle style1;
     style1.height = Dimension(12);
@@ -2853,9 +2860,11 @@ HWTEST_F(TabBarPatternTestNg, FromJson, TestSize.Level1)
     tabBarPattern_->indicatorStyles_ = { style1, style2 };
     tabBarPattern_->tabBarStyles_ = { TabBarStyle::NOSTYLE, TabBarStyle::SUBTABBATSTYLE };
 
+    // Round-trip: serialize to JSON then parse back via FromJson.
     auto json = JsonUtil::Create(true);
     tabBarPattern_->ToJsonValue(json, filter);
     tabBarPattern_->FromJson(json);
+    // After round-trip, tabBarStyles array should preserve the original count of 2.
     auto tabBarStyles = JsonUtil::ParseJsonString(json->GetString("tabBarStyles"));
     EXPECT_EQ(tabBarStyles->GetArraySize(), 2);
 }
@@ -2874,15 +2883,20 @@ HWTEST_F(TabBarPatternTestNg, ApplyTurnPageRateToIndicator, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
+    // Apply a turn-page rate that increases the indicator offset.
     tabBarPattern_->ApplyTurnPageRateToIndicator(0.9f);
 
+    // With a lower initial turnPageRate_, applying a higher rate should still
+    // produce a valid (clamped) offset without exceeding the threshold.
     tabBarPattern_->turnPageRate_ = 0.5f;
     EXPECT_EQ(tabBarPattern_->turnPageRate_ <= 0.673f, true);
     tabBarPattern_->ApplyTurnPageRateToIndicator(0.9f);
 
+    // Decreasing the rate should move the indicator back toward the origin.
     tabBarPattern_->turnPageRate_ = 0.9f;
     tabBarPattern_->ApplyTurnPageRateToIndicator(0.3f);
 
+    // In RTL mode the indicator offset direction is mirrored.
     tabBarPattern_->isRTL_ = true;
     tabBarPattern_->ApplyTurnPageRateToIndicator(0.3f);
     EXPECT_EQ(tabBarPattern_->currentIndicatorOffset_, 360);
@@ -2900,20 +2914,25 @@ HWTEST_F(TabBarPatternTestNg, HandleBottomTabBarAnimation, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
+    // Only one NOSTYLE entry: indicator (1) equals tabBarStyles size, boundary case.
     tabBarPattern_->tabBarStyles_ = { TabBarStyle::NOSTYLE };
     tabBarPattern_->indicator_ = 1;
     tabBarPattern_->HandleBottomTabBarAnimation(1);
     EXPECT_EQ(tabBarPattern_->indicator_, tabBarPattern_->tabBarStyles_.size());
 
+    // Forward animation from index 0.
     tabBarPattern_->indicator_ = 0;
     tabBarPattern_->HandleBottomTabBarAnimation(1);
 
+    // Negative indicator should be guarded against underflow.
     tabBarPattern_->indicator_ = -1;
     tabBarPattern_->HandleBottomTabBarAnimation(1);
 
+    // Backward animation from index 0 should clamp at 0.
     tabBarPattern_->indicator_ = 0;
     tabBarPattern_->HandleBottomTabBarAnimation(-1);
 
+    // Mixed styles: animating past a BOTTOMTABBATSTYLE entry should switch style.
     tabBarPattern_->tabBarStyles_ = { TabBarStyle::BOTTOMTABBATSTYLE, TabBarStyle::NOSTYLE };
     tabBarPattern_->indicator_ = 1;
     tabBarPattern_->HandleBottomTabBarAnimation(1);
@@ -2932,10 +2951,13 @@ HWTEST_F(TabBarPatternTestNg, SetOnTabBarItemsChangeEvent, TestSize.Level1)
     CreateTabContents(TABCONTENT_NUMBER);
     CreateTabsDone(model);
 
+    // Notify before the event callback is set: should be a safe no-op.
     OnTabBarItemsChangeEvent func = [](){};
     tabBarPattern_->NotifyTabBarItemsChange();
+    // Register the callback, then notify again to trigger the registered event.
     tabBarPattern_->SetOnTabBarItemsChangeEvent(std::move(func));
     tabBarPattern_->NotifyTabBarItemsChange();
+    // The callback should now be registered (non-null).
     EXPECT_NE(tabBarPattern_->onTabBarItemsChangeEvent_, nullptr);
 }
 

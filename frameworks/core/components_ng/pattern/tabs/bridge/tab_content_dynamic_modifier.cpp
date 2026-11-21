@@ -335,6 +335,17 @@ void ResetSidebarSectionImpl(ArkUINodeHandle node)
 {
     (void)node;
 }
+
+void SetKeepAliveImpl(ArkUINodeHandle node, ArkUI_Bool keepAlive)
+{
+    (void)node;
+    (void)keepAlive;
+}
+
+void ResetKeepAliveImpl(ArkUINodeHandle node)
+{
+    (void)node;
+}
 #endif
 } // namespace
 
@@ -698,6 +709,20 @@ void ResetSidebarSection(ArkUINodeHandle node)
     TabContentModelNG::SetSidebarSection(frameNode, section);
 }
 
+void SetKeepAlive(ArkUINodeHandle node, ArkUI_Bool keepAlive)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabContentModelNG::SetKeepAlive(frameNode, keepAlive);
+}
+
+void ResetKeepAlive(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabContentModelNG::SetKeepAlive(frameNode, false);
+}
+
 namespace NodeModifier {
 const ArkUITabContentModifier* GetTabContentDynamicModifier()
 {
@@ -741,6 +766,8 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
             .setTabBarBadge = SetTabBarBadge,
             .setSidebarSection = SetSidebarSection,
             .resetSidebarSection = ResetSidebarSection,
+            .setKeepAlive = SetKeepAlive,
+            .resetKeepAlive = ResetKeepAlive,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -784,6 +811,8 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
         .setTabBarBadge = SetTabBarBadgeImpl,
         .setSidebarSection = SetSidebarSectionImpl,
         .resetSidebarSection = ResetSidebarSectionImpl,
+        .setKeepAlive = SetKeepAliveImpl,
+        .resetKeepAlive = ResetKeepAliveImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

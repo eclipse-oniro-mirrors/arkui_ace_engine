@@ -911,6 +911,7 @@ void TabContentBridge::RegisterTabContentAttributes(panda::Local<panda::ObjectRe
         "setTabContentOnWillHide", "resetTabContentOnWillHide",
         "setTabBarVisibility", "resetTabBarVisibility",
         "setSidebarSection", "resetSidebarSection",
+        "setKeepAlive", "resetKeepAlive",
     };
     Local<panda::JSValueRef> funcValues[] = {
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::Create),
@@ -931,6 +932,8 @@ void TabContentBridge::RegisterTabContentAttributes(panda::Local<panda::ObjectRe
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetTabBarVisibility),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::SetSidebarSection),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetSidebarSection),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::SetKeepAlive),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabContentBridge::ResetKeepAlive),
     };
     auto tabContent = panda::ObjectRef::NewWithNamedProperties(
         vm, ArraySize(functionNames), functionNames, funcValues);
@@ -1327,6 +1330,33 @@ ArkUINativeModuleValue TabContentBridge::ResetSidebarSection(ArkUIRuntimeCallInf
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabContentModifier()->resetSidebarSection(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabContentBridge::SetKeepAlive(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABCONTENT_ARG_INDEX_0);
+    Local<JSValueRef> keepAliveArg = runtimeCallInfo->GetCallArgRef(TABCONTENT_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    ArkUI_Bool keepAlive = false;
+    if (!keepAliveArg.IsNull() && !keepAliveArg->IsUndefined() && keepAliveArg->IsBoolean()) {
+        keepAlive = keepAliveArg->ToBoolean(vm)->Value();
+    }
+    GetArkUINodeModifiers()->getTabContentModifier()->setKeepAlive(nativeNode, keepAlive);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabContentBridge::ResetKeepAlive(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getTabContentModifier()->resetKeepAlive(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 } // namespace OHOS::Ace::NG

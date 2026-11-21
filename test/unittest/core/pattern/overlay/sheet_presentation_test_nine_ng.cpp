@@ -32,6 +32,9 @@
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 #include "core/components_ng/pattern/sheet/sheet_presentation_pattern.h"
 #include "core/components_ng/pattern/sheet/sheet_style.h"
+#include "core/components_ng/pattern/sheet/sheet_theme.h"
+#include "core/components_ng/pattern/sheet/bridge/sheet_pattern_inner_modifier.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/pattern/sheet/sheet_view.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 
@@ -209,6 +212,68 @@ HWTEST_F(SheetPresentationTestNineNg, ApplySheetImmersiveStrategyDefaults003, Te
     EXPECT_EQ(sheetStyle.titleBarHoverMode.value(), SheetTitleBarHoverMode::STACK);
     EXPECT_FALSE(sheetStyle.titleBarBackgroundBlur.has_value());
     pipeline->ApplyDefaultImmersiveStrategy({});
+    SheetPresentationTestNineNg::TearDownTestCase();
+}
+
+/**
+ * @tc.name: SheetUpdateBackgroundColorIfNoMaterialColor001
+ * @tc.desc: Verify SheetUpdateBackgroundColorIfNoMaterialColor updates the sheet background color with the theme
+ *           color when no material color is configured, and keeps the existing color when a material color is set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetPresentationTestNineNg, SheetUpdateBackgroundColorIfNoMaterialColor001, TestSize.Level1)
+{
+    SheetPresentationTestNineNg::SetUpTestCase();
+    auto callback = [](const std::string&) {};
+    auto sheetNode = FrameNode::CreateFrameNode("Sheet", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<SheetPresentationPattern>(0, "SheetPresentation", std::move(callback)));
+    ASSERT_NE(sheetNode, nullptr);
+    auto* sheetPatternModifier = InnerModifier::GetSheetPatternInnerModifier();
+    ASSERT_NE(sheetPatternModifier, nullptr);
+    auto renderContext = sheetNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+
+    auto sheetTheme = AceType::MakeRefPtr<SheetTheme>();
+    const Color themeColor(0xff123456);
+    sheetTheme->sheetBackgoundColor_ = themeColor;
+    SheetStyle sheetStyle;
+
+    /**
+     * @tc.steps: step1. systemMaterial is null -> background color is updated to the theme color.
+     * @tc.expected: background color equals sheetTheme->GetSheetBackgoundColor().
+     */
+    renderContext->UpdateBackgroundColor(Color::RED);
+    sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(sheetNode, sheetStyle, sheetTheme);
+    auto backgroundColor = renderContext->GetBackgroundColor();
+    ASSERT_TRUE(backgroundColor.has_value());
+    EXPECT_EQ(backgroundColor.value(), themeColor);
+
+    /**
+     * @tc.steps: step2. immersiveOptions exists but materialColor has no value -> updated to the theme color.
+     * @tc.expected: background color eauals sheetTheme->GetSheetBackgoundColor().
+     */
+    auto material = AceType::MakeRefPtr<UiMaterial>();
+    sheetStyle.systemMaterial = material;
+    ImmersiveOptions options;
+    material->SetImmersiveOptions(options);
+    renderContext->UpdateBackgroundColor(Color::RED);
+    sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(sheetNode, sheetStyle, sheetTheme);
+    backgroundColor = renderContext->GetBackgroundColor();
+    ASSERT_TRUE(backgroundColor.has_value());
+    EXPECT_EQ(backgroundColor.value(), themeColor);
+
+    /**
+     * @tc.steps: step3. materialColor has a value -> background color is not overwritten.
+     * @tc.expected: background color keeps the previous value.
+     */
+    options.materialColor = Color::BLUE;
+    material->SetImmersiveOptions(options);
+    renderContext->UpdateBackgroundColor(Color::RED);
+    sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(sheetNode, sheetStyle, sheetTheme);
+    backgroundColor = renderContext->GetBackgroundColor();
+    ASSERT_TRUE(backgroundColor.has_value());
+    EXPECT_EQ(backgroundColor.value(), Color::RED);
+
     SheetPresentationTestNineNg::TearDownTestCase();
 }
 } // namespace OHOS::Ace::NG

@@ -148,7 +148,9 @@ class RecoverableStorageImpl extends StorageHelper {
     this.throwIfTypeIsNotSupported(options.type);
     this.throwIfConnectOptionsInvalid(options);
     const instanceId: number = this.getInstanceIdFromComponent(options.component);
-    if (instanceId === RecoverableStorageImpl.INVALID_INSTANCE_ID) {
+    // NaN === NaN is always false — never compare against INVALID_INSTANCE_ID directly;
+    // use the finite check (same as keys/remove/setRestoredData entries).
+    if (!RecoverableStorageImpl.isValidInstanceId(instanceId)) {
       throw new BusinessError(RECOVERABLE_STORAGE_UNSUPPORTED_TYPE,
         RecoverableStorageImpl.MISSING_COMPONENT_MESSAGE_);
     }
@@ -294,7 +296,10 @@ class RecoverableStorageImpl extends StorageHelper {
       try {
         // ADR-14: read-only properties (getter-only / @Computed / non-writable) are
         // skipped from the snapshot, silently (no callback — skipping is not an error).
-        serialized = DataCoder.stringify(entry.value, false, RecoverableStorageImpl.readOnlyFilter_);
+        // allowNullPropertyValues=true (opt-in, RecoverableStorage only): null fields are
+        // union-type-legal in recoverable state and round-trip as native JSON null;
+        // PersistenceV2 callers of DataCoder keep the historical behavior.
+        serialized = DataCoder.stringify(entry.value, false, RecoverableStorageImpl.readOnlyFilter_, true);
       } catch (err) {
         // INV-5: serialization failure must not crash nor block other entries
         this.notifyErrorFor(partition, key, 'serialization',

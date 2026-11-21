@@ -28,11 +28,35 @@
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_constants.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/components_ng/manager/scroll_adjust/scroll_adjust_manager.h"
 
 namespace OHOS::Ace::NG {
+uint64_t WaterFlowModelNG::BeginEdgeUpdate(FrameNode* frameNode, bool header)
+{
+    CHECK_NULL_RETURN(frameNode, 0);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_RETURN(pattern, 0);
+    return pattern->BeginEdgeUpdate(header);
+}
+
+void WaterFlowModelNG::SetEdge(FrameNode* frameNode, bool header, const RefPtr<UINode>& content, uint64_t generation)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetEdge(header, content, generation);
+}
+
+void WaterFlowModelNG::SetSticky(FrameNode* frameNode, StickyStyle style)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetSticky(style);
+}
 
 #define SCROLLABLE_WATERFLOW_ATTRIBUTE "Scrollable.WaterFlowAttribute."
 

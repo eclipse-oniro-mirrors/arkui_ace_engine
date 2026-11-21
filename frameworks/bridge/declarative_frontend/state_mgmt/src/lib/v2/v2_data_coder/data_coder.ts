@@ -35,9 +35,14 @@ class DataCoder {
   private static visitedSources_ = new Map<object, object>();
 
   /**
-   * Serialize an object to a JSON2
+   * Serialize an object to a JSON2.
+   * allowNullPropertyValues (default false, opt-in): only RecoverableStorage passes true —
+   * null property values serialize as native JSON null. Default callers (PersistenceV2 /
+   * AppStorageV2) keep the historical behavior (TypeError on null) untouched.
    */
-  public static stringify<T>(value: T, forceLegacyFormat: boolean = false, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): string {
+  public static stringify<T>(value: T, forceLegacyFormat: boolean = false,
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false,
+    allowNullPropertyValues: boolean = false): string {
     if (forceLegacyFormat) {
       return JSONCoder.stringify(value);
     }
@@ -46,7 +51,7 @@ class DataCoder {
       ? UIUtilsImpl.instance().getTarget(value)
       : value;
 
-    const result = this.FORMAT_TAG + JSON2.stringify(origValue, ignoreReadOnlyProperties);
+    const result = this.FORMAT_TAG + JSON2.stringify(origValue, ignoreReadOnlyProperties, allowNullPropertyValues);
 
     if (ObserveV2.IsMakeObserved(value)) {
       DataCoder.touchAll(value as unknown as object);

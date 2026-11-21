@@ -19,7 +19,7 @@
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
 

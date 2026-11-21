@@ -134,11 +134,24 @@ void *EaWorkerTaskWrapperImpl::GetCurrentAniEnv()
 
 bool EaWorkerTaskWrapperImpl::HasAttachCurrentThread(pthread_t tid)
 {
+    std::shared_lock<std::shared_mutex> lock(attachMutex_);
     if (threadId_ == tid) {
         return true;
     }
 
     return attachCurrentThreads_.find(tid) != attachCurrentThreads_.end();
+}
+
+void EaWorkerTaskWrapperImpl::AddAttachedThread(pthread_t tid)
+{
+    std::unique_lock<std::shared_mutex> lock(attachMutex_);
+    attachCurrentThreads_.insert(tid);
+}
+
+void EaWorkerTaskWrapperImpl::RemoveAttachedThread(pthread_t tid)
+{
+    std::unique_lock<std::shared_mutex> lock(attachMutex_);
+    attachCurrentThreads_.erase(tid);
 }
 
 void EaWorkerTaskWrapperImpl::Call(const TaskExecutor::Task& task, PriorityType priorityType)
@@ -194,7 +207,7 @@ void EaWorkerTaskWrapperImpl::Call(const TaskExecutor::Task& task,
             GetVM(hostInstanceId_, &vm);
             CHECK_NULL_VOID(vm);
             vm->DetachCurrentThread();
-            attachCurrentThreads_.erase(tid);
+            RemoveAttachedThread(tid);
         }
     };
 
@@ -206,7 +219,7 @@ void EaWorkerTaskWrapperImpl::Call(const TaskExecutor::Task& task,
     }
 
     if (!attachCurrentThread) {
-        attachCurrentThreads_.insert(tid);
+        AddAttachedThread(tid);
     }
 
     int64_t ts = GetSysTimestamp();

@@ -21,6 +21,18 @@
 #undef PRIVATE
 #undef PROTECTED
 
+#define private public
+#define protected public
+#include "base/memory/referenced.h"
+#include "core/common/font_manager.h"
+#include "core/common/font_loader.h"
+#include "core/components/common/properties/text_style.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/common/mock_font_manager.h"
+#undef private
+#undef protected
+
 using namespace testing;
 using namespace testing::ext;
 
@@ -163,6 +175,98 @@ HWTEST_F(MeasureUtilTest, MeasureTextSize005, TestSize.Level1)
     Size result = MeasureUtil::MeasureTextSize(context);
     EXPECT_GE(result.Width(), 0.0);
     EXPECT_GE(result.Height(), 0.0);
+}
+
+/**
+ * @tc.name: MeasureTextSizeWithFontFamily001
+ * @tc.desc: Verify MeasureTextSize with single font family from textStyle
+ * @tc.type: FUNC
+ */
+HWTEST_F(MeasureUtilTest, MeasureTextSizeWithFontFamily001, TestSize.Level1)
+{
+    TextStyle textStyle;
+    textStyle.SetFontSize(Dimension(20.0, DimensionUnit::FP));
+    textStyle.SetFontFamilies(std::vector<std::string> { "sans-serif" });
+    Size result = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, "SingleFamily");
+    EXPECT_GT(result.Width(), 0.0);
+    EXPECT_GT(result.Height(), 0.0);
+}
+
+/**
+ * @tc.name: MeasureTextSizeWithFontFamily002
+ * @tc.desc: Verify MeasureTextSize with multiple font families joined by comma
+ * @tc.type: FUNC
+ */
+HWTEST_F(MeasureUtilTest, MeasureTextSizeWithFontFamily002, TestSize.Level1)
+{
+    TextStyle textStyle;
+    textStyle.SetFontSize(Dimension(20.0, DimensionUnit::FP));
+    textStyle.SetFontFamilies(std::vector<std::string> { "sans-serif", "serif", "monospace" });
+    Size result = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, "MultipleFamilies");
+    EXPECT_GT(result.Width(), 0.0);
+    EXPECT_GT(result.Height(), 0.0);
+}
+
+/**
+ * @tc.name: MeasureTextSizeWithFontFamily003
+ * @tc.desc: Verify MeasureTextSize falls back to app custom font when textStyle has no font families
+ * @tc.type: FUNC
+ */
+HWTEST_F(MeasureUtilTest, MeasureTextSizeWithFontFamily003, TestSize.Level1)
+{
+    NG::MockPipelineContext::SetUp();
+    auto pipelineContext = NG::MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    MockContainer::SetUp(pipelineContext);
+    auto fontManager = AceType::MakeRefPtr<MockFontManager>();
+    pipelineContext->fontManager_ = fontManager;
+    FontManager::appCustomFont_ = "AppCustomFont";
+
+    TextStyle textStyle;
+    textStyle.SetFontSize(Dimension(20.0, DimensionUnit::FP));
+    Size result = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, "FallbackFont");
+    EXPECT_GT(result.Width(), 0.0);
+    EXPECT_GT(result.Height(), 0.0);
+
+    FontManager::appCustomFont_ = "";
+    MockContainer::TearDown();
+    NG::MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: MeasureTextSizeWithFontFamily004
+ * @tc.desc: Verify MeasureTextSize with no font families and null font manager
+ * @tc.type: FUNC
+ */
+HWTEST_F(MeasureUtilTest, MeasureTextSizeWithFontFamily004, TestSize.Level1)
+{
+    NG::MockPipelineContext::SetUp();
+    auto pipelineContext = NG::MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    MockContainer::SetUp(pipelineContext);
+
+    TextStyle textStyle;
+    textStyle.SetFontSize(Dimension(20.0, DimensionUnit::FP));
+    Size result = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, "NullFontManager");
+    EXPECT_GT(result.Width(), 0.0);
+    EXPECT_GT(result.Height(), 0.0);
+
+    MockContainer::TearDown();
+    NG::MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: MeasureTextSizeWithFontFamily005
+ * @tc.desc: Verify MeasureTextSize with no font families and no pipeline context
+ * @tc.type: FUNC
+ */
+HWTEST_F(MeasureUtilTest, MeasureTextSizeWithFontFamily005, TestSize.Level1)
+{
+    TextStyle textStyle;
+    textStyle.SetFontSize(Dimension(20.0, DimensionUnit::FP));
+    Size result = MeasureUtil::MeasureTextSizeWithFontFamily(textStyle, "NoPipeline");
+    EXPECT_GT(result.Width(), 0.0);
+    EXPECT_GT(result.Height(), 0.0);
 }
 
 } // namespace OHOS::Ace

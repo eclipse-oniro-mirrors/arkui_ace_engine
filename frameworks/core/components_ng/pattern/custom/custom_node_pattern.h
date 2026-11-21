@@ -41,6 +41,22 @@ public:
         renderFunction_ = renderFunction;
     }
 
+    // Executes the render function under a deadline (asynchronous loading,
+    // CustomMeasureLayoutNode host). On timeout the function is kept so a later
+    // slice resumes in place; on any other outcome it is consumed.
+    RefPtr<UINode> InvokeRenderFunction(int64_t deadline, bool& isTimeout)
+    {
+        isTimeout = false;
+        if (!renderFunction_) {
+            return nullptr;
+        }
+        auto child = renderFunction_(deadline, isTimeout);
+        if (!isTimeout) {
+            renderFunction_ = nullptr;
+        }
+        return child;
+    }
+
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
 
 private:

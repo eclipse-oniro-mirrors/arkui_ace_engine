@@ -997,6 +997,9 @@ HWTEST_F(MenuItemTestNg, MenuItemPaintMethod008, TestSize.Level1)
  */
 HWTEST_F(MenuItemTestNg, MenuItemPaintMethod009, TestSize.Level1)
 {
+    /**
+     * @tc.steps: step1. Create MenuItem and set geometry on leftRow and rightRow.
+     */
     MenuItemModelNG MneuItemModelInstance;
     MenuItemProperties itemOption;
     MneuItemModelInstance.Create(itemOption);
@@ -1012,14 +1015,18 @@ HWTEST_F(MenuItemTestNg, MenuItemPaintMethod009, TestSize.Level1)
     ASSERT_NE(rightRow, nullptr);
     rightRow->GetGeometryNode()->SetFrameOffset(OffsetF(RIGHT_ROW_X, 0.0f));
     rightRow->GetGeometryNode()->SetFrameSize(SizeF(RIGHT_ROW_WIDTH, MENU_ITEM_SIZE_HEIGHT));
-
+    /**
+     * @tc.steps: step2. Set paint properties with INVALID Unit margins to trigger anchoring.
+     */
     RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
     paintProp->UpdateStartMargin(Dimension(0.0f, DimensionUnit::INVALID));
     paintProp->UpdateEndMargin(Dimension(0.0f, DimensionUnit::INVALID));
     paintProp->UpdateStrokeWidth(Dimension(1.0f, DimensionUnit::PX));
     paintProp->UpdateDividerColor(Color::RED);
     paintProp->UpdateNeedDivider(true);
-
+    /**
+     * @tc.steps: step3. Execute GetOverlayDrawFunction and verify DrawPath is called.
+     */
     RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
     Testing::MockCanvas canvas;
     EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
