@@ -20,6 +20,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 #include "accessibility_config.h"
@@ -149,6 +150,10 @@ private:
         const NG::PointF& point;
         const std::vector<int64_t>& mountBindIds;
         AccessibilityHoverTestPathForThird& path;
+        // Structural cycle guard for the hit-test walk: provider ids already entered in this
+        // walk. Not a request budget: it never caps nodes, edges, depth or bytes; a repeated
+        // id is simply skipped so a cyclic edge cannot re-enter the walk.
+        std::unordered_set<int64_t> visited;
     };
     bool HoverPathForThirdRecursive(
         const AccessibilityElementInfo& nodeInfo, ThirdHoverContext& context, size_t depth);

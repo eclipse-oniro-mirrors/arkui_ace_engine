@@ -165,6 +165,10 @@ bool AccessibilityHoverManagerForThirdNG::HoverChildrenForThird(
 {
     const auto childrenIds = nodeInfo.GetChildIds();
     for (auto childId = childrenIds.rbegin(); childId != childrenIds.rend(); ++childId) {
+        // Skip a repeated id before it is queried so a cyclic edge never re-enters the walk.
+        if (!context.visited.insert(*childId).second) {
+            continue;
+        }
         AccessibilityElementInfo childInfo;
         if (!GetElementInfoForThird(*childId, childInfo, context.hostElementId)) {
             continue;
@@ -223,6 +227,14 @@ AccessibilityHoverTestPathForThird AccessibilityHoverManagerForThirdNG::HoverPat
         rootInfo.GetHitTestBehavior().c_str(), mountBindIds.size());
     AccessibilityHoverTestPathForThird path;
     ThirdHoverContext context { hostElementId, point, mountBindIds, path };
+    // Seed the cycle guard with the root in the provider's raw id space: child ids are
+    // unspliced, so the spliced accessibility id is de-spliced first. The guard is structural
+    // only - unlike the removed request budgets it never aborts or truncates the walk.
+    int64_t rootId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t rootTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        rootInfo.GetAccessibilityId(), rootId, rootTreeId);
+    context.visited.insert(rootId);
     HoverPathForThirdRecursive(rootInfo, context, 0);
     TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
         "third hover hit-test result: pathSize=%{public}zu, hitId=%{public}" PRId64,

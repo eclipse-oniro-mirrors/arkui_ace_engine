@@ -170,9 +170,18 @@ bool FocusStrategyOsalThird::CanSendHoverWithTargetIdByReadableRules(
     int64_t currentId, int64_t& targetId)
 {
     targetId = currentId;
-    UpdateOriginNodeInfo(currentId);
-    auto checkNode = GetCurrentCheckNode();
-    CHECK_NULL_RETURN(checkNode, false);
+    // The hover readable-rules check serves the provider's own registered tree: one per-node
+    // query plus the ancestor chain, with no full-tree assembly and no request budgets. The
+    // empty map pair keeps GetAceParent on the per-parent provider-query path.
+    auto origin = std::make_shared<ArkUI_AccessibilityElementInfo>();
+    if (!JsThirdProviderInteractionOperation::FindNativeInfoById(accessibilityProvider_, currentId, origin)) {
+        // Fail-open, as before the tree assembly: the id comes from the provider's own hit-test
+        // answer, so the enter event still goes out with the hovered id. The event send itself
+        // re-queries the provider and drops the event if that query fails.
+        return true;
+    }
+    auto checkNode = std::make_shared<ThirdRulesCheckNode>(
+        origin, origin->GetElementId(), accessibilityProvider_);
     std::shared_ptr<FocusRulesCheckNode> targetNode;
     auto changeResult = NeedChangeToReadableNodeThroughAncestor(checkNode, targetNode, FocusRuleType::DEFAULT);
     CHECK_NE_RETURN(changeResult, true, true); // changeResult false means not change, send targetId with currentId
