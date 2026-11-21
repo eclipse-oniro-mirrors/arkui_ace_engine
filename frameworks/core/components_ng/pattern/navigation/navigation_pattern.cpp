@@ -9327,6 +9327,9 @@ void NavigationPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& 
     }
     auto reportNode = isPopPage ? GetHost() : keyNode;
     CHECK_NULL_VOID(reportNode);
+    if (!reportNode->IsOnMainTree()) {
+        return;
+    }
     if (keyNode || mgr->IsStartEventReportEnabled()) {
         mgr->OnTransitionAdded(reportNode->GetId());
     }

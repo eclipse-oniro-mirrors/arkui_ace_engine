@@ -700,6 +700,8 @@ HWTEST_F(NavigationPatternTestFiveNg, ContentChangeTransitionDetach001, TestSize
     auto secondPattern = secondDestination->GetPattern<NavDestinationPattern>();
     ASSERT_NE(secondPattern, nullptr);
     secondPattern->SetNavigationNode(AceType::Claim(navNode));
+    firstDestination->AttachToMainTree();
+    secondDestination->AttachToMainTree();
 
     pattern->ContentChangeOnTransitionStart(firstDestination);
     pattern->ContentChangeOnTransitionStart(secondDestination);
@@ -743,6 +745,7 @@ HWTEST_F(NavigationPatternTestFiveNg, ContentChangeTransitionReport001, TestSize
         V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     ASSERT_NE(destination, nullptr);
+    destination->AttachToMainTree();
     pattern->ContentChangeOnTransitionStart(destination);
     ASSERT_TRUE(contentChangeManager->IsTransitioning());
 
