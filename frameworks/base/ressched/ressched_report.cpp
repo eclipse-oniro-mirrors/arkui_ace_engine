@@ -69,6 +69,7 @@ constexpr int32_t ABILITY_OR_PAGE_SWITCH_START_EVENT = 0;
 constexpr int32_t ABILITY_OR_PAGE_SWITCH_END_EVENT = 1;
 constexpr int32_t MODULE_SERIALIZER_COUNT = 3;
 constexpr int32_t RSS_VSYNC_SCENE_LIST_VAULE = 2;
+constexpr size_t MAX_PAGE_INFO_LENGTH = 512;
 #ifdef FFRT_EXISTS
 constexpr int32_t LONG_FRAME_START_EVENT = 0;
 constexpr int32_t LONG_FRAME_END_EVENT = 1;
@@ -151,6 +152,15 @@ void LoadEventDisplayId(std::unordered_map<std::string, std::string>& payload, i
         auto displayId = container->GetDisplayId();
         payload[DISPLAY_ID] = std::to_string(displayId);
     }
+}
+
+std::string TruncatePageInfo(const std::string& pageName)
+{
+    if (pageName.size() <= MAX_PAGE_INFO_LENGTH) {
+        return pageName;
+    }
+    LOGD("report page info oversized: %{public}u, truncated", static_cast<uint32_t>(pageName.size()));
+    return pageName.substr(0, MAX_PAGE_INFO_LENGTH);
 }
 }
 
@@ -752,8 +762,8 @@ void ResSchedReport::HandlePageTransition(const PageTransitionInfo& pageTransiti
         return;
     }
     std::unordered_map<std::string, std::string> payload;
-    payload[FROM_PAGE_INFO] = pageTransitionInfo.fromPage;
-    payload[TO_PAGE_INFO] = pageTransitionInfo.toPage;
+    payload[FROM_PAGE_INFO] = TruncatePageInfo(pageTransitionInfo.fromPage);
+    payload[TO_PAGE_INFO] = TruncatePageInfo(pageTransitionInfo.toPage);
     payload[TRANSITION_MODE] = pageTransitionInfo.mode;
     payload[FROM_COMPONENT_NAME] = pageTransitionInfo.fromComponentName;
     payload[TO_COMPONENT_NAME] = pageTransitionInfo.toComponentName;
