@@ -33,6 +33,7 @@
 namespace OHOS::Ace::Framework {
 constexpr int32_t ARGS_COUNT_ONE = 1;
 constexpr int32_t ARGS_COUNT_TWO = 2;
+constexpr int32_t ARGS_COUNT_THREE = 3;
 constexpr int32_t ARG_INDEX_UNIT = 2;
 
 namespace {
@@ -112,7 +113,7 @@ void FinalizeOffscreenCanvas(napi_env env, void* data, void* hint)
     wrapper = nullptr;
 }
 
-JSOffscreenCanvas* CreateAndInitOffscreenCanvas(napi_env env, napi_value argv[])
+JSOffscreenCanvas* CreateAndInitOffscreenCanvas(napi_env env, napi_value (&argv)[ARGS_COUNT_THREE])
 {
     auto workCanvasHolder = std::make_unique<JSOffscreenCanvas>();
     auto* workCanvas = workCanvasHolder.get();
