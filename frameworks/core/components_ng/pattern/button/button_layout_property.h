@@ -22,6 +22,7 @@
 #include "core/components/dialog/dialog_properties.h"
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_v2/inspector/utils.h"
+#include "ui/properties/ui_material_enums.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -57,6 +58,7 @@ public:
         value->propMaxFontSize_ = CloneMaxFontSize();
         value->propHeightAdaptivePolicy_ = CloneHeightAdaptivePolicy();
         value->propTextAlign_ = CloneTextAlign();
+        value->propVibrancyMode_ = CloneVibrancyMode();
         return value;
     }
 
@@ -80,6 +82,7 @@ public:
         ResetMaxFontSize();
         ResetHeightAdaptivePolicy();
         ResetTextAlign();
+        ResetVibrancyMode();
     }
 
     void UpdateBackgroundColorFlagByUser(bool value)
@@ -115,6 +118,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(MinFontScale, float, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(MaxFontScale, float, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(TextAlign, Ace::TextAlign, PROPERTY_UPDATE_NORMAL);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(VibrancyMode, VibrancyMode, PROPERTY_UPDATE_NORMAL);
 
 private:
     ACE_DISALLOW_COPY_AND_MOVE(ButtonLayoutProperty);

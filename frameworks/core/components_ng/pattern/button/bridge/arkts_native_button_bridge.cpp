@@ -1452,6 +1452,37 @@ ArkUINativeModuleValue ButtonBridge::ResetMaxFontScale(ArkUIRuntimeCallInfo* run
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue ButtonBridge::SetVibrancyMode(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(vm, firstArg, nativeNode), true, panda::JSValueRef::Undefined(vm));
+    int mode = 0;
+    if (secondArg->IsNumber()) {
+        mode = secondArg->Int32Value(vm);
+    }
+    auto* buttonModifier = GetSafeButtonModifier();
+    CHECK_NULL_RETURN(buttonModifier, panda::JSValueRef::Undefined(vm));
+    buttonModifier->setButtonVibrancyMode(nativeNode, mode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ButtonBridge::ResetVibrancyMode(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    auto* buttonModifier = GetSafeButtonModifier();
+    CHECK_NULL_RETURN(buttonModifier, panda::JSValueRef::Undefined(vm));
+    buttonModifier->resetButtonVibrancyMode(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue ButtonBridge::SetButtonWidth(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -1832,6 +1863,8 @@ void ButtonBridge::RegisterButtonAttributes(Local<panda::ObjectRef> object, Ecma
         "resetMinFontScale",
         "setMaxFontScale",
         "resetMaxFontScale",
+        "setVibrancyMode",
+        "resetVibrancyMode",
         "setWidth",
         "setHeight",
         "setOnClick",
@@ -1883,6 +1916,8 @@ void ButtonBridge::RegisterButtonAttributes(Local<panda::ObjectRef> object, Ecma
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::ResetMinFontScale),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::SetMaxFontScale),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::ResetMaxFontScale),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::SetVibrancyMode),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::ResetVibrancyMode),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::SetButtonWidth),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::SetButtonHeight),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ButtonBridge::SetButtonOnClick),

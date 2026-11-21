@@ -1127,6 +1127,11 @@ void ButtonModelNG::SetMaxFontScale(float maxFontScale)
     ACE_UPDATE_LAYOUT_PROPERTY(ButtonLayoutProperty, MaxFontScale, maxFontScale);
 }
 
+void ButtonModelNG::SetVibrancyMode(VibrancyMode mode)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(ButtonLayoutProperty, VibrancyMode, mode);
+}
+
 void ButtonModelNG::SetCreateWithLabel(FrameNode* frameNode, bool createWithLabel)
 {
     auto property = frameNode->GetLayoutProperty<ButtonLayoutProperty>();
@@ -1145,6 +1150,11 @@ void ButtonModelNG::SetMinFontScale(FrameNode* frameNode, float minFontScale)
 void ButtonModelNG::SetMaxFontScale(FrameNode* frameNode, float maxFontScale)
 {
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(ButtonLayoutProperty, MaxFontScale, maxFontScale, frameNode);
+}
+
+void ButtonModelNG::SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(ButtonLayoutProperty, VibrancyMode, mode, frameNode);
 }
 
 float ButtonModelNG::GetMinFontScale(FrameNode* frameNode)
