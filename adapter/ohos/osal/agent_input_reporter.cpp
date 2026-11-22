@@ -35,6 +35,7 @@ void InputManager::ReportAgentInputDecision(const NG::AgentInputResult& decision
     const int32_t appCloneIndex = context ? context->GetCurrentAppCloneIndex() : 0;
     // SAF forwards reason unchanged; carry the component metadata as JSON.
     auto metadata = JsonUtil::Create(true);
+    metadata->Put("sessionId", std::to_string(decision.sessionId).c_str());
     metadata->Put("nodeId", std::to_string(decision.nodeId).c_str());
     metadata->Put("tag", decision.tag.c_str());
     metadata->Put("bundleName", decision.bundleName.c_str());

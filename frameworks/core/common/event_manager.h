@@ -548,15 +548,15 @@ private:
     void UpdateInfoWhenFinishDispatch(const TouchEvent& point, bool sendOnTouch);
     void EraseEventRefereeWithStrategy(const TouchEvent& point);
     void EraseAgentTouchState(const TouchEvent& point);
+    void PrepareAgentTouchState(const TouchEvent& point, const TouchTestResult& targets);
+    void PrepareAgentMouseDerivedTouchState(const TouchEvent& point, const TouchTestResult& targets);
     void DoSingleMouseActionRelease(const PressMouseInfo& pressMouseInfo);
     bool DispatchPreparedTouchEvent(
         const TouchEvent& event, TouchEvent& point, const TouchTestResult& targets, bool sendOnTouch);
     bool IsAgentMouseInScope(const MouseEvent& event) const;
     bool IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG::FrameNode>& node);
     bool PrepareAgentMousePressGate(const MouseEvent& event, const PressMouseInfo& key);
-    void PruneAgentMouseEntered(const MouseEvent& event, const PressMouseInfo& key);
-    void RepeatAgentMouseReport(const PressMouseInfo& key);
-    void FinishAgentMouseGesture(const MouseEvent& event, const PressMouseInfo& key);
+    bool FinishAgentMouseGesture(const MouseEvent& event, const PressMouseInfo& key);
     bool DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& event);
     bool DispatchMouseEventInLessAPI13(const MouseEvent& event);
     void DispatchMouseEventToPressResults(const MouseEvent& event, const MouseTestResult& targetResults,

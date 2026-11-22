@@ -39,7 +39,7 @@ template<typename EventT>
 void ConvertAgentIdentity(MMI::InputEvent& source, EventT& event)
 {
     const auto injectorInfo = source.GetInjectorInfo();
-    event.isAgent = source.HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_PENDING_CHECK) && injectorInfo.has_value();
+    event.isAgent = source.HasFlag(OHOS::MMI::InputEvent::EVENT_FLAG_CONTROLLER) && injectorInfo.has_value();
     event.agentWindowId = source.GetAgentWindowId();
     event.callingUid = event.isAgent ? injectorInfo->uid : -1;
     event.hasSafSessionId = event.isAgent;

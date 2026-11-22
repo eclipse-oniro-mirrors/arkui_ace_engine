@@ -53,7 +53,7 @@ bool IsAgentTouchDenied(const NGGestureRecognizer& recognizer, const TouchEvent&
     }
     auto node = recognizer.GetAttachedNode().Upgrade();
     auto manager = GetCurrentEventManager();
-    return !node || !manager || !manager->IsAgentTouchAllowed(point, node);
+    return node && manager && !manager->IsAgentTouchAllowed(point, node);
 }
 
 } // namespace
