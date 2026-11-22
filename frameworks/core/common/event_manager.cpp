@@ -273,10 +273,15 @@ bool IsAgentControlSourceTool(SourceTool tool)
     return tool == SourceTool::UNKNOWN || tool == SourceTool::FINGER || tool == SourceTool::MOUSE;
 }
 
+bool IsAgentEnterCode(const KeyEvent& event)
+{
+    return !event.isRedispatch &&
+        (event.code == KeyCode::KEY_ENTER || event.code == KeyCode::KEY_NUMPAD_ENTER);
+}
+
 bool IsAgentKeyEvent(const KeyEvent& event)
 {
-    return event.isAgent && !event.isRedispatch &&
-        (event.code == KeyCode::KEY_ENTER || event.code == KeyCode::KEY_NUMPAD_ENTER);
+    return event.isAgent && IsAgentEnterCode(event);
 }
 
 bool EventManager::IsAgentTouchInScope(const TouchEvent& event)
@@ -1773,6 +1778,13 @@ void EventManager::PrepareAgentKeyEvent(
     }
     auto state = FindAgentKeyState(event);
     if (event.action == KeyAction::DOWN && !state) {
+        for (auto it = agentKeyStates_.begin(); it != agentKeyStates_.end();) {
+            if (it->deviceId == event.deviceId && it->code == event.code) {
+                it = agentKeyStates_.erase(it);
+            } else {
+                ++it;
+            }
+        }
         AgentKeyState newState;
         newState.agentWindowId = event.agentWindowId;
         newState.callingUid = event.callingUid;
@@ -1807,15 +1819,25 @@ bool EventManager::IsAgentKeyAllowed(const KeyEvent& event, const RefPtr<NG::Fra
 
 void EventManager::FinishAgentKeyEvent(const KeyEvent& event)
 {
-    if (!IsAgentKeyEvent(event) || (event.action != KeyAction::UP && event.action != KeyAction::CANCEL)) {
+    if (!IsAgentEnterCode(event) || (event.action != KeyAction::UP && event.action != KeyAction::CANCEL)) {
         return;
     }
-    for (auto it = agentKeyStates_.begin(); it != agentKeyStates_.end(); ++it) {
-        if (it->agentWindowId == event.agentWindowId && it->callingUid == event.callingUid &&
-            it->sessionId == event.safSessionId && it->deviceId == event.deviceId && it->code == event.code &&
-            it->hasSession == event.hasSafSessionId) {
-            agentKeyStates_.erase(it);
-            return;
+    if (event.isAgent) {
+        for (auto it = agentKeyStates_.begin(); it != agentKeyStates_.end(); ++it) {
+            if (it->agentWindowId == event.agentWindowId && it->callingUid == event.callingUid &&
+                it->sessionId == event.safSessionId && it->deviceId == event.deviceId && it->code == event.code &&
+                it->hasSession == event.hasSafSessionId) {
+                agentKeyStates_.erase(it);
+                return;
+            }
+        }
+        return;
+    }
+    for (auto it = agentKeyStates_.begin(); it != agentKeyStates_.end();) {
+        if (it->deviceId == event.deviceId && it->code == event.code) {
+            it = agentKeyStates_.erase(it);
+        } else {
+            ++it;
         }
     }
 }

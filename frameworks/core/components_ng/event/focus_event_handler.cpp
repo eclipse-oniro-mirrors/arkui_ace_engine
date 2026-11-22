@@ -27,16 +27,22 @@
 #include "core/event/crown_event.h"
 namespace OHOS::Ace::NG {
 namespace {
+bool IsAgentEnterCode(const KeyEvent& key)
+{
+    return !key.isRedispatch &&
+        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
+}
+
 bool IsAgentEnter(const KeyEvent& key)
 {
-    return key.isAgent && !key.isRedispatch &&
-        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
+    return key.isAgent && IsAgentEnterCode(key);
 }
 
 } // namespace
 
 struct NodeSensitiveKeyDispatch {
     WeakPtr<FrameNode> initialNode;
+    RefPtr<EventManager> eventManager;
     bool notified = false;
     int32_t depth = 0;
 };
@@ -71,15 +77,15 @@ void FocusEventHandler::PrepareSensitiveKeyDispatch(const FocusEvent& event)
     if (!nodes.empty()) {
         dispatch->initialNode = nodes.back();
     }
+    auto node = GetFrameNode();
+    auto pipeline = node ? node->GetContext() : nullptr;
+    dispatch->eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
     const auto& key = static_cast<const KeyEvent&>(event.event);
     if (!IsAgentEnter(key)) {
         return;
     }
-    auto node = GetFrameNode();
-    auto pipeline = node ? node->GetContext() : nullptr;
-    auto eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
-    if (eventManager) {
-        eventManager->PrepareAgentKeyEvent(key, nodes);
+    if (dispatch->eventManager) {
+        dispatch->eventManager->PrepareAgentKeyEvent(key, nodes);
     }
 }
 
@@ -93,11 +99,7 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
     const bool controlled = IsAgentEnter(key);
     bool allowed = true;
     if (controlled) {
-        auto pipeline = node->GetContext();
-        auto eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
-        if (eventManager) {
-            allowed = eventManager->IsAgentKeyAllowed(key, node);
-        }
+        allowed = dispatch->eventManager && dispatch->eventManager->IsAgentKeyAllowed(key, node);
     }
     auto hit = dispatch->initialNode.Upgrade();
     if (!dispatch->notified && hit && !key.isRedispatch) {
@@ -116,14 +118,11 @@ void FinishAgentKeyDispatch(const FocusEvent& event)
     auto dispatch = event.sensitiveInput;
     CHECK_NULL_VOID(dispatch);
     const auto& key = static_cast<const KeyEvent&>(event.event);
-    if (!IsAgentEnter(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
+    if (!IsAgentEnterCode(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
         return;
     }
-    auto node = dispatch->initialNode.Upgrade();
-    auto pipeline = node ? node->GetContext() : nullptr;
-    auto eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
-    if (eventManager) {
-        eventManager->FinishAgentKeyEvent(key);
+    if (dispatch->eventManager) {
+        dispatch->eventManager->FinishAgentKeyEvent(key);
     }
 }
 
