@@ -60,8 +60,6 @@ struct TextProperties {
     Color upColor;
     Color currentColor;
     Color downColor;
-    std::optional<uint32_t> maxLines;
-    std::optional<TextOverflow> textOverflow;
 };
 
 enum class ContainerPickerDirection {
@@ -216,6 +214,9 @@ public:
     void ApplyTextStyleToItem(const RefPtr<FrameNode>& node, bool isSelected);
     Dimension LinearFontSize(const Dimension& startFontSize, const Dimension& endFontSize, double percent);
     void AddAnimationTextProperties(int32_t currentIndex, const RefPtr<TextLayoutProperty>& textLayoutProperty);
+    void UpdatePickerTextProperties(int32_t dataIndex, int32_t animIdx, int32_t showCount,
+        const RefPtr<TextLayoutProperty>& textLayoutProperty,
+        const Color& defaultColor, const Dimension& defaultSize);
     void UpdateTextPropertiesLinear(bool isDown, double scale);
     void TextPropertiesLinearAnimation(const RefPtr<TextLayoutProperty>& textLayoutProperty, int32_t index,
         int32_t showCount, bool isDown, double scale);
