@@ -868,6 +868,202 @@ HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexDuringReload, TestSize.Level1)
 }
 
 /**
+ * @tc.name: AnimateToIndexDuringPartialReload
+ * @tc.desc: A partial reload of a grid with a spanning item keeps an animated target in the invalidated rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexDuringPartialReload, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    CreateBigColItem(0, 1);
+    CreateFixedItems(30);
+    CreateDone();
+    ASSERT_TRUE(pattern_->GetGridLayoutInfo().hasBigItem_);
+    ASSERT_EQ(pattern_->GetItemRect(5).Top(), 2 * ITEM_MAIN_SIZE);
+
+    frameNode_->ChildrenUpdatedFrom(5);
+    AnimateToIndexWithTicks(5, ScrollAlign::START);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 5);
+    EXPECT_EQ(pattern_->GetItemRect(5).Top(), 0.0f);
+}
+
+/**
+ * @tc.name: AnimateToIndexReloadShrinksLastRow
+ * @tc.desc: Shrinking the partially visible last row must not discard a pending animation to an earlier row.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexReloadShrinksLastRow, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    CreateFixedHeightItems(19, ITEM_MAIN_SIZE);
+    CreateFixedHeightItems(1, 1000.0f);
+    CreateDone();
+    ScrollToIndex(19, false, ScrollAlign::START);
+    UpdateCurrentOffset(-200.0f);
+    ASSERT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 19);
+    ASSERT_FLOAT_EQ(pattern_->GetItemRect(19).Top(), -200.0f);
+
+    auto lastItem = GetChildFrameNode(frameNode_, 19);
+    ASSERT_NE(lastItem, nullptr);
+    ViewAbstract::SetHeight(AceType::RawPtr(lastItem), CalcLength(ITEM_MAIN_SIZE));
+    frameNode_->ChildrenUpdatedFrom(0);
+    MockAnimationManager::GetInstance().SetTicks(3);
+    ScrollToIndex(2, true, ScrollAlign::START);
+    EXPECT_FALSE(MockAnimationManager::GetInstance().AllFinished());
+    TickToFinish();
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 2);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 2 * ITEM_MAIN_SIZE);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRect(2).Top(), 0.0f);
+}
+
+/**
+ * @tc.name: AnimateToIndexReloadKeepsSpanningRow
+ * @tc.desc: A span extending past the resized viewport affects the target row and the cached item's column.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexReloadKeepsSpanningRow, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1, true);
+    ViewAbstract::SetHeight(CalcLength(500.0f));
+    CreateFixedHeightItems(4, ITEM_MAIN_SIZE);
+    CreateBigItem(2, 3, 0, 0, NULL_VALUE, 2 * ITEM_MAIN_SIZE);
+    CreateFixedHeightItems(20, ITEM_MAIN_SIZE);
+    CreateDone();
+    ASSERT_FLOAT_EQ(pattern_->GetItemRect(7).Top(), 4 * ITEM_MAIN_SIZE);
+
+    // The same resize without a pending animation supplies a reference for the real cached child's geometry.
+    auto resizeAndReload = [this](float height) {
+        ViewAbstract::SetHeight(AceType::RawPtr(frameNode_), CalcLength(height));
+        frameNode_->ChildrenUpdatedFrom(0);
+    };
+    resizeAndReload(300.0f);
+    FlushUITasks();
+    std::vector<RectF> referenceRects;
+    for (int32_t index = 0; index <= 6; ++index) {
+        referenceRects.emplace_back(GetChildRect(frameNode_, index));
+    }
+    ASSERT_FLOAT_EQ(referenceRects.back().Left(), WIDTH / 2);
+    resizeAndReload(500.0f);
+    FlushUITasks();
+
+    resizeAndReload(300.0f);
+    MockAnimationManager::GetInstance().SetTicks(3);
+    ScrollToIndex(7, true, ScrollAlign::START);
+    ASSERT_NE(pattern_->infoCopy_, nullptr);
+    int32_t targetRow = -1;
+    ASSERT_TRUE(pattern_->infoCopy_->GetLineIndexByIndex(7, targetRow));
+    EXPECT_EQ(targetRow, 4);
+    for (size_t index = 0; index < referenceRects.size(); ++index) {
+        EXPECT_EQ(GetChildRect(frameNode_, static_cast<int32_t>(index)), referenceRects[index]) << "Item " << index;
+    }
+    TickToFinish();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 4 * ITEM_MAIN_SIZE);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRect(7).Top(), 0.0f);
+}
+
+/**
+ * @tc.name: AnimateToIndexReloadRebuildsTwoSpanningLines
+ * @tc.desc: A span continuing beyond a nonzero viewport anchor must use its own height and retain both occupied cells.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexReloadRebuildsTwoSpanningLines, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    ViewAbstract::SetHeight(CalcLength(700.0f));
+    CreateFixedHeightItems(6, ITEM_MAIN_SIZE);
+    CreateBigItem(3, 5, 0, 0, NULL_VALUE, 3 * ITEM_MAIN_SIZE);
+    CreateFixedHeightItems(1, 180.0f);
+    CreateFixedHeightItems(20, ITEM_MAIN_SIZE);
+    CreateDone();
+    ScrollToIndex(4, false, ScrollAlign::START);
+    ASSERT_EQ(pattern_->GetGridLayoutInfo().startMainLineIndex_, 2);
+
+    ViewAbstract::SetHeight(AceType::RawPtr(frameNode_), CalcLength(280.0f));
+    frameNode_->ChildrenUpdatedFrom(0);
+    MockAnimationManager::GetInstance().SetTicks(3);
+    ScrollToIndex(10, true, ScrollAlign::END);
+    ASSERT_EQ(pattern_->GetGridLayoutInfo().startMainLineIndex_, 2);
+    ASSERT_EQ(pattern_->GetGridLayoutInfo().endMainLineIndex_, 3);
+    ASSERT_FALSE(MockAnimationManager::GetInstance().AllFinished());
+    ASSERT_NE(pattern_->infoCopy_, nullptr);
+    const auto& snapshot = *pattern_->infoCopy_;
+    int32_t targetRow = -1;
+    ASSERT_TRUE(snapshot.GetLineIndexByIndex(10, targetRow));
+    EXPECT_EQ(targetRow, 6);
+    for (int32_t line = 4; line <= 5; ++line) {
+        auto row = snapshot.gridMatrix_.find(line);
+        ASSERT_NE(row, snapshot.gridMatrix_.end());
+        auto cell = row->second.find(0);
+        ASSERT_NE(cell, row->second.end());
+        EXPECT_EQ(cell->second, 6);
+        auto height = snapshot.lineHeightMap_.find(line);
+        ASSERT_NE(height, snapshot.lineHeightMap_.end());
+        EXPECT_FLOAT_EQ(height->second, ITEM_MAIN_SIZE);
+    }
+    TickToFinish();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 500.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRect(10).Bottom(), 280.0f);
+}
+
+/**
+ * @tc.name: AnimateToIndexReloadConsumesRequestAtStart
+ * @tc.desc: A fresh layout after a successful animation at the start must not retain the old layout target.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexReloadConsumesRequestAtStart, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    CreateFixedHeightItems(20, ITEM_MAIN_SIZE);
+    CreateDone();
+
+    frameNode_->ChildrenUpdatedFrom(0);
+    MockAnimationManager::GetInstance().SetTicks(3);
+    ScrollToIndex(8, true, ScrollAlign::CENTER);
+    ASSERT_FALSE(MockAnimationManager::GetInstance().AllFinished());
+    EXPECT_FALSE(pattern_->GetGridLayoutInfo().targetIndex_.has_value());
+    TickToFinish();
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 650.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRect(8).Top(), 150.0f);
+
+    frameNode_->ChildrenUpdatedFrom(0);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    FlushUITasks();
+    EXPECT_TRUE(MockAnimationManager::GetInstance().AllFinished());
+    EXPECT_FALSE(pattern_->GetGridLayoutInfo().targetIndex_.has_value());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 650.0f);
+}
+
+/**
+ * @tc.name: AnimateToIndexReloadRemovesTarget
+ * @tc.desc: Removing a requested last item before layout does not animate to its stale row.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, AnimateToIndexReloadRemovesTarget, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    CreateFixedHeightItems(8, ITEM_MAIN_SIZE);
+    CreateDone();
+    const int32_t target = 7;
+    MockAnimationManager::GetInstance().SetTicks(3);
+    pattern_->ScrollToIndex(target, true, ScrollAlign::START);
+    frameNode_->RemoveChildAtIndex(target);
+    frameNode_->ChildrenUpdatedFrom(target);
+    FlushUITasks();
+
+    EXPECT_TRUE(MockAnimationManager::GetInstance().AllFinished());
+    EXPECT_FALSE(pattern_->targetIndex_.has_value());
+    EXPECT_FALSE(pattern_->GetGridLayoutInfo().targetIndex_.has_value());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+}
+
+/**
  * @tc.name: OnModifyDone001
  * @tc.desc: Test OnModifyDone
  * @tc.type: FUNC
