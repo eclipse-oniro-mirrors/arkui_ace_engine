@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <algorithm>
 #include <functional>
 #include <unordered_map>
 
@@ -70,7 +71,8 @@ struct AgentKeyContextHash {
     }
 };
 
-std::unordered_map<AgentKeyContext, std::shared_ptr<AgentGestureState>, AgentKeyContextHash> g_agentKeyStates;
+using AgentKeyStateMap = std::unordered_map<AgentKeyContext, std::shared_ptr<AgentGestureState>, AgentKeyContextHash>;
+AgentKeyStateMap g_agentKeyStates;
 
 AgentKeyContext GetAgentKeyContext(const KeyEvent& key)
 {
@@ -78,10 +80,27 @@ AgentKeyContext GetAgentKeyContext(const KeyEvent& key)
         key.hasSafSessionId };
 }
 
+bool IsAgentEnterCode(const KeyEvent& key)
+{
+    return !key.isRedispatch &&
+        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
+}
+
 bool IsAgentEnter(const KeyEvent& key)
 {
-    return key.isAgent && !key.isRedispatch &&
-        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
+    return key.isAgent && IsAgentEnterCode(key);
+}
+
+bool IsSameAgentKey(const AgentKeyContext& context, const KeyEvent& key)
+{
+    return context.instanceId == Container::CurrentId() && context.deviceId == key.deviceId &&
+        context.code == key.code;
+}
+
+AgentKeyStateMap::iterator FindAgentKeyState(const KeyEvent& key)
+{
+    return std::find_if(g_agentKeyStates.begin(), g_agentKeyStates.end(),
+        [&key](const auto& item) { return IsSameAgentKey(item.first, key); });
 }
 
 void FreezeAgentKeyNode(AgentGestureState& state, const RefPtr<FrameNode>& node)
@@ -146,11 +165,10 @@ void ReportAgentDeny(const AgentGestureState& state)
 
 void FinishAgentKeyState(const KeyEvent& key)
 {
-    if (!IsAgentEnter(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
+    if (!IsAgentEnterCode(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
         return;
     }
-    auto context = GetAgentKeyContext(key);
-    auto it = g_agentKeyStates.find(context);
+    auto it = FindAgentKeyState(key);
     if (it == g_agentKeyStates.end()) {
         return;
     }
@@ -198,14 +216,33 @@ void FocusEventHandler::PrepareSensitiveKeyDispatch(const FocusEvent& event)
         dispatch->initialNode = nodes.back();
     }
     const auto& key = static_cast<const KeyEvent&>(event.event);
-    if (!IsAgentEnter(key)) {
+    const bool hasAgentState = IsAgentEnterCode(key) && FindAgentKeyState(key) != g_agentKeyStates.end();
+    if (!IsAgentEnter(key) && !hasAgentState) {
+        return;
+    }
+    if (!IsAgentEnter(key) && key.action == KeyAction::DOWN) {
+        auto stale = FindAgentKeyState(key);
+        if (stale != g_agentKeyStates.end()) {
+            g_agentKeyStates.erase(stale);
+        }
         return;
     }
     dispatch->context = GetAgentKeyContext(key);
     if (key.action == KeyAction::DOWN) {
         auto previous = g_agentKeyStates.find(dispatch->context);
+        if (previous == g_agentKeyStates.end()) {
+            for (auto it = g_agentKeyStates.begin(); it != g_agentKeyStates.end();) {
+                if (IsSameAgentKey(it->first, key)) {
+                    it = g_agentKeyStates.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        previous = g_agentKeyStates.find(dispatch->context);
         if (previous != g_agentKeyStates.end()) {
             dispatch->state = previous->second;
+            dispatch->context = previous->first;
         } else {
             dispatch->state = std::make_shared<AgentGestureState>();
             dispatch->state->hasSession = key.hasSafSessionId;
@@ -216,9 +253,10 @@ void FocusEventHandler::PrepareSensitiveKeyDispatch(const FocusEvent& event)
             g_agentKeyStates[dispatch->context] = dispatch->state;
         }
     } else {
-        auto it = g_agentKeyStates.find(dispatch->context);
+        auto it = FindAgentKeyState(key);
         if (it != g_agentKeyStates.end()) {
             dispatch->state = it->second;
+            dispatch->context = it->first;
         }
     }
     if (dispatch->state) {
@@ -236,7 +274,7 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
     const auto& key = static_cast<const KeyEvent&>(event.event);
     auto node = GetFrameNode();
     CHECK_NULL_RETURN(node, false);
-    const bool controlled = IsAgentEnter(key);
+    const bool controlled = IsAgentEnter(key) || dispatch->state != nullptr;
     bool allowed = true;
     if (controlled && dispatch->state) {
         allowed = HandleAgentKeyNode(*dispatch->state, node);
@@ -245,7 +283,7 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
     if (!dispatch->notified && hit && !key.isRedispatch) {
         dispatch->notified = true;
         NodeSensitiveInputInfo info;
-        info.isAgent = key.isAgent;
+        info.isAgent = key.isAgent || dispatch->state != nullptr;
         info.type = NodeSensitiveInputEventType::KEY;
         info.keyEvent = &key;
         NotifyNodeSensitiveInput(hit, info);
@@ -254,7 +292,7 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
         return false;
     }
     if (!dispatch->state) {
-        return key.action != KeyAction::DOWN;
+        return false;
     }
     return !allowed;
 }
@@ -264,7 +302,7 @@ void FinishAgentKeyDispatch(const FocusEvent& event)
     auto dispatch = event.sensitiveInput;
     CHECK_NULL_VOID(dispatch);
     const auto& key = static_cast<const KeyEvent&>(event.event);
-    if (!IsAgentEnter(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
+    if (!IsAgentEnterCode(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
         return;
     }
     if (dispatch->state) {
@@ -356,9 +394,6 @@ bool FocusEventHandler::HandleCustomEventDispatch(const FocusEvent& event)
 bool FocusEventHandler::OnFocusEvent(const FocusEvent& event)
 {
     if (!IsCurrentFocus()) {
-        if (event.event.eventType == UIInputEventType::KEY) {
-            FinishAgentKeyState(static_cast<const KeyEvent&>(event.event));
-        }
         TAG_LOGI(AceLogTag::ACE_FOCUS,
             "node: %{public}s/%{public}d not current focus, cannot handle key event",
             GetFrameName().c_str(), GetFrameId());

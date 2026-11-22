@@ -241,7 +241,7 @@ template<typename StateMap>
 void ResetAgentDenyStates(StateMap& states, const MouseEvent& event)
 {
     for (auto& item : states) {
-        if (item.first.id == event.id && MatchesAgentGestureContext(*item.second, event)) {
+        if (item.first.id == event.id) {
             item.second->hasDeny = false;
         }
     }
@@ -1600,8 +1600,10 @@ void EventManager::PrepareAgentMouseDerivedTouchState(const TouchEvent& point, c
 {
     const auto key = GetMouseSourceKey(point);
     auto mouseState = agentMouseStates_.find(key);
-    const bool isCurrentState = mouseState != agentMouseStates_.end() &&
-        MatchesAgentGestureContext(*mouseState->second, point) && !mouseState->second->touchEnded;
+    const bool isCurrentState = mouseState != agentMouseStates_.end() && !mouseState->second->touchEnded;
+    if (!isCurrentState && point.type != TouchType::DOWN) {
+        return;
+    }
     if (!isCurrentState) {
         if (mouseState != agentMouseStates_.end()) {
             mouseState->second->mouseEnded = true;
@@ -1625,7 +1627,7 @@ void EventManager::PrepareAgentTouchState(const TouchEvent& point, const TouchTe
     }
     auto existing = agentTouchStates_.find(point.id);
     if (point.type != TouchType::DOWN) {
-        if (existing != agentTouchStates_.end() && MatchesAgentGestureContext(*existing->second, point)) {
+        if (existing != agentTouchStates_.end()) {
             existing->second->hasDeny = false;
         }
         return;
@@ -1669,9 +1671,12 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
     }
     if (IsAgentTouchInScope(point)) {
         PrepareAgentTouchState(point, iter->second);
-        if (!IsMouseDerivedTouchEvent(point) && point.type != TouchType::DOWN) {
-            auto state = agentTouchStates_.find(point.id);
-            if (state == agentTouchStates_.end() || !MatchesAgentGestureContext(*state->second, point)) {
+        if (point.type != TouchType::DOWN) {
+            const bool hasState = IsMouseDerivedTouchEvent(point)
+                ? agentMouseStates_.find(GetMouseSourceKey(point)) != agentMouseStates_.end()
+                : agentTouchStates_.find(point.id) != agentTouchStates_.end();
+            if (!hasState) {
+                EraseAgentTouchState(point);
                 return true;
             }
         }
@@ -1692,13 +1697,13 @@ bool EventManager::IsAgentTouchAllowed(const TouchEvent& event, const RefPtr<NG:
     if (IsMouseDerivedTouchEvent(event)) {
         // Mouse-derived touches consult the owning mouse state of the press.
         auto it = agentMouseStates_.find(GetMouseSourceKey(event));
-        if (it == agentMouseStates_.end() || !MatchesAgentGestureContext(*it->second, event)) {
+        if (it == agentMouseStates_.end()) {
             return false;
         }
         return TryDeliverAgentNode(*it->second, node);
     }
     auto it = agentTouchStates_.find(event.id);
-    if (it == agentTouchStates_.end() || !MatchesAgentGestureContext(*it->second, event)) {
+    if (it == agentTouchStates_.end()) {
         return false;
     }
     return TryDeliverAgentNode(*it->second, node);
@@ -1738,22 +1743,22 @@ void EventManager::EraseAgentTouchState(const TouchEvent& point)
         return;
     }
     if (IsMouseDerivedTouchEvent(point)) {
-        auto it = agentMouseStates_.find(GetMouseSourceKey(point));
-        if (it != agentMouseStates_.end() && MatchesAgentGestureContext(*it->second, point)) {
+        const auto key = GetMouseSourceKey(point);
+        auto it = agentMouseStates_.find(key);
+        if (it != agentMouseStates_.end()) {
             it->second->touchEnded = true;
             if (it->second->mouseEnded) {
                 agentMouseStates_.erase(it);
-                mouseInputHitNodes_.erase(point.id);
+                mouseInputHitNodes_.erase(key.id);
             }
+        } else {
+            mouseInputHitNodes_.erase(key.id);
         }
         return;
     }
     auto it = agentTouchStates_.find(point.id);
     if (it == agentTouchStates_.end()) {
         touchInputHitNodes_.erase(point.id);
-        return;
-    }
-    if (!MatchesAgentGestureContext(*it->second, point)) {
         return;
     }
     agentTouchStates_.erase(it);
@@ -2706,7 +2711,7 @@ bool EventManager::FinishAgentMouseGesture(const MouseEvent& event, const PressM
     bool hasMatchingState = false;
     for (auto it = agentMouseStates_.begin(); it != agentMouseStates_.end();) {
         const bool sameButton = event.button == MouseButton::NONE_BUTTON || it->first.mouseButton == event.button;
-        if (it->first.id != event.id || !sameButton || !MatchesAgentGestureContext(*it->second, event)) {
+        if (it->first.id != event.id || !sameButton) {
             ++it;
             continue;
         }
@@ -2786,7 +2791,7 @@ void EventManager::PrepareAgentMousePress(const MouseEvent& event)
             FreezeAgentTargets(currMouseTestResultsMap_[event.id], *existing->second, hitNode);
             auto fullIt = mouseTestResults_.find(event.GetPointerId(event.id));
             if (fullIt != mouseTestResults_.end()) {
-                FreezeAgentTargets(fullIt->second, *existing->second, hitNode);
+                FreezeAgentTargets(fullIt->second, *existing->second);
             }
             return;
         }
@@ -2807,7 +2812,7 @@ void EventManager::PrepareAgentMousePress(const MouseEvent& event)
     FreezeAgentTargets(currMouseTestResultsMap_[event.id], st, hitNode);
     auto fullIt = mouseTestResults_.find(event.GetPointerId(event.id));
     if (fullIt != mouseTestResults_.end()) {
-        FreezeAgentTargets(fullIt->second, st, hitNode);
+        FreezeAgentTargets(fullIt->second, st);
     }
 }
 
@@ -2825,7 +2830,7 @@ bool EventManager::IsAgentMouseInScope(const MouseEvent& event) const
         return false;
     }
     return std::any_of(agentMouseStates_.begin(), agentMouseStates_.end(), [&event](const auto& item) {
-        if (item.first.id != event.id || !MatchesAgentGestureContext(*item.second, event)) {
+        if (item.first.id != event.id) {
             return false;
         }
         if (event.action == MouseAction::RELEASE) {
@@ -2842,11 +2847,7 @@ bool EventManager::IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG:
     }
     const bool inScope = IsAgentMouseInScope(event);
     if (!inScope && event.action != MouseAction::RELEASE && event.action != MouseAction::CANCEL) {
-        const bool hasDifferentContext = std::any_of(agentMouseStates_.begin(), agentMouseStates_.end(),
-            [&event](const auto& item) {
-                return item.first.id == event.id && !MatchesAgentGestureContext(*item.second, event);
-            });
-        return !hasDifferentContext;
+        return true;
     }
     if (event.button != MouseButton::NONE_BUTTON && event.button != MouseButton::LEFT_BUTTON &&
         event.button != MouseButton::RIGHT_BUTTON) {
@@ -2857,7 +2858,7 @@ bool EventManager::IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG:
         bool matched = false;
         bool allowed = true;
         for (auto& item : agentMouseStates_) {
-            if (item.first.id != event.id || !MatchesAgentGestureContext(*item.second, event)) {
+            if (item.first.id != event.id) {
                 continue;
             }
             matched = true;
@@ -2867,9 +2868,6 @@ bool EventManager::IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG:
     }
     PressMouseInfo key { event.id, event.button };
     auto stIt = agentMouseStates_.find(key);
-    if (stIt != agentMouseStates_.end() && !MatchesAgentGestureContext(*stIt->second, event)) {
-        stIt = agentMouseStates_.end();
-    }
     if (stIt == agentMouseStates_.end()) {
         return event.action != MouseAction::RELEASE && event.action != MouseAction::CANCEL;
     }
