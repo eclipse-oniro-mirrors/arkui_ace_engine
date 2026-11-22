@@ -164,7 +164,6 @@ void ReportAgentDeny(const NG::AgentGestureState& state)
 bool TryDeliverAgentNode(NG::AgentGestureState& state, const RefPtr<NG::FrameNode>& node)
 {
     if (state.hasDeny) {
-        ReportAgentDeny(state);
         return false;
     }
     if (!node) {
@@ -236,6 +235,16 @@ bool MatchesAgentGestureContext(const NG::AgentGestureState& state, const EventT
         return false;
     }
     return !state.hasSession || state.sessionId == event.safSessionId;
+}
+
+template<typename StateMap>
+void ResetAgentDenyStates(StateMap& states, const MouseEvent& event)
+{
+    for (auto& item : states) {
+        if (item.first.id == event.id && MatchesAgentGestureContext(*item.second, event)) {
+            item.second->hasDeny = false;
+        }
+    }
 }
 
 bool IsAgentControlSourceTool(SourceTool tool)
@@ -1604,20 +1613,25 @@ void EventManager::PrepareAgentMouseDerivedTouchState(const TouchEvent& point, c
         mouseState = agentMouseStates_.emplace(key, std::move(state)).first;
     }
     mouseState->second->derivedTouchSeen = true;
+    mouseState->second->hasDeny = false;
     FreezeAgentTargets(targets, *mouseState->second);
 }
 
 void EventManager::PrepareAgentTouchState(const TouchEvent& point, const TouchTestResult& targets)
 {
-    if (point.type != TouchType::DOWN) {
-        return;
-    }
     if (IsMouseDerivedTouchEvent(point)) {
         PrepareAgentMouseDerivedTouchState(point, targets);
         return;
     }
     auto existing = agentTouchStates_.find(point.id);
+    if (point.type != TouchType::DOWN) {
+        if (existing != agentTouchStates_.end() && MatchesAgentGestureContext(*existing->second, point)) {
+            existing->second->hasDeny = false;
+        }
+        return;
+    }
     if (existing != agentTouchStates_.end() && MatchesAgentGestureContext(*existing->second, point)) {
+        existing->second->hasDeny = false;
         return;
     }
     if (existing != agentTouchStates_.end()) {
@@ -2726,6 +2740,9 @@ bool EventManager::DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& sourc
 {
     auto event = sourceEvent;
     const bool agentControlled = IsAgentMouseInScope(event);
+    if (agentControlled) {
+        ResetAgentDenyStates(agentMouseStates_, event);
+    }
     MouseTestResult handledResults;
     bool isStopPropagation = false;
     PressMouseInfo key{ event.id, event.button };
@@ -2864,6 +2881,9 @@ bool EventManager::DispatchMouseEventInLessAPI13(const MouseEvent& sourceEvent)
 {
     auto event = sourceEvent;
     const bool agentControlled = IsAgentMouseInScope(event);
+    if (agentControlled) {
+        ResetAgentDenyStates(agentMouseStates_, event);
+    }
     MouseTestResult handledResults;
     bool isStopPropagation = false;
     PressMouseInfo key{ event.id, event.button };

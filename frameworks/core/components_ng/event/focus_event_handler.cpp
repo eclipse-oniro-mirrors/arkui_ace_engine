@@ -106,7 +106,6 @@ void ReportAgentDeny(const AgentGestureState& state);
 bool HandleAgentKeyNode(AgentGestureState& state, const RefPtr<FrameNode>& node)
 {
     if (state.hasDeny) {
-        ReportAgentDeny(state);
         return false;
     }
     CHECK_NULL_RETURN(node, true);
@@ -223,6 +222,7 @@ void FocusEventHandler::PrepareSensitiveKeyDispatch(const FocusEvent& event)
         }
     }
     if (dispatch->state) {
+        dispatch->state->hasDeny = false;
         for (const auto& node : nodes) {
             FreezeAgentKeyNode(*dispatch->state, node);
         }
