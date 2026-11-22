@@ -658,6 +658,41 @@ void ContainerPickerPattern::AddAnimationTextProperties(
     animationProperties_.emplace_back(properties);
 }
 
+void ContainerPickerPattern::UpdatePickerTextProperties(int32_t dataIndex, int32_t animIdx,
+    int32_t showCount, const RefPtr<TextLayoutProperty>& textLayoutProperty,
+    const Color& defaultColor, const Dimension& defaultSize)
+{
+    CHECK_NULL_VOID(textLayoutProperty);
+    bool isCenter = (dataIndex == selectedIndex_);
+    if (isCenter && HasSelectedTextStyle()) {
+        if (selectedTextStyle_.fontSize.has_value() && selectedTextStyle_.fontSize->IsValid()) {
+            textLayoutProperty->UpdateFontSize(selectedTextStyle_.fontSize.value());
+        }
+        if (selectedTextStyle_.textColor.has_value()) {
+            textLayoutProperty->UpdateTextColor(selectedTextStyle_.textColor.value());
+        }
+        if (selectedTextStyle_.fontWeight.has_value()) {
+            textLayoutProperty->UpdateFontWeight(selectedTextStyle_.fontWeight.value());
+        }
+        if (selectedTextStyle_.minFontSize.has_value()) {
+            textLayoutProperty->UpdateAdaptMinFontSize(selectedTextStyle_.minFontSize.value());
+        }
+        if (selectedTextStyle_.maxFontSize.has_value()) {
+            textLayoutProperty->UpdateAdaptMaxFontSize(selectedTextStyle_.maxFontSize.value());
+        }
+        if (selectedTextStyle_.textOverflow.has_value()) {
+            textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
+        }
+    } else if (HasSelectedTextStyle()) {
+        textLayoutProperty->UpdateFontSize(defaultSize);
+        textLayoutProperty->UpdateTextColor(defaultColor);
+        textLayoutProperty->ResetAdaptMinFontSize();
+        textLayoutProperty->ResetAdaptMaxFontSize();
+        textLayoutProperty->ResetTextOverflow();
+    }
+    AddAnimationTextProperties(animIdx, textLayoutProperty);
+}
+
 void ContainerPickerPattern::UpdateSingleItemTextLinear(
     const ContainerPickerUtils::PositionMap::value_type& item,
     const RefPtr<FrameNode>& host, const Color& defaultColor, const Dimension& defaultSize,
@@ -806,12 +841,6 @@ void ContainerPickerPattern::CacheOriginalItemStyle(int32_t index,
     if (textLayoutProperty->HasFontWeight()) {
         orig.fontWeight = textLayoutProperty->GetFontWeight().value();
     }
-    if (textLayoutProperty->HasMaxLines()) {
-        orig.maxLines = textLayoutProperty->GetMaxLines().value();
-    }
-    if (textLayoutProperty->HasTextOverflow()) {
-        orig.textOverflow = textLayoutProperty->GetTextOverflow().value();
-    }
     originalItemStyle_[index] = orig;
 }
 
@@ -835,13 +864,7 @@ void ContainerPickerPattern::ApplyCenterItemSelectedStyle(
         textLayoutProperty->UpdateAdaptMaxFontSize(selectedTextStyle_.maxFontSize.value());
     }
     if (selectedTextStyle_.textOverflow.has_value()) {
-        if (selectedTextStyle_.textOverflow.value() != TextOverflow::MARQUEE) {
-            textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
-            textLayoutProperty->UpdateMaxLines(1);
-        } else {
-            textLayoutProperty->ResetTextOverflow();
-            textLayoutProperty->ResetMaxLines();
-        }
+        textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
     }
     textLayoutProperty->UpdateAlignment(Alignment::CENTER);
 }
@@ -858,16 +881,7 @@ void ContainerPickerPattern::RestoreItemOriginalStyle(int32_t index,
     textLayoutProperty->UpdateFontWeight(it->second.fontWeight);
     textLayoutProperty->ResetAdaptMinFontSize();
     textLayoutProperty->ResetAdaptMaxFontSize();
-    if (it->second.textOverflow.has_value()) {
-        textLayoutProperty->UpdateTextOverflow(it->second.textOverflow.value());
-    } else {
-        textLayoutProperty->ResetTextOverflow();
-    }
-    if (it->second.maxLines.has_value()) {
-        textLayoutProperty->UpdateMaxLines(it->second.maxLines.value());
-    } else {
-        textLayoutProperty->ResetMaxLines();
-    }
+    textLayoutProperty->ResetTextOverflow();
     applyColor = it->second.currentColor;
 }
 
