@@ -228,6 +228,16 @@ std::shared_ptr<NG::AgentGestureState> CreateAgentGestureState(const TouchEvent&
 }
 
 template<typename EventType>
+void RestoreAgentGestureIdentity(EventType& event, const NG::AgentGestureState& state)
+{
+    event.isAgent = true;
+    event.agentWindowId = state.agentWindowId;
+    event.callingUid = state.callingUid;
+    event.hasSafSessionId = state.hasSession;
+    event.safSessionId = state.sessionId;
+}
+
+template<typename EventType>
 bool MatchesAgentGestureContext(const NG::AgentGestureState& state, const EventType& event)
 {
     if (!event.isAgent || state.agentWindowId != event.agentWindowId ||
@@ -1660,6 +1670,23 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
     ContainerScope scope(instanceId_);
     TouchEvent point = event;
     UpdateDragInfo(point);
+    if (!point.isAgent && (point.type == TouchType::UP || point.type == TouchType::CANCEL)) {
+        std::shared_ptr<NG::AgentGestureState> state;
+        if (IsMouseDerivedTouchEvent(point)) {
+            auto it = agentMouseStates_.find(GetMouseSourceKey(point));
+            if (it != agentMouseStates_.end()) {
+                state = it->second;
+            }
+        } else {
+            auto it = agentTouchStates_.find(point.id);
+            if (it != agentTouchStates_.end()) {
+                state = it->second;
+            }
+        }
+        if (state) {
+            RestoreAgentGestureIdentity(point, *state);
+        }
+    }
     const auto iter = touchTestResults_.find(point.id);
     NotifyTouchToInteractionObserver(
         instanceId_, point, iter != touchTestResults_.end() ? &iter->second : nullptr);
@@ -2744,6 +2771,16 @@ bool EventManager::FinishAgentMouseGesture(const MouseEvent& event, const PressM
 bool EventManager::DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& sourceEvent)
 {
     auto event = sourceEvent;
+    if (!event.isAgent && (event.action == MouseAction::RELEASE || event.action == MouseAction::CANCEL)) {
+        auto state = agentMouseStates_.find({ event.id, event.button });
+        if (state == agentMouseStates_.end() && event.button == MouseButton::NONE_BUTTON) {
+            state = std::find_if(agentMouseStates_.begin(), agentMouseStates_.end(),
+                [&event](const auto& item) { return item.first.id == event.id; });
+        }
+        if (state != agentMouseStates_.end()) {
+            RestoreAgentGestureIdentity(event, *state->second);
+        }
+    }
     const bool agentControlled = IsAgentMouseInScope(event);
     if (agentControlled) {
         ResetAgentDenyStates(agentMouseStates_, event);
@@ -2878,6 +2915,16 @@ bool EventManager::IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG:
 bool EventManager::DispatchMouseEventInLessAPI13(const MouseEvent& sourceEvent)
 {
     auto event = sourceEvent;
+    if (!event.isAgent && (event.action == MouseAction::RELEASE || event.action == MouseAction::CANCEL)) {
+        auto state = agentMouseStates_.find({ event.id, event.button });
+        if (state == agentMouseStates_.end() && event.button == MouseButton::NONE_BUTTON) {
+            state = std::find_if(agentMouseStates_.begin(), agentMouseStates_.end(),
+                [&event](const auto& item) { return item.first.id == event.id; });
+        }
+        if (state != agentMouseStates_.end()) {
+            RestoreAgentGestureIdentity(event, *state->second);
+        }
+    }
     const bool agentControlled = IsAgentMouseInScope(event);
     if (agentControlled) {
         ResetAgentDenyStates(agentMouseStates_, event);
