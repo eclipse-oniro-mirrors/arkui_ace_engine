@@ -12,14 +12,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <algorithm>
-#include <functional>
-#include <unordered_map>
-
 #include "focus_event_handler.h"
 #include "core/common/container.h"
 
-#include "base/input_manager/input_manager.h"
 #include "core/common/event_manager.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/node_sensitive_input.h"
@@ -32,147 +27,10 @@
 #include "core/event/crown_event.h"
 namespace OHOS::Ace::NG {
 namespace {
-struct AgentKeyContext {
-    int32_t instanceId = -1;
-    int32_t agentWindowId = -1;
-    int32_t callingUid = -1;
-    uint64_t sessionId = 0;
-    int64_t deviceId = 0;
-    KeyCode code = KeyCode::KEY_UNKNOWN;
-    bool hasSession = false;
-
-    bool operator==(const AgentKeyContext& other) const
-    {
-        return instanceId == other.instanceId && agentWindowId == other.agentWindowId &&
-            callingUid == other.callingUid &&
-            sessionId == other.sessionId && deviceId == other.deviceId && code == other.code &&
-            hasSession == other.hasSession;
-    }
-};
-
-struct AgentKeyContextHash {
-    static constexpr size_t agentWindowIdShift = 1;
-    static constexpr size_t callingUidShift = 2;
-    static constexpr size_t sessionIdShift = 3;
-    static constexpr size_t deviceIdShift = 4;
-    static constexpr size_t keyCodeShift = 5;
-    static constexpr size_t sessionFlagShift = 6;
-
-    size_t operator()(const AgentKeyContext& context) const
-    {
-        size_t value = std::hash<int32_t> {}(context.instanceId);
-        value ^= std::hash<int32_t> {}(context.agentWindowId) << agentWindowIdShift;
-        value ^= std::hash<int32_t> {}(context.callingUid) << callingUidShift;
-        value ^= std::hash<uint64_t> {}(context.sessionId) << sessionIdShift;
-        value ^= std::hash<int64_t> {}(context.deviceId) << deviceIdShift;
-        value ^= std::hash<int32_t> {}(static_cast<int32_t>(context.code)) << keyCodeShift;
-        value ^= std::hash<bool> {}(context.hasSession) << sessionFlagShift;
-        return value;
-    }
-};
-
-using AgentKeyStateMap = std::unordered_map<AgentKeyContext, std::shared_ptr<AgentGestureState>, AgentKeyContextHash>;
-AgentKeyStateMap g_agentKeyStates;
-
-AgentKeyContext GetAgentKeyContext(const KeyEvent& key)
-{
-    return { Container::CurrentId(), key.agentWindowId, key.callingUid, key.safSessionId, key.deviceId, key.code,
-        key.hasSafSessionId };
-}
-
-bool IsAgentEnterCode(const KeyEvent& key)
-{
-    return !key.isRedispatch &&
-        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
-}
-
 bool IsAgentEnter(const KeyEvent& key)
 {
-    return key.isAgent && IsAgentEnterCode(key);
-}
-
-bool IsSameAgentKey(const AgentKeyContext& context, const KeyEvent& key)
-{
-    return context.instanceId == Container::CurrentId() && context.deviceId == key.deviceId &&
-        context.code == key.code;
-}
-
-AgentKeyStateMap::iterator FindAgentKeyState(const KeyEvent& key)
-{
-    return std::find_if(g_agentKeyStates.begin(), g_agentKeyStates.end(),
-        [&key](const auto& item) { return IsSameAgentKey(item.first, key); });
-}
-
-void FreezeAgentKeyNode(AgentGestureState& state, const RefPtr<FrameNode>& node)
-{
-    CHECK_NULL_VOID(node);
-    if (state.nodes.count(node->GetId())) {
-        return;
-    }
-    auto compId = node->GetInspectorId().value_or("");
-    if (compId.empty()) {
-        compId = std::to_string(node->GetId());
-    }
-    const bool hasControlMode = node->HasAgentControlMode();
-    const bool allowed = !InputManager::HasControlComponentPermission() || !hasControlMode ||
-        node->GetAgentControlMode() == AgentControlMode::ALLOW;
-    state.nodes.emplace(node->GetId(), NodeSnapshot {
-        std::move(compId), node->GetTag(), allowed, hasControlMode });
-}
-
-void ReportAgentDeny(const AgentGestureState& state);
-
-bool HandleAgentKeyNode(AgentGestureState& state, const RefPtr<FrameNode>& node)
-{
-    if (state.hasDeny) {
-        return false;
-    }
-    CHECK_NULL_RETURN(node, true);
-    FreezeAgentKeyNode(state, node);
-    auto it = state.nodes.find(node->GetId());
-    if (it == state.nodes.end()) {
-        return true;
-    }
-    if (!it->second.hasControlMode) {
-        return true;
-    }
-    if (!it->second.allowed && it->second.hasControlMode) {
-        state.hasDeny = true;
-        state.denyNodeId = node->GetId();
-        state.denyCompId = it->second.compId;
-        state.denyTag = it->second.tag;
-        ReportAgentDeny(state);
-        return false;
-    }
-    return true;
-}
-
-void ReportAgentDeny(const AgentGestureState& state)
-{
-    if (!state.hasSession || !state.hasDeny || state.denyNodeId == -1) {
-        return;
-    }
-    AgentInputResult result;
-    result.sessionId = state.sessionId;
-    result.callingUid = state.callingUid;
-    result.instanceId = state.instanceId;
-    result.nodeId = state.denyNodeId;
-    result.compId = state.denyCompId;
-    result.tag = state.denyTag;
-    result.allowed = false;
-    InputManager::ReportAgentInputDecision(result);
-}
-
-void FinishAgentKeyState(const KeyEvent& key)
-{
-    if (!IsAgentEnterCode(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
-        return;
-    }
-    auto it = FindAgentKeyState(key);
-    if (it == g_agentKeyStates.end()) {
-        return;
-    }
-    g_agentKeyStates.erase(it);
+    return key.isAgent && !key.isRedispatch &&
+        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
 }
 
 } // namespace
@@ -181,8 +39,6 @@ struct NodeSensitiveKeyDispatch {
     WeakPtr<FrameNode> initialNode;
     bool notified = false;
     int32_t depth = 0;
-    AgentKeyContext context;
-    std::shared_ptr<AgentGestureState> state;
 };
 
 std::vector<RefPtr<FrameNode>> FocusEventHandler::CollectSensitiveKeyNodes(const FocusEvent& event)
@@ -216,54 +72,14 @@ void FocusEventHandler::PrepareSensitiveKeyDispatch(const FocusEvent& event)
         dispatch->initialNode = nodes.back();
     }
     const auto& key = static_cast<const KeyEvent&>(event.event);
-    const bool hasAgentState = IsAgentEnterCode(key) && FindAgentKeyState(key) != g_agentKeyStates.end();
-    if (!IsAgentEnter(key) && !hasAgentState) {
+    if (!IsAgentEnter(key)) {
         return;
     }
-    if (!IsAgentEnter(key) && key.action == KeyAction::DOWN) {
-        auto stale = FindAgentKeyState(key);
-        if (stale != g_agentKeyStates.end()) {
-            g_agentKeyStates.erase(stale);
-        }
-        return;
-    }
-    dispatch->context = GetAgentKeyContext(key);
-    if (key.action == KeyAction::DOWN) {
-        auto previous = g_agentKeyStates.find(dispatch->context);
-        if (previous == g_agentKeyStates.end()) {
-            for (auto it = g_agentKeyStates.begin(); it != g_agentKeyStates.end();) {
-                if (IsSameAgentKey(it->first, key)) {
-                    it = g_agentKeyStates.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-        }
-        previous = g_agentKeyStates.find(dispatch->context);
-        if (previous != g_agentKeyStates.end()) {
-            dispatch->state = previous->second;
-            dispatch->context = previous->first;
-        } else {
-            dispatch->state = std::make_shared<AgentGestureState>();
-            dispatch->state->hasSession = key.hasSafSessionId;
-            dispatch->state->sessionId = key.safSessionId;
-            dispatch->state->agentWindowId = key.agentWindowId;
-            dispatch->state->callingUid = key.callingUid;
-            dispatch->state->instanceId = Container::CurrentId();
-            g_agentKeyStates[dispatch->context] = dispatch->state;
-        }
-    } else {
-        auto it = FindAgentKeyState(key);
-        if (it != g_agentKeyStates.end()) {
-            dispatch->state = it->second;
-            dispatch->context = it->first;
-        }
-    }
-    if (dispatch->state) {
-        dispatch->state->hasDeny = false;
-        for (const auto& node : nodes) {
-            FreezeAgentKeyNode(*dispatch->state, node);
-        }
+    auto node = GetFrameNode();
+    auto pipeline = node ? node->GetContext() : nullptr;
+    auto eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
+    if (eventManager) {
+        eventManager->PrepareAgentKeyEvent(key, nodes);
     }
 }
 
@@ -274,27 +90,25 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
     const auto& key = static_cast<const KeyEvent&>(event.event);
     auto node = GetFrameNode();
     CHECK_NULL_RETURN(node, false);
-    const bool controlled = IsAgentEnter(key) || dispatch->state != nullptr;
+    const bool controlled = IsAgentEnter(key);
     bool allowed = true;
-    if (controlled && dispatch->state) {
-        allowed = HandleAgentKeyNode(*dispatch->state, node);
+    if (controlled) {
+        auto pipeline = node->GetContext();
+        auto eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
+        if (eventManager) {
+            allowed = eventManager->IsAgentKeyAllowed(key, node);
+        }
     }
     auto hit = dispatch->initialNode.Upgrade();
     if (!dispatch->notified && hit && !key.isRedispatch) {
         dispatch->notified = true;
         NodeSensitiveInputInfo info;
-        info.isAgent = key.isAgent || dispatch->state != nullptr;
+        info.isAgent = key.isAgent;
         info.type = NodeSensitiveInputEventType::KEY;
         info.keyEvent = &key;
         NotifyNodeSensitiveInput(hit, info);
     }
-    if (!controlled) {
-        return false;
-    }
-    if (!dispatch->state) {
-        return false;
-    }
-    return !allowed;
+    return controlled && !allowed;
 }
 
 void FinishAgentKeyDispatch(const FocusEvent& event)
@@ -302,13 +116,14 @@ void FinishAgentKeyDispatch(const FocusEvent& event)
     auto dispatch = event.sensitiveInput;
     CHECK_NULL_VOID(dispatch);
     const auto& key = static_cast<const KeyEvent&>(event.event);
-    if (!IsAgentEnterCode(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
+    if (!IsAgentEnter(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
         return;
     }
-    if (dispatch->state) {
-        g_agentKeyStates.erase(dispatch->context);
-    } else {
-        FinishAgentKeyState(key);
+    auto node = dispatch->initialNode.Upgrade();
+    auto pipeline = node ? node->GetContext() : nullptr;
+    auto eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
+    if (eventManager) {
+        eventManager->FinishAgentKeyEvent(key);
     }
 }
 

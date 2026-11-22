@@ -227,6 +227,17 @@ std::shared_ptr<NG::AgentGestureState> CreateAgentGestureState(const TouchEvent&
     return state;
 }
 
+std::shared_ptr<NG::AgentGestureState> CreateAgentGestureState(const KeyEvent& event, int32_t instanceId)
+{
+    auto state = std::make_shared<NG::AgentGestureState>();
+    state->hasSession = event.hasSafSessionId;
+    state->sessionId = event.safSessionId;
+    state->agentWindowId = event.agentWindowId;
+    state->callingUid = event.callingUid;
+    state->instanceId = instanceId;
+    return state;
+}
+
 template<typename EventType>
 void RestoreAgentGestureIdentity(EventType& event, const NG::AgentGestureState& state)
 {
@@ -260,6 +271,12 @@ void ResetAgentDenyStates(StateMap& states, const MouseEvent& event)
 bool IsAgentControlSourceTool(SourceTool tool)
 {
     return tool == SourceTool::UNKNOWN || tool == SourceTool::FINGER || tool == SourceTool::MOUSE;
+}
+
+bool IsAgentKeyEvent(const KeyEvent& event)
+{
+    return event.isAgent && !event.isRedispatch &&
+        (event.code == KeyCode::KEY_ENTER || event.code == KeyCode::KEY_NUMPAD_ENTER);
 }
 
 bool EventManager::IsAgentTouchInScope(const TouchEvent& event)
@@ -1734,6 +1751,73 @@ bool EventManager::IsAgentTouchAllowed(const TouchEvent& event, const RefPtr<NG:
         return false;
     }
     return TryDeliverAgentNode(*it->second, node);
+}
+
+EventManager::AgentKeyState* EventManager::FindAgentKeyState(const KeyEvent& event)
+{
+    for (auto& item : agentKeyStates_) {
+        if (item.agentWindowId == event.agentWindowId && item.callingUid == event.callingUid &&
+            item.sessionId == event.safSessionId && item.deviceId == event.deviceId && item.code == event.code &&
+            item.hasSession == event.hasSafSessionId) {
+            return &item;
+        }
+    }
+    return nullptr;
+}
+
+void EventManager::PrepareAgentKeyEvent(
+    const KeyEvent& event, const std::vector<RefPtr<NG::FrameNode>>& nodes)
+{
+    if (!IsAgentKeyEvent(event)) {
+        return;
+    }
+    auto state = FindAgentKeyState(event);
+    if (event.action == KeyAction::DOWN && !state) {
+        AgentKeyState newState;
+        newState.agentWindowId = event.agentWindowId;
+        newState.callingUid = event.callingUid;
+        newState.sessionId = event.safSessionId;
+        newState.deviceId = event.deviceId;
+        newState.code = event.code;
+        newState.hasSession = event.hasSafSessionId;
+        newState.decision = CreateAgentGestureState(event, instanceId_);
+        agentKeyStates_.emplace_back(std::move(newState));
+        state = &agentKeyStates_.back();
+    }
+    if (!state || !state->decision) {
+        return;
+    }
+    state->decision->hasDeny = false;
+    for (const auto& node : nodes) {
+        FreezeAgentNode(*state->decision, node);
+    }
+}
+
+bool EventManager::IsAgentKeyAllowed(const KeyEvent& event, const RefPtr<NG::FrameNode>& node)
+{
+    if (!IsAgentKeyEvent(event)) {
+        return true;
+    }
+    auto state = FindAgentKeyState(event);
+    if (!state || !state->decision) {
+        return true;
+    }
+    return TryDeliverAgentNode(*state->decision, node);
+}
+
+void EventManager::FinishAgentKeyEvent(const KeyEvent& event)
+{
+    if (!IsAgentKeyEvent(event) || (event.action != KeyAction::UP && event.action != KeyAction::CANCEL)) {
+        return;
+    }
+    for (auto it = agentKeyStates_.begin(); it != agentKeyStates_.end(); ++it) {
+        if (it->agentWindowId == event.agentWindowId && it->callingUid == event.callingUid &&
+            it->sessionId == event.safSessionId && it->deviceId == event.deviceId && it->code == event.code &&
+            it->hasSession == event.hasSafSessionId) {
+            agentKeyStates_.erase(it);
+            return;
+        }
+    }
 }
 
 bool EventManager::DispatchPreparedTouchEvent(
@@ -3324,6 +3408,7 @@ void EventManager::ClearResults()
     axisTouchTestResults_.clear();
     agentTouchStates_.clear();
     agentMouseStates_.clear();
+    agentKeyStates_.clear();
     touchInputHitNodes_.clear();
     mouseInputHitNodes_.clear();
 }
