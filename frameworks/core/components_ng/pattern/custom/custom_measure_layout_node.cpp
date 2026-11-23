@@ -69,9 +69,10 @@ bool CustomMeasureLayoutNode::Render(int64_t deadline)
     // External synchronous callers (e.g. FrameNode::FrameProxy flat wrapper building)
     // bypass the layout algorithm, so the first-build gate is engaged here as well —
     // its conditions are evaluated inside TryStartAsyncLoad, the single source of
-    // truth (the idle path drives ExecuteAsyncBuild directly, unaffected).
+    // truth, and it returns true whether the deferral engaged just now or on an
+    // earlier call (the idle path drives ExecuteAsyncBuild directly, unaffected).
     if (TryStartAsyncLoad()) {
-        return false; // engaged just now: never build synchronously this pass
+        return false;
     }
     if (deadline > 0 && GetSysTimestamp() > deadline) {
         return false;

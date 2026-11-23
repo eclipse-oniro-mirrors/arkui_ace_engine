@@ -20,6 +20,7 @@
 #include "core/components_ng/base/scroll_viewport_coordinator.h"
 #include "core/common/thp_extra_manager.h"
 #include "mock_pipeline_context.h"
+#include "core/pipeline_ng/async_load_scheduler.h"
 
 #include "base/memory/ace_type.h"
 #include "core/common/ai/ai_write_adapter.h"

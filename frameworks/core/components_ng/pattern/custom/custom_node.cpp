@@ -113,11 +113,13 @@ bool CustomNode::Render(int64_t deadline)
     // building, menu/navigation hosts) all land here. Engage the first-build gate on
     // entry — its conditions (enabled, untouched, unbuilt via the unconsumed render
     // function, on the main tree) are evaluated inside TryStartAsyncLoad, the single
-    // source of truth — and never synchronously build a deferred node. Update paths
-    // (if/else branch flips, runtime-added items) skip Build() entirely; LOADING
-    // re-entry stays allowed (idle slicing) and FORCED passes through (backstop).
+    // source of truth — and never synchronously build a deferred node: it returns
+    // true whether the deferral engaged just now or on an earlier call. Update
+    // paths (if/else branch flips, runtime-added items) skip Build() entirely;
+    // LOADING re-entry stays allowed (idle slicing) and FORCED passes through
+    // (the timeout backstop).
     if (TryStartAsyncLoad()) {
-        return false; // engaged just now: never build synchronously this pass
+        return false;
     }
     // Render-window suppression: while this (re-entrant) build runs, per-child mount
     // sync requests are not propagated upward. The budget-exhaustion early returns
