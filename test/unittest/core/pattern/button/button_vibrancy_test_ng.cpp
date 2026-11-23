@@ -29,6 +29,7 @@
 #include "core/components_ng/pattern/button/button_model_ng.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "ui/properties/ui_material_enums.h"
 
 using namespace testing;
@@ -230,6 +231,36 @@ HWTEST_F(ButtonVibrancyTestNg, UpdateTextVibrancy003, TestSize.Level1)
     ButtonModelNG::SetVibrancyMode(AccessibilityManager::RawPtr(frameNode), VibrancyMode::DARKEN);
     pattern->UpdateTextVibrancy();
     EXPECT_EQ(textRenderContext->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::DARKEN);
+
+    g_uiMaterialLevel = backupLevel;
+}
+
+/**
+ * @tc.name: UpdateTextVibrancy004
+ * @tc.desc: Test UpdateTextVibrancy does not override custom child's own vibrancy mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ButtonVibrancyTestNg, UpdateTextVibrancy004, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(V2::BUTTON_ETS_TAG, NODE_ID, AceType::MakeRefPtr<ButtonPattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto customChild = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, TEXT_NODE_ID, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(customChild, nullptr);
+    frameNode->AddChild(customChild);
+
+    auto backupLevel = g_uiMaterialLevel;
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    ButtonModelNG::SetCreateWithLabel(AccessibilityManager::RawPtr(frameNode), false);
+    ViewAbstract::SetVibrancyMode(AccessibilityManager::RawPtr(customChild), VibrancyMode::BRIGHTEN);
+    ButtonModelNG::SetVibrancyMode(AccessibilityManager::RawPtr(frameNode), VibrancyMode::DARKEN);
+
+    auto pattern = frameNode->GetPattern<ButtonPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->UpdateTextVibrancy();
+
+    auto childRenderContext = customChild->GetRenderContext();
+    ASSERT_NE(childRenderContext, nullptr);
+    EXPECT_EQ(childRenderContext->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::BRIGHTEN);
 
     g_uiMaterialLevel = backupLevel;
 }

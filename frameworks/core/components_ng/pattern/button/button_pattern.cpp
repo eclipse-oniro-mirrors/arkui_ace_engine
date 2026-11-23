@@ -1670,6 +1670,9 @@ void ButtonPattern::UpdateTextVibrancy()
     CHECK_NULL_VOID(host);
     auto layoutProperty = GetLayoutProperty<ButtonLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
+    if (!layoutProperty->GetCreateWithLabelValue(true)) {
+        return;
+    }
     auto textNode = DynamicCast<FrameNode>(host->GetFirstChild());
     CHECK_NULL_VOID(textNode);
     VibrancyMode mode = layoutProperty->GetVibrancyModeValue(VibrancyMode::DISABLED);
