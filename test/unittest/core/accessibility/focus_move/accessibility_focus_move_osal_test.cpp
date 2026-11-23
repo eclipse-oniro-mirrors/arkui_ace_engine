@@ -1772,7 +1772,7 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningSnapshotAndSanitizedEdges, Te
     EXPECT_EQ(provider->queries, queries);
 }
 
-HWTEST_F(AccessibilityFocusMoveTest, ThirdDeepBranchPreservesNormalSubtree, TestSize.Level1)
+HWTEST_F(AccessibilityFocusMoveTest, ThirdDeepBranchRejectsDeepTree, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
     provider->Add(TEST_ROOT_ID, -1, {TEST_FIRST_NODE_ID, TEST_OTHER_ROOT_ID});
@@ -1786,21 +1786,21 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdDeepBranchPreservesNormalSubtree, Test
     NodeConfig config;
     config.belongTreeId = TEST_TREE_ID;
     FocusStrategyOsalThird strategy(manager, provider, config);
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(TEST_SECOND_NODE_ID));
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(TEST_THIRD_NODE_ID));
+    // a branch deeper than the depth budget rejects the whole tree instead of
+    // publishing a truncated one.
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_SECOND_NODE_ID));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
     AccessibilityFocusMoveParam param {};
     param.direction = FocusMoveDirection::FIND_LAST;
     AccessibilityElementInfo output;
     auto result = strategy.ExecuteFocusMoveSearch(TEST_FIRST_NODE_ID, param, output);
-    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_SUCCESS);
-    EXPECT_TRUE(output.IsValidElement());
-    int64_t expectedId = TEST_THIRD_NODE_ID;
-    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(config.belongTreeId, expectedId);
-    EXPECT_EQ(output.GetAccessibilityId(), expectedId);
+    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL_LOST_NODE);
+    EXPECT_TRUE(result.needTerminate);
+    EXPECT_FALSE(output.IsValidElement());
     EXPECT_EQ(provider->queries.count(TEST_OTHER_ROOT_ID + ThirdAccessibilityTraversal::MAX_DEPTH), 0);
 }
 
-HWTEST_F(AccessibilityFocusMoveTest, ThirdRejectedPayloadPreservesSiblingBudget, TestSize.Level1)
+HWTEST_F(AccessibilityFocusMoveTest, ThirdRejectedPayloadRejectsTree, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
     provider->Add(TEST_ROOT_ID, -1, {TEST_OTHER_ROOT_ID, TEST_FIRST_NODE_ID});
@@ -1810,17 +1810,14 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdRejectedPayloadPreservesSiblingBudget,
     provider->Add(TEST_SECOND_NODE_ID, TEST_FIRST_NODE_ID, {});
     auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
     FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(TEST_SECOND_NODE_ID));
-    auto root = strategy.ChangeToRoot();
-    ASSERT_NE(root, nullptr);
-    auto children = root->GetAceChildren();
-    ASSERT_EQ(children.size(), 1);
-    ASSERT_NE(children.front(), nullptr);
-    EXPECT_EQ(children.front()->GetAccessibilityId(), TEST_FIRST_NODE_ID);
+    // an oversized payload rejects the whole tree; the healthy sibling is not published.
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_SECOND_NODE_ID));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_OTHER_ROOT_ID));
 }
 
-HWTEST_F(AccessibilityFocusMoveTest, ThirdNodeLimitPreservesShallowTargets, TestSize.Level1)
+HWTEST_F(AccessibilityFocusMoveTest, ThirdNodeLimitRejectsTree, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
     provider->Add(TEST_ROOT_ID, -1, {TEST_FIRST_NODE_ID, TEST_OTHER_ROOT_ID});
@@ -1840,16 +1837,18 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdNodeLimitPreservesShallowTargets, Test
     AccessibilityFocusMoveParam param {};
     param.direction = FocusMoveDirection::FIND_LAST;
     AccessibilityElementInfo output;
+    // Exceeding the node budget rejects the whole tree.
     auto result = strategy.ExecuteFocusMoveSearch(TEST_FIRST_NODE_ID, param, output);
-    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_SUCCESS);
-    int64_t expectedId = TEST_THIRD_NODE_ID;
-    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(config.belongTreeId, expectedId);
-    EXPECT_EQ(output.GetAccessibilityId(), expectedId);
-    EXPECT_EQ(provider->queries.size(), ThirdAccessibilityTraversal::MAX_NODES);
+    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL_LOST_NODE);
+    EXPECT_TRUE(result.needTerminate);
+    EXPECT_FALSE(output.IsValidElement());
+    // The budget aborts the discovery walk, so the queued records never consume
+    // provider callbacks.
+    EXPECT_EQ(provider->queries.count(TEST_EXTRA_NODE_ID_BASE), 0);
     EXPECT_EQ(provider->queries.count(TEST_EXTRA_NODE_ID_BASE + ThirdAccessibilityTraversal::MAX_NODES - 1), 0);
 }
 
-HWTEST_F(AccessibilityFocusMoveTest, ThirdCumulativePayloadKeepsAcceptedNodes, TestSize.Level1)
+HWTEST_F(AccessibilityFocusMoveTest, ThirdCumulativePayloadRejectsTree, TestSize.Level1)
 {
     auto provider = AceType::MakeRefPtr<FocusTreeProvider>();
     provider->Add(TEST_ROOT_ID, -1, {TEST_FIRST_NODE_ID, TEST_SECOND_NODE_ID, TEST_THIRD_NODE_ID});
@@ -1860,11 +1859,11 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdCumulativePayloadKeepsAcceptedNodes, T
     }
     auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
     FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(TEST_SECOND_NODE_ID));
+    // the cumulative payload rejects the whole tree; accepted nodes are not published.
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_SECOND_NODE_ID));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_THIRD_NODE_ID));
-    auto root = strategy.ChangeToRoot();
-    ASSERT_NE(root, nullptr);
-    EXPECT_EQ(root->GetAceChildren().size(), 2);
 }
 
 HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningDepthBoundaryAndFailure, TestSize.Level1)
@@ -1887,13 +1886,12 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningDepthBoundaryAndFailure, Test
     AccessibilityFocusMoveParam param {};
     param.direction = FocusMoveDirection::FIND_LAST;
     AccessibilityElementInfo output;
+    // adding a node beyond the depth budget rejects the whole tree on the next build.
     auto result = strategy.ExecuteFocusMoveSearch(-1, param, output);
-    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_SUCCESS);
-    EXPECT_TRUE(output.IsValidElement());
-    int64_t expectedId = end;
-    AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(config.belongTreeId, expectedId);
-    EXPECT_EQ(output.GetAccessibilityId(), expectedId);
-    EXPECT_NE(strategy.ChangeToRoot(), nullptr);
+    EXPECT_EQ(result.resultType, FocusMoveResultType::SEARCH_FAIL_LOST_NODE);
+    EXPECT_TRUE(result.needTerminate);
+    EXPECT_FALSE(output.IsValidElement());
+    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(end + 1));
     EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
     EXPECT_EQ(provider->queries.count(end + 1), 0);
@@ -1924,10 +1922,9 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningWideTreeAndNodeLimit, TestSiz
     EXPECT_EQ(target, nullptr);
     provider->nodes[TEST_ROOT_ID].AddChildNodeId(TEST_OVER_LIMIT_NODE_ID);
     provider->Add(TEST_OVER_LIMIT_NODE_ID, TEST_ROOT_ID, {});
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
-    auto root = strategy.GetCurrentCheckNode();
-    ASSERT_NE(root, nullptr);
-    EXPECT_EQ(root->GetAceChildren().size(), ThirdAccessibilityTraversal::MAX_NODES - 1);
+    // exceeding the node budget rejects the whole tree.
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_OVER_LIMIT_NODE_ID));
     EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
 }
@@ -1945,16 +1942,11 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningRepeatedEdgesConsumeBudget, T
     }
     auto manager = AceType::MakeRefPtr<JsAccessibilityManager>();
     FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
+    // repeated edges consume the edge budget; exceeding it rejects the whole tree.
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
+    EXPECT_EQ(strategy.ChangeToRoot(), nullptr);
     EXPECT_EQ(provider->queries.size(), 3);
-    auto root = strategy.GetCurrentCheckNode();
-    ASSERT_NE(root, nullptr);
-    auto children = root->GetAceChildren();
-    ASSERT_EQ(children.size(), 2);
-    for (const auto& child : children) {
-        ASSERT_NE(child, nullptr);
-        EXPECT_TRUE(child->GetAceChildren().empty());
-    }
 }
 
 HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningHoverSkipsCycleAndMissingSibling, TestSize.Level1)
@@ -2105,10 +2097,9 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningPayloadLimitAndOwnedActions, 
     ASSERT_EQ(node->GetNodeInfo()->GetOperationActions().size(), 1);
     EXPECT_STREQ(node->GetNodeInfo()->GetOperationActions()[0].description, "original action");
     provider->nodes[TEST_FIRST_NODE_ID].SetContents(std::string(ThirdAccessibilityTraversal::MAX_BYTES, 'x'));
-    ASSERT_TRUE(strategy.UpdateOriginNodeInfo(-1));
-    auto root = strategy.GetCurrentCheckNode();
-    ASSERT_NE(root, nullptr);
-    EXPECT_TRUE(root->GetAceChildren().empty());
+    // the cumulative payload rejects the whole tree on the next build.
+    EXPECT_FALSE(strategy.UpdateOriginNodeInfo(-1));
+    EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
     EXPECT_FALSE(strategy.UpdateOriginNodeInfo(TEST_FIRST_NODE_ID));
     EXPECT_EQ(strategy.GetCurrentCheckNode(), nullptr);
 }
