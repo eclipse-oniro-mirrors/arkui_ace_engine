@@ -981,4 +981,80 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState017, TestSize.Level1)
     EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 }
 
+/**
+ * @tc.name: GetScrollState018
+ * @tc.desc: Test zero-delta nested fling frame does not pollute parent query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState018, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_ANIMATION, NestedState::CHILD_SCROLL, 1000.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+}
+
+/**
+ * @tc.name: GetScrollState019
+ * @tc.desc: Test every non-moving nested frame returns IDLE regardless of source and nested state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState019, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    CreateContent();
+    CreateScrollDone();
+    const std::vector<int32_t> sources = { SCROLL_FROM_UPDATE, SCROLL_FROM_AXIS, SCROLL_FROM_BAR,
+        SCROLL_FROM_CROWN, SCROLL_FROM_BAR_OVER_DRAG, SCROLL_FROM_ANIMATION, SCROLL_FROM_ANIMATION_SPRING,
+        SCROLL_FROM_ANIMATION_CONTROLLER, SCROLL_FROM_BAR_FLING };
+    const std::vector<NestedState> nestedStates = { NestedState::CHILD_SCROLL, NestedState::CHILD_OVER_SCROLL,
+        NestedState::CHILD_CHECK_OVER_SCROLL };
+    for (auto state : nestedStates) {
+        for (auto source : sources) {
+            pattern_->SetScrollSource(SCROLL_FROM_NONE);
+            pattern_->HandleScroll(10.0f, source, state, 1000.0f);
+            EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE) << "source: " << source
+                                                                              << ", nested state: "
+                                                                              << static_cast<int32_t>(state);
+        }
+    }
+}
+
+/**
+ * @tc.name: GetScrollState020
+ * @tc.desc: Test nested frames keep SCROLL or FLING when the parent actually moves
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState020, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->HandleScroll(-10.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    pattern_->HandleScroll(-10.0f, SCROLL_FROM_ANIMATION, NestedState::CHILD_SCROLL, 1000.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
+}
+
+/**
+ * @tc.name: GetScrollState021
+ * @tc.desc: Test zero-delta gesture frames keep the component's own scroll state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState021, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_UPDATE, NestedState::GESTURE, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_ANIMATION, NestedState::GESTURE, 1000.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
+}
+
 } // namespace OHOS::Ace::NG
