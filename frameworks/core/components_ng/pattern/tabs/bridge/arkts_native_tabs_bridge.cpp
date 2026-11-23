@@ -34,6 +34,7 @@
 #include "frameworks/core/components/tab_bar/tabs_event.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
+#include "base/utils/system_properties.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #ifndef NG_BUILD
 #include "compatible/components/tab_bar/modifier/tab_modifier_api.h"
@@ -289,6 +290,7 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "setBarStyle", "resetBarStyle", "setSidebarPosition",
         "resetSidebarPosition", "setSidebarHeader", "resetSidebarHeader", "setSidebarSearchable",
         "resetSidebarSearchable", "setShowSidebarControlButton", "resetShowSidebarControlButton",
+        "setSidebarTitleBar", "resetSidebarTitleBar",
         "setBarDisplayModeBreakpoint", "resetBarDisplayModeBreakpoint",
         "setOnBarDisplayModeChange", "resetOnBarDisplayModeChange", "setSidebarDisplayStyle",
         "resetSidebarDisplayStyle", "setTabSidebarWidth", "resetTabSidebarWidth", "setTabMinSidebarWidth",
@@ -406,6 +408,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarSearchable),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetShowSidebarControlButton),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetShowSidebarControlButton),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarTitleBar),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarTitleBar),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetBarDisplayModeBreakpoint),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetBarDisplayModeBreakpoint),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetOnBarDisplayModeChange),
@@ -3557,6 +3561,52 @@ ArkUINativeModuleValue TabsBridge::ResetSidebarSearchable(ArkUIRuntimeCallInfo* 
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabsModifier()->resetSidebarSearchable(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::SetSidebarTitleBar(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    Local<JSValueRef> optArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    if (optArg.IsNull() || optArg->IsUndefined() || !optArg->IsObject(vm)) {
+        GetArkUINodeModifiers()->getTabsModifier()->resetSidebarTitleBar(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    std::string textStr;
+    std::string iconStr;
+    RefPtr<ResourceObject> textResObj;
+    RefPtr<ResourceObject> iconResObj;
+    auto obj = optArg->ToObject(vm);
+    auto textVal = ArkTSUtils::GetProperty(vm, obj, "text");
+    auto hasText = ArkTSUtils::ParseJsString(vm, textVal, textStr, textResObj);
+    auto iconVal = ArkTSUtils::GetProperty(vm, obj, "icon");
+    auto hasIcon = ArkTSUtils::ParseJsMedia(vm, iconVal, iconStr, iconResObj, true);
+    ArkUITabsSidebarTitleBarOptions options;
+    options.text = hasText ? textStr.c_str() : nullptr;
+    options.icon = hasIcon ? iconStr.c_str() : nullptr;
+    options.isNull = false;
+    GetArkUINodeModifiers()->getTabsModifier()->setSidebarTitleBar(nativeNode, &options);
+    if (SystemProperties::ConfigChangePerform()) {
+        TabsResourceObjParam iconParam{ TabJsResType::SIDEBAR_TITLE_BAR_ICON, AceType::RawPtr(iconResObj) };
+        GetArkUINodeModifiers()->getTabsModifier()->createWithResourceObj(nativeNode, &iconParam);
+        TabsResourceObjParam textParam{ TabJsResType::SIDEBAR_TITLE_BAR_TEXT, AceType::RawPtr(textResObj) };
+        GetArkUINodeModifiers()->getTabsModifier()->createWithResourceObj(nativeNode, &textParam);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::ResetSidebarTitleBar(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getTabsModifier()->resetSidebarTitleBar(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

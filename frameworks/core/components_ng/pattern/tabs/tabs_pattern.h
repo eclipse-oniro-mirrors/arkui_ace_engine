@@ -324,6 +324,30 @@ public:
 
     void UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode);
 
+    void SetSidebarTitleBar(const TabsSidebarTitleBarOptions& options)
+    {
+        sidebarTitleBarOptions_ = options;
+    }
+
+    bool HasSidebarTitleBar() const
+    {
+        return !sidebarTitleBarOptions_.isNull;
+    }
+
+    const TabsSidebarTitleBarOptions& GetSidebarTitleBar() const
+    {
+        return sidebarTitleBarOptions_;
+    }
+
+    void UpdateSidebarTitleBarIcon(const std::string& icon)
+    {
+        sidebarTitleBarOptions_.icon = icon;
+    }
+    void UpdateSidebarTitleBarText(const std::string& text)
+    {
+        sidebarTitleBarOptions_.text = text;
+    }
+
     const TabsSidebarSearchableOptions& GetTabsSidebarSearchableOptions() const
     {
         return searchableOptions_;
@@ -666,6 +690,7 @@ private:
     RefPtr<NG::UINode> sidebarFooterNode_;
     RefPtr<NG::UINode> sidebarBottomBarNode_;
     TabsSidebarSearchableOptions searchableOptions_;
+    TabsSidebarTitleBarOptions sidebarTitleBarOptions_;
     bool showSidebarControlButton_ = false;
     std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
     bool hasBarBlurStyle_ = false;

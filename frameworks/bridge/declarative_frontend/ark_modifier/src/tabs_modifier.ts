@@ -263,6 +263,10 @@ class LazyArkTabsComponent extends ArkComponent {
     this.lazyComponent.showSidebarControlButton(value);
     return this;
   }
+  sidebarTitleBar(value: TabsSidebarTitleBarOptions): this {
+    this.lazyComponent.sidebarTitleBar(value);
+    return this;
+  }
 
   barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): this {
     this.lazyComponent.barDisplayModeBreakpoint(value);

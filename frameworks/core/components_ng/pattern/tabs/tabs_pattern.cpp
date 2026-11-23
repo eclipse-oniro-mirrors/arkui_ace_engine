@@ -2827,6 +2827,9 @@ void TabsPattern::SyncPropertiesToSideBar()
     // 4. Sync showSidebarControlButton
     sideBarPattern->SetShowSidebarControlButton(showSidebarControlButton_);
 
+    // 4.1 Sync sidebarTitleBar
+    sideBarPattern->SetSidebarTitleBarOptions(sidebarTitleBarOptions_);
+
     // 5. Replay bar modifier on the sidebar node first (matches tabBar execution order
     // where barModifier is applied before bar* properties, so bar* can override modifier)
     if (barModifierApply_) {
@@ -2904,6 +2907,12 @@ void TabsPattern::UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode)
     } else {
         if (showSidebarControlButton_ && !collapseButtonNode_) {
             UpdateCollapseButtonIfNeeded();
+            if (sideBarNode_) {
+                auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+                if (sideBarPattern) {
+                    sideBarPattern->UpdateTitleBarContent();
+                }
+            }
         }
     }
 }

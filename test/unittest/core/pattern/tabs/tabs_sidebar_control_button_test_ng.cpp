@@ -281,14 +281,6 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseButtonNodeCreationTest001, Test
     EXPECT_EQ(buttonParent, AceType::DynamicCast<UINode>(frameNode_));
 
     /**
-     * @tc.expected: Placeholder is created in headerContainer
-     */
-    EXPECT_NE(sideBarPattern->buttonPlaceholderNode_, nullptr);
-    auto placeholderParent = sideBarPattern->buttonPlaceholderNode_->GetParent();
-    ASSERT_NE(placeholderParent, nullptr);
-    EXPECT_EQ(placeholderParent, AceType::DynamicCast<UINode>(sideBarPattern->headerContainerNode_));
-
-    /**
      * @tc.expected: Icon node is created and mounted inside button
      */
     EXPECT_NE(sideBarPattern->collapseButtonIconNode_, nullptr);
@@ -325,7 +317,6 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ClearCollapseButtonStateTest001, TestSi
     ASSERT_NE(sideBarPattern, nullptr);
     ASSERT_NE(sideBarPattern->GetCollapseButtonNode(), nullptr);
     ASSERT_NE(sideBarPattern->collapseButtonIconNode_, nullptr);
-    ASSERT_NE(sideBarPattern->buttonPlaceholderNode_, nullptr);
 
     /**
      * @tc.steps: Clear state
@@ -337,7 +328,6 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ClearCollapseButtonStateTest001, TestSi
      */
     EXPECT_EQ(sideBarPattern->collapseButtonNode_, nullptr);
     EXPECT_EQ(sideBarPattern->collapseButtonIconNode_, nullptr);
-    EXPECT_EQ(sideBarPattern->buttonPlaceholderNode_, nullptr);
 }
 
 /**
@@ -359,7 +349,6 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ClearCollapseButtonStateTest002, TestSi
     sideBarPattern->ClearCollapseButtonState();
     EXPECT_EQ(sideBarPattern->collapseButtonNode_, nullptr);
     EXPECT_EQ(sideBarPattern->collapseButtonIconNode_, nullptr);
-    EXPECT_EQ(sideBarPattern->buttonPlaceholderNode_, nullptr);
 }
 
 /**
@@ -1104,7 +1093,6 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ShowSidebarControlButtonDynamicToggleTe
     ASSERT_NE(sbPattern, nullptr);
     EXPECT_EQ(sbPattern->GetCollapseButtonNode(), nullptr);
     EXPECT_EQ(sbPattern->collapseButtonIconNode_, nullptr);
-    EXPECT_EQ(sbPattern->buttonPlaceholderNode_, nullptr);
 }
 
 /**
@@ -1220,6 +1208,200 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnRight001
     EXPECT_TRUE(dividerRender->HasTransformTranslate());
     EXPECT_EQ(sideBarNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
     EXPECT_EQ(dividerNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+}
+
+// =========================================================================
+// Part 5: Tests for sidebarTitleBar API (title bar row + icon/text nodes)
+// =========================================================================
+
+namespace {
+constexpr float CONTAINER_MODAL_TITLE_HEIGHT_PX = 100.0f;
+} // namespace
+
+/**
+ * @tc.name: SidebarTitleBarTest001
+ * @tc.desc: Default state — no titleBar row when sidebarTitleBar never set
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    EXPECT_FALSE(pattern_->HasSidebarTitleBar());
+    // titleBarRowNode_ is always created in CreateTitleBarRowIfNeeded (visibility GONE
+    // when no titleBar options and no control button), so it should exist but be GONE.
+    auto rowNode = sideBarPattern->GetTitleBarRowNode();
+    ASSERT_NE(rowNode, nullptr);
+    EXPECT_EQ(rowNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest002
+ * @tc.desc: Reset sidebarTitleBar with isNull=true → removes titleBar content
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest002, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    TabsSidebarTitleBarOptions options;
+    options.text = "Title";
+    options.isNull = false;
+    pattern_->SetSidebarTitleBar(options);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->HasSidebarTitleBar());
+
+    TabsSidebarTitleBarOptions resetOptions;
+    resetOptions.isNull = true;
+    pattern_->SetSidebarTitleBar(resetOptions);
+    FlushUITasks();
+
+    EXPECT_FALSE(pattern_->HasSidebarTitleBar());
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest003
+ * @tc.desc: ComputeTitleBarRowHeight default — controlButtonVisible=false → default height
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest003, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    MockPipelineContext::GetCurrent()->SetContainerControlButtonVisible(false);
+    MockPipelineContext::GetCurrent()->SetContainerCustomTitleVisible(false);
+    MockPipelineContext::GetCurrent()->SetContainerModalTitleHeight(0);
+
+    Dimension height = sideBarPattern->ComputeTitleBarRowHeight();
+    // controlButtonVisible=false → returns default TITLE_BAR_ROW_HEIGHT
+    // TITLE_BAR_ROW_HEIGHT = COLLAPSE_BUTTON_SIZE + 2*COLLAPSE_BUTTON_HORIZONTAL_PADDING = 40 + 16 = 56vp
+    EXPECT_EQ(height.Value(), 56.0f);
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest004
+ * @tc.desc: ComputeTitleBarRowHeight with customTitleVisible=true → default height
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest004, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    MockPipelineContext::GetCurrent()->SetContainerCustomTitleVisible(true);
+    MockPipelineContext::GetCurrent()->SetContainerControlButtonVisible(true);
+    MockPipelineContext::GetCurrent()->SetContainerModalTitleHeight(static_cast<int32_t>(CONTAINER_MODAL_TITLE_HEIGHT_PX));
+
+    Dimension height = sideBarPattern->ComputeTitleBarRowHeight();
+    // customTitleVisible=true → returns default TITLE_BAR_ROW_HEIGHT
+    EXPECT_EQ(height.Value(), 56.0f);
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest005
+ * @tc.desc: ComputeTitleBarRowHeight with three-button present → returns containerModalTitleHeight
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest005, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    MockPipelineContext::GetCurrent()->SetContainerCustomTitleVisible(false);
+    MockPipelineContext::GetCurrent()->SetContainerControlButtonVisible(true);
+    MockPipelineContext::GetCurrent()->SetContainerModalTitleHeight(static_cast<int32_t>(CONTAINER_MODAL_TITLE_HEIGHT_PX));
+
+    Dimension height = sideBarPattern->ComputeTitleBarRowHeight();
+    // !customTitleVisible && controlButtonVisible → returns titleHeight in PX
+    EXPECT_FLOAT_EQ(height.Value(), CONTAINER_MODAL_TITLE_HEIGHT_PX);
+    EXPECT_EQ(height.Unit(), DimensionUnit::PX);
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest006
+ * @tc.desc: ComputeTitleBarRowHeight with titleHeight<=0 → default height
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest006, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    MockPipelineContext::GetCurrent()->SetContainerCustomTitleVisible(false);
+    MockPipelineContext::GetCurrent()->SetContainerControlButtonVisible(true);
+    MockPipelineContext::GetCurrent()->SetContainerModalTitleHeight(0);
+
+    Dimension height = sideBarPattern->ComputeTitleBarRowHeight();
+    // titleHeight<=0 → returns default TITLE_BAR_ROW_HEIGHT
+    EXPECT_EQ(height.Value(), 56.0f);
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest07
+ * @tc.desc: TitleBar row padding uses start/end fields for RTL mirroring
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest07, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    TabsSidebarTitleBarOptions options;
+    options.text = "Title";
+    options.isNull = false;
+    pattern_->SetSidebarTitleBar(options);
+    FlushUITasks();
+
+    auto rowNode = sideBarPattern->GetTitleBarRowNode();
+    ASSERT_NE(rowNode, nullptr);
+    auto rowProp = rowNode->GetLayoutProperty<LinearLayoutProperty>();
+    ASSERT_NE(rowProp, nullptr);
+    const auto& padding = rowProp->GetPaddingProperty();
+    ASSERT_NE(padding, nullptr);
+    // start/end fields used (not left/right) for RTL-aware layout
+    EXPECT_TRUE(padding->start.has_value());
+    EXPECT_TRUE(padding->end.has_value());
+}
+
+/**
+ * @tc.name: SidebarTitleBarTest08
+ * @tc.desc: Button Y vertically centered with three-button control when title bar hidden
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest08, TestSize.Level1)
+{
+    CreateTabsWithSidebar(true);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+    auto sideBarNode = pattern_->GetSideBarNode();
+    ASSERT_NE(sideBarNode, nullptr);
+
+    MockPipelineContext::GetCurrent()->SetContainerCustomTitleVisible(false);
+    MockPipelineContext::GetCurrent()->SetContainerControlButtonVisible(true);
+    MockPipelineContext::GetCurrent()->SetContainerModalTitleHeight(static_cast<int32_t>(CONTAINER_MODAL_TITLE_HEIGHT_PX));
+    FlushLayoutTask(frameNode_);
+
+    auto collapseButton = pattern_->GetCollapseButtonNode();
+    ASSERT_NE(collapseButton, nullptr);
+    auto buttonGeo = collapseButton->GetGeometryNode();
+    ASSERT_NE(buttonGeo, nullptr);
+    float buttonY = buttonGeo->GetMarginFrameOffset().GetY();
+    float buttonSize = 40.0f; // COLLAPSE_BUTTON_SIZE = 40vp
+    // buttonY should be (titleHeight - buttonSize) / 2 + paddingOffset.Y
+    // With dpi ≈ 1.0 in test, titleHeight=100px, buttonSize=40px
+    // buttonY ≈ (100 - 40) / 2 = 30 (plus paddingOffset.Y which is 0 in test)
+    EXPECT_GT(buttonY, 0.0f);
+    EXPECT_FLOAT_EQ(buttonY, (CONTAINER_MODAL_TITLE_HEIGHT_PX - buttonSize) / 2.0f);
 }
 
 } // namespace OHOS::Ace::NG

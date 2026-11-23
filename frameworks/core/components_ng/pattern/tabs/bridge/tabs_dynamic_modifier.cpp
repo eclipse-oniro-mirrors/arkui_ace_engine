@@ -976,6 +976,10 @@ void SetSidebarSearchableImpl(ArkUINodeHandle node, struct ArkUITabsSidebarSearc
 
 void ResetSidebarSearchableImpl(ArkUINodeHandle node) {}
 
+void SetSidebarTitleBarImpl(ArkUINodeHandle node, struct ArkUITabsSidebarTitleBarOptions* options) {}
+
+void ResetSidebarTitleBarImpl(ArkUINodeHandle node) {}
+
 void SetShowSidebarControlButtonImpl(ArkUINodeHandle node, ArkUI_Bool showControlButton) {}
 
 void ResetShowSidebarControlButtonImpl(ArkUINodeHandle node) {}
@@ -2240,6 +2244,33 @@ void ResetShowSidebarControlButton(ArkUINodeHandle node)
     TabsModelNG::SetShowSidebarControlButton(frameNode, false);
 }
 
+void SetSidebarTitleBar(ArkUINodeHandle node, struct ArkUITabsSidebarTitleBarOptions* options)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(options);
+    TabsSidebarTitleBarOptions titleBarOptions;
+    titleBarOptions.isNull = options->isNull;
+    if (!options->isNull) {
+        if (options->text) {
+            titleBarOptions.text = std::string(options->text);
+        }
+        if (options->icon) {
+            titleBarOptions.icon = std::string(options->icon);
+        }
+    }
+    TabsModelNG::SetSidebarTitleBar(frameNode, titleBarOptions);
+}
+
+void ResetSidebarTitleBar(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsSidebarTitleBarOptions options;
+    options.isNull = true;
+    TabsModelNG::SetSidebarTitleBar(frameNode, options);
+}
+
 void SetBarDisplayModeBreakpoint(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2679,6 +2710,8 @@ const ArkUITabsModifier* GetTabsModifier()
             .resetSidebarSearchable = ResetSidebarSearchable,
             .setShowSidebarControlButton = SetShowSidebarControlButton,
             .resetShowSidebarControlButton = ResetShowSidebarControlButton,
+            .setSidebarTitleBar = SetSidebarTitleBar,
+            .resetSidebarTitleBar = ResetSidebarTitleBar,
             .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpoint,
             .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpoint,
             .setOnBarDisplayModeChange = SetOnBarDisplayModeChange,
@@ -2838,6 +2871,8 @@ const ArkUITabsModifier* GetTabsModifier()
         .resetSidebarSearchable = ResetSidebarSearchableImpl,
         .setShowSidebarControlButton = SetShowSidebarControlButtonImpl,
         .resetShowSidebarControlButton = ResetShowSidebarControlButtonImpl,
+        .setSidebarTitleBar = SetSidebarTitleBarImpl,
+        .resetSidebarTitleBar = ResetSidebarTitleBarImpl,
         .setBarDisplayModeBreakpoint = SetBarDisplayModeBreakpointImpl,
         .resetBarDisplayModeBreakpoint = ResetBarDisplayModeBreakpointImpl,
         .setOnBarDisplayModeChange = SetOnBarDisplayModeChangeImpl,

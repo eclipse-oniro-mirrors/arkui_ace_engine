@@ -130,5 +130,27 @@ struct TabsSidebarSearchableOptions {
     }
 };
 
+struct TabsSidebarTitleBarOptions {
+    std::optional<std::string> text;
+    std::optional<std::string> icon;
+    bool isNull = true;
+
+    bool operator==(const TabsSidebarTitleBarOptions& other) const
+    {
+        if (isNull != other.isNull) {
+            return false;
+        }
+        if (isNull) {
+            return true;
+        }
+        return text == other.text && icon == other.icon;
+    }
+
+    bool operator!=(const TabsSidebarTitleBarOptions& other) const
+    {
+        return !(*this == other);
+    }
+};
+
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_INTERFACES_INNER_API_ACE_KIT_INCLUDE_UI_VIEW_COMPONENTS_TABS_TABS_DECLARATION_H

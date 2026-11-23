@@ -56,6 +56,10 @@
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/pattern/symbol/symbol_source_info.h"
+#include "core/components_ng/pattern/image/image_pattern.h"
+#include "core/image/image_source_info.h"
+#include "core/components_ng/pattern/image/image_layout_property.h"
+#include "core/components_ng/pattern/image/image_render_property.h"
 #include "core/common/resource/resource_manager.h"
 #include "core/interfaces/native/node/node_button_modifier.h"
 #include "core/components/tab_bar/tab_theme.h"
@@ -68,6 +72,7 @@
 #include "core/animation/spring_curve.h"
 #include "core/gestures/gesture_info.h"
 #include "core/interfaces/native/node/search_modifier.h"
+#include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -87,8 +92,15 @@ constexpr double GRADUAL_BLUR_MAX_OPACITY = 0.8;
 
 const Color DEFAULT_GRADIENT_MASK_BLEND_COLOR = Color(0xFFF1F3F5);
 const Dimension COLLAPSE_BUTTON_SIZE = 40.0_vp;
+const Dimension COLLAPSE_BUTTON_HORIZONTAL_PADDING = 8.0_vp;
+const Dimension TITLE_BAR_ICON_SIZE = 24.0_vp;
 const Dimension COLLAPSE_BUTTON_ICON_SIZE = 24.0_vp;
 constexpr int32_t COLLAPSE_BUTTON_ZINDEX = 4;
+const Dimension TITLE_BAR_ROW_HEIGHT =
+    COLLAPSE_BUTTON_SIZE + COLLAPSE_BUTTON_HORIZONTAL_PADDING + COLLAPSE_BUTTON_HORIZONTAL_PADDING;
+const Dimension TITLE_BAR_ICON_TEXT_PADDING = 12.0_vp;
+const Dimension TITLE_BAR_RIGHT_PADDING_NO_BUTTON = 8.0_vp;
+const Dimension TITLE_BAR_BUTTON_AREA_WIDTH = COLLAPSE_BUTTON_SIZE + COLLAPSE_BUTTON_HORIZONTAL_PADDING;
 
 const std::vector<std::pair<float, float>> MASK_BLUR_STOPS = {
     { 1.0f, 0.0f }, { 0.6f, 0.6f }, { 0.0f, 1.0f }
@@ -396,9 +408,9 @@ void TabsSideBarPattern::UpdateHeaderNodeIfNeeded()
         curHeaderNode_ = nullptr;
     }
 
-    // Mount new header after placeholder (placeholder stays at index 0)
+    // Mount new header after title bar row (title bar row stays at index 0)
     if (headerNode_) {
-        int32_t insertIndex = buttonPlaceholderNode_ ? 1 : 0;
+        int32_t insertIndex = titleBarRowNode_ ? 1 : 0;
         headerNode_->MountToParent(headerContainerNode_, insertIndex);
         curHeaderNode_ = headerNode_;
     }
@@ -556,7 +568,7 @@ void TabsSideBarPattern::OnModifyDone()
     UpdateBottomBarNodeIfNeeded();
     bool isHeaderContainerVisible;
     bool isScrollEffectEnabled;
-    if (!curHeaderNode_ && !searchContainerNode_ && !collapseButtonNode_) {
+    if (!curHeaderNode_ && !searchContainerNode_ && !collapseButtonNode_ && !titleBarRowNode_) {
         isScrollEffectEnabled = false;
         isHeaderContainerVisible = false;
     } else {
@@ -590,6 +602,9 @@ void TabsSideBarPattern::OnModifyDone()
     if (collapseButtonIconNode_) {
         UpdateCollapseButtonIcon();
     }
+
+    // Update title bar content (icon + text) based on latest sidebarTitleBar options.
+    UpdateTitleBarContent();
 }
 
 RefPtr<FrameNode> TabsSideBarPattern::CreateEffectNode(const std::string& tag)
@@ -772,24 +787,8 @@ RefPtr<FrameNode> TabsSideBarPattern::CreateCollapseButton(const RefPtr<FrameNod
     buttonNode->MountToParent(tabsNode);
     buttonNode->MarkModifyDone();
 
-    // Create placeholder in headerContainer to reserve space for button (56vp = 8+40+8)
-    if (headerContainerNode_ && !buttonPlaceholderNode_) {
-        auto placeholder = FrameNode::CreateFrameNode(
-            "CollapseButtonPlaceholder", ElementRegister::GetInstance()->MakeUniqueId(),
-            AceType::MakeRefPtr<Pattern>());
-        CHECK_NULL_RETURN(placeholder, buttonNode);
-        auto placeholderProp = placeholder->GetLayoutProperty();
-        if (placeholderProp) {
-            placeholderProp->UpdateUserDefinedIdealSize(
-                CalcSize(std::nullopt, CalcLength(COLLAPSE_BUTTON_SIZE + 16.0_vp)));
-            placeholderProp->UpdateVisibility(showControlButton_ ? VisibleType::VISIBLE : VisibleType::GONE);
-        }
-        placeholder->MountToParent(headerContainerNode_, 0);
-        placeholder->MarkModifyDone();
-        headerContainerNode_->MarkNeedSyncRenderTree();
-        headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-        buttonPlaceholderNode_ = placeholder;
-    }
+    // Ensure title bar row exists in headerContainer to reserve space for button (56vp height).
+    CreateTitleBarRowIfNeeded();
 
     collapseButtonNode_ = buttonNode;
     collapseButtonIconNode_ = iconNode;
@@ -1182,7 +1181,8 @@ void TabsSideBarPattern::UpdateCollapseButtonIcon()
     auto tabsLayoutProp = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
     CHECK_NULL_VOID(tabsLayoutProp);
     auto sideBarPosition = tabsLayoutProp->GetSidebarPositionValue(BarPosition::START);
-    bool isRTL = tabsLayoutProp->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    auto layoutDirection = tabsLayoutProp->GetNonAutoLayoutDirection();
+    bool isRTL = layoutDirection == TextDirection::RTL;
     bool isEnd = (isRTL && sideBarPosition == BarPosition::START) ||
                  (!isRTL && sideBarPosition == BarPosition::END);
     const char* symbolName = nullptr;
@@ -1202,12 +1202,168 @@ void TabsSideBarPattern::ClearCollapseButtonState()
 {
     collapseButtonNode_ = nullptr;
     collapseButtonIconNode_ = nullptr;
-    if (buttonPlaceholderNode_ && headerContainerNode_) {
-        headerContainerNode_->RemoveChild(buttonPlaceholderNode_);
-        headerContainerNode_->MarkNeedSyncRenderTree();
-        headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-        buttonPlaceholderNode_ = nullptr;
+}
+
+Dimension TabsSideBarPattern::ComputeTitleBarRowHeight() const
+{
+    if (!ShouldAlignWithControlButtons()) {
+        return TITLE_BAR_ROW_HEIGHT;
     }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, TITLE_BAR_ROW_HEIGHT);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, TITLE_BAR_ROW_HEIGHT);
+    int32_t titleHeight = pipeline->GetContainerModalTitleHeight();
+    if (titleHeight <= 0) {
+        return TITLE_BAR_ROW_HEIGHT;
+    }
+    return Dimension(static_cast<float>(titleHeight), DimensionUnit::PX);
+}
+
+bool TabsSideBarPattern::ShouldAlignWithControlButtons() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, false);
+    if (pipeline->GetContainerCustomTitleVisible() || !pipeline->GetContainerControlButtonVisible()) {
+        return false;
+    }
+    int32_t titleHeight = pipeline->GetContainerModalTitleHeight();
+    if (titleHeight <= 0) {
+        return false;
+    }
+    return true;
+}
+
+void TabsSideBarPattern::CreateTitleBarRowIfNeeded()
+{
+    if (!headerContainerNode_ || titleBarRowNode_) {
+        return;
+    }
+    auto row = FrameNode::GetOrCreateFrameNode(
+        "TitleBarRow", ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<LinearLayoutPattern>(false); });
+    CHECK_NULL_VOID(row);
+    auto rowProp = row->GetLayoutProperty<LinearLayoutProperty>();
+    if (rowProp) {
+        rowProp->UpdateFlexDirection(FlexDirection::ROW);
+        rowProp->UpdateMeasureType(MeasureType::MATCH_PARENT_CROSS_AXIS);
+        rowProp->UpdateUserDefinedIdealSize(
+            CalcSize(std::nullopt, CalcLength(ComputeTitleBarRowHeight())));
+        bool visible = showControlButton_ || !titleBarOptions_.isNull;
+        rowProp->UpdateVisibility(visible ? VisibleType::VISIBLE : VisibleType::GONE);
+    }
+    row->MountToParent(headerContainerNode_, 0);
+    row->MarkModifyDone();
+    headerContainerNode_->MarkNeedSyncRenderTree();
+    headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+
+    titleBarRowNode_ = row;
+}
+
+RefPtr<FrameNode> TabsSideBarPattern::CreateTitleBarIconNode()
+{
+    auto iconNode = FrameNode::GetOrCreateFrameNode(V2::IMAGE_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<ImagePattern>(); });
+    CHECK_NULL_RETURN(iconNode, nullptr);
+    auto imageLayoutProp = iconNode->GetLayoutProperty<ImageLayoutProperty>();
+    if (imageLayoutProp) {
+        imageLayoutProp->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(TITLE_BAR_ICON_SIZE), CalcLength(TITLE_BAR_ICON_SIZE)));
+    }
+    return iconNode;
+}
+
+RefPtr<FrameNode> TabsSideBarPattern::CreateTitleBarTextNode()
+{
+    auto textNode = FrameNode::GetOrCreateFrameNode(V2::TEXT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextPattern>(); });
+    CHECK_NULL_RETURN(textNode, nullptr);
+    auto textLayoutProp = textNode->GetLayoutProperty<TextLayoutProperty>();
+    if (textLayoutProp) {
+        textLayoutProp->UpdateMaxLines(1);
+        textLayoutProp->UpdateTextOverflow(TextOverflow::ELLIPSIS);
+    }
+    // Allow text to shrink so it fits the remaining width in the row
+    auto layoutProp = textNode->GetLayoutProperty();
+    if (layoutProp) {
+        layoutProp->UpdateFlexShrink(1.0f);
+    }
+    return textNode;
+}
+
+void TabsSideBarPattern::UpdateTitleBarContent()
+{
+    CreateTitleBarRowIfNeeded();
+    CHECK_NULL_VOID(titleBarRowNode_);
+
+    bool hasIcon = !titleBarOptions_.isNull && titleBarOptions_.icon.has_value() &&
+                   !titleBarOptions_.icon->empty();
+    bool hasText = !titleBarOptions_.isNull && titleBarOptions_.text.has_value() &&
+                   !titleBarOptions_.text->empty();
+    bool visible = showControlButton_ || hasIcon || hasText;
+
+    auto rowProp = titleBarRowNode_->GetLayoutProperty<LinearLayoutProperty>();
+    if (rowProp) {
+        rowProp->UpdateVisibility(visible ? VisibleType::VISIBLE : VisibleType::GONE);
+        PaddingProperty padding;
+        padding.start = CalcLength(COLLAPSE_BUTTON_HORIZONTAL_PADDING);
+        padding.end = CalcLength(showControlButton_ ? TITLE_BAR_BUTTON_AREA_WIDTH
+                                                    : TITLE_BAR_RIGHT_PADDING_NO_BUTTON);
+        rowProp->UpdatePadding(padding);
+    }
+
+    if (hasIcon) {
+        if (!titleBarIconNode_) {
+            titleBarIconNode_ = CreateTitleBarIconNode();
+            if (titleBarIconNode_) {
+                titleBarIconNode_->MountToParent(titleBarRowNode_);
+            }
+        }
+        if (titleBarIconNode_) {
+            auto imageLayoutProp = titleBarIconNode_->GetLayoutProperty<ImageLayoutProperty>();
+            if (imageLayoutProp) {
+                ImageSourceInfo info(*titleBarOptions_.icon);
+                imageLayoutProp->UpdateImageSourceInfo(info);
+            }
+            titleBarIconNode_->MarkModifyDone();
+        }
+    } else if (titleBarIconNode_) {
+        titleBarRowNode_->RemoveChild(titleBarIconNode_);
+        titleBarIconNode_ = nullptr;
+    }
+
+    // Handle text node
+    if (hasText) {
+        if (!titleBarTextNode_) {
+            titleBarTextNode_ = CreateTitleBarTextNode();
+            if (titleBarTextNode_) {
+                titleBarTextNode_->MountToParent(titleBarRowNode_);
+            }
+        }
+        if (titleBarTextNode_) {
+            auto textLayoutProp = titleBarTextNode_->GetLayoutProperty<TextLayoutProperty>();
+            if (textLayoutProp) {
+                textLayoutProp->UpdateContent(*titleBarOptions_.text);
+            }
+            if (titleBarIconNode_) {
+                auto iconProp = titleBarIconNode_->GetLayoutProperty();
+                if (iconProp) {
+                    MarginProperty iconMargin;
+                    iconMargin.end = CalcLength(TITLE_BAR_ICON_TEXT_PADDING);
+                    iconProp->UpdateMargin(iconMargin);
+                }
+            }
+            titleBarTextNode_->MarkModifyDone();
+        }
+    } else if (titleBarTextNode_) {
+        titleBarRowNode_->RemoveChild(titleBarTextNode_);
+        titleBarTextNode_ = nullptr;
+    }
+    titleBarRowNode_->MarkModifyDone();
+    titleBarRowNode_->MarkNeedSyncRenderTree();
+    titleBarRowNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 } // namespace OHOS::Ace::NG

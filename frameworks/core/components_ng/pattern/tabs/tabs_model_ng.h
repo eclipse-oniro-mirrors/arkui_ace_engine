@@ -97,6 +97,7 @@ public:
     void SetSidebarHeader(const RefPtr<AceType>& header) override;
     void SetSidebarSearchableOptions(const TabsSidebarSearchableOptions& options) override;
     void SetShowSidebarControlButton(bool showControlButton) override;
+    void SetSidebarTitleBar(const TabsSidebarTitleBarOptions& options) override;
     void SetBarDisplayModeBreakpoint(const TabBarDisplayModeBreakpoint& breakpoint) override;
     void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) override;
     void SetKeepTabBarInSideBar(bool keepTabBarInSideBar) override;
@@ -208,6 +209,8 @@ public:
     static void HandleSidebarDividerColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
     static void HandleSidebarDividerStartMargin(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
     static void HandleSidebarDividerEndMargin(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarTitleBarIcon(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarTitleBarText(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
 
     static void SetBarFloatingStyle(FrameNode* frameNode, const BarFloatingStyleParameters& parameters);
     static void ResetBarFloatingStyle(FrameNode* frameNode);
@@ -221,6 +224,7 @@ public:
     static void SetSidebarBottomBar(FrameNode* frameNode, const RefPtr<AceType>& bottomBar);
     static void SetSidebarSearchableOptions(FrameNode* frameNode, const TabsSidebarSearchableOptions& options);
     static void SetShowSidebarControlButton(FrameNode* frameNode, bool showControlButton);
+    static void SetSidebarTitleBar(FrameNode* frameNode, const TabsSidebarTitleBarOptions& options);
     static void SetBarDisplayModeBreakpoint(FrameNode* frameNode, const TabBarDisplayModeBreakpoint& breakpoint);
     static void SetOnBarDisplayModeChange(FrameNode* frameNode,
         std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange);

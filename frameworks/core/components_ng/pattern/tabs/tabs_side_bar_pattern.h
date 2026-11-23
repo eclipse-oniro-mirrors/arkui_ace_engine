@@ -117,6 +117,11 @@ public:
         return footerContainerNode_;
     }
 
+    RefPtr<FrameNode> GetTitleBarRowNode() const
+    {
+        return titleBarRowNode_;
+    }
+
     void SetSwiperController(const RefPtr<SwiperController>& controller)
     {
         swiperController_ = controller;
@@ -130,6 +135,16 @@ public:
     void SetShowSidebarControlButton(bool show)
     {
         showControlButton_ = show;
+    }
+
+    void SetSidebarTitleBarOptions(const TabsSidebarTitleBarOptions& options)
+    {
+        titleBarOptions_ = options;
+    }
+
+    const TabsSidebarTitleBarOptions& GetSidebarTitleBarOptions() const
+    {
+        return titleBarOptions_;
     }
 
     void CreateChildNodeIfNeeded(const RefPtr<FrameNode>& tabsNode);
@@ -149,6 +164,8 @@ public:
     void ClearCollapseButtonState();
 
     void UpdateCollapseButtonIcon();
+    void UpdateTitleBarContent();
+    Dimension ComputeTitleBarRowHeight() const;
 
     bool IsCollapsed() const
     {
@@ -170,6 +187,8 @@ public:
         return isBottomBarScrollEffectEnabled_;
     }
 
+    bool ShouldAlignWithControlButtons() const;
+
 private:
     void OnModifyDone() override;
     void CreateTabListIfNeeded(const RefPtr<FrameNode>& tabsNode);
@@ -185,6 +204,9 @@ private:
     void CreateMaskNodeIfNeeded();
     RefPtr<FrameNode> CreateCollapseButtonNode();
     RefPtr<FrameNode> CreateCollapseButtonIcon();
+    void CreateTitleBarRowIfNeeded();
+    RefPtr<FrameNode> CreateTitleBarIconNode();
+    RefPtr<FrameNode> CreateTitleBarTextNode();
     void InitCollapseButtonClickEvent(const RefPtr<GestureEventHub>& gestureHub);
     void OnCollapseButtonClick();
     void CollapseSideBarContent();
@@ -234,7 +256,10 @@ private:
 
     RefPtr<FrameNode> collapseButtonNode_ = nullptr;
     RefPtr<FrameNode> collapseButtonIconNode_ = nullptr;
-    RefPtr<FrameNode> buttonPlaceholderNode_ = nullptr;
+    RefPtr<FrameNode> titleBarRowNode_ = nullptr;
+    RefPtr<FrameNode> titleBarIconNode_ = nullptr;
+    RefPtr<FrameNode> titleBarTextNode_ = nullptr;
+    TabsSidebarTitleBarOptions titleBarOptions_;
     bool isCollapsed_ = false;
     bool isCollapseAnimating_ = false;
     bool showControlButton_ = false;
