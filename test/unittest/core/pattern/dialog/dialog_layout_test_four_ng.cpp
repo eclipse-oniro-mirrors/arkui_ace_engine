@@ -175,14 +175,26 @@ HWTEST_F(DialogLayoutFourTestNg, GetMaskRect002, TestSize.Level1)
  */
 HWTEST_F(DialogLayoutFourTestNg, GetMaskRect003, TestSize.Level1)
 {
+    /**
+     * @tc.steps: step1. create DialogLayoutAlgorithm and set UIExtension subwindow flags
+     * without expand display and with an empty host window rect.
+     */
     DialogLayoutAlgorithm algo;
     algo.isUIExtensionSubWindow_ = true;
     algo.expandDisplay_ = false;
     algo.hostWindowRect_ = RectF(0.0f, 0.0f, 0.0f, 0.0f);
+    /**
+     * @tc.steps: step2. create dialog node with DialogPattern.
+     * @tc.expected: the dialog node created successfully.
+     */
     auto dialogTheme = AceType::MakeRefPtr<DialogTheme>();
     auto dialog = FrameNode::CreateFrameNode(
         V2::DIALOG_ETS_TAG, 1, AceType::MakeRefPtr<DialogPattern>(dialogTheme, nullptr));
     ASSERT_NE(dialog, nullptr);
+    /**
+     * @tc.steps: step3. test DialogLayoutAlgorithm's GetMaskRect function.
+     * @tc.expected: maskRect falls back to 100% width and height with percent unit.
+     */
     auto maskRect = algo.GetMaskRect(dialog);
     ASSERT_TRUE(maskRect.has_value());
     EXPECT_EQ(maskRect->GetWidth().Unit(), DimensionUnit::PERCENT);
@@ -196,16 +208,27 @@ HWTEST_F(DialogLayoutFourTestNg, GetMaskRect003, TestSize.Level1)
  */
 HWTEST_F(DialogLayoutFourTestNg, CreateDialogChildConstraint001, TestSize.Level1)
 {
+    /**
+     * @tc.steps: step1. create frame node and layoutWrapper.
+     * @tc.expected: the frame node and layoutWrapper created successfully.
+     */
     DialogLayoutAlgorithm algo;
     auto frameNode = FrameNode::CreateFrameNode(V2::DIALOG_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
     ASSERT_NE(frameNode, nullptr);
     auto layoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(
         frameNode, frameNode->GetGeometryNode(), frameNode->GetLayoutProperty());
     ASSERT_NE(layoutWrapper, nullptr);
+    /**
+     * @tc.steps: step2. update layout constraint with parentIdealSize and update content constraint.
+     */
     LayoutConstraintF layoutConstraint;
     layoutConstraint.parentIdealSize = OptionalSizeF(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     layoutWrapper->GetLayoutProperty()->UpdateLayoutConstraint(layoutConstraint);
     layoutWrapper->GetLayoutProperty()->UpdateContentConstraint();
+    /**
+     * @tc.steps: step3. test DialogLayoutAlgorithm's CreateDialogChildConstraint function.
+     * @tc.expected: the minSize and maxSize of child constraint equal to the given height and width.
+     */
     auto constraint = algo.CreateDialogChildConstraint(layoutWrapper.rawPtr_, 200.0f, 400.0f);
     EXPECT_EQ(constraint.maxSize.Height(), 200.0f);
     EXPECT_EQ(constraint.maxSize.Width(), 400.0f);
