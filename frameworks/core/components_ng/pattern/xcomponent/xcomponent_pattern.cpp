@@ -3018,18 +3018,50 @@ void XComponentPattern::HandleVisibilityLifecycleChange(bool visible)
     if (!isVisibilityLifecycleRegistered_) {
         RegisterVisibilityLifecycleCallback();
     }
-    if (visible) {
-        isVisibilityLifecycleDestroyed_ = false;
-        // OnVisibilityLifecycleCreate dispatches per component kind internally
-        // and needs no special casing here
-        OnVisibilityLifecycleCreate();
-    } else {
+    if (!visible) {
         isVisibilityLifecycleDestroyed_ = true;
         if (renderSurface_) {
             renderSurface_->ReleaseSurfaceBuffers();
         }
         OnVisibilityLifecycleDestroy();
+        return;
     }
+    // a window-level show does not imply the component itself is visible: while
+    // the component subtree is Hidden/None the surface stays destroyed and the
+    // component-level visible-area callback fires create on visibility restore
+    if (!IsNodeVisibleInTree(host)) {
+        TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
+            "XComponent[%{public}s] visibility create skipped, component hidden by visibility property",
+            GetId().c_str());
+        return;
+    }
+    isVisibilityLifecycleDestroyed_ = false;
+    // OnVisibilityLifecycleCreate dispatches per component kind internally
+    // and needs no special casing here
+    OnVisibilityLifecycleCreate();
+}
+
+bool XComponentPattern::IsNodeVisibleInTree(const RefPtr<FrameNode>& host) const
+{
+    // visibility property only: window show/hide state is carried by the event
+    // itself, and active state belongs to the visible-area path, so neither is
+    // part of the surface pairing guard
+    if (!host->IsVisible()) {
+        return false;
+    }
+    auto parent = host->GetParent();
+    while (parent) {
+        auto parentFrame = AceType::DynamicCast<FrameNode>(parent);
+        if (!parentFrame) {
+            parent = parent->GetParent();
+            continue;
+        }
+        if (!parentFrame->IsVisible()) {
+            return false;
+        }
+        parent = parentFrame->GetParent();
+    }
+    return true;
 }
 
 void XComponentPattern::OnVisibilityLifecycleCreate()

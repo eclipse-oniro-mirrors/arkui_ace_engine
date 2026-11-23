@@ -612,4 +612,131 @@ HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTes
     EXPECT_EQ(g_surfaceDestroyCount, 1);
     EXPECT_FALSE(pattern->isVisibilityLifecycleDestroyed_);
 }
+
+/**
+ * @tc.name: SurfaceVisibilityLifecycleTest014
+ * @tc.desc: Test window show while component visibility is Hidden does not fire create;
+ *           create fires only after visibility is restored to Visible
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTest014, TestSize.Level1)
+{
+    auto frameNode = CreateXComponentNode(XCOMPONENT_SURFACE_TYPE_VALUE);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = GetPattern(frameNode);
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->isNativeXComponent_ = true;
+    auto [nativeXComponentImpl, nativeXComponentWeak] = pattern->GetNativeXComponent();
+    ASSERT_NE(nativeXComponentImpl, nullptr);
+    auto nativeXComponent = nativeXComponentWeak.lock();
+    ASSERT_NE(nativeXComponent, nullptr);
+    OH_NativeXComponent_Callback surfaceCallback = {};
+    surfaceCallback.OnSurfaceCreated = OnSurfaceCreatedCallback;
+    surfaceCallback.OnSurfaceChanged = [](OH_NativeXComponent*, void*) {};
+    surfaceCallback.OnSurfaceDestroyed = OnSurfaceDestroyedCallback;
+    surfaceCallback.DispatchTouchEvent = [](OH_NativeXComponent*, void*) {};
+    EXPECT_EQ(nativeXComponent->RegisterCallback(&surfaceCallback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS);
+
+    pattern->SetSurfaceVisibilityLifecycle(true);
+    pattern->hasXComponentInit_ = true;
+    frameNode->onMainTree_ = true;
+    auto mockRenderSurface = AceType::MakeRefPtr<MockRenderSurface>();
+    pattern->renderSurface_ = mockRenderSurface;
+
+    g_surfaceCreateCount = 0;
+    g_surfaceDestroyCount = 0;
+
+    /**
+     * @tc.steps: step1. XComponent becomes invisible (component Hidden or window hide)
+     * @tc.expected: destroy fired once, pairing state is destroyed
+     */
+    EXPECT_CALL(*mockRenderSurface, ReleaseSurfaceBuffers()).Times(1);
+    pattern->OnVisibilityLifecycleChange(false);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_EQ(g_surfaceCreateCount, 0);
+    EXPECT_TRUE(pattern->isVisibilityLifecycleDestroyed_);
+
+    /**
+     * @tc.steps: step2. Window show event arrives while component visibility is Hidden
+     * @tc.expected: create is skipped, destroyed state is kept for the component-level restore
+     */
+    frameNode->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    pattern->OnVisibilityLifecycleChange(true);
+    EXPECT_EQ(g_surfaceCreateCount, 0);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_TRUE(pattern->isVisibilityLifecycleDestroyed_);
+
+    /**
+     * @tc.steps: step3. Component visibility restored to Visible, visible-area event fires
+     * @tc.expected: create fired once, paired with the destroy from step1
+     */
+    frameNode->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    pattern->OnVisibilityLifecycleChange(true);
+    EXPECT_EQ(g_surfaceCreateCount, 1);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_FALSE(pattern->isVisibilityLifecycleDestroyed_);
+}
+
+/**
+ * @tc.name: SurfaceVisibilityLifecycleTest015
+ * @tc.desc: Test window show while an ancestor is Hidden does not fire create;
+ *           create fires only after the ancestor visibility is restored
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTest015, TestSize.Level1)
+{
+    auto frameNode = CreateXComponentNode(XCOMPONENT_SURFACE_TYPE_VALUE);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = GetPattern(frameNode);
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->isNativeXComponent_ = true;
+    auto [nativeXComponentImpl, nativeXComponentWeak] = pattern->GetNativeXComponent();
+    ASSERT_NE(nativeXComponentImpl, nullptr);
+    auto nativeXComponent = nativeXComponentWeak.lock();
+    ASSERT_NE(nativeXComponent, nullptr);
+    OH_NativeXComponent_Callback surfaceCallback = {};
+    surfaceCallback.OnSurfaceCreated = OnSurfaceCreatedCallback;
+    surfaceCallback.OnSurfaceChanged = [](OH_NativeXComponent*, void*) {};
+    surfaceCallback.OnSurfaceDestroyed = OnSurfaceDestroyedCallback;
+    surfaceCallback.DispatchTouchEvent = [](OH_NativeXComponent*, void*) {};
+    EXPECT_EQ(nativeXComponent->RegisterCallback(&surfaceCallback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS);
+
+    auto parent = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    parent->AddChild(frameNode);
+
+    pattern->SetSurfaceVisibilityLifecycle(true);
+    pattern->hasXComponentInit_ = true;
+    frameNode->onMainTree_ = true;
+    auto mockRenderSurface = AceType::MakeRefPtr<MockRenderSurface>();
+    pattern->renderSurface_ = mockRenderSurface;
+
+    g_surfaceCreateCount = 0;
+    g_surfaceDestroyCount = 0;
+
+    /**
+     * @tc.steps: step1. XComponent becomes invisible, then window show arrives with ancestor Hidden
+     * @tc.expected: destroy fired once, window-show create is skipped while ancestor is Hidden
+     */
+    EXPECT_CALL(*mockRenderSurface, ReleaseSurfaceBuffers()).Times(1);
+    pattern->OnVisibilityLifecycleChange(false);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_TRUE(pattern->isVisibilityLifecycleDestroyed_);
+    parent->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    pattern->OnVisibilityLifecycleChange(true);
+    EXPECT_EQ(g_surfaceCreateCount, 0);
+    EXPECT_TRUE(pattern->isVisibilityLifecycleDestroyed_);
+
+    /**
+     * @tc.steps: step2. Ancestor visibility restored to Visible, visible-area event fires
+     * @tc.expected: create fired once, paired with the destroy from step1
+     */
+    parent->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    pattern->OnVisibilityLifecycleChange(true);
+    EXPECT_EQ(g_surfaceCreateCount, 1);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_FALSE(pattern->isVisibilityLifecycleDestroyed_);
+}
 } // namespace OHOS::Ace::NG

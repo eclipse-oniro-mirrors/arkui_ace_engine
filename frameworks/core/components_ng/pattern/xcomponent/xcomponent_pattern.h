@@ -422,6 +422,7 @@ protected:
     void LoadNative();
     void RegisterVisibilityLifecycleCallback();
     void UnregisterVisibilityLifecycleCallback();
+    bool IsNodeVisibleInTree(const RefPtr<FrameNode>& host) const;
     virtual bool IsSurfaceLifecycleReady() const;
     virtual void OnVisibilityLifecycleCreate();
     virtual void OnVisibilityLifecycleDestroy();
