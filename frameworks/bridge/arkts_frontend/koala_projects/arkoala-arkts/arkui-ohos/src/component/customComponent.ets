@@ -646,6 +646,11 @@ export class CustomDelegate<T extends ExtendableComponent, T_Options> extends
         if (this.instance instanceof OptionsCallback) {
             const optionsCallback = this.instance as OptionsCallback<T_Options>;
             optionsCallback.__initializeStruct(initializers, content);
+            // The component's first structural initialization (which carries the
+            // @ComponentInit method) is done: the enableAsyncLoad construction
+            // window closes here. Runs once per instance creation — reuse takes
+            // instances from the pool without re-initializing.
+            this.instance.__closeAsyncLoadWindow__Internal();
         } else {
             throw new Error('not an options callback');
         }

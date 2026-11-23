@@ -148,6 +148,10 @@ export abstract class ExtendableComponent implements LifeCycle, IVariableOwner {
     private providedVars_: Map<string, IProvideDecoratedVariable<object>> = new Map<string, IProvideDecoratedVariable<object>>();
     private providedVarsV2_: Map<string, IProviderDecoratedVariable<object>> = new Map<string, IProviderDecoratedVariable<object>>();
     private delegate_?: IExtendableComponent;
+    // Closes the enableAsyncLoad construction window. Set by the framework when
+    // the first structural initialization of this component (which carries the
+    // @ComponentInit-decorated method) completes — see CustomDelegate.__initializeStruct.
+    private asyncLoadWindowClosed_: boolean = false;
     // Resolved asynchronous-loading configuration (resolved timeout and
     // placeholder id) once an effective enableAsyncLoad request has been made.
     // Persisted for the whole instance lifetime so that every (re-)attach of the
@@ -687,16 +691,29 @@ export abstract class ExtendableComponent implements LifeCycle, IVariableOwner {
     }
 
     /**
+     * Closes the enableAsyncLoad construction window for this instance. Called by
+     * the framework exactly once, after the component's first structural
+     * initialization (__initializeStruct, which carries the @ComponentInit method)
+     * completes. Reused instances keep the window closed: reuse does not
+     * re-construct, and the deferral semantics continue natively.
+     */
+    __closeAsyncLoadWindow__Internal(): void {
+        this.asyncLoadWindowClosed_ = true;
+    }
+
+    /**
      * Stores the asynchronous-loading configuration for this component instance.
      *
      * Reached by apps only through the CustomComponentContext returned by
      * UIUtils.getCustomComponentContext(); framework internal.
      *
-     * Effective only once, and only inside the construction window:
-     * on the static paradigm the window is bounded by the delegate being set —
-     * the user constructor (including the @ComponentInit-decorated method) runs
-     * before the framework creates the CustomDelegate, everything afterwards is
-     * out of window and ignored. The first effective request wins — later calls,
+     * Effective only once, and only inside the construction window. On the static
+     * paradigm the @ComponentInit-decorated method is carried by the component's
+     * first structural initialization (__initializeStruct), which runs after the
+     * CustomDelegate has been created — so the window cannot be bounded by the
+     * delegate being set. It is closed explicitly by the framework right after
+     * that first initialization completes; everything afterwards is out of
+     * window and ignored. The first effective request wins — later calls,
      * even with different options, never rewrite the configuration (first request wins).
      *
      * Unlike the dynamic side, the native peer does not exist yet at this point,
@@ -707,7 +724,7 @@ export abstract class ExtendableComponent implements LifeCycle, IVariableOwner {
      */
     __enableAsyncLoad__Internal(options?: CustomComponentAsyncLoadOptions): void {
         const ownerTag = Class.of(this as Object).getName();
-        if (this.delegate_ !== undefined) {
+        if (this.asyncLoadWindowClosed_) {
             // Out-of-window calls are ignored without any observable effect,
             // but are recorded as a maintainability warning log.
             console.warn(`${ownerTag}: enableAsyncLoad ignored: outside the construction window`);
