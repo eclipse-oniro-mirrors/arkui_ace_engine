@@ -1104,12 +1104,15 @@ void CheckBoxPattern::UpdatePaintPropertyBySettingData(RefPtr<CheckBoxPaintPrope
 {
     if (checkboxSettingData_.selectedColor.has_value()) {
         paintProp->UpdateCheckBoxSelectedColor(checkboxSettingData_.selectedColor.value());
+        paintProp->UpdateCheckBoxSelectedColorFlagByUser(true);
     }
     if (checkboxSettingData_.unselectedColor.has_value()) {
         paintProp->UpdateCheckBoxUnSelectedColor(checkboxSettingData_.unselectedColor.value());
+        paintProp->UpdateCheckBoxUnSelectedColorFlagByUser(true);
     }
     if (checkboxSettingData_.strokeColor.has_value()) {
         paintProp->UpdateCheckBoxCheckMarkColor(checkboxSettingData_.strokeColor.value());
+        paintProp->UpdateCheckBoxCheckMarkColorFlagByUser(true);
     }
 }
 

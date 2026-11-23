@@ -85,17 +85,18 @@ RefPtr<Modifier> CheckBoxPaintMethod::GetContentModifier(PaintWrapper* paintWrap
 
 void CheckBoxPaintMethod::UpdateCheckboxColors(const RefPtr<CheckBoxPaintProperty>& paintProperty)
 {
-    if (paintProperty->HasCheckBoxSelectedColor()) {
+    if (paintProperty->HasCheckBoxSelectedColor() || paintProperty->GetCheckBoxSelectedColorFlagByUserValue(false)) {
         checkboxModifier_->SetUserActiveColor(paintProperty->GetCheckBoxSelectedColorValue());
+    }
+    if (paintProperty->HasCheckBoxUnSelectedColor() ||
+        paintProperty->GetCheckBoxUnSelectedColorFlagByUserValue(false)) {
+        checkboxModifier_->SetInActiveColor(paintProperty->GetCheckBoxUnSelectedColorValue());
+    }
+    if (paintProperty->HasCheckBoxCheckMarkColor() || paintProperty->GetCheckBoxCheckMarkColorFlagByUserValue(false)) {
+        checkboxModifier_->SetPointColor(paintProperty->GetCheckBoxCheckMarkColorValue());
     }
     if (paintProperty->HasCheckBoxSelectedStyle()) {
         checkboxModifier_->SetCheckboxStyle(paintProperty->GetCheckBoxSelectedStyleValue());
-    }
-    if (paintProperty->HasCheckBoxUnSelectedColor()) {
-        checkboxModifier_->SetInActiveColor(paintProperty->GetCheckBoxUnSelectedColorValue());
-    }
-    if (paintProperty->HasCheckBoxCheckMarkColor()) {
-        checkboxModifier_->SetPointColor(paintProperty->GetCheckBoxCheckMarkColorValue());
     }
 }
 
@@ -140,7 +141,7 @@ void CheckBoxPaintMethod::UpdateContentModifier(PaintWrapper* paintWrapper)
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
     auto checkBoxTheme = context->GetTheme<CheckboxTheme>(host->GetThemeScopeId());
-    if (paintProperty->HasCheckBoxUnSelectedColor()) {
+    if (paintProperty->GetCheckBoxUnSelectedColorFlagByUserValue(false)) {
         CHECK_NULL_VOID(checkBoxTheme);
         checkboxModifier_->SetHasUnselectedColor(
             paintProperty->GetCheckBoxUnSelectedColorValue() != checkBoxTheme->GetInactiveColor());

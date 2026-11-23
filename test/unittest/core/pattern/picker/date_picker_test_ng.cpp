@@ -221,6 +221,8 @@ HWTEST_F(DatePickerTestNg, DatePickerModelCreateDatePicker001, TestSize.Level0)
     ASSERT_NE(stackNode, nullptr);
     auto buttonNode = AceType::DynamicCast<FrameNode>(stackNode->GetChildAtIndex(0));
     auto renderContext = buttonNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    buttonNode->GetLayoutProperty()->UpdateIsUserSetBackgroundColor(true);
     auto columnNode = AceType::DynamicCast<FrameNode>(stackNode->GetChildAtIndex(1)->GetLastChild());
     columnNode->MarkModifyDone();
     auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();

@@ -1311,8 +1311,11 @@ HWTEST_F(CheckBoxTestNG, CheckBoxPaintMethodTest002, TestSize.Level1)
     if (checkBoxPaintProperty) {
         checkBoxPaintProperty->UpdateCheckBoxSelect(SELECT_STATE);
         checkBoxPaintProperty->UpdateCheckBoxSelectedColor(SELECTED_COLOR);
+        checkBoxPaintProperty->UpdateCheckBoxSelectedColorFlagByUser(true);
         checkBoxPaintProperty->UpdateCheckBoxUnSelectedColor(UNSELECTED_COLOR);
+        checkBoxPaintProperty->UpdateCheckBoxUnSelectedColorFlagByUser(true);
         checkBoxPaintProperty->UpdateCheckBoxCheckMarkColor(CHECK_MARK_COLOR);
+        checkBoxPaintProperty->UpdateCheckBoxCheckMarkColorFlagByUser(true);
         checkBoxPaintProperty->UpdateCheckBoxCheckMarkSize(CHECK_MARK_SIZE);
         checkBoxPaintProperty->UpdateCheckBoxCheckMarkWidth(CHECK_MARK_WIDTH);
     }

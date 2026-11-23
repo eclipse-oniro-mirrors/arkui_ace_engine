@@ -339,6 +339,7 @@ HWTEST_F(TimePickerColumnPatternTestNg, TimePickerColumnPattern006, TestSize.Lev
     auto buttonNode = FrameNode::GetOrCreateFrameNode(
         V2::BUTTON_ETS_TAG, stack->ClaimNodeId(), []() { return AceType::MakeRefPtr<ButtonPattern>(); });
     stackNode->children_.emplace_front(buttonNode);
+    buttonNode->GetLayoutProperty()->UpdateIsUserSetBackgroundColor(true);
 
     minuteColumnPattern->hoverColor_ = Color::BLACK;
     minuteColumnPattern->pressColor_ = Color::BLUE;
