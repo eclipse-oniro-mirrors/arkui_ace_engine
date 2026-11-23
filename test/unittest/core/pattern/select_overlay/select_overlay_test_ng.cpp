@@ -8679,7 +8679,7 @@ HWTEST_F(SelectOverlayTestNg, UpdateMenuColors004, TestSize.Level1)
 HWTEST_F(SelectOverlayTestNg, TranslateInputIdentityAndRefresh, TestSize.Level1)
 {
     auto theme = AceType::MakeRefPtr<TextOverlayTheme>();
-    EXPECT_EQ(theme->GetTranslateInput(), "快捷翻译");
+    EXPECT_EQ(theme->GetTranslateInput(), "Translate input");
     EXPECT_EQ(static_cast<int32_t>(NativeMenuId::ID_CAMERA_INPUT), 5);
     EXPECT_EQ(static_cast<int32_t>(NativeMenuId::ID_PASSWORD_VAULT), 17);
     EXPECT_EQ(SelectOverlayNode::ConvertToIntMenuId(OH_DEFAULT_TRANSLATE_INPUT),
@@ -8711,7 +8711,7 @@ HWTEST_F(SelectOverlayTestNg, TranslateInputSystemMenuFiltering, TestSize.Level1
         size_t count = 0;
         for (const auto& item : SelectOverlayNode::GetSystemMenuItemParams(info)) {
             if (item.menuOptionsParam.id == OH_DEFAULT_TRANSLATE_INPUT) {
-                EXPECT_EQ(item.menuOptionsParam.content, "快捷翻译");
+                EXPECT_EQ(item.menuOptionsParam.content, "Translate input");
                 ++count;
             }
         }
@@ -8761,7 +8761,7 @@ HWTEST_F(SelectOverlayTestNg, TranslateInputToolbarAndOverflow, TestSize.Level1)
     ASSERT_EQ(params.size(), 1);
     ASSERT_EQ(ids.size(), 1);
     EXPECT_EQ(ids.front(), OH_DEFAULT_TRANSLATE_INPUT);
-    EXPECT_EQ(params.front().value, "快捷翻译");
+    EXPECT_EQ(params.front().value, "Translate input");
     ASSERT_TRUE(params.front().action);
     params.front().action();
     EXPECT_EQ(translateInputCount, 1);
@@ -8801,7 +8801,7 @@ HWTEST_F(SelectOverlayTestNg, TranslateInputCustomMenuCallback, TestSize.Level1)
     ASSERT_EQ(params.size(), 1);
     ASSERT_EQ(ids.size(), 1);
     EXPECT_EQ(ids.front(), OH_DEFAULT_TRANSLATE_INPUT);
-    EXPECT_EQ(params.front().value, "快捷翻译");
+    EXPECT_EQ(params.front().value, "Translate input");
     ASSERT_TRUE(params.front().action);
     params.front().action();
     EXPECT_EQ(count, 1);

@@ -54,4 +54,18 @@ bool IsCurrentInputMethodDefaultIme()
 #endif
 }
 
+bool IsTranslateInputSupportedByCurrentIme()
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_RETURN(inputMethod, false);
+    if (!inputMethod->IsInputTypeSupported(MiscServices::InputType::TRANSLATION_INPUT)) {
+        return false;
+    }
+    return IsCurrentInputMethodDefaultIme();
+#else
+    return false;
+#endif
+}
+
 } // namespace OHOS::Ace

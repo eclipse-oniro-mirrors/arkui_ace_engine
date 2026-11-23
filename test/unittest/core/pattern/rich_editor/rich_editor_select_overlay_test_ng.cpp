@@ -1853,14 +1853,14 @@ HWTEST_F(RichEditorSelectOverlayTestNg, TranslateInputEditorModes, TestSize.Leve
     auto layoutProperty = richEditorNode_->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
     layoutProperty->UpdateTextInputType(TextInputType::TEXT);
-    auto isDefaultIme = IsCurrentInputMethodDefaultIme();
+    auto isTranslateSupported = IsTranslateInputSupportedByCurrentIme();
     for (bool singleLine : { false, true }) {
         pattern->isSingleLineMode_ = singleLine;
         EXPECT_EQ(pattern->IsInPlainTextInputMode(), singleLine);
         pattern->customKeyboardBuilder_ = nullptr;
         pattern->textSelector_.Update(0, 0);
         overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
-        EXPECT_EQ(info.showTranslateInput, isDefaultIme);
+        EXPECT_EQ(info.showTranslateInput, isTranslateSupported);
 
         pattern->textSelector_.Update(0, 1);
         overlay->OnUpdateMenuInfo(info, DIRTY_ALL_MENU_ITEM);
