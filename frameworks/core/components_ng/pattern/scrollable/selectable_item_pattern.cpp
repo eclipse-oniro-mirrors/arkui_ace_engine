@@ -55,6 +55,9 @@ void SelectableItemPattern::CreateEditModeCheckBox()
     checkboxModifier->setSelect(checkboxHandle, isSelected_);
 
     editModeCheckBoxNode_ = AceType::Claim(reinterpret_cast<FrameNode*>(checkboxHandle));
+    CHECK_NULL_VOID(editModeCheckBoxNode_);
+    // The C-API helper has already increased the reference count, balance it here.
+    editModeCheckBoxNode_->DecRefCount();
     auto checkboxLayoutProperty = editModeCheckBoxNode_->GetLayoutProperty<LayoutProperty>();
     CHECK_NULL_VOID(checkboxLayoutProperty);
     MarginProperty marginCheckbox;

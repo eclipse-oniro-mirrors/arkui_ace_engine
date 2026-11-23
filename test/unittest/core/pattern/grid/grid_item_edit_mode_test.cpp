@@ -90,6 +90,34 @@ HWTEST_F(GridItemEditModeTestNg, CreateEditModeCheckBox001, TestSize.Level0)
     EXPECT_NE(itemPattern->editModeCheckBoxNode_, nullptr);
 }
 
+/**
+ * @tc.name: CreateEditModeCheckBoxBalancesCapiReference001
+ * @tc.desc: Test edit mode checkbox creation balances the reference held by the C-API helper
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridItemEditModeTestNg, CreateEditModeCheckBoxBalancesCapiReference001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Grid and enable edit mode for one item.
+     * @tc.expected: The checkbox node is created as a child of the item.
+     */
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateFixedItems(6);
+    CreateDone();
+
+    auto itemPattern = GetItemPattern(0);
+    ASSERT_NE(itemPattern, nullptr);
+    itemPattern->SetEditModeEnabled(true);
+    ASSERT_NE(itemPattern->editModeCheckBoxNode_, nullptr);
+
+    /**
+     * @tc.steps: step2. Read the checkbox reference count.
+     * @tc.expected: The C-API helper reference is balanced, leaving three framework-owned references.
+     */
+    EXPECT_EQ(itemPattern->editModeCheckBoxNode_->RefCount(), 3);
+}
+
 HWTEST_F(GridItemEditModeTestNg, CreateEditModeCheckBoxAsChild001, TestSize.Level0)
 {
     auto model = CreateGrid();
