@@ -1758,7 +1758,8 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpda
 
 /**
  * @tc.name: ContainerPickerPatternTest_OnThemeScopeUpdate003
- * @tc.desc: Verify OnThemeScopeUpdate keeps no-refresh on API 26+ when user configured theme attributes.
+ * @tc.desc: Verify OnThemeScopeUpdate still refreshes theme-following item text styles on API 26+
+ *           when user configured theme attributes.
  * @tc.type: FUNC
  */
 HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpdate003, TestSize.Level1)
@@ -1784,8 +1785,9 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpda
     pattern->SetIndicatorStyleVal(indicatorStyle);
 
     bool updateResult = pattern->OnThemeScopeUpdate(1);
-    EXPECT_FALSE(updateResult);
-    EXPECT_FALSE(frameNode->needCallChildrenUpdate_);
+    EXPECT_TRUE(updateResult);
+    EXPECT_TRUE(frameNode->needCallChildrenUpdate_);
+    EXPECT_TRUE(frameNode->IsLayoutDirtyMarked());
 
     container->SetApiTargetVersion(backupApiVersion);
 }
@@ -2922,7 +2924,9 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpda
 
 /**
  * @tc.name: ContainerPickerPatternTest_OnThemeScopeUpdate009
- * @tc.desc: Test OnThemeScopeUpdate handles all conditions false correctly.
+ * @tc.desc: Test OnThemeScopeUpdate still resyncs item text styles when indicator colors are
+             all user-set and no default font color was written (theme-following text color
+             must refresh regardless of the indicator resync gate).
  * @tc.type: FUNC
  */
 HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpdate009, TestSize.Level1)
@@ -2949,8 +2953,9 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpda
     pattern->isUseDefaultFontColor_ = false;
 
     bool updateResult = pattern->OnThemeScopeUpdate(1);
-    EXPECT_FALSE(updateResult);
-    EXPECT_FALSE(frameNode->needCallChildrenUpdate_);
+    EXPECT_TRUE(updateResult);
+    EXPECT_TRUE(frameNode->needCallChildrenUpdate_);
+    EXPECT_TRUE(frameNode->IsLayoutDirtyMarked());
 
     container->SetApiTargetVersion(backupApiVersion);
 }
@@ -3402,10 +3407,10 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_FlushAnimationTe
     pattern->FlushAnimationTextProperties(true);
     EXPECT_EQ(pattern->animationProperties_.size(), static_cast<size_t>(0));
 
-    TextProperties props1;
+    ContainerPickerTextProperties props1;
     props1.fontSize = Dimension(10.0, DimensionUnit::FP);
     props1.currentColor = Color::RED;
-    TextProperties props2;
+    ContainerPickerTextProperties props2;
     props2.fontSize = Dimension(20.0, DimensionUnit::FP);
     props2.currentColor = Color::GREEN;
     pattern->animationProperties_.push_back(props1);
@@ -3594,6 +3599,229 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetSelectedTextS
     EXPECT_FLOAT_EQ(textLayoutProperty->GetFontSize().value().Value(), 25.0);
     EXPECT_TRUE(textLayoutProperty->HasFontWeight());
     EXPECT_EQ(textLayoutProperty->GetFontWeight().value(), FontWeight::MEDIUM);
+}
+
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisMaxLines001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle sets maxLines(1) when textOverflow is ELLIPSIS.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisMaxLines001,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::ELLIPSIS);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_ClipMaxLines001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle sets maxLines(1) when textOverflow is CLIP.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_ClipMaxLines001,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::CLIP;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::CLIP);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeNotApplied001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle does not apply MARQUEE overflow — both
+ *            textOverflow and maxLines are reset so marquee effect does not take effect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeNotApplied001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::MARQUEE;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    textLayoutProperty->UpdateTextOverflow(TextOverflow::ELLIPSIS);
+    textLayoutProperty->UpdateMaxLines(1);
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+
+    EXPECT_FALSE(textLayoutProperty->HasTextOverflow());
+    EXPECT_FALSE(textLayoutProperty->HasMaxLines());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisToClipSwitch001
+ * @tc.desc: Test switching textOverflow from ELLIPSIS to CLIP does not leak or lose maxLines.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_EllipsisToClipSwitch001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(22.0, DimensionUnit::FP);
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = Color::RED;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+
+    style.textOverflow = TextOverflow::CLIP;
+    pattern->SetSelectedTextStyleVal(style);
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::CLIP);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_RestoreItemOriginalStyle_ResetMaxLines001
+ * @tc.desc: Test RestoreItemOriginalStyle resets maxLines alongside textOverflow.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_RestoreItemOriginalStyle_ResetMaxLines001,
+    TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle style;
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = Color::BLACK;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    EXPECT_FALSE(textLayoutProperty->HasMaxLines());
+    EXPECT_FALSE(textLayoutProperty->HasTextOverflow());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_RestoreItemOriginalStyle_PreservesUserMaxLines001
+ * @tc.desc: Test RestoreItemOriginalStyle restores user-set maxLines and textOverflow from
+ *            cache instead of blindly resetting them. Pre-set maxLines(2) and CLIP, cache,
+ *            apply ELLIPSIS style (sets maxLines=1), then restore — verify original values
+ *            are recovered, not destroyed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_RestoreItemOriginalStyle_PreservesUserMaxLines001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    textLayoutProperty->UpdateMaxLines(2);
+    textLayoutProperty->UpdateTextOverflow(TextOverflow::CLIP);
+
+    Dimension defaultSize(20.0, DimensionUnit::FP);
+    Color defaultColor = Color::BLACK;
+    pattern->CacheOriginalItemStyle(0, textLayoutProperty, defaultSize, defaultColor);
+
+    PickerTextStyle style;
+    style.textOverflow = TextOverflow::ELLIPSIS;
+    pattern->SetSelectedTextStyleVal(style);
+
+    Color applyColor = Color::BLACK;
+    pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::ELLIPSIS);
+
+    pattern->RestoreItemOriginalStyle(0, textLayoutProperty, applyColor);
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 2);
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::CLIP);
 }
 
 /**
@@ -4063,5 +4291,207 @@ HWTEST_F(ContainerPickerPatternTest, SetSelectedTextStyle_ClearStyle_RestoresIte
     EXPECT_EQ(textLayoutProperty->GetTextColor().value(), themeColor);
     // originalItemStyle_ preserved (not cleared) for future restoration
     EXPECT_FALSE(pattern->originalItemStyle_.empty());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_FireChangeEvent_DuringDrag_PreservesTextColor001
+ * @tc.desc: During drag, FireChangeEvent updates selectedIndex but does not overwrite
+ *            interpolated text color (SetSelectedTextStyle is guarded by !isDragging_).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_FireChangeEvent_DuringDrag_PreservesTextColor001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(20.0, DimensionUnit::FP);
+    style.textColor = Color::BLUE;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color interpolatedColor(0x12345678);
+    textLayoutProperty->UpdateTextColor(interpolatedColor);
+
+    pattern->height_ = 500.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 0;
+    for (int32_t i = 0; i < 5; ++i) {
+        pattern->itemPosition_[i] = { i * 100.0f, (i + 1) * 100.0f, nullptr };
+    }
+
+    pattern->isDragging_ = true;
+    pattern->isAnimationRunning_ = false;
+
+    pattern->FireChangeEvent();
+
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), interpolatedColor);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_FireChangeEvent_DuringAnimation_PreservesTextColor001
+ * @tc.desc: During animation, FireChangeEvent does not overwrite interpolated text color.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_FireChangeEvent_DuringAnimation_PreservesTextColor001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(20.0, DimensionUnit::FP);
+    style.textColor = Color::BLUE;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color interpolatedColor(0x12345678);
+    textLayoutProperty->UpdateTextColor(interpolatedColor);
+
+    pattern->height_ = 500.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 0;
+    for (int32_t i = 0; i < 5; ++i) {
+        pattern->itemPosition_[i] = { i * 100.0f, (i + 1) * 100.0f, nullptr };
+    }
+
+    pattern->isDragging_ = false;
+    pattern->isAnimationRunning_ = true;
+
+    pattern->FireChangeEvent();
+
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), interpolatedColor);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_OnDirtyLayoutWrapperSwap_DuringDrag_PreservesColor001
+ * @tc.desc: During drag, OnDirtyLayoutWrapperSwap does not call SetDefaultTextStyle or
+ *            SetSelectedTextStyle, preserving interpolated text color.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_OnDirtyLayoutWrapperSwap_DuringDrag_PreservesColor001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(20.0, DimensionUnit::FP);
+    style.textColor = Color::BLUE;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color interpolatedColor(0x12345678);
+    textLayoutProperty->UpdateTextColor(interpolatedColor);
+    pattern->isUseDefaultFontColor_ = true;
+
+    auto algorithm = AceType::MakeRefPtr<ContainerPickerLayoutAlgorithm>();
+    ASSERT_NE(algorithm, nullptr);
+    ContainerPickerUtils::PositionMap itemPos;
+    for (int32_t i = 0; i < 5; ++i) {
+        itemPos[i] = { i * 100.0f, (i + 1) * 100.0f, nullptr };
+    }
+    algorithm->SetItemPosition(itemPos);
+    algorithm->SetTotalItemCount(5);
+    algorithm->SetHeight(500.0f);
+    algorithm->SetContentMainSize(500.0f);
+
+    auto layoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(
+        frameNode, AceType::MakeRefPtr<GeometryNode>(), frameNode->GetLayoutProperty());
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto algoWrapper = AceType::MakeRefPtr<LayoutAlgorithmWrapper>(algorithm);
+    layoutWrapper->SetLayoutAlgorithm(algoWrapper);
+
+    pattern->isDragging_ = true;
+    pattern->isAnimationRunning_ = false;
+    pattern->isNeedPlayInertialAnimation_ = false;
+    pattern->height_ = 500.0f;
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+
+    DirtySwapConfig config;
+    config.skipMeasure = false;
+    config.skipLayout = false;
+    config.contentOffsetChange = true;
+
+    pattern->OnDirtyLayoutWrapperSwap(layoutWrapper, config);
+
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), interpolatedColor);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_GetLayoutProperties_DuringDrag_PreservesColor001
+ * @tc.desc: During drag, GetLayoutProperties does not call SetSelectedTextStyle,
+ *            preserving interpolated text color.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContainerPickerPatternTest,
+    ContainerPickerPatternTest_GetLayoutProperties_DuringDrag_PreservesColor001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    PickerTextStyle style;
+    style.fontSize = Dimension(20.0, DimensionUnit::FP);
+    style.textColor = Color::BLUE;
+    pattern->SetSelectedTextStyleVal(style);
+
+    auto textPattern = AceType::MakeRefPtr<TextPattern>();
+    auto textNode = CreateChildNode(V2::TEXT_ETS_TAG, textPattern);
+    ASSERT_NE(textNode, nullptr);
+    frameNode->AddChild(textNode);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    Color interpolatedColor(0x12345678);
+    textLayoutProperty->UpdateTextColor(interpolatedColor);
+
+    auto algorithm = AceType::MakeRefPtr<ContainerPickerLayoutAlgorithm>();
+    ASSERT_NE(algorithm, nullptr);
+    ContainerPickerUtils::PositionMap itemPos;
+    for (int32_t i = 0; i < 5; ++i) {
+        itemPos[i] = { i * 100.0f, (i + 1) * 100.0f, nullptr };
+    }
+    algorithm->SetItemPosition(itemPos);
+    algorithm->SetTotalItemCount(5);
+    algorithm->SetHeight(500.0f);
+    algorithm->SetContentMainSize(500.0f);
+
+    pattern->isDragging_ = true;
+    pattern->isAnimationRunning_ = false;
+    pattern->totalItemCount_ = 5;
+
+    pattern->GetLayoutProperties(algorithm);
+
+    EXPECT_EQ(textLayoutProperty->GetTextColor().value(), interpolatedColor);
 }
 } // namespace OHOS::Ace::NG

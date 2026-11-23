@@ -359,6 +359,24 @@ export class DatePickerComponent extends ViewPU {
         if (params.secondFormatter !== undefined) {
             this.secondFormatter = params.secondFormatter;
         }
+        if (params.lunarLeapMonthCacheKey !== undefined) {
+            this.lunarLeapMonthCacheKey = params.lunarLeapMonthCacheKey;
+        }
+        if (params.lunarLeapMonthCacheValue !== undefined) {
+            this.lunarLeapMonthCacheValue = params.lunarLeapMonthCacheValue;
+        }
+        if (params.lunarDaysCacheKey !== undefined) {
+            this.lunarDaysCacheKey = params.lunarDaysCacheKey;
+        }
+        if (params.lunarDaysCacheValue !== undefined) {
+            this.lunarDaysCacheValue = params.lunarDaysCacheValue;
+        }
+        if (params.convertResultCacheKey !== undefined) {
+            this.convertResultCacheKey = params.convertResultCacheKey;
+        }
+        if (params.convertResultCacheValue !== undefined) {
+            this.convertResultCacheValue = params.convertResultCacheValue;
+        }
     }
     updateStateVars(params) {
         this.__options.reset(params.options);
@@ -937,14 +955,14 @@ export class DatePickerComponent extends ViewPU {
         if (prevLunar !== this.lunar) {
             if (!prevLunar && this.lunar && this.lunarCalendar !== null) {
                 // Switching from gregorian to lunar: convert gregorian date to lunar date
-                const gregorianDate = this.createDateFromParams(
-                    this.selectedYear, this.selectedMonth, this.selectedDay
-                );
+                const gregorianDate = this.createDateFromParams(this.selectedYear, this.selectedMonth, this.selectedDay);
                 this.lunarCalendar.setTime(gregorianDate);
                 this.selectedMonth = this.lunarCalendar.get('month');
                 this.selectedDay = this.lunarCalendar.get('date');
-                // Use Gregorian year with lunar year boundary adjustment.
-                // lunarCalendar.get('year') returns sexagenary cycle (1-60), not Gregorian year.
+                // Use Gregorian year (not lunarCalendar.get('year') which returns
+                // sexagenary cycle 1-60). Adjust for lunar year boundary:
+                // if lunar month is 腊月(11) and Gregorian month is Jan/Feb,
+                // the lunar year is the previous Gregorian year.
                 this.selectedYear = gregorianDate.getFullYear();
                 if (this.selectedMonth >= 11 && gregorianDate.getMonth() <= 1) {
                     this.selectedYear -= 1;
@@ -956,16 +974,12 @@ export class DatePickerComponent extends ViewPU {
                     this.selectedYear = this.endYear;
                 }
                 // Detect if the date falls in a leap month
-                this.selectedIsLeapMonth = this.isDateInLeapMonth(
-                    gregorianDate, this.selectedYear, this.selectedMonth
-                );
+                this.selectedIsLeapMonth = this.isDateInLeapMonth(gregorianDate, this.selectedYear, this.selectedMonth);
             }
             else if (prevLunar && !this.lunar && prevLunarCalendar !== null) {
                 // Switching from lunar to gregorian: convert lunar date to gregorian date
                 // Use prevLunarCalendar for conversion since current lunarCalendar is null
-                const gregorianDate = this.convertLunarToGregorianWithCalendar(
-                    prevLunarCalendar, this.selectedYear, this.selectedMonth, this.selectedDay, this.selectedIsLeapMonth
-                );
+                const gregorianDate = this.convertLunarToGregorianWithCalendar(prevLunarCalendar, this.selectedYear, this.selectedMonth, this.selectedDay, this.selectedIsLeapMonth);
                 if (gregorianDate !== null) {
                     this.selectedYear = gregorianDate.getFullYear();
                     this.selectedMonth = gregorianDate.getMonth();
@@ -1033,12 +1047,6 @@ export class DatePickerComponent extends ViewPU {
             this.dayArray.push(this.formatLunarDay(i));
         }
     }
-    /**
-     * Detects which lunar month (0-11) has a leap month in the given lunar year.
-     * A leap month shares the same month index as its preceding regular month;
-     * it's detected by finding a lunar month whose start (date==1) appears twice.
-     * Returns the leap month index or -1 if no leap month exists.
-     */
     getLunarLeapMonth(gregorianYear) {
         if (gregorianYear === DatePickerConstant.HIDE_YEAR_SENTINEL || this.lunarCalendar === null) {
             return -1;
@@ -1047,14 +1055,11 @@ export class DatePickerComponent extends ViewPU {
             return this.lunarLeapMonthCacheValue;
         }
         try {
-            // Use mid-year reference to determine the lunar year
             const refDate = this.createDateFromParams(gregorianYear, 6, 1);
             this.lunarCalendar.setTime(refDate);
             const expectedLunarYear = this.lunarCalendar.get('year');
-            // Track how many times each lunar month starts (date == 1)
             const monthStartCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
             let leapMonth = -1;
-            // Scan through the Gregorian year (~384 days covers a full lunar year)
             const startDate = this.createDateFromParams(gregorianYear, 0, 1);
             for (let dayOffset = 0; dayOffset < 470; dayOffset++) {
                 const testDate = new Date(startDate.getTime() + dayOffset * 86400000);
@@ -1139,10 +1144,7 @@ export class DatePickerComponent extends ViewPU {
         return null;
     }
     getLunarDaysInMonth(gregorianYear, lunarMonth, isLeap) {
-        if (gregorianYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
-            return 30;
-        }
-        if (this.lunarCalendar === null) {
+        if (gregorianYear === DatePickerConstant.HIDE_YEAR_SENTINEL || this.lunarCalendar === null) {
             return 30;
         }
         const cacheKey = `${gregorianYear}_${lunarMonth}_${isLeap}`;
@@ -1200,9 +1202,7 @@ export class DatePickerComponent extends ViewPU {
         }
     }
     convertLunarToGregorian(gregorianYear, lunarMonth, lunarDay, isLeap) {
-        return this.convertLunarToGregorianWithCalendar(
-            this.lunarCalendar, gregorianYear, lunarMonth, lunarDay, isLeap
-        );
+        return this.convertLunarToGregorianWithCalendar(this.lunarCalendar, gregorianYear, lunarMonth, lunarDay, isLeap);
     }
     convertLunarToGregorianWithCalendar(calendar, gregorianYear, lunarMonth, lunarDay, isLeap) {
         if (calendar === null) {
@@ -1238,9 +1238,7 @@ export class DatePickerComponent extends ViewPU {
             }
             let resultDate = null;
             if (monthStart !== null) {
-                // Add (lunarDay - 1) days to reach the target date
                 const candidate = new Date(monthStart.getTime() + (lunarDay - 1) * 86400000);
-                // Verify the result is still in the correct lunar month
                 calendar.setTime(candidate);
                 if (calendar.get('month') === lunarMonth && calendar.get('date') === lunarDay) {
                     resultDate = candidate;
@@ -1923,16 +1921,13 @@ export class DatePickerComponent extends ViewPU {
         const newSelectedTextStyle = this.options.selectedTextStyle;
         const newItemTextStyle = this.options.itemTextStyle;
         const newSelectionIndicator = this.options.selectionIndicator;
-        if (newSelectedTextStyle !== undefined &&
-            !this.deepEqual(newSelectedTextStyle, this.selectedTextStyle)) {
+        if (!this.textStyleEqual(newSelectedTextStyle, this.selectedTextStyle)) {
             this.selectedTextStyle = newSelectedTextStyle;
         }
-        if (newItemTextStyle !== undefined &&
-            !this.deepEqual(newItemTextStyle, this.itemTextStyle)) {
+        if (!this.textStyleEqual(newItemTextStyle, this.itemTextStyle)) {
             this.itemTextStyle = newItemTextStyle;
         }
-        if (newSelectionIndicator !== undefined &&
-            !this.deepEqual(newSelectionIndicator, this.selectionIndicator)) {
+        if (!this.indicatorStyleEqual(newSelectionIndicator, this.selectionIndicator)) {
             this.selectionIndicator = newSelectionIndicator;
         }
         // Only rebuild arrays when range/mode actually changed (not just selected)
@@ -2216,8 +2211,10 @@ export class DatePickerComponent extends ViewPU {
                 this.lunarCalendar.setTime(targetDate);
                 this.selectedMonth = this.lunarCalendar.get('month');
                 this.selectedDay = this.lunarCalendar.get('date');
-                // Use Gregorian year with lunar year boundary adjustment.
-                // lunarCalendar.get('year') returns sexagenary cycle (1-60), not Gregorian year.
+                // Use Gregorian year (not lunarCalendar.get('year') which returns
+                // sexagenary cycle 1-60). Adjust for lunar year boundary:
+                // if lunar month is 腊月(11) and Gregorian month is Jan/Feb,
+                // the lunar year is the previous Gregorian year.
                 this.selectedYear = targetDate.getFullYear();
                 if (this.selectedMonth >= 11 && targetDate.getMonth() <= 1) {
                     this.selectedYear -= 1;
@@ -2229,9 +2226,7 @@ export class DatePickerComponent extends ViewPU {
                     this.selectedYear = this.endYear;
                 }
                 // Detect if the target date falls in a leap month
-                this.selectedIsLeapMonth = this.isDateInLeapMonth(
-                    targetDate, this.selectedYear, this.selectedMonth
-                );
+                this.selectedIsLeapMonth = this.isDateInLeapMonth(targetDate, this.selectedYear, this.selectedMonth);
                 // Ensure selected date is within lunar range based on gregorian year
                 if (this.selectedYear === this.startYear) {
                     if (this.selectedMonth < this.lunarStartMonth) {
@@ -2240,7 +2235,7 @@ export class DatePickerComponent extends ViewPU {
                         this.selectedDay = this.lunarStartDay;
                     }
                     else if (this.selectedMonth === this.lunarStartMonth && this.selectedDay < this.lunarStartDay &&
-                             !this.selectedIsLeapMonth) {
+                        !this.selectedIsLeapMonth) {
                         this.selectedDay = this.lunarStartDay;
                     }
                 }
@@ -2251,7 +2246,7 @@ export class DatePickerComponent extends ViewPU {
                         this.selectedDay = this.lunarEndDay;
                     }
                     else if (this.selectedMonth === this.lunarEndMonth && this.selectedDay > this.lunarEndDay &&
-                             !this.selectedIsLeapMonth) {
+                        !this.selectedIsLeapMonth) {
                         this.selectedDay = this.lunarEndDay;
                     }
                 }
@@ -2437,9 +2432,7 @@ export class DatePickerComponent extends ViewPU {
             result.day = this.selectedDay;
         }
         else if (this.lunar && this.lunarCalendar !== null) {
-            const gregorianDate = this.convertLunarToGregorian(
-                this.selectedYear, this.selectedMonth, this.selectedDay, this.selectedIsLeapMonth
-            );
+            const gregorianDate = this.convertLunarToGregorian(this.selectedYear, this.selectedMonth, this.selectedDay, this.selectedIsLeapMonth);
             if (gregorianDate !== null) {
                 result.year = gregorianDate.getFullYear();
                 result.month = gregorianDate.getMonth();
@@ -2465,6 +2458,8 @@ export class DatePickerComponent extends ViewPU {
         const newYear = this.hideYear && selectedIndex === this.yearArray.length - 1
             ? DatePickerConstant.HIDE_YEAR_SENTINEL
             : this.startYear + selectedIndex;
+        // Guard: if the year hasn't actually changed, do nothing.
+        // This prevents reverse linkage when ArkUI re-fires onChange during re-renders.
         if (newYear === this.selectedYear) {
             return;
         }
@@ -2550,7 +2545,8 @@ export class DatePickerComponent extends ViewPU {
         this.updateDateColumnLoopState();
         if (this.lunar) {
             setTimeout(() => { this.dateOnChange?.(this.getResult()); }, 0);
-        } else {
+        }
+        else {
             this.dateOnChange?.(this.getResult());
         }
     }
@@ -2567,6 +2563,7 @@ export class DatePickerComponent extends ViewPU {
             if (leapMonth >= 0 && leapMonth >= startLunarMonthIndex) {
                 const leapArrayIndex = leapMonth - startLunarMonthIndex; // index of regular leap month
                 if (selectedIndex === leapArrayIndex + 1) {
+                    // The entry right after the regular leap month is the leap month
                     newMonth = leapMonth;
                     newIsLeap = true;
                 }
@@ -2574,12 +2571,15 @@ export class DatePickerComponent extends ViewPU {
                     newMonth = startLunarMonthIndex + selectedIndex;
                 }
                 else {
+                    // After the leap month entry, subtract 1 from the index
                     newMonth = startLunarMonthIndex + selectedIndex - 1;
                 }
             }
             else {
                 newMonth = startLunarMonthIndex + selectedIndex;
             }
+            // Guard: if the month hasn't actually changed, do nothing.
+            // This prevents reverse linkage when ArkUI re-fires onChange during re-renders.
             if (newMonth === this.selectedMonth && newIsLeap === this.selectedIsLeapMonth) {
                 return;
             }
@@ -2620,7 +2620,8 @@ export class DatePickerComponent extends ViewPU {
         this.updateDateColumnLoopState();
         if (this.lunar) {
             setTimeout(() => { this.dateOnChange?.(this.getResult()); }, 0);
-        } else {
+        }
+        else {
             this.dateOnChange?.(this.getResult());
         }
     }
@@ -2632,6 +2633,7 @@ export class DatePickerComponent extends ViewPU {
                 startLunarDayIndex = this.lunarStartDay;
             }
             const newDay = startLunarDayIndex + selectedIndex;
+            // Guard: if the day hasn't actually changed, do nothing.
             if (newDay === this.selectedDay) {
                 return;
             }
@@ -2651,7 +2653,8 @@ export class DatePickerComponent extends ViewPU {
         }
         if (this.lunar) {
             setTimeout(() => { this.dateOnChange?.(this.getResult()); }, 0);
-        } else {
+        }
+        else {
             this.dateOnChange?.(this.getResult());
         }
     }
@@ -3037,11 +3040,11 @@ export class DatePickerComponent extends ViewPU {
         const atEndYear = this.selectedYear === this.endYear;
         this.monthColumnCanLoop = !atStartYear && !atEndYear;
         if (this.lunar) {
-            const atStartMonth = atStartYear && this.selectedMonth === this.lunarStartMonth &&
-                                 !this.selectedIsLeapMonth;
+            const atStartMonth = atStartYear && this.selectedMonth === this.lunarStartMonth && !this.selectedIsLeapMonth;
             const atEndMonth = atEndYear && this.selectedMonth === this.lunarEndMonth && !this.selectedIsLeapMonth;
             this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
-        } else {
+        }
+        else {
             const atStartMonth = atStartYear && this.selectedMonth === this.startMonth;
             const atEndMonth = atEndYear && this.selectedMonth === this.endMonth;
             this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
@@ -3249,32 +3252,114 @@ export class DatePickerComponent extends ViewPU {
         const calculatedRadius = Math.min(minColumnWidth / 2, 12);
         return Math.max(calculatedRadius, 0);
     }
-    deepEqual(a, b) {
+    textStyleEqual(a, b) {
         if (a === b) {
             return true;
         }
         if (!a || !b) {
             return false;
         }
-        const keysA = Object.keys(a);
-        const keysB = Object.keys(b);
-        if (keysA.length !== keysB.length) {
+        if (a.color !== b.color) {
             return false;
         }
-        for (const key of keysA) {
-            const valA = a[key];
-            const valB = b[key];
-            if (valA === valB) {
-                continue;
-            }
-            if (typeof valA === 'object' && typeof valB === 'object' && valA && valB) {
-                if (!this.deepEqual(valA, valB)) {
-                    return false;
-                }
-            }
-            else {
+        if (a.overflow !== b.overflow) {
+            return false;
+        }
+        if (a.minFontSize !== b.minFontSize) {
+            return false;
+        }
+        if (a.maxFontSize !== b.maxFontSize) {
+            return false;
+        }
+        if (a.font === b.font) {
+            return true;
+        }
+        if (!a.font || !b.font) {
+            return false;
+        }
+        if (a.font.size !== b.font.size) {
+            return false;
+        }
+        if (a.font.weight !== b.font.weight) {
+            return false;
+        }
+        if (a.font.family !== b.font.family) {
+            return false;
+        }
+        if (a.font.style !== b.font.style) {
+            return false;
+        }
+        return true;
+    }
+    lengthMetricsEqual(a, b) {
+        if (a === b) {
+            return true;
+        }
+        if (!a || !b) {
+            return false;
+        }
+        return a.value === b.value && a.unit === b.unit;
+    }
+    borderRadiusEqual(a, b) {
+        if (a === b) {
+            return true;
+        }
+        if (!a || !b) {
+            return false;
+        }
+        const lmA = a;
+        const lmB = b;
+        if (lmA.value !== undefined || lmB.value !== undefined) {
+            if (lmA.value === undefined || lmB.value === undefined) {
                 return false;
             }
+            return lmA.value === lmB.value && lmA.unit === lmB.unit;
+        }
+        const lrA = a;
+        const lrB = b;
+        if (lrA.topStart !== undefined || lrA.topEnd !== undefined ||
+            lrA.bottomStart !== undefined || lrA.bottomEnd !== undefined ||
+            lrB.topStart !== undefined || lrB.topEnd !== undefined ||
+            lrB.bottomStart !== undefined || lrB.bottomEnd !== undefined) {
+            return this.lengthMetricsEqual(lrA.topStart, lrB.topStart) &&
+                this.lengthMetricsEqual(lrA.topEnd, lrB.topEnd) &&
+                this.lengthMetricsEqual(lrA.bottomStart, lrB.bottomStart) &&
+                this.lengthMetricsEqual(lrA.bottomEnd, lrB.bottomEnd);
+        }
+        const rbA = a;
+        const rbB = b;
+        return rbA.topLeft === rbB.topLeft &&
+            rbA.topRight === rbB.topRight &&
+            rbA.bottomLeft === rbB.bottomLeft &&
+            rbA.bottomRight === rbB.bottomRight;
+    }
+    indicatorStyleEqual(a, b) {
+        if (a === b) {
+            return true;
+        }
+        if (!a || !b) {
+            return false;
+        }
+        if (a.type !== b.type) {
+            return false;
+        }
+        if (a.dividerColor !== b.dividerColor) {
+            return false;
+        }
+        if (a.backgroundColor !== b.backgroundColor) {
+            return false;
+        }
+        if (!this.lengthMetricsEqual(a.startMargin, b.startMargin)) {
+            return false;
+        }
+        if (!this.lengthMetricsEqual(a.endMargin, b.endMargin)) {
+            return false;
+        }
+        if (!this.lengthMetricsEqual(a.strokeWidth, b.strokeWidth)) {
+            return false;
+        }
+        if (!this.borderRadiusEqual(a.borderRadius, b.borderRadius)) {
+            return false;
         }
         return true;
     }
@@ -3377,23 +3462,23 @@ export class DatePickerComponent extends ViewPU {
             }
             else if (lr.topStart !== undefined) {
                 if (this.isRTL()) {
-                    tl = lr.topEnd.value;
+                    tl = lr.topEnd !== undefined ? lr.topEnd.value : defaultRadius;
                     tr = lr.topStart.value;
-                    bl = lr.bottomEnd.value;
-                    br = lr.bottomStart.value;
+                    bl = lr.bottomEnd !== undefined ? lr.bottomEnd.value : defaultRadius;
+                    br = lr.bottomStart !== undefined ? lr.bottomStart.value : defaultRadius;
                 }
                 else {
                     tl = lr.topStart.value;
-                    tr = lr.topEnd.value;
-                    bl = lr.bottomStart.value;
-                    br = lr.bottomEnd.value;
+                    tr = lr.topEnd !== undefined ? lr.topEnd.value : defaultRadius;
+                    bl = lr.bottomStart !== undefined ? lr.bottomStart.value : defaultRadius;
+                    br = lr.bottomEnd !== undefined ? lr.bottomEnd.value : defaultRadius;
                 }
             }
             else if (rb.topLeft !== undefined) {
                 tl = rb.topLeft;
-                tr = rb.topRight;
-                bl = rb.bottomLeft;
-                br = rb.bottomRight;
+                tr = rb.topRight !== undefined ? rb.topRight : defaultRadius;
+                bl = rb.bottomLeft !== undefined ? rb.bottomLeft : defaultRadius;
+                br = rb.bottomRight !== undefined ? rb.bottomRight : defaultRadius;
             }
         }
         if (position === 'middle') {
@@ -3425,26 +3510,25 @@ export class DatePickerComponent extends ViewPU {
         const totalWidthPx = this.getTotalWidthPx();
         const currentColumnWidthPx = totalWidthPx > 0 ? this.getColumnWidthPx(columnIndex) : 0;
         if (totalWidthPx > 0 && currentColumnWidthPx > 0) {
-            const safetyMargin = 2;
-            const safeColumnWidth = Math.max(0, currentColumnWidthPx - safetyMargin);
-            const precedingWidthPx = this.getPrecedingWidthPx(columnIndex);
-            const followingWidthPx = this.getFollowingWidthPx(columnIndex);
-            let remainingStart = 0;
-            let remainingEnd = 0;
+            let rawStartPx = 0;
+            let rawEndPx = 0;
             if (indicator.startMargin) {
-                const userStartPx = this.lengthMetricsToPx(indicator.startMargin);
-                remainingStart = Math.max(0, userStartPx - precedingWidthPx);
+                rawStartPx = Math.max(0, this.lengthMetricsToPx(indicator.startMargin));
             }
             if (indicator.endMargin) {
-                const userEndPx = this.lengthMetricsToPx(indicator.endMargin);
-                remainingEnd = Math.max(0, userEndPx - followingWidthPx);
+                rawEndPx = Math.max(0, this.lengthMetricsToPx(indicator.endMargin));
             }
-            if (remainingStart + remainingEnd >= currentColumnWidthPx) {
-                adjustedStrokeWidth = LengthMetrics.px(0);
+            if (rawStartPx + rawEndPx > totalWidthPx) {
                 adjustedStartMargin = undefined;
                 adjustedEndMargin = undefined;
             }
             else {
+                const precedingWidthPx = this.getPrecedingWidthPx(columnIndex);
+                const followingWidthPx = this.getFollowingWidthPx(columnIndex);
+                const remainingStart = Math.max(0, rawStartPx - precedingWidthPx);
+                const remainingEnd = Math.max(0, rawEndPx - followingWidthPx);
+                const safetyMargin = 2;
+                const safeColumnWidth = Math.max(0, currentColumnWidthPx - safetyMargin);
                 const cappedStart = Math.min(remainingStart, safeColumnWidth);
                 adjustedStartMargin = cappedStart > 0 ? LengthMetrics.px(cappedStart) : undefined;
                 const cappedEnd = Math.min(remainingEnd, safeColumnWidth);
@@ -3465,8 +3549,7 @@ export class DatePickerComponent extends ViewPU {
             backgroundColor: indicator.backgroundColor
         };
     }
-
-    DateModeDateColumns() {
+    DateModeDateColumns(parent = null) {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
             UIPickerComponent.width(this.getDateColumnWidth(0));
@@ -3587,8 +3670,7 @@ export class DatePickerComponent extends ViewPU {
         ForEach.pop();
         UIPickerComponent.pop();
     }
-
-    DateModeYearMonthColumns() {
+    DateModeYearMonthColumns(parent = null) {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
             UIPickerComponent.width(this.getDateColumnWidth(0));
@@ -3674,8 +3756,7 @@ export class DatePickerComponent extends ViewPU {
         ForEach.pop();
         UIPickerComponent.pop();
     }
-
-    DateModeMonthDayColumns() {
+    DateModeMonthDayColumns(parent = null) {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
             UIPickerComponent.width(this.getDateColumnWidth(0));
@@ -3761,7 +3842,6 @@ export class DatePickerComponent extends ViewPU {
         ForEach.pop();
         UIPickerComponent.pop();
     }
-
     initialRender() {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Row.create();
@@ -3779,12 +3859,12 @@ export class DatePickerComponent extends ViewPU {
                                     If.create();
                                     if (this.lunar) {
                                         this.ifElseBranchUpdateFunction(0, () => {
-                                            this.DateModeDateColumns();
+                                            this.DateModeDateColumns.bind(this)();
                                         });
                                     }
                                     else {
                                         this.ifElseBranchUpdateFunction(1, () => {
-                                            this.DateModeDateColumns();
+                                            this.DateModeDateColumns.bind(this)();
                                         });
                                     }
                                 }, If);
@@ -3797,12 +3877,12 @@ export class DatePickerComponent extends ViewPU {
                                     If.create();
                                     if (this.lunar) {
                                         this.ifElseBranchUpdateFunction(0, () => {
-                                            this.DateModeYearMonthColumns();
+                                            this.DateModeYearMonthColumns.bind(this)();
                                         });
                                     }
                                     else {
                                         this.ifElseBranchUpdateFunction(1, () => {
-                                            this.DateModeYearMonthColumns();
+                                            this.DateModeYearMonthColumns.bind(this)();
                                         });
                                     }
                                 }, If);
@@ -3815,12 +3895,12 @@ export class DatePickerComponent extends ViewPU {
                                     If.create();
                                     if (this.lunar) {
                                         this.ifElseBranchUpdateFunction(0, () => {
-                                            this.DateModeMonthDayColumns();
+                                            this.DateModeMonthDayColumns.bind(this)();
                                         });
                                     }
                                     else {
                                         this.ifElseBranchUpdateFunction(1, () => {
-                                            this.DateModeMonthDayColumns();
+                                            this.DateModeMonthDayColumns.bind(this)();
                                         });
                                     }
                                 }, If);
