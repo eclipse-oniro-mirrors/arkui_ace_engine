@@ -57,6 +57,9 @@ ExecutorResult WheelScrollExecutor::ExecuteStep()
                 return SetFailureState(ExecutionState::CONTROL_DENIED);
             }
         }
+        if (DetectSpecialComponentHit(coordinates_.GetX(), coordinates_.GetY())) {
+            return ExecutorResult::FAILED;
+        }
         const auto windowOffset = context->GetDisplayWindowRectInfo().GetOffset();
         // The first frame opens the axis session and carries the scroll delta.
         context->OnAxisEvent(RelaxedEventFactory::CreateAxisEvent(

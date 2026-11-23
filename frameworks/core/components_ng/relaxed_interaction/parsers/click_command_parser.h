@@ -43,7 +43,8 @@ private:
     static bool ParseMode(const JsonValue* cmdJson, ExecuteMode& mode);
     static bool ParseCoordinates(const JsonValue* cmdJson, PointF& coordinates);
     static bool ParsePcOptions(const JsonValue* cmdJson, ClickInput& input);
-    std::vector<std::unique_ptr<BaseExecutor>> CreateExecutor(ExecuteMode mode, const PointF& coordinates);
+    std::vector<std::unique_ptr<BaseExecutor>> CreateExecutor(
+        ExecuteMode mode, const PointF& coordinates, int32_t clickCount = 1);
 };
 
 } // namespace OHOS::Ace::NG

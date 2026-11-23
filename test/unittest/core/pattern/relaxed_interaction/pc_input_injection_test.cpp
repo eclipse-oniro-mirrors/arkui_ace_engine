@@ -1599,4 +1599,54 @@ HWTEST_F(PcCommandEntryTest, StandardEntry_TimeoutAndMalformedArgumentsReturnFix
     EXPECT_EQ(context_->keys.back().action, KeyAction::UP);
 }
 
+HWTEST_F(PcInputInjectionParserTest, PressKeyParser_HomeMapsToKeyboardMoveHome, TestSize.Level1)
+{
+    // Keyboard Home is KEY_MOVE_HOME: KEY_HOME (1) is the system Home key that the
+    // focus/caret/shortcut paths never treat as a keyboard Home press.
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    PressKeyCommandParser parser { WeakPtr<PipelineContext>(context) };
+    auto executors = parser.Parse(Parse(R"({"action_info":{"key":"home"}})"));
+    ASSERT_EQ(executors.size(), 1U);
+    EXPECT_EQ(executors.front()->ExecuteStep(), ExecutorResult::SUCCESS);
+    ASSERT_EQ(context->keys.size(), 2U);
+    EXPECT_EQ(context->keys.front().code, KeyCode::KEY_MOVE_HOME);
+    EXPECT_EQ(context->keys.front().keyIntention, KeyIntention::INTENTION_HOME);
+}
+
+HWTEST_F(PcInputInjectionParserTest, SimulateTouchExecutor_RepeatsClickPerClickCount, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    SimulateTouchExecutor executor(context, PointF(10.0f, 20.0f), 2);
+    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::PENDING);
+    ASSERT_EQ(context->touches.size(), 2U);
+    EXPECT_EQ(context->touches[0].type, TouchType::DOWN);
+    EXPECT_EQ(context->touches[1].type, TouchType::UP);
+    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::SUCCESS);
+    ASSERT_EQ(context->touches.size(), 4U);
+    EXPECT_EQ(context->touches[2].type, TouchType::DOWN);
+    EXPECT_EQ(context->touches[3].type, TouchType::UP);
+    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::SUCCESS);
+    EXPECT_EQ(context->touches.size(), 4U);
+}
+
+HWTEST_F(PcInputInjectionParserTest, Manager_BoundaryHoldCompletesInsteadOfTimeout, TestSize.Level1)
+{
+    // hold_ms == command timeout: the declared hold extends the effective timeout, so the
+    // boundary hold completes with SUCCESS instead of being judged TIMEOUT.
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    auto manager = AceType::MakeRefPtr<RelaxedInteractionManager>(WeakPtr<PipelineContext>(context));
+    manager->SetCommandTimeoutMs(1000);
+    NG::ExecutionState observed = NG::ExecutionState::NONE;
+    EXPECT_EQ(manager->ProcessCommand(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":1000}}})",
+        [&observed](NG::ExecutionState state) { observed = state; }, true), ProcessResult::SUCCESS);
+    auto result = NG::ExecutionState::FAILED;
+    for (int32_t attempt = 0; attempt < 40 && result != NG::ExecutionState::SUCCESS; ++attempt) {
+        result = manager->ExecuteNextStep();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    EXPECT_EQ(result, NG::ExecutionState::SUCCESS);
+    EXPECT_EQ(observed, NG::ExecutionState::SUCCESS);
+}
+
 } // namespace OHOS::Ace::NG

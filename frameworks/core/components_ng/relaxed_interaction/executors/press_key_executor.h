@@ -21,6 +21,7 @@ public:
     ExecutorResult ExecuteStep() override;
     std::string GetType() const override { return "press_key"; }
     bool IsSingleStep() const override { return false; }
+    int32_t GetHoldMs() const override { return holdMs_; }
 
 private:
     ExecutorResult FinishSequence(const RefPtr<PipelineContext>& context);

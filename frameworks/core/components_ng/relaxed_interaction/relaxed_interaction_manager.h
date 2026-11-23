@@ -76,6 +76,8 @@ public:
     }
 
     static constexpr int32_t DEFAULT_COMMAND_TIMEOUT_MS = 5000;
+    // Scheduling slack on top of a declared hold before the workflow may be judged TIMEOUT.
+    static constexpr int32_t WORKFLOW_TIMEOUT_MARGIN_MS = 500;
 
 private:
     ProcessResult ProcessCommandInternal(const std::string& jsonStr,
@@ -114,6 +116,9 @@ private:
         // controller(agent) relayed by the UISession caller (see SecurityAuthInfo).
         bool needSecurityAuth = false;
         uint64_t agentTokenId = UINT64_MAX;
+        // Longest declared in-workflow hold (e.g. press_key hold_ms); extends the effective
+        // timeout so a legitimate boundary hold (hold_ms = 5000) is not judged TIMEOUT.
+        int32_t holdDurationMs = 0;
         std::string commandType;
         std::chrono::steady_clock::time_point startTime {};
         bool isPcCommand = false;

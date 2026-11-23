@@ -112,6 +112,9 @@ ExecutorResult MouseClickExecutor::ExecuteStep()
             Cancel();
             return SetFailureState(ExecutionState::CONTROL_DENIED);
         }
+        if (DetectSpecialComponentHit(events_[nextEvent_].x, events_[nextEvent_].y)) {
+            return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
+        }
     }
     if (completed_) {
         return ExecutorResult::SUCCESS;

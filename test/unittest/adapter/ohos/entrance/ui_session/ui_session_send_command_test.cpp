@@ -709,6 +709,33 @@ TEST(CommandResultTest, JsonContractAndUtf8Boundaries)
     cJSON_Delete(root);
 }
 
+TEST(CommandResultTest, SpecialComponentFailureUsesDedicatedContract)
+{
+    NG::RelaxedCommandResult result = NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE);
+    result.specialComponentFailed = true;
+    result.specialNodeId = 1234;
+    result.specialOffsetX = 12.5f;
+    result.specialOffsetY = 30.0f;
+    auto json = JsonUtil::ParseJsonString(SerializeCommandResult(result));
+    ASSERT_TRUE(json && json->IsObject());
+    EXPECT_EQ(json->GetString("resultCode"), "SEC_UEC_FAILED");
+    EXPECT_TRUE(json->Contains("message"));
+    auto extraInfo = json->GetValue("extraInfo");
+    ASSERT_TRUE(extraInfo && extraInfo->IsObject());
+    EXPECT_EQ(extraInfo->GetInt("nodeId"), 1234);
+    auto offset = extraInfo->GetValue("offset");
+    ASSERT_TRUE(offset && offset->IsObject());
+    EXPECT_EQ(offset->GetInt("x"), 12);
+    EXPECT_EQ(offset->GetInt("y"), 30);
+
+    // Ordinary failures keep the legacy three-field contract (no resultCode/extraInfo).
+    auto legacy = JsonUtil::ParseJsonString(SerializeCommandResult(
+        NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE)));
+    ASSERT_TRUE(legacy && legacy->IsObject());
+    EXPECT_FALSE(legacy->Contains("resultCode"));
+    EXPECT_FALSE(legacy->Contains("extraInfo"));
+}
+
 TEST(CommandResultTest, PcUnavailableCodesPreserveMessagesAndLegacyContract)
 {
     struct UnavailableResult {

@@ -28,7 +28,8 @@ class PipelineContext;
 
 class StrictClickExecutor : public BaseExecutor {
 public:
-    explicit StrictClickExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates);
+    explicit StrictClickExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates,
+        int32_t clickCount = 1);
     ~StrictClickExecutor() override = default;
 
     ExecutorResult ExecuteStep() override;
@@ -50,6 +51,8 @@ public:
 
 private:
     PointF coordinates_;
+    int32_t clickCount_ = 1;
+    int32_t clicksDone_ = 0;
 };
 
 } // namespace OHOS::Ace::NG

@@ -109,8 +109,9 @@ void PressAndMoveExecutor::Cancel()
     }
 }
 
-// One-shot deny checks at the first injected point. Returns false when the move is
-// denied; the failure state has already been recorded on the executor.
+// One-shot deny and special-component checks at the first injected point. Returns false
+// when the move is denied or targets a special component; the failure state has already
+// been recorded on the executor.
 bool PressAndMoveExecutor::CheckDenyOnce()
 {
     denyChecked_ = true;
@@ -119,6 +120,9 @@ bool PressAndMoveExecutor::CheckDenyOnce()
         : PointF(mouseEvents_.front().x, mouseEvents_.front().y);
     if (IsDenied(point)) {
         SetFailureState(ExecutionState::CONTROL_DENIED);
+        return false;
+    }
+    if (DetectSpecialComponentHit(point.GetX(), point.GetY())) {
         return false;
     }
     return true;

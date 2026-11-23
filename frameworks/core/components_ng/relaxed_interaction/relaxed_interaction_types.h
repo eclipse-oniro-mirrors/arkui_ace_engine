@@ -52,12 +52,28 @@ enum class RelaxedCommandErrorType : uint8_t {
     CONTEXT_UNAVAILABLE,
 };
 
+// Hit payload when an injected command targets a special-component placeholder
+// (UIExtension/DynamicComponent). Carried to the finish callback so the result can
+// surface the SEC_UEC_FAILED contract with the component-local offset.
+struct SpecialComponentHitInfo {
+    bool hit = false;
+    int32_t nodeId = 0;
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+};
+
 // Terminal result object carried by the relaxed/PC finish callback; serialized to
 // the fixed JSON contract {"result":...,"errorType":...,"errorMessage":...}.
 struct RelaxedCommandResult {
     bool success = false;
     RelaxedCommandErrorType errorType = RelaxedCommandErrorType::EXECUTE_FAIL;
     std::string errorMessage;
+    // Special-component failure contract: serialized as the dedicated
+    // {"resultCode":"SEC_UEC_FAILED","message":...,"extraInfo":{nodeId,offset}} shape.
+    bool specialComponentFailed = false;
+    int32_t specialNodeId = 0;
+    float specialOffsetX = 0.0f;
+    float specialOffsetY = 0.0f;
 
     static RelaxedCommandResult Success()
     {

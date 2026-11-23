@@ -25,7 +25,8 @@ class PipelineContext;
 
 class SimulateTouchExecutor : public BaseExecutor {
 public:
-    explicit SimulateTouchExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates);
+    explicit SimulateTouchExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates,
+        int32_t clickCount = 1);
     ~SimulateTouchExecutor() override = default;
 
     ExecutorResult ExecuteStep() override;
@@ -47,6 +48,8 @@ public:
 
 private:
     PointF coordinates_;
+    int32_t clickCount_ = 1;
+    int32_t clicksDone_ = 0;
 };
 
 } // namespace OHOS::Ace::NG

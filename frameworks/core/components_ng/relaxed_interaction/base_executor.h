@@ -41,6 +41,12 @@ public:
 
     virtual bool IsSingleStep() const = 0;
 
+    // Longest in-executor hold/wait (ms) that legitimately extends the workflow timeout window.
+    virtual int32_t GetHoldMs() const
+    {
+        return 0;
+    }
+
     // P2 security seam: stamp deny callback and identity before execution.
     virtual void SetDenyCallback(RelaxedDenyCallback callback, const RelaxedCommandIdentity& identity)
     {
@@ -80,6 +86,20 @@ protected:
     ExecutionState failureState_ = ExecutionState::FAILED;
     RelaxedDenyCallback denyCallback_;
     RelaxedCommandIdentity identity_;
+
+public:
+    // Detects a hit on a special-component placeholder node (UIExtension/DynamicComponent).
+    // On hit: records TARGET_NOT_FOUND failure state, stashes nodeId + component-local offset
+    // (converted with the same NGGestureRecognizer::Transform used by real-input forwarding)
+    // and returns true; the caller should return ExecutorResult::FAILED.
+    bool DetectSpecialComponentHit(double x, double y);
+
+    // Special-component hit payload consumed by the result serialization (SEC_UEC_FAILED).
+    static void ConsumeSpecialComponentHit(SpecialComponentHitInfo& info);
+    static void ClearSpecialComponentHit();
+
+private:
+    static thread_local SpecialComponentHitInfo specialComponentHit_;
 };
 
 } // namespace OHOS::Ace::NG
