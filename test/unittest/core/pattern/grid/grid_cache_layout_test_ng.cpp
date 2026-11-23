@@ -22,6 +22,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
+#include "core/components_ng/pattern/grid/irregular/grid_irregular_layout_algorithm.h"
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
@@ -2152,6 +2153,101 @@ HWTEST_F(GridCacheLayoutTestNg, IrregularStartLineBacktrack001, TestSize.Level1)
     EXPECT_EQ(GetChildY(frameNode_, 27), 300.0f);
 
     SystemProperties::gridIrregularLayoutEnable_ = savedFlag;
+}
+
+/**
+ * @tc.name: SyncPreloadItemsIrregularGuard001
+ * @tc.desc: [GridIrregularLayoutAlgorithm::SyncPreloadItems] the head-cache index loop
+ *           skips an item whose resolved matrix tile is not a valid placement, covering
+ *           every sign combination of the pos.first / pos.second guard: an item missing
+ *           from the matrix, an item at a negative column and an item at a negative row
+ *           are all skipped without being built, while an in-window item placed at a
+ *           valid (col >= 0, row >= 0) tile is measured and built. The negative-column
+ *           and negative-row entries are planted into gridMatrix_ directly (production
+ *           fillers only place non-negative keys), so the defensive combinations of
+ *           the guard can be exercised.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadItemsIrregularGuard001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Two columns, items of 100px, viewport 240x400 (4 lines),
+     *             cachedCount = 2 with showCachedItems -> production cacheCnt = 4;
+     *             sync-cache-layout child attached so the head window takes the
+     *             index-based loop. Initial layout fills lines 0-3 (items 0-7), so
+     *             the head-side items 16-19 stay unbuilt
+     * @tc.expected: the grid starts at the top with items 0-7 in the viewport
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(2, true);
+    CreateItemsInLazyForEach(30, [](uint32_t idx) { return 100.0f; });
+    pattern_->AddSyncCacheLayoutChild();
+    CreateDone();
+
+    const auto& info = pattern_->info_;
+    EXPECT_EQ(info.startIndex_, 0);
+    EXPECT_EQ(info.endIndex_, 7);
+    EXPECT_FALSE(GetItem(16, true));
+
+    /**
+     * @tc.steps: step2. Drive the algorithm directly (the same direct-call pattern as
+     *             CheckSyncPreloadLineShift): viewport at lines 10-13 (items 20-27), so
+     *             the head cache index window is {16..19}. Plant the guarded tiles:
+     *             item 19 at (col 1, row 9) — the valid control tile,
+     *             item 18 at (col -2, row 9) — negative column,
+     *             item 17 at (col 1, row -1) — negative row,
+     *             item 16 — no matrix entry at all
+     * @tc.expected: GetItemPos resolves all four sign combinations of the guard
+     */
+    GridIrregularLayoutAlgorithm algorithm(pattern_->info_);
+    algorithm.wrapper_ = AceType::RawPtr(frameNode_);
+    algorithm.crossLens_ = { 120.0f, 120.0f };
+    algorithm.crossGap_ = 0.0f;
+    algorithm.mainGap_ = 0.0f;
+    auto& algInfo = algorithm.info_;
+    algInfo.gridMatrix_.clear();
+    algInfo.lineHeightMap_.clear();
+    algInfo.startIndex_ = 20;
+    algInfo.endIndex_ = 27;
+    algInfo.startMainLineIndex_ = 10;
+    algInfo.endMainLineIndex_ = 13;
+    // viewport lines 10-13
+    for (int32_t row = 10; row <= 13; ++row) {
+        algInfo.gridMatrix_[row][0] = 2 * row;
+        algInfo.gridMatrix_[row][1] = 2 * row + 1;
+        algInfo.lineHeightMap_[row] = 100.0f;
+    }
+    // head cache line 9: the valid control tile and the negative-column tile
+    algInfo.gridMatrix_[9][1] = 19;
+    algInfo.gridMatrix_[9][-2] = 18;
+    algInfo.lineHeightMap_[9] = 100.0f;
+    // negative row above the solved range: the negative-row tile
+    algInfo.gridMatrix_[-1][1] = 17;
+
+    // (pos.first < 0 = false, pos.second < 0 = false)
+    EXPECT_EQ(algInfo.GetItemPos(19), (std::pair<int32_t, int32_t>(1, 9)));
+    // (pos.first < 0 = true, pos.second < 0 = false)
+    EXPECT_EQ(algInfo.GetItemPos(18), (std::pair<int32_t, int32_t>(-2, 9)));
+    // (pos.first < 0 = false, pos.second < 0 = true)
+    EXPECT_EQ(algInfo.GetItemPos(17), (std::pair<int32_t, int32_t>(1, -1)));
+    // (pos.first < 0 = true, pos.second < 0 = true)
+    EXPECT_EQ(algInfo.GetItemPos(16), (std::pair<int32_t, int32_t>(-1, -1)));
+
+    /**
+     * @tc.steps: step3. Run the shown preload with the production cache window
+     * @tc.expected: the guarded items (16, 17, 18) are skipped and stay unbuilt, while
+     *               the valid tile (19) is measured and built; the planted entries
+     *               survive the pass untouched
+     */
+    algorithm.SyncPreloadItems(4);
+
+    EXPECT_FALSE(GetItem(16, true)) << "missing-entry item is skipped";
+    EXPECT_FALSE(GetItem(17, true)) << "negative-row item is skipped";
+    EXPECT_FALSE(GetItem(18, true)) << "negative-column item is skipped";
+    ASSERT_TRUE(GetItem(19, true)) << "valid-tile item is measured by the head window";
+    EXPECT_EQ(algInfo.GetItemPos(18), (std::pair<int32_t, int32_t>(-2, 9)));
+    EXPECT_EQ(algInfo.GetItemPos(17), (std::pair<int32_t, int32_t>(1, -1)));
 }
 
 /**

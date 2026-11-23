@@ -339,16 +339,10 @@ private:
     //    while the node was last on screen, so removing the node runs a
     //    transition out that finishes and calls SetInActiveAfterTransitionOut.
     // Otherwise SetActive(false) is applied immediately.
-    // A pending deferred flag is cancelled when the node is reactivated or returns
-    // to the render tree (RebuildL1 / GetFrameChild), so a transition out finishing
-    // later cannot deactivate a node that is visible again.
+    // A pending deferred flag is cancelled when RebuildL1 reactivates the node, so a
+    // transition out finishing later cannot deactivate a node that is visible again.
     void SetFrameNodeInactive(
         const RefPtr<FrameNode>& frameNode, bool removeFromTree, const std::optional<IndexType>& oldIndex);
-
-    // Cancel a deferred SetActive(false) armed by SetFrameNodeInactive when the node
-    // returns to the render tree (GetFrameChildByIndexImpl with addToRenderTree), so a
-    // transition out finishing later cannot deactivate a node that is visible again.
-    void CancelPendingInactiveAfterTransitionOut(const RefPtr<UINode>& node);
 
     // Puts the cache item's node back on the render tree: fixes depth / parent, attaches it
     // to the main tree (dropping it from disappearing children) and schedules the children

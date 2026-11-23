@@ -371,7 +371,7 @@ void ArkoalaLazyNode::RemoveDuplicatedItem(const RefPtr<UINode>& child, int32_t 
         duplicatedIndices.push_back(cachedIndex);
     }
     for (auto duplicatedIndex : duplicatedIndices) {
-        TAG_LOGW(AceLogTag::ACE_LAZY_FOREACH,
+        TAG_LOGD(AceLogTag::ACE_LAZY_FOREACH,
             "item %{public}d of index %{public}d is still mapped at index %{public}d, remove the duplicate",
             itemId, index, duplicatedIndex);
         node4Index_.Remove(duplicatedIndex);
