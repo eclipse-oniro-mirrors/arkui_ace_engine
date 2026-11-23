@@ -454,4 +454,52 @@ HWTEST_F(RichEditorColorModeTestNg, UpdateStyledStringByColorMode001, TestSize.L
     pattern->UpdateStyledStringByColorMode();
     EXPECT_FALSE(pattern->isSpanStringMode_);
 }
+
+/**
+ * @tc.name: OnSkinConfigurationUpdate001
+ * @tc.desc: Test OnSkinConfigurationUpdate refreshes already-rendered URL span color on skin/theme change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorColorModeTestNg, OnSkinConfigurationUpdate001, TestSize.Level0)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipeline = richEditorNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    // Theme manager returning a RichEditorTheme so GetUrlSpanColor resolves to the theme URL color.
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    ASSERT_NE(themeManager, nullptr);
+    EXPECT_CALL(*themeManager, GetTheme(::testing::_))
+        .WillRepeatedly(::testing::Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(::testing::_, ::testing::_))
+        .WillRepeatedly(::testing::Return(AceType::MakeRefPtr<RichEditorTheme>()));
+    pipeline->SetThemeManager(themeManager);
+
+    // Add a span and mark it as a URL span whose color follows the theme.
+    AddSpan(u"abc");
+    pattern->isSpanStringMode_ = false;
+    auto contentNode = richEditorNode_->GetChildAtIndex(0);
+    ASSERT_NE(contentNode, nullptr);
+    auto spanNode = AceType::DynamicCast<SpanNode>(contentNode->GetChildAtIndex(0));
+    ASSERT_NE(spanNode, nullptr);
+    auto spanItem = spanNode->GetSpanItem();
+    ASSERT_NE(spanItem, nullptr);
+    spanItem->urlOnRelease = []() {};
+    spanItem->useThemeFontColor = true;
+
+    // Simulate a stale URL color already rendered on screen (differs from the theme URL color).
+    const Color staleColor = Color::RED;
+    spanNode->UpdateTextColor(staleColor);
+    const Color expectedUrlColor = pattern->GetUrlSpanColor();
+    ASSERT_NE(expectedUrlColor.GetValue(), staleColor.GetValue());
+    ASSERT_TRUE(spanNode->GetTextColor().has_value());
+    EXPECT_EQ(spanNode->GetTextColor().value().GetValue(), staleColor.GetValue());
+
+    // Skin/theme change: OnSkinConfigurationUpdate must refresh the URL span color.
+    pattern->OnSkinConfigurationUpdate();
+
+    // The URL span color is now refreshed to the theme URL color.
+    ASSERT_TRUE(spanNode->GetTextColor().has_value());
+    EXPECT_EQ(spanNode->GetTextColor().value().GetValue(), expectedUrlColor.GetValue());
+}
 } // namespace OHOS::Ace::NG
