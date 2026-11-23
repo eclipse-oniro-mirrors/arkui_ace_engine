@@ -60,6 +60,15 @@ constexpr float SWIPE_SPRING_MASS = 1.f;
 constexpr float SWIPE_SPRING_STIFFNESS = 228.f;
 constexpr float SWIPE_SPRING_DAMPING = 30.f;
 constexpr int32_t DELETE_ANIMATION_DURATION = 400;
+
+void TraceSwipeGestureFailure(int32_t nodeId, const char* action, const char* reason,
+    const char* result, float oldOffset)
+{
+    TAG_LOGI(AceLogTag::ACE_LIST, "ListItem:%{public}d swipe %{public}s reason:%{public}s "
+        "result:%{public}s oldOffset:%{public}f", nodeId, action, reason, result, oldOffset);
+    ACE_SCOPED_TRACE("ListItem swipe %s id:%d reason:%s result:%s oldOffset:%f",
+        action, nodeId, reason, result, oldOffset);
+}
 } // namespace
 
 void ListItemPattern::BeforeCreateLayoutWrapper()
@@ -272,10 +281,26 @@ bool ListItemPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirt
 
 void ListItemPattern::OnRecycle()
 {
+    const bool wasDragging = isDragging_;
+    isDragging_ = false;
+    if (wasDragging) {
+        auto frameNode = GetListFrameNode();
+        auto listPattern = frameNode ? frameNode->GetPattern<ListPattern>() : nullptr;
+        if (listPattern) {
+            listPattern->SetSwiperItemEnd(AceType::WeakClaim(this));
+        }
+    }
     if (swiperIndex_ == ListItemSwipeIndex::ITEM_CHILD) {
+        // A programmatic close is already CHILD while its animation is still running.
+        // Preserve that animation and its completion listener as in the original path.
+        ResetSwipeOffset();
         return;
     }
     FireSwipeActionStateChange(ListItemSwipeIndex::ITEM_CHILD);
+    if (isSpringMotionRunning_) {
+        isSpringMotionRunning_ = false;
+        AceAsyncTraceEndCommercial(0, TRAILING_ANIMATION);
+    }
     if (springController_ && !springController_->IsStopped()) {
         // clear stop listener before stop
         springController_->ClearStopListeners();
@@ -287,6 +312,35 @@ void ListItemPattern::OnRecycle()
     curOffset_ = 0.0f;
     FireSwipeActionOffsetChange(oldOffset, curOffset_);
     MarkDirtyNode();
+}
+
+const char* ListItemPattern::ResetSwipeOffset()
+{
+    if (swiperIndex_ != ListItemSwipeIndex::ITEM_CHILD || swipeActionState_ != SwipeActionState::COLLAPSED) {
+        return "skip_state";
+    }
+    if ((springController_ && !springController_->IsStopped()) || isSpringMotionRunning_) {
+        return "skip_animation";
+    }
+    if (expandSwipeAction_ || pendingSwipeFunc_) {
+        return "skip_pending";
+    }
+    if (inStartDeleteArea_ || inEndDeleteArea_) {
+        return "skip_delete_area";
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, "no_host");
+    const float oldOffset = curOffset_;
+    curOffset_ = 0.0f;
+    if (NearZero(oldOffset)) {
+        return "already_zero";
+    }
+    ACE_SCOPED_TRACE("ListItem swipe reset id:%d oldOffset:%f", host->GetId(), oldOffset);
+    TAG_LOGI(AceLogTag::ACE_LIST, "ListItem:%{public}d swipe reset oldOffset:%{public}f", host->GetId(), oldOffset);
+    MarkDirtyNode();
+    // This can synchronously execute application code. Do not overwrite its new state afterwards.
+    FireSwipeActionOffsetChange(oldOffset, 0.0f);
+    return "reset";
 }
 
 void ListItemPattern::SetStartNode(const RefPtr<NG::UINode>& startNode)
@@ -622,6 +676,11 @@ void ListItemPattern::InitSwiperAction(bool axisChanged)
 {
     bool isPanInit = false;
     if (!panEvent_) {
+        int32_t nodeId = -1;
+        {
+            auto host = GetHost();
+            nodeId = host ? host->GetId() : -1;
+        }
         auto weak = AceType::WeakClaim(this);
         auto actionStartTask = [weak](const GestureEvent& info) {
             auto pattern = weak.Upgrade();
@@ -649,31 +708,12 @@ void ListItemPattern::InitSwiperAction(bool axisChanged)
             pattern->HandleDragUpdate(info);
         };
 
-        auto actionEndTask = [weak](const GestureEvent& info) {
-            auto pattern = weak.Upgrade();
-            CHECK_NULL_VOID(pattern);
-            auto frameNode = pattern->GetListFrameNode();
-            CHECK_NULL_VOID(frameNode);
-            auto listPattern = frameNode->GetPattern<ListPattern>();
-            CHECK_NULL_VOID(listPattern);
-            if (!listPattern->IsCurrentSwiperItem(weak) || !pattern->isDragging_) {
-                return;
-            }
-            pattern->HandleDragEnd(info);
+        auto actionEndTask = [weak, nodeId](const GestureEvent& info) {
+            FinishSwipeGesture(weak, info, "end", nodeId);
         };
-
-        auto actionCancelTask = [weak]() {
-            auto pattern = weak.Upgrade();
-            CHECK_NULL_VOID(pattern);
-            auto frameNode = pattern->GetListFrameNode();
-            CHECK_NULL_VOID(frameNode);
-            auto listPattern = frameNode->GetPattern<ListPattern>();
-            CHECK_NULL_VOID(listPattern);
-            if (!listPattern->IsCurrentSwiperItem(weak) || !pattern->isDragging_) {
-                return;
-            }
+        auto actionCancelTask = [weak, nodeId]() {
             GestureEvent info;
-            pattern->HandleDragEnd(info);
+            FinishSwipeGesture(weak, info, "cancel", nodeId);
         };
         panEvent_ = MakeRefPtr<PanEvent>(std::move(actionStartTask), std::move(actionUpdateTask),
             std::move(actionEndTask), std::move(actionCancelTask));
@@ -704,6 +744,47 @@ void ListItemPattern::InitSwiperAction(bool axisChanged)
     } else if (axisChanged) {
         springController_->Stop();
     }
+}
+
+void ListItemPattern::FinishSwipeGesture(
+    const WeakPtr<ListItemPattern>& weak, const GestureEvent& info, const char* action, int32_t nodeId)
+{
+    auto pattern = weak.Upgrade();
+    if (!pattern) {
+        TraceSwipeGestureFailure(nodeId, action, "pattern_released", "ignored", 0.0f);
+        return;
+    }
+    const float oldOffset = pattern->curOffset_;
+    if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+        TraceSwipeGestureFailure(nodeId, action, "ignored_input", "mouse_axis", oldOffset);
+        return;
+    }
+    auto frameNode = pattern->GetListFrameNode();
+    if (!frameNode) {
+        if (!pattern->isDragging_) {
+            TraceSwipeGestureFailure(nodeId, action, "no_list_frame", "not_dragging", oldOffset);
+            return;
+        }
+        pattern->isDragging_ = false;
+        const char* result = pattern->ResetSwipeOffset();
+        // The reset may execute an application callback. Only report the saved decision and offset.
+        TraceSwipeGestureFailure(nodeId, action, "no_list_frame", result, oldOffset);
+        return;
+    }
+    auto listPattern = frameNode->GetPattern<ListPattern>();
+    if (!listPattern) {
+        TraceSwipeGestureFailure(nodeId, action, "invalid_list_pattern", "ignored", oldOffset);
+        return;
+    }
+    if (!listPattern->IsCurrentSwiperItem(weak)) {
+        TraceSwipeGestureFailure(nodeId, action, "not_current", "ignored", oldOffset);
+        return;
+    }
+    if (!pattern->isDragging_) {
+        TraceSwipeGestureFailure(nodeId, action, "not_dragging", "ignored", oldOffset);
+        return;
+    }
+    pattern->HandleDragEndImpl(info, *listPattern);
 }
 
 void ListItemPattern::HandleDragStart(const GestureEvent& info)
@@ -889,9 +970,19 @@ void ListItemPattern::HandleDragUpdate(const GestureEvent& info)
 
 void ListItemPattern::StartSpringMotion(float start, float end, float velocity, bool trigOnFinishEvent)
 {
+    int32_t nodeId = -1;
+    {
+        auto host = GetHost();
+        nodeId = host ? host->GetId() : -1;
+    }
     if (!springController_) {
+        TAG_LOGI(AceLogTag::ACE_LIST, "ListItem:%{public}d spring ignored: no animator, "
+            "start:%{public}f end:%{public}f",
+            nodeId, start, end);
         return;
     }
+    ACE_SCOPED_TRACE("ListItem spring request id:%d animator:%d status:%d start:%f end:%f velocity:%f",
+        nodeId, springController_->GetId(), static_cast<int32_t>(springController_->GetStatus()), start, end, velocity);
     const RefPtr<SpringProperty> DEFAULT_OVER_SPRING_PROPERTY =
         AceType::MakeRefPtr<SpringProperty>(SWIPE_SPRING_MASS, SWIPE_SPRING_STIFFNESS, SWIPE_SPRING_DAMPING);
     if (!springMotion_) {
@@ -1051,9 +1142,21 @@ void ListItemPattern::HandleDragEnd(const GestureEvent& info)
         return;
     }
 
-    auto listPattern = GetListFrameNode()->GetPattern<ListPattern>();
+    auto frameNode = GetListFrameNode();
+    if (!frameNode) {
+        auto host = GetHost();
+        TAG_LOGI(AceLogTag::ACE_LIST, "ListItem:%{public}d HandleDragEnd ignored: no List, offset:%{public}f "
+            "dragging:%{public}d", host ? host->GetId() : -1, curOffset_, isDragging_);
+        return;
+    }
+    auto listPattern = frameNode->GetPattern<ListPattern>();
     CHECK_NULL_VOID(listPattern);
-    listPattern->SetSwiperItemEnd(AceType::WeakClaim(this));
+    HandleDragEndImpl(info, *listPattern);
+}
+
+void ListItemPattern::HandleDragEndImpl(const GestureEvent& info, ListPattern& listPattern)
+{
+    listPattern.SetSwiperItemEnd(AceType::WeakClaim(this));
 
     auto host = GetHost();
     CHECK_NULL_VOID(host);
