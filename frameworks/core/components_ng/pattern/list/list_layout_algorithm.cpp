@@ -94,6 +94,7 @@ static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
     LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache,
     bool allowPlaceholderSubstitution = false)
 {
+    CHECK_NULL_RETURN(layoutWrapper, nullptr);
     const auto& layoutProperty = AceType::DynamicCast<ListLayoutProperty>(layoutWrapper->GetLayoutProperty());
     // Scroll placeholder load observation at the List child build call point: predict before
     // the real builder runs on an unbuilt index and sample its duration afterwards. Observation
