@@ -262,4 +262,41 @@ HWTEST_F(AssetTest, AssetTest08, TestSize.Level1)
     std::vector<RefPtr<Asset>> ret2 = assetManager->GetAssetFromI18n(assetName);
     EXPECT_EQ(ret2.size() == 0, true);
 }
+
+/**
+ * @tc.name: AssetTest09
+ * @tc.desc: Test GetAsset with component_collection.json branch
+ * @tc.type: FUNC
+ */
+HWTEST_F(AssetTest, AssetTest09, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Build a manager without any provider.
+     */
+    auto assetManager = AceType::MakeRefPtr<AssetManagerImpl>();
+
+    /**
+     * @tc.steps: step2. Call GetAsset with component_collection.json.
+     * @tc.expected: step2. Return nullptr and component_collection.json branch is taken.
+     */
+    auto result = assetManager->GetAsset(COMPONENT_COLLECTION_JSON);
+    EXPECT_EQ(result, nullptr);
+
+    /**
+     * @tc.steps: step3. Call GetAsset with an asset name similar to component_collection.json.
+     * @tc.expected: step3. Return nullptr and normal asset name branch is taken.
+     */
+    auto similarResult = assetManager->GetAsset(std::string(COMPONENT_COLLECTION_JSON) + ".bak");
+    EXPECT_EQ(similarResult, nullptr);
+
+    /**
+     * @tc.steps: step4. Call GetAsset with a provider that misses the asset.
+     * @tc.expected: step4. Return nullptr with provider queried.
+     */
+    auto assetProvider = AceType::MakeRefPtr<MockAssetProvider>();
+    EXPECT_CALL(*assetProvider, IsValid()).Times(1).WillOnce(Return(true));
+    assetManager->PushBack(assetProvider);
+    auto providerResult = assetManager->GetAsset(COMPONENT_COLLECTION_JSON);
+    EXPECT_EQ(providerResult, nullptr);
+}
 } // namespace OHOS::Ace

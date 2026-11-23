@@ -615,7 +615,7 @@ bool AceContainer::MaybeRelease()
 {
     CHECK_NULL_RETURN(taskExecutor_, true);
     if (taskExecutor_->WillRunOnCurrentThread(TaskExecutor::TaskType::PLATFORM)) {
-        LOGI("Destroy AceContainer on PLATFORM thread.");
+        LOGD("Destroy AceContainer on PLATFORM thread.");
         return true;
     } else {
         std::lock_guard lock(destructMutex_);
@@ -1733,7 +1733,7 @@ void AceContainer::DestroyContainer(int32_t instanceId, const std::function<void
     // Complete pending tree requests on UI before destroying the pipeline.
     taskExecutor->PostSyncTask(
         [weakContainer = WeakPtr<Container>(container)]() {
-            LOGI("Wait UI thread before destroy...");
+            LOGD("Wait UI thread before destroy...");
             auto owner = weakContainer.Upgrade();
             CHECK_NULL_VOID(owner);
             auto pipeline = AceType::DynamicCast<NG::PipelineContext>(owner->GetPipelineContext());
@@ -1745,8 +1745,21 @@ void AceContainer::DestroyContainer(int32_t instanceId, const std::function<void
     // unregister watchdog before stop thread to avoid UI_BLOCK report
     AceEngine::Get().UnRegisterFromWatchDog(instanceId);
 
-    taskExecutor->PostSyncTask([] { LOGI("Wait UI thread..."); }, TaskExecutor::TaskType::UI, "ArkUIWaitLog");
-    taskExecutor->PostSyncTask([] { LOGI("Wait JS thread..."); }, TaskExecutor::TaskType::JS, "ArkUIWaitLog");
+    bool isFaMode = container->GetFrontendType() == FrontendType::JS;
+    taskExecutor->PostSyncTask(
+        [isFaMode]() {
+            if (isFaMode) {
+                LOGI("Wait UI thread...");
+            }
+        },
+        TaskExecutor::TaskType::UI, "ArkUIWaitLog");
+    taskExecutor->PostSyncTask(
+        [isFaMode] {
+            if (isFaMode) {
+                LOGI("Wait JS thread...");
+            }
+        },
+        TaskExecutor::TaskType::JS, "ArkUIWaitLog");
 
     container->DestroyView(); // Stop all threads(ui,gpu,io) for current ability.
     auto removeContainerTask = [instanceId, destroyCallback] {
@@ -2934,7 +2947,6 @@ void AceContainer::AttachView(std::shared_ptr<Window> window, const RefPtr<AceVi
         auto pipeline = AceType::DynamicCast<NG::PipelineContext>(pipelineContext_);
         UiSessionManager::GetInstance()->SaveTranslateManager(uiTranslateManager, instanceId_);
         if (pipeline) {
-            LOGI("set translateManager to pipeline, instanceId:%{public}d", pipeline->GetInstanceId());
             pipeline->SaveTranslateManager(uiTranslateManager);
         } else {
             LOGE("pipeline invalid,only new ArkUI pipeline support UIsession");
@@ -2952,7 +2964,6 @@ void AceContainer::AttachView(std::shared_ptr<Window> window, const RefPtr<AceVi
     auto pipeline = AceType::DynamicCast<NG::PipelineContext>(pipelineContext_);
     UiSessionManager::GetInstance()->SaveTranslateManager(uiTranslateManager, instanceId_);
     if (pipeline) {
-        LOGI("set translateManager to pipeline, instanceId:%{public}d", pipeline->GetInstanceId());
         pipeline->SaveTranslateManager(uiTranslateManager);
     } else {
         LOGE("pipeline invalid,only new ArkUI pipeline support UIsession");

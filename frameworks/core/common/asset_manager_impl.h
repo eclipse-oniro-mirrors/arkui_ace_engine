@@ -27,6 +27,8 @@
 #include "core/common/asset_mapping.h"
 
 namespace OHOS::Ace {
+constexpr char COMPONENT_COLLECTION_JSON[] = "component_collection.json";
+
 class AssetImpl final : public Asset {
 public:
     AssetImpl(std::unique_ptr<AssetMapping> mapping) : assetMapping_(std::move(mapping)) {};

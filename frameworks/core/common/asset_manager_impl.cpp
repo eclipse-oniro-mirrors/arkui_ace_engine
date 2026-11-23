@@ -65,7 +65,11 @@ RefPtr<Asset> AssetManagerImpl::GetAsset(const std::string& assetName)
         }
     }
 
-    LOGW("GetAsset failed: %{public}s", assetName.c_str());
+    if (assetName == COMPONENT_COLLECTION_JSON) {
+        LOGD("GetAsset failed: %{public}s", assetName.c_str());
+    } else {
+        LOGW("GetAsset failed: %{public}s", assetName.c_str());
+    }
     return nullptr;
 }
 

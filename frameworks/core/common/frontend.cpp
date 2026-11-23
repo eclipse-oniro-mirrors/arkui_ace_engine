@@ -21,14 +21,14 @@ namespace OHOS::Ace {
 Frontend::~Frontend()
 {
     std::lock_guard lock(destructMutex_);
-    LOGI("Frontend destroyed");
+    LOGD("Frontend destroyed");
 }
 
 bool Frontend::MaybeRelease()
 {
     CHECK_NULL_RETURN(taskExecutor_, true);
     if (taskExecutor_->WillRunOnCurrentThread(TaskExecutor::TaskType::JS)) {
-        LOGI("Destroy Frontend on JS thread.");
+        LOGD("Destroy Frontend on JS thread.");
         return true;
     } else {
         std::lock_guard lock(destructMutex_);
@@ -40,12 +40,12 @@ bool Frontend::MaybeRelease()
 std::string Frontend::stateToString(int state)
 {
     static const char* stateMap[7] = {
-        "ON_CREATE",
-        "ON_DESTROY",
-        "ON_SHOW",
-        "ON_HIDE",
-        "ON_ACTIVE",
-        "ON_INACTIVE",
+        "CREATE",
+        "DESTROY",
+        "SHOW",
+        "HIDE",
+        "ACTIVE",
+        "INACTIVE",
         "UNDEFINE",
     };
     return stateMap[state];
