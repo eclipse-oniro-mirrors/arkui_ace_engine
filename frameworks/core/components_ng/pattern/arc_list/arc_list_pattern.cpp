@@ -289,6 +289,9 @@ void ArcListPattern::HandleScrollBarOutBoundary()
         ScrollablePattern::HandleScrollBarOutBoundary(0);
         return;
     }
+    if (itemPosition_.find(centerIndex_) == itemPosition_.end()) {
+        return;
+    }
 
     float overScroll = 0.0f;
     float itemHeight = itemPosition_[centerIndex_].endPos - itemPosition_[centerIndex_].startPos;
@@ -306,6 +309,9 @@ void ArcListPattern::HandleScrollBarOutBoundary()
 float ArcListPattern::GetSnapCenterOverScrollPos(float startPos, float prevScroll)
 {
     float overScroll = prevScroll;
+    if (itemPosition_.find(centerIndex_) == itemPosition_.end()) {
+        return overScroll;
+    }
     float itemHeight = itemPosition_[centerIndex_].endPos - itemPosition_[centerIndex_].startPos;
     float snapSize = ArcListLayoutAlgorithm::GetItemSnapSize();
     float snapHeight = LessOrEqual(itemHeight, snapSize) ? itemHeight : snapSize;

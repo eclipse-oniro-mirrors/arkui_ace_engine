@@ -3054,12 +3054,13 @@ void ListPattern::InitializeFastScrollRequest(int32_t index, ScrollAlign align, 
 
 bool ListPattern::MarkFastScrollVisibleTargetPrepared()
 {
-    const auto& request = *GetFastScrollRequest();
+    const auto* request = GetFastScrollRequest();
+    CHECK_NULL_RETURN(request, false);
     if (!isInitialized_ || prevMeasureBreak_ ||
-        !Positive(contentMainSize_) || !NearZero(request.extraOffset)) {
+        !Positive(contentMainSize_) || !NearZero(request->extraOffset)) {
         return false;
     }
-    auto item = itemPosition_.find(request.index);
+    auto item = itemPosition_.find(request->index);
     if (item == itemPosition_.end() || item->second.isGroup || item->second.isLazyChild) {
         return false;
     }
@@ -3107,15 +3108,16 @@ bool ListPattern::EstimateFastScrollPositions(int32_t firstMeasured, int32_t las
 
 void ListPattern::ResolveFastScrollAlign()
 {
-    auto& request = *GetFastScrollRequest();
-    if (request.align != ScrollAlign::AUTO ||
+    auto* request = GetFastScrollRequest();
+    CHECK_NULL_VOID(request);
+    if (request->align != ScrollAlign::AUTO ||
         GetFastScrollPreparation()->preparation == FastScrollPreparation::NEED_TARGET) {
         return;
     }
-    auto info = posMap_->GetPositionInfo(request.index);
+    auto info = posMap_->GetPositionInfo(request->index);
     float start = info.mainPos - currentOffset_;
     float end = start + info.mainSize;
-    auto iter = itemPosition_.find(request.index);
+    auto iter = itemPosition_.find(request->index);
     if (iter != itemPosition_.end() && (!childrenSize_ || iter->second.isGroup)) {
         start = iter->second.startPos;
         end = iter->second.endPos;
@@ -3123,31 +3125,32 @@ void ListPattern::ResolveFastScrollAlign()
     float target = CalculateTargetPos(start, end);
     float endTarget = 0.0f;
     GetListItemAnimatePos(start, end, ScrollAlign::END, endTarget);
-    request.align = NearEqual(target, endTarget) ? ScrollAlign::END : ScrollAlign::START;
-    if (NearZero(target) && request.align == ScrollAlign::START) {
+    request->align = NearEqual(target, endTarget) ? ScrollAlign::END : ScrollAlign::START;
+    if (NearZero(target) && request->align == ScrollAlign::START) {
         float startTarget = 0.0f;
         GetListItemAnimatePos(start, end, ScrollAlign::START, startTarget);
         // AUTO keeps an already visible item in place; do not reapply extraOffset each frame.
-        request.extraOffset -= startTarget;
+        request->extraOffset -= startTarget;
     }
 }
 
 bool ListPattern::GetFastScrollTargetPosition(float& position) const
 {
-    const auto& target = *GetFastScrollRequest();
-    auto info = posMap_->GetPositionInfo(target.index);
+    const auto* target = GetFastScrollRequest();
+    CHECK_NULL_RETURN(target, false);
+    auto info = posMap_->GetPositionInfo(target->index);
     if (Negative(info.mainSize)) {
         return false;
     }
     float start = info.mainPos - currentOffset_;
     float end = start + info.mainSize;
-    auto iter = itemPosition_.find(target.index);
+    auto iter = itemPosition_.find(target->index);
     if (iter != itemPosition_.end() && (!childrenSize_ || iter->second.isGroup)) {
         start = iter->second.startPos;
         end = iter->second.endPos;
     }
-    GetListItemAnimatePos(start, end, target.align, position);
-    position += target.extraOffset;
+    GetListItemAnimatePos(start, end, target->align, position);
+    position += target->extraOffset;
     if ((Positive(position) && IsAtBottom()) || (Negative(position) && IsAtTop())) {
         position = 0.0f;
     }
@@ -3226,8 +3229,9 @@ void ListPattern::TryStartFastScroll()
 
 void ListPattern::UpdateFastScrollAnimation(float coordinateCorrection)
 {
-    const auto& request = *GetFastScrollRequest();
-    if (!Positive(request.viewportSize) || GetFastScrollPreparation()->preparation != FastScrollPreparation::READY) {
+    const auto* request = GetFastScrollRequest();
+    CHECK_NULL_VOID(request);
+    if (!Positive(request->viewportSize) || GetFastScrollPreparation()->preparation != FastScrollPreparation::READY) {
         return;
     }
     float position = 0.0f;
@@ -3238,8 +3242,8 @@ void ListPattern::UpdateFastScrollAnimation(float coordinateCorrection)
         return;
     }
     if (!NearZero(coordinateCorrection, 0.1f) ||
-        !NearEqual(request.targetOffset, position, 0.1f) ||
-        !NearEqual(request.viewportSize, contentMainSize_)) {
+        !NearEqual(request->targetOffset, position, 0.1f) ||
+        !NearEqual(request->viewportSize, contentMainSize_)) {
         if (HasKnownFastScrollRowMismatch()) {
             return;
         }
@@ -3303,11 +3307,12 @@ void ListPattern::ApplyFastScrollLayoutResult(const RefPtr<ListLayoutAlgorithm>&
 
 void ListPattern::ApplyFastScrollPreparationResult(const RefPtr<ListLayoutAlgorithm>& algorithm)
 {
-    auto& request = *GetFastScrollRequest();
+    auto* request = GetFastScrollRequest();
+    CHECK_NULL_VOID(request);
     const auto* result = algorithm->GetFastScrollMeasureResult();
     CHECK_NULL_VOID(result);
     const auto& measuredPositions = result->measuredSizes;
-    const bool targetMeasured = measuredPositions.count(request.index);
+    const bool targetMeasured = measuredPositions.count(request->index);
     if (result->status == FastScrollMeasureStatus::UNSUPPORTED) {
         GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::UNSUPPORTED;
     } else if (result->status == FastScrollMeasureStatus::COMPLETE) {
@@ -3457,6 +3462,9 @@ bool ListPattern::GetListItemAnimatePos(float startPos, float endPos, ScrollAlig
 bool ListPattern::GetListItemGroupAnimatePosWithoutIndexInGroup(
     int32_t index, float startPos, float endPos, ScrollAlign align, float& targetPos) const
 {
+    if (index < 0) {
+        return false;
+    }
     auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     auto groupWrapper = host->GetChildByIndex(index);
@@ -3509,6 +3517,9 @@ bool ListPattern::GetListItemGroupAnimatePosWithoutIndexInGroup(
 bool ListPattern::GetListItemGroupAnimatePosWithIndexInGroup(
     int32_t index, int32_t indexInGroup, float startPos, ScrollAlign align, float& targetPos) const
 {
+    if (index < 0) {
+        return false;
+    }
     auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     auto groupWrapper = host->GetChildByIndex(index);
