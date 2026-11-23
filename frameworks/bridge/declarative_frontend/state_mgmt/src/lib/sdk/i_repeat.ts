@@ -38,7 +38,13 @@ type OnMoveHandler = (from: number, to: number) => void;
 
 // Repeat creation options (public RepeatOptions API): the cache clean controller is read
 // once when the Repeat is created and cannot be modified afterwards (spec R-8).
-type RepeatOptions = { controller?: RepeatController };
+// allowReuseInAnimation is likewise a creation-time option: whether node reuse is
+// allowed while an implicit animation is running. Explicitly false opts the Repeat out
+// of reuse during implicit animations and switches its direct Grid / WaterFlow parent
+// to the sync-cache-in-layout strategy. Defaults: false when the parent container is a
+// List, true otherwise; leaving it unset preserves each container's default behavior
+// (no value is forwarded to the native side).
+type RepeatOptions = { controller?: RepeatController, allowReuseInAnimation?: boolean };
 
 /*
     global function Repeat()

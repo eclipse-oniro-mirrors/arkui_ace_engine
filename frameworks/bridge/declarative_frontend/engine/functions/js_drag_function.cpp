@@ -168,6 +168,7 @@ void JsDragEvent::JSBind(BindingTarget globalObj)
     JSClass<JsDragEvent>::CustomMethod("setResult", &JsDragEvent::SetResult);
     JSClass<JsDragEvent>::CustomMethod("getResult", &JsDragEvent::GetResult);
     JSClass<JsDragEvent>::CustomMethod("getPreviewRect", &JsDragEvent::GetPreviewRect);
+    JSClass<JsDragEvent>::CustomMethod("setDragWindowVisible", &JsDragEvent::SetDragWindowVisible);
     JSClass<JsDragEvent>::CustomProperty(
         "useCustomDropAnimation", &JsDragEvent::GetUseCustomDropAnimation, &JsDragEvent::SetUseCustomDropAnimation);
     JSClass<JsDragEvent>::CustomProperty(
@@ -466,6 +467,14 @@ void JsDragEvent::SetUseCustomDropAnimation(const JSCallbackInfo& args)
 {
     if (args[0]->IsBoolean()) {
         dragEvent_->UseCustomAnimation(args[0]->ToBoolean());
+    }
+}
+
+void JsDragEvent::SetDragWindowVisible(const JSCallbackInfo& args)
+{
+    CHECK_NULL_VOID(dragEvent_);
+    if (args[0]->IsBoolean()) {
+        dragEvent_->SetDragWindowVisible(args[0]->ToBoolean());
     }
 }
 

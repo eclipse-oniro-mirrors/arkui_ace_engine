@@ -28,6 +28,7 @@ private:
     static void CustomNodeSetBuildFunction(
         ani_env *env, [[maybe_unused]] ani_object aniClass, ani_long ptr,
         ani_fn_object buildFunc, ani_fn_object reloadFunc);
+    static void CustomNodeSetAsyncLoadConfig(ani_env *env, ani_object aniClass, ani_long ptr, ani_string configJson);
     static void CustomNodeAddChild(
         ani_env *env, [[maybe_unused]] ani_object obj, ani_long parent, ani_long child);
     static ani_object CustomNodeCallDefaultMeasure(ani_env *env, [[maybe_unused]] ani_object aniClass, ani_long ptr);

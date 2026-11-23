@@ -77,6 +77,31 @@ ani_boolean RepeatIsImplicitAnimationOpen([[maybe_unused]] ani_env* env, [[maybe
 
     return modifier->getLazyForEachNodeAniModifier()->isImplicitAnimationOpen(lazyNodePtr);
 }
- 
+
+ani_boolean RepeatHasCustomComponent([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object aniClass,
+    ani_long lazyNodePtr)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier) {
+        return ANI_FALSE;
+    }
+
+    return modifier->getLazyForEachNodeAniModifier()->hasCustomComponent(lazyNodePtr);
+}
+
+// forwards RepeatOptions.allowReuseInAnimation (creation-time option) to the node:
+// explicitly false switches the direct Grid / WaterFlow parent of the Repeat to the
+// sync-cache-in-layout strategy while the node is attached
+void RepeatSetAllowReuseInAnimation([[maybe_unused]] ani_env* env, [[maybe_unused]] ani_object aniClass,
+    ani_long lazyNodePtr, ani_boolean allow)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier) {
+        return;
+    }
+
+    modifier->getLazyForEachNodeAniModifier()->setAllowReuseInAnimation(lazyNodePtr, allow);
+}
+
 } // namespace OHOS::Ace::Ani
 #endif // KOALA_PROJECTS_ARKOALA_ARKTS_ARKUI_OHOS_ANI_NATIVE_LAZY_FOR_EACH_MODULE_H

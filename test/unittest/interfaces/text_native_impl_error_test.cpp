@@ -13,13 +13,78 @@
  * limitations under the License.
  */
 
+#include <csignal>
+#include <functional>
+#include <string>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include "gtest/gtest.h"
+#include "interfaces/native/node/config_manager.h"
+#include "native_interface.h"
 #include "node_model.h"
+#include "test/mock/frameworks/base/log/mock_log_wrapper.h"
 #include "text_native_impl.h"
 
 using namespace testing;
 using namespace testing::ext;
 using namespace OHOS::Ace::NodeModel;
+
+namespace {
+constexpr int32_t SELECTION_MENU_CHECK_TYPE_NODE_DISPOSED =
+    static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED);
+
+// Switches the process-wide disposed-node check to the given mode; the fixture
+// TearDown restores DISABLED so later tests in this binary are unaffected.
+void EnableSelectionMenuCheckMode(int32_t mode)
+{
+    ASSERT_TRUE(ConfigManager::SetRuntimeCheckMode(SELECTION_MENU_CHECK_TYPE_NODE_DISPOSED, mode));
+}
+
+void RestoreSelectionMenuCheckMode()
+{
+    EXPECT_TRUE(ConfigManager::SetRuntimeCheckMode(SELECTION_MENU_CHECK_TYPE_NODE_DISPOSED,
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+}
+
+// Asserts one captured diagnostic log carries the three stable fields: the check name
+// NODE_DISPOSED, the given API name and the fixed reason text.
+void AssertSelectionMenuDiagnosticLog(const DiagnosticLog* diag, const char* apiName)
+{
+    ASSERT_NE(diag, nullptr);
+    ASSERT_NE(diag->checkName, nullptr);
+    ASSERT_NE(diag->apiName, nullptr);
+    ASSERT_NE(diag->reason, nullptr);
+    EXPECT_NE(std::string(diag->checkName).find("NODE_DISPOSED"), std::string::npos);
+    EXPECT_NE(std::string(diag->apiName).find(apiName), std::string::npos);
+    EXPECT_NE(std::string(diag->reason).find("Node has been disposed"), std::string::npos);
+}
+
+// Manually forks to verify CRASH mode aborts; EXPECT_DEATH relies on GoogleTest's
+// CapturedStream which creates temp files in /tmp, a directory that may not exist
+// on device environments (e.g. rk3568), causing the test process itself to abort.
+void ExpectAbort(const std::function<void()>& fn)
+{
+    fflush(stdout);
+    fflush(stderr);
+    pid_t pid = fork();
+    if (pid < 0) {
+        ADD_FAILURE() << "fork() failed";
+        return;
+    }
+    if (pid == 0) {
+        fn();
+        _exit(0); // Should never reach here if CRASH mode works correctly
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) != pid) {
+        ADD_FAILURE() << "waitpid() failed";
+        return;
+    }
+    EXPECT_TRUE(WIFSIGNALED(status)) << "expected signal termination, got exit code: " << WEXITSTATUS(status);
+    EXPECT_EQ(WTERMSIG(status), SIGABRT) << "expected SIGABRT, got signal: " << WTERMSIG(status);
+}
+} // namespace
 
 class TextNativeImplErrorTest : public testing::Test {
 public:
@@ -28,6 +93,10 @@ public:
         InitialFullImpl();
     }
     static void TearDownTestCase() {}
+    void TearDown() override
+    {
+        RestoreSelectionMenuCheckMode();
+    }
 };
 
 /**
@@ -807,6 +876,167 @@ HWTEST_F(TextNativeImplErrorTest, TextSelectionMenuOptions_GetContentNode_NullOu
     ASSERT_NE(options, nullptr);
     ArkUI_ErrorCode result = OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, nullptr);
     EXPECT_EQ(result, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_TextSelectionMenuOptions_Dispose(options);
+}
+
+/**
+ * @tc.name: TextNativeImplErrorTest_TextSelectionMenuOptions_DisposedCheck001
+ * @tc.desc: A disposed-style node hits the NODE_DISPOSED guard on both selection-menu
+ *           content node entries in LOG mode: the diagnostic log carries NODE_DISPOSED,
+ *           the API name and the reason; return values and side effects stay identical
+ *           to DISABLED mode; the error message query channel stays free of disposed
+ *           content.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextNativeImplErrorTest, TextSelectionMenuOptions_DisposedCheck001, TestSize.Level1)
+{
+    ArkUI_TextSelectionMenuOptions* options = OH_ArkUI_TextSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+    // Stack-controlled sample: only the magic field drives the disposed-state check.
+    ArkUI_Node disposedNode;
+    disposedNode.uiNodeHandle = nullptr;
+    disposedNode.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    // DISABLED baseline: no diagnosis, return values and side effects unchanged.
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+    ResetDiagnosticLog();
+    ArkUI_NodeHandle getNodeDisabled = nullptr;
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &disposedNode),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, &getNodeDisabled),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(getNodeDisabled, &disposedNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    // LOG mode: each entry diagnoses once and never short-circuits.
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+    ResetDiagnosticLog();
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &disposedNode),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(GetDiagnosticLogCount(), 1);
+    AssertSelectionMenuDiagnosticLog(GetLastDiagnosticLog(), "OH_ArkUI_TextSelectionMenuOptions_SetContentNode");
+
+    ArkUI_NodeHandle getNodeLog = nullptr;
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, &getNodeLog),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(GetDiagnosticLogCount(), 2);
+    AssertSelectionMenuDiagnosticLog(GetLastDiagnosticLog(), "OH_ArkUI_TextSelectionMenuOptions_GetContentNode");
+    // LOG keeps the DISABLED side effect: the stored handle is returned unchanged.
+    EXPECT_EQ(getNodeLog, getNodeDisabled);
+
+    // The error message query channel does not carry disposed content from this check.
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    if (errorMessage != nullptr) {
+        EXPECT_EQ(std::string(errorMessage).find("has been disposed"), std::string::npos);
+    }
+    OH_ArkUI_TextSelectionMenuOptions_Dispose(options);
+}
+
+/**
+ * @tc.name: TextNativeImplErrorTest_TextSelectionMenuOptions_DisposedCheck002
+ * @tc.desc: Valid magic never triggers the guard: LOG/DISABLED/CRASH modes keep identical
+ *           return values on both content node entries for a valid handle and CRASH does
+ *           not terminate the process.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextNativeImplErrorTest, TextSelectionMenuOptions_DisposedCheck002, TestSize.Level1)
+{
+    ArkUI_TextSelectionMenuOptions* options = OH_ArkUI_TextSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+    ArkUI_Node validNode;
+    validNode.uiNodeHandle = nullptr;
+    validNode.magic = ARKUI_NODE_MAGIC_VALID;
+
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+    ResetDiagnosticLog();
+    ArkUI_NodeHandle getNodeLog = nullptr;
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &validNode),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, &getNodeLog),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(getNodeLog, &validNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+    ArkUI_NodeHandle getNodeDisabled = nullptr;
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &validNode),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, &getNodeDisabled),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(getNodeDisabled, &validNode);
+
+    // A valid handle does not trigger the check in CRASH mode either (no termination).
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH));
+    ResetDiagnosticLog();
+    ArkUI_NodeHandle getNodeCrash = nullptr;
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &validNode),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, &getNodeCrash),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(getNodeCrash, &validNode);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+    OH_ArkUI_TextSelectionMenuOptions_Dispose(options);
+}
+
+/**
+ * @tc.name: TextNativeImplErrorTest_TextSelectionMenuOptions_DisposedCheck003
+ * @tc.desc: Null inputs keep the existing parameter-error contracts on both content node
+ *           entries with the check enabled; the entry guard is null-safe and stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextNativeImplErrorTest, TextSelectionMenuOptions_DisposedCheck003, TestSize.Level1)
+{
+    ArkUI_TextSelectionMenuOptions* options = OH_ArkUI_TextSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+    ArkUI_Node node;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+    ArkUI_NodeHandle out = nullptr;
+
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+    ResetDiagnosticLog();
+    EXPECT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(nullptr, &node),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, nullptr),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(nullptr, &out),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, nullptr),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(GetDiagnosticLogCount(), 0);
+    OH_ArkUI_TextSelectionMenuOptions_Dispose(options);
+}
+
+/**
+ * @tc.name: TextNativeImplErrorTest_TextSelectionMenuOptions_DisposedCheck004
+ * @tc.desc: CRASH mode diagnoses and aborts on a disposed-style content node before the
+ *           pointer is stored (Set) or read (Get). Uses manual fork instead of
+ *           EXPECT_DEATH to avoid GoogleTest's CapturedStream which requires /tmp.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextNativeImplErrorTest, TextSelectionMenuOptions_DisposedCheck004, TestSize.Level1)
+{
+    ArkUI_TextSelectionMenuOptions* options = OH_ArkUI_TextSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+    ArkUI_Node disposedNode;
+    disposedNode.uiNodeHandle = nullptr;
+    disposedNode.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    // Pre-store the disposed handle with the check disabled (CRASH mode aborts on Set).
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+    ASSERT_EQ(OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &disposedNode),
+        ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR);
+
+    EnableSelectionMenuCheckMode(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH));
+
+    // CRASH diagnoses and aborts before the stored content pointer is read.
+    ExpectAbort([&]() {
+        ArkUI_NodeHandle out = nullptr;
+        OH_ArkUI_TextSelectionMenuOptions_GetContentNode(options, &out);
+    });
+    // CRASH diagnoses and aborts before the incoming content pointer is stored.
+    ExpectAbort([&]() { OH_ArkUI_TextSelectionMenuOptions_SetContentNode(options, &disposedNode); });
+
+    RestoreSelectionMenuCheckMode();
     OH_ArkUI_TextSelectionMenuOptions_Dispose(options);
 }
 

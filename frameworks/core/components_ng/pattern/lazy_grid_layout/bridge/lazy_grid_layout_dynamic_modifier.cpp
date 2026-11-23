@@ -22,7 +22,7 @@
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/lazy_grid_layout/lazy_grid_layout_model.h"
 #include "core/components_ng/pattern/lazy_grid_layout/lazy_grid_layout_model_static.h"
-#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/scrollable/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_grid_layout/bridge/lazy_grid_layout_custom_modifier.h"
 
 namespace OHOS::Ace::NG {

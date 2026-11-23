@@ -187,10 +187,14 @@ public:
     static const UiMaterial* PreProcessMaterial(const UiMaterial* material);
     static std::shared_ptr<Rosen::Filter> CreateRosenFilter(const ImmersiveMaterialConfig& params);
     static ColorMode GetNodeColorMode(const RefPtr<NG::FrameNode>& node);
+    static std::optional<Color> GetColorByMode(
+        const RefPtr<NG::FrameNode>& node, ColorMode colorMode, uint32_t resId);
     static void RegisterMaterialFunc(const ArkUIMaterialFuncRegistry* registry);
     static void RegisterMaterialFilterFunc(const ArkUIMaterialFilterFuncRegistry* registry);
 
 private:
+    static ColorMode GetFinalColorMode(
+        const std::shared_ptr<ImmersiveOptions>& options, ColorMode nodeColorMode, bool finalInvertColor);
     static bool ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& options, UiMaterialLevel systemLevel,
         UiMaterialTransparency systemTransparency);
     static MaterialState ParseMaterialState(const std::string& value);

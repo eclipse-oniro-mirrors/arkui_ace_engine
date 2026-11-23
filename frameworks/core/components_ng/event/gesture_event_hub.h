@@ -396,6 +396,9 @@ public:
     int32_t RegisterCoordinationListener(const RefPtr<PipelineBase>& context);
     DragDropInfo GetDragDropInfo(const GestureEvent& info, const RefPtr<FrameNode> frameNode,
         DragDropInfo& dragPreviewInfo, const RefPtr<OHOS::Ace::DragEvent>& dragEvent);
+    void ResetStaleDragWindowHideState(const RefPtr<FrameNode>& frameNode);
+    void RecordDragWindowHideOnDragStart(
+        const RefPtr<OHOS::Ace::DragEvent>& dragEvent, const RefPtr<FrameNode>& frameNode);
     RefPtr<UnifiedData> GetUnifiedData(const std::string& frameTag, DragDropInfo& dragDropInfo,
         const RefPtr<OHOS::Ace::DragEvent>& dragEvent);
     std::vector<RefPtr<FrameNode>> ResolveAutoHideTargetsByUniqueId(

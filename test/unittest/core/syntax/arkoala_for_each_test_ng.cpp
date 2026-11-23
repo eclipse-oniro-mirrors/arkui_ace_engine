@@ -16,6 +16,8 @@
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "frameworks/core/components_ng/syntax/arkoala_for_each_node.h"
+#include "core/components_ng/pattern/grid/grid_pattern.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -148,5 +150,166 @@ TEST_F(ArkoalaForEachNodeTest, SetOnMoveTest001)
     forEachNode->FlushUpdateAndMarkDirty();
     forEachNode->SetOnMove(setOnMoveCbFunc);
     forEachNode->SetOnMove(nullptr);
+}
+
+/**
+ * @tc.name: SetAllowReuseInAnimation001
+ * @tc.desc: Test ArkoalaForEachNode SetAllowReuseInAnimation stores the tri-state value
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaForEachNodeTest, SetAllowReuseInAnimation001)
+{
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    EXPECT_NE(repeatNode, nullptr);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+
+    repeatNode->SetAllowReuseInAnimation(false);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.value());
+
+    repeatNode->SetAllowReuseInAnimation(true);
+    ASSERT_TRUE(repeatNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_TRUE(repeatNode->isAllowReuseInAnimation_.value());
+
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(repeatNode->isAllowReuseInAnimation_.has_value());
+}
+
+/**
+ * @tc.name: OnAttachSyncCache001
+ * @tc.desc: Attach/detach holds and releases the sync-cache-in-layout reference on
+ *           Grid/WaterFlow parents for a Repeat-mode ArkoalaForEachNode
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaForEachNodeTest, OnAttachSyncCache001)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    auto waterFlowNode =
+        FrameNode::CreateFrameNode(V2::WATERFLOW_ETS_TAG, GetNextId(), AceType::MakeRefPtr<WaterFlowPattern>());
+    auto waterFlowPattern = waterFlowNode->GetPattern<WaterFlowPattern>();
+    ASSERT_NE(waterFlowPattern, nullptr);
+    waterFlowNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+}
+
+/**
+ * @tc.name: OnAttachSyncCache002
+ * @tc.desc: A ForEach-mode ArkoalaForEachNode never enables the sync-cache-in-layout
+ *           strategy, and neither does a Repeat-mode node with the option unset or true
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaForEachNodeTest, OnAttachSyncCache002)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+
+    // ForEach mode: not qualified even with the option set
+    auto forEachNode = CreateForEachNode(GetNextId());
+    forEachNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(forEachNode);
+    forEachNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(forEachNode->syncCacheHost_.Invalid());
+    forEachNode->OnDetachFromMainTree(false, nullptr);
+
+    // Repeat mode with the option unset keeps the container default
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    gridNode->AddChild(repeatNode);
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+
+    // explicitly true also keeps the container default
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+}
+
+/**
+ * @tc.name: SetAllowReuseInAnimationAttached001
+ * @tc.desc: SetAllowReuseInAnimation on an already-attached Repeat-mode ArkoalaForEachNode
+ *           re-runs the parent toggle: release the sync-cache reference held for the old
+ *           value, register for the new one when it now qualifies
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaForEachNodeTest, SetAllowReuseInAnimationAttached001)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    gridNode->AddChild(repeatNode);
+
+    /**
+     * @tc.steps: step1. Attach with the option unset: the attach-time toggle keeps the
+     *             container default
+     */
+    repeatNode->AttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    /**
+     * @tc.steps: step2. The option arrives after attach and switches the parent while
+     *             attached; setting the same value again is a no-op
+     * @tc.expected: the sync-cache reference is registered for false, kept for a repeat
+     *               set of false
+     */
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    /**
+     * @tc.steps: step3. Switch back to true and to false again while attached
+     * @tc.expected: each transition releases / re-registers the reference
+     */
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(repeatNode->syncCacheHost_.Invalid());
+
+    /**
+     * @tc.steps: step4. Detach releases the reference; later sets have no effect
+     */
+    repeatNode->DetachFromMainTree(false, false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    /**
+     * @tc.steps: step5. ForEach mode never qualifies even when the option arrives attached
+     */
+    auto forEachNode = CreateForEachNode(GetNextId());
+    gridNode->AddChild(forEachNode);
+    forEachNode->AttachToMainTree(false);
+    forEachNode->SetAllowReuseInAnimation(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(forEachNode->syncCacheHost_.Invalid());
+    forEachNode->DetachFromMainTree(false, false);
 }
 } // namespace OHOS::Ace::NG

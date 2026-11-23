@@ -33,6 +33,7 @@ using namespace testing::ext;
 namespace OHOS::Ace {
 
 namespace {
+constexpr size_t MAX_PAGE_INFO_LENGTH_VALUE = 512;
 } // namespace
 
 class ResSchedReportTest : public testing::Test {
@@ -263,6 +264,21 @@ HWTEST_F(ResSchedReportTest, ResSchedReportTest015, TestSize.Level1)
     pageTransitionInfo.toPage = "topage";
     ResSchedReport::GetInstance().HandlePageTransition(pageTransitionInfo, 0);
     EXPECT_FALSE(pageTransitionInfo.fromPage.empty());
+}
+
+/**
+ * @tc.name: ResSchedReportTest016
+ * @tc.desc: test HandlePageTransition truncates oversized fromPage and toPage to 512
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportTest, ResSchedReportTest016, TestSize.Level1)
+{
+    PageTransitionInfo pageTransitionInfo;
+    pageTransitionInfo.fromPage = std::string(MAX_PAGE_INFO_LENGTH_VALUE + 1, 'x');;
+    pageTransitionInfo.toPage = std::string(MAX_PAGE_INFO_LENGTH_VALUE * 3, 'y');
+    ResSchedReport::GetInstance().HandlePageTransition(pageTransitionInfo, 0);
+    EXPECT_FALSE(pageTransitionInfo.fromPage.empty());
+    EXPECT_FALSE(pageTransitionInfo.toPage.empty());
 }
 
 namespace {

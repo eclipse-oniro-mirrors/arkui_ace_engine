@@ -1120,7 +1120,7 @@ void JSNavigation::SetCustomNavContentTransition(const JSCallbackInfo& info)
         JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx, transition);
         auto ret = func->Execute(from, to, operation);
         if (!ret->IsObject()) {
-            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "custom transition is invalid, do default animation");
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "invalid transition, do default anim");
             transition.isValid = false;
             return transition;
         }

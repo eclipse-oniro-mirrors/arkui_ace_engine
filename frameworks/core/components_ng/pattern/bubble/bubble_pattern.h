@@ -321,7 +321,7 @@ public:
     {
         return hostWindowRect_;
     }
-
+    
     void RegisterDoubleBindCallback(const std::function<void(const std::string&)>& callback)
     {
         doubleBindCallback_ = callback;
@@ -433,10 +433,11 @@ public:
         return isUserSetMaterial_;
     }
 
+    NG::RectF GetWindowButtonRect(const RefPtr<FrameNode>& frameNode);
+
     void UpdatePopupTheme(bool colorMode);
     RefPtr<PopupTheme> GetPopupTheme();
     ThemeColorMode GetStyleOptionColorMode();
-    NG::RectF GetWindowButtonRect(const RefPtr<FrameNode>& frameNode);
     void OnRemoveChild(const RefPtr<FrameNode>& node) override;
 
 protected:

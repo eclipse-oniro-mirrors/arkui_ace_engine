@@ -34,70 +34,55 @@ std::mutex XComponentInnerSurfaceController::mutex;
 int32_t XComponentInnerSurfaceController::SetRenderFitBySurfaceId(
     const std::string& surfaceId, RenderFit renderFit, bool isRenderFitNewVersionEnabled)
 {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = nodeMap.find(surfaceId);
-    if (it == nodeMap.end()) {
-        return XCOMPONENT_CONTROLLER_INVALID_PARAMETER;
+    WeakPtr<FrameNode> weakNode;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto it = nodeMap.find(surfaceId);
+        if (it == nodeMap.end()) {
+            return XCOMPONENT_CONTROLLER_INVALID_PARAMETER;
+        }
+        weakNode = it->second;
     }
-    auto weakNode = it->second;
     auto node = weakNode.Upgrade();
     CHECK_NULL_RETURN(node, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto xcPattern = AceType::DynamicCast<XComponentPattern>(node->GetPattern());
-    CHECK_NULL_RETURN(xcPattern, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto renderContext = xcPattern->GetRenderContextForSurface();
-    CHECK_NULL_RETURN(renderContext, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
     auto context = node->GetContextRefPtr();
-    if (context) {
-        auto taskExecutor = context->GetTaskExecutor();
-        if (taskExecutor && !taskExecutor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
-            TAG_LOGW(AceLogTag::ACE_XCOMPONENT,
-                "SetRenderFitBySurfaceId is not called on UI thread, SurfaceId: %{public}s", surfaceId.c_str());
-        }
-    }
-    renderContext->SetRenderFit(renderFit);
-#ifdef ENABLE_ROSEN_BACKEND
-    auto rosenRenderContext = AceType::DynamicCast<NG::RosenRenderContext>(renderContext);
-    CHECK_NULL_RETURN(rosenRenderContext, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    std::shared_ptr<Rosen::RSNode> rsNode = rosenRenderContext->GetRSNode();
-    CHECK_NULL_RETURN(rsNode, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto rsSurfaceNode = rsNode->ReinterpretCastTo<Rosen::RSSurfaceNode>();
-    CHECK_NULL_RETURN(rsSurfaceNode, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "SetRenderFitBySurfaceId, RenderFit: %{public}d, SurfaceId: %{public}s, "
-        "isNewVersion: %{public}d", static_cast<int32_t>(renderFit), surfaceId.c_str(), isRenderFitNewVersionEnabled);
-    rsSurfaceNode->SetFrameGravityNewVersionEnabled(isRenderFitNewVersionEnabled);
-#endif
-    node->MarkNeedRenderOnly();
+    CHECK_NULL_RETURN(context, XCOMPONENT_CONTROLLER_NO_ERROR);
+    auto taskExecutor = context->GetTaskExecutor();
+    CHECK_NULL_RETURN(taskExecutor, XCOMPONENT_CONTROLLER_NO_ERROR);
+    taskExecutor->PostTask(
+        [weakNode, renderFit, isRenderFitNewVersionEnabled]() {
+            auto node = weakNode.Upgrade();
+            CHECK_NULL_VOID(node);
+            auto xcPattern = AceType::DynamicCast<XComponentPattern>(node->GetPattern());
+            CHECK_NULL_VOID(xcPattern);
+            xcPattern->SetSurfaceRenderFit(renderFit, isRenderFitNewVersionEnabled);
+            node->MarkNeedRenderOnly();
+        },
+        TaskExecutor::TaskType::UI, "ArkUIXComponentSetRenderFit");
     return XCOMPONENT_CONTROLLER_NO_ERROR;
 }
 
 int32_t XComponentInnerSurfaceController::GetRenderFitBySurfaceId(
     const std::string& surfaceId, int32_t& renderFitNumber, bool& isRenderFitNewVersionEnabled)
 {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = nodeMap.find(surfaceId);
-    if (it == nodeMap.end()) {
-        return XCOMPONENT_CONTROLLER_INVALID_PARAMETER;
+    WeakPtr<FrameNode> weakNode;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto it = nodeMap.find(surfaceId);
+        if (it == nodeMap.end()) {
+            return XCOMPONENT_CONTROLLER_INVALID_PARAMETER;
+        }
+        weakNode = it->second;
     }
-    auto weakNode = it->second;
     auto node = weakNode.Upgrade();
     CHECK_NULL_RETURN(node, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
     auto xcPattern = AceType::DynamicCast<XComponentPattern>(node->GetPattern());
     CHECK_NULL_RETURN(xcPattern, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto renderContext = xcPattern->GetRenderContextForSurface();
-    CHECK_NULL_RETURN(renderContext, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    RenderFit renderFit = renderContext->GetRenderFit().value_or(RenderFit::RESIZE_FILL);
-    renderFitNumber = static_cast<int32_t>(renderFit);
+    renderFitNumber = static_cast<int32_t>(RenderFit::RESIZE_FILL);
     isRenderFitNewVersionEnabled = false;
-#ifdef ENABLE_ROSEN_BACKEND
-    auto rosenRenderContext = AceType::DynamicCast<NG::RosenRenderContext>(renderContext);
-    CHECK_NULL_RETURN(rosenRenderContext, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    std::shared_ptr<Rosen::RSNode> rsNode = rosenRenderContext->GetRSNode();
-    CHECK_NULL_RETURN(rsNode, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    auto rsSurfaceNode = rsNode->ReinterpretCastTo<Rosen::RSSurfaceNode>();
-    CHECK_NULL_RETURN(rsSurfaceNode, XCOMPONENT_CONTROLLER_INVALID_PARAMETER);
-    isRenderFitNewVersionEnabled = rsSurfaceNode->GetFrameGravityNewVersionEnabled();
-#endif
-    return XCOMPONENT_CONTROLLER_NO_ERROR;
+    return xcPattern->GetSurfaceRenderFit(renderFitNumber, isRenderFitNewVersionEnabled)
+        ? XCOMPONENT_CONTROLLER_NO_ERROR
+        : XCOMPONENT_CONTROLLER_INVALID_PARAMETER;
 }
 
 int32_t XComponentInnerSurfaceController::GetSurfaceRotationBySurfaceId(

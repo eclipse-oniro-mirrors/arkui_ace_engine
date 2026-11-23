@@ -44,14 +44,67 @@ public:
     virtual void SetThresholdType(ThresholdType thresholdType) {}
 };
 
-class RSAnimationTimingProtocol {};
-class RSAnimationTimingCurve {};
+class RSAnimationTimingProtocol {
+public:
+    template<typename... Args>
+    void SetDuration(Args&&...)
+    {}
+    template<typename... Args>
+    void SetRepeatCount(Args&&...)
+    {}
+};
+class RSAnimationTimingCurve {
+public:
+    template<typename... Args>
+    static RSAnimationTimingCurve CreateCubicCurve(Args&&...)
+    {
+        return {};
+    }
+    inline static const int LINEAR = 0;
+};
 
 template<typename T>
-class RSProperty : public RSPropertyBase {};
+class RSProperty : public RSPropertyBase {
+public:
+    RSProperty() = default;
+    explicit RSProperty(const T& value) : value_(value) {}
+    void Set(const T& value)
+    {
+        value_ = value;
+    }
+    T Get() const
+    {
+        return value_;
+    }
+
+private:
+    T value_ {};
+};
 
 template<typename T>
-class RSAnimatableProperty : public RSProperty<T> {};
+class RSAnimatableProperty : public RSProperty<T> {
+public:
+    using RSProperty<T>::RSProperty;
+    bool GetShowingValueAndCancelAnimation()
+    {
+        return true;
+    }
+    void RequestCancelAnimation()
+    {
+        ++cancelAnimationRequestCount_;
+    }
+    size_t GetCancelAnimationRequestCount() const
+    {
+        return cancelAnimationRequestCount_;
+    }
+    T GetStagingValue() const
+    {
+        return this->Get();
+    }
+
+private:
+    size_t cancelAnimationRequestCount_ = 0;
+};
 
 template<typename T>
 class RSAnimatableArithmetic {

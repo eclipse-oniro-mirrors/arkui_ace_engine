@@ -414,6 +414,17 @@ void SetSidebarSectionImpl(Ark_NativePointer node, const Opt_SidebarSection* val
     }
     TabContentModelNG::SetSidebarSection(frameNode, sidebarSection);
 }
+void SetKeepAliveImpl(Ark_NativePointer node, const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    if (!convValue) {
+        TabContentModelNG::SetKeepAlive(frameNode, false);
+        return;
+    }
+    TabContentModelNG::SetKeepAlive(frameNode, *convValue);
+}
 void SetTabBarVisibilityImpl(Ark_NativePointer node,
                              Ark_TabVisibility visibility,
                              const Opt_TabBarDisplayMode* displayMode)
@@ -442,6 +453,7 @@ const GENERATED_ArkUITabContentModifier* GetTabContentModifier()
         TabContentAttributeModifier::SetOnWillShowImpl,
         TabContentAttributeModifier::SetOnWillHideImpl,
         TabContentAttributeModifier::SetSidebarSectionImpl,
+        TabContentAttributeModifier::SetKeepAliveImpl,
         TabContentAttributeModifier::SetTabBarVisibilityImpl,
     };
     return &ArkUITabContentModifierImpl;

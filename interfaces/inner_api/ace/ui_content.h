@@ -22,6 +22,7 @@
 #include <mutex>
 #include <optional>
 #include <refbase.h>
+#include <shared_mutex>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -703,7 +704,7 @@ public:
 
 private:
     static std::atomic<bool> successFlag_;
-    static std::mutex mtx_;
+    static std::shared_mutex mtx_;
     static std::string angleConfigJson_;
     static std::atomic<bool> setUICorrectionConfigSuccessFlag_;
     static std::mutex setUICorrectionConfigMutex_;

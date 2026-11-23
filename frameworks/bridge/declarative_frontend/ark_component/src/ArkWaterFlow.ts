@@ -438,10 +438,71 @@ interface WaterFlowParam {
   footer?: CustomBuilder;
 }
 
+class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | ComponentContent | undefined> {
+  static identity: Symbol = Symbol('waterFlowHeader');
+  constructor(value: CustomBuilder | ComponentContent | undefined) {
+    super(value);
+  }
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetHeader(node);
+    } else {
+      getUINativeModule().waterFlow.setHeader(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return this.stageValue !== this.value;
+  }
+}
+
+class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | ComponentContent | undefined> {
+  static identity: Symbol = Symbol('waterFlowFooter');
+  constructor(value: CustomBuilder | ComponentContent | undefined) {
+    super(value);
+  }
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetFooter(node);
+    } else {
+      getUINativeModule().waterFlow.setFooter(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return this.stageValue !== this.value;
+  }
+}
+
+class WaterFlowStickyModifier extends ModifierWithKey<StickyStyle | undefined> {
+  static identity: Symbol = Symbol('waterFlowSticky');
+  constructor(value: StickyStyle | undefined) {
+    super(value);
+  }
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetSticky(node);
+    } else {
+      getUINativeModule().waterFlow.setSticky(node, this.value);
+    }
+  }
+}
+
 class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements WaterFlowAttribute {
   constructor(nativePtr: KNode, classType?: ModifierType) {
     super(nativePtr, classType);
   }
+  header(value: CustomBuilder | ComponentContent | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
+    return this;
+  }
+  footer(value: CustomBuilder | ComponentContent | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowFooterModifier.identity, WaterFlowFooterModifier, value);
+    return this;
+  }
+  sticky(value: StickyStyle | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowStickyModifier.identity, WaterFlowStickyModifier, value);
+    return this;
+  }
+
   columnsTemplate(value: string | ItemFillPolicy): this {
     modifierWithKey(this._modifiersWithKeys, ColumnsTemplateModifier.identity, ColumnsTemplateModifier, value);
     return this;

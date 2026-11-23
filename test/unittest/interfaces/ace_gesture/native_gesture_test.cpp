@@ -2275,3 +2275,49 @@ HWTEST_F(NativeGestureTest, GestureRecognizerObserverFollowsDisposal, TestSize.L
     gestureApi->dispose(recognizer);
     EXPECT_EQ(OH_ArkUI_GestureInterruptInfo_GetRecognizer(&interruptInfo), nullptr);
 }
+
+/**
+ * @tc.name: SetGestureInterrupterToNodeWithNullInterrupter
+ * @tc.desc: SetGestureInterrupterToNode and SetGestureInterrupterToNodeWithUserData should accept a null
+ *           interrupter callback without crashing. The null check is performed lazily inside the judge
+ *           callback, so registering a null interrupter must still return success.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTest, SetGestureInterrupterToNodeWithNullInterrupter, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto gestureNode = nodeAPI->createNode(ARKUI_NODE_STACK);
+    ASSERT_NE(gestureNode, nullptr);
+
+    auto ret = OHOS::Ace::GestureModel::SetGestureInterrupterToNode(gestureNode, nullptr);
+    EXPECT_EQ(ret, 0);
+
+    void* userData = reinterpret_cast<void*>(new int);
+    ret = OHOS::Ace::GestureModel::SetGestureInterrupterToNodeWithUserData(gestureNode, userData, nullptr);
+    EXPECT_EQ(ret, 0);
+    delete reinterpret_cast<int*>(userData);
+}
+
+/**
+ * @tc.name: SetArkUIGestureRecognizerDisposeNotifyWithNullCallback
+ * @tc.desc: OH_ArkUI_SetArkUIGestureRecognizerDisposeNotify with a null callback must not crash when the
+ *           recognizer is disposed. The null callback is guarded inside the dispose notify lambda.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTest, SetArkUIGestureRecognizerDisposeNotifyWithNullCallback, TestSize.Level1)
+{
+    auto gestureAPI = reinterpret_cast<ArkUI_NativeGestureAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_GESTURE, "ArkUI_NativeGestureAPI_1"));
+    ASSERT_NE(gestureAPI, nullptr);
+    auto panGesture = gestureAPI->createPanGesture(1, GESTURE_DIRECTION_ALL, 5.0);
+    ASSERT_NE(panGesture, nullptr);
+    panGesture->capi = false;
+
+    auto ret = OH_ArkUI_SetArkUIGestureRecognizerDisposeNotify(panGesture, nullptr, nullptr);
+    EXPECT_EQ(ret, 0);
+
+    // dispose triggers the dispose notify lambda; must not dereference the null callback.
+    gestureAPI->dispose(panGesture);
+}

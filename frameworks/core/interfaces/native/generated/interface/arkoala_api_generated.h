@@ -28151,6 +28151,8 @@ typedef struct GENERATED_ArkUITabContentModifier {
                           const Opt_VoidCallback* value);
     void (*setSidebarSection)(Ark_NativePointer node,
                               const Opt_SidebarSection* value);
+    void (*setKeepAlive)(Ark_NativePointer node,
+                         const Opt_Boolean* value);
     void (*setTabBarVisibility)(Ark_NativePointer node,
                                 Ark_TabVisibility visibility,
                                 const Opt_TabBarDisplayMode* displayMode);
@@ -30591,6 +30593,8 @@ typedef struct GENERATED_ArkUIDragEventAccessor {
     Ark_Boolean (*isRemote)(Ark_DragEvent peer);
     Ark_Float64 (*getGlobalDisplayX)(Ark_DragEvent peer);
     Ark_Float64 (*getGlobalDisplayY)(Ark_DragEvent peer);
+    void (*setDragWindowVisible)(Ark_DragEvent peer,
+                                 Ark_Boolean visible);
     Ark_DragBehavior (*getDragBehavior)(Ark_DragEvent peer);
     void (*setDragBehavior)(Ark_DragEvent peer,
                             Ark_DragBehavior dragBehavior);
@@ -30778,7 +30782,8 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getDestroy)();
     void (*destroyPeer)(Ark_FrameNode peer);
     Ark_Boolean (*isModifiable)(Ark_NativePointer peer);
-    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
+    Ark_Boolean (*dispatchInputEvent)(Ark_VMContext vmContext,
+                                      Ark_FrameNode peer,
                                       const Ark_InputEventType* event,
                                       const Opt_CompetitionStrategy* competitionStrategy);
     Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,

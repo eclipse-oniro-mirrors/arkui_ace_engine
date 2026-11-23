@@ -61,6 +61,32 @@ declare class MutableBuilder<Args extends Object[]> {
 }
 // NativeView
 // implemented in C++  for release
+
+// Default timeout of asynchronous loading in ms (API contract, frozen).
+const DEFAULT_ASYNC_LOAD_TIMEOUT_MS: number = 1000;
+// Resolved value for "never force-load" (negative timeout, incl. ±Infinity).
+const ASYNC_LOAD_TIMEOUT_NEVER: number = -1;
+
+/**
+ * Resolves an `options.timeout` into the integer millisecond value the native side
+ * consumes, so the JSON bridge only ever carries a plain int32:
+ *   undefined / NaN                   -> 1000 (framework default)
+ *   any negative (incl. +/-Infinity)  -> -1    (never time out)
+ *   any other number                  -> ceil to whole ms, clamped to int32 max
+ * The sign of the ORIGINAL value picks the semantic tier (never vs immediate), so rounding
+ * applies only to non-negative values: a negative fraction never crosses into the
+ * immediate-timeout tier.
+ */
+function __resolveAsyncLoadTimeoutMs__Internal(timeout?: number): number {
+  if (typeof timeout !== 'number' || Number.isNaN(timeout)) {
+    return DEFAULT_ASYNC_LOAD_TIMEOUT_MS;
+  }
+  if (timeout < 0 || timeout === Number.POSITIVE_INFINITY) {
+    return ASYNC_LOAD_TIMEOUT_NEVER;
+  }
+  return Math.min(2147483647, Math.ceil(timeout));
+}
+
 abstract class PUV2ViewBase extends ViewBuildNodeBase {
 
   public __notifyDecoratedWatch__Internal(_varName: string): void {}
@@ -160,6 +186,14 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
   protected __preRenderedChildren__Internal?: Map<string, PUV2ViewBase>;
   public __isPreRendered__Internal: boolean = false;
   private __customComponentContext__Internal?: CustomComponentContext;
+  private __asyncLoadConfig__Internal?: CustomComponentAsyncLoadOptions;
+  // enableAsyncLoad only takes effect inside the construction window
+  // (constructor body incl. @ComponentInit). Opened when PUV2ViewBase construction
+  // begins; see the constructor for how it is closed.
+  private __asyncLoadWindowOpen__Internal: boolean = false;
+  // The first effective request wins; later calls never rewrite the config
+  // (recorded as a maintainability warning).
+  private __asyncLoadRequested__Internal: boolean = false;
   public __isGlobalPoolActive__Internal : boolean = false;
   static __preRenderCounter__Internal: number = 0;
 
@@ -218,6 +252,15 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     // Read the prototype flag set by @Active/@Inactive decorators
     const hasActiveOrInactiveDecorators: string = '__hasActiveOrInactiveDecorators__Internal';
     this.__needToActiveOrInactiveLifecycle__Internal = this[hasActiveOrInactiveDecorators] === true;
+    // The subclass constructor — whose tail runs @ComponentInit — completes synchronously
+    // after super() returns, and every later callback (aboutToAppear onwards) can only run
+    // after this task yields. Draining the microtask queue therefore closes the
+    // construction window exactly between "subclass constructor done" and the first
+    // lifecycle callback.
+    this.__asyncLoadWindowOpen__Internal = true;
+    Promise.resolve().then(() => {
+      this.__asyncLoadWindowOpen__Internal = false;
+    });
     stateMgmtConsole.debug(`${this.debugInfo__()}: constructor: done`);
   }
 
@@ -436,6 +479,64 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
       return this.nativeViewPartialUpdate.setReusableMemOptStrategy(1);
     }
     return this.nativeViewPartialUpdate.setReusableMemOptStrategy(0);
+  }
+
+  /**
+   * Stores the asynchronous-loading configuration for this component instance and
+   * pushes the native-consumable subset to the C++ side.
+   *
+   * Reached by apps only through the CustomComponentContext returned by
+   * UIUtils.getCustomComponentContext(); framework internal.
+   *
+   * Effective only once, and only inside the construction window:
+   * calls from aboutToAppear onwards are silently ignored, and the first effective
+   * request wins — later calls, even with different options, never rewrite the
+   * configuration (first request wins). The timeout is resolved here so the native
+   * side receives a single integer (design L2→L4 contract); the transported
+   * members are the placeholder id, the resolved timeout and the suggested
+   * placeholder size, stringified per axis (numbers mean vp, unit-suffixed
+   * strings keep their unit; a Resource cannot be serialized and degrades to
+   * "unset" on that axis).
+   */
+  public __enableAsyncLoad__Internal(options?: CustomComponentAsyncLoadOptions): void {
+    if (!this.__asyncLoadWindowOpen__Internal) {
+      // Out-of-window calls are ignored without any observable effect,
+      // but are recorded as a maintainability warning log (hilog).
+      stateMgmtConsole.warn(`${this.debugInfo__()}: enableAsyncLoad ignored: outside the construction window`);
+      return;
+    }
+    if (this.__asyncLoadRequested__Internal) {
+      stateMgmtConsole.warn(`${this.debugInfo__()}: enableAsyncLoad ignored: already requested, first request wins`);
+      return;
+    }
+    this.__asyncLoadRequested__Internal = true;
+    this.__asyncLoadConfig__Internal = options;
+    const payload: Record<string, string | number> = {};
+    const placeholder = options?.placeholder;
+    const placeholderId = placeholder?.id;
+    if (placeholder && (typeof placeholderId !== 'string' || placeholderId === '')) {
+      // A configured placeholder whose id is empty or not a string
+      // degrades to "no placeholder", recorded as a maintainability warning (hilog).
+      stateMgmtConsole.warn(`${this.debugInfo__()}: enableAsyncLoad: placeholder configured but id is ` +
+        `empty or not a string, placeholder ignored`);
+    }
+    if (typeof placeholderId === 'string' && placeholderId !== '') {
+      payload.placeholderId = placeholderId;
+    }
+    const size = placeholder?.size;
+    if (size) {
+      // Stringify keeps the unit: numbers become bare strings meaning vp, suffixed
+      // strings ("100%", "10px") keep their unit; a Resource stringifies unusably
+      // and degrades to "unset" on the native parse side.
+      if (size.width !== undefined) {
+        payload.width = String(size.width);
+      }
+      if (size.height !== undefined) {
+        payload.height = String(size.height);
+      }
+    }
+    payload.timeout = __resolveAsyncLoadTimeoutMs__Internal(options?.timeout);
+    this.nativeViewPartialUpdate.setAsyncLoadConfig(JSON.stringify(payload));
   }
 
   public __setHasStartMemOpt__Internal(hasStartMemOpt: boolean): void {
@@ -1096,6 +1197,9 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
         },
         getDefaultReusePool(): IDefaultReusePool | undefined {
           return PUV2ViewBase.prototype.__getDefaultReusePool__Internal.call(thizz);
+        },
+        enableAsyncLoad: (options?: CustomComponentAsyncLoadOptions): void => {
+          return PUV2ViewBase.prototype.__enableAsyncLoad__Internal.call(thizz, options);
         }
       }))(this);
     }

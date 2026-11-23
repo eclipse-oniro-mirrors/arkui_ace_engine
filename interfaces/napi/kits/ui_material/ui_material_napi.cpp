@@ -20,6 +20,7 @@
 #include "base/thread/task_executor.h"
 #include "core/common/container.h"
 #include "core/common/visual_effect/transparency_utils.h"
+#include "core/components/common/properties/blur_style_option.h"
 #include "core/components/common/properties/ui_material.h"
 
 namespace OHOS::Ace::Napi {
@@ -44,6 +45,7 @@ const char INTERACTIVE_NAME[] = "interactive";
 const char LIGHT_EFFECT_NAME[] = "lightEffect";
 const char LIGHT_EFFECT_COLOR_NAME[] = "color";
 const char COLOR_BLEND_MODE_NAME[] = "colorBlendMode";
+const char COLOR_MODE_NAME[] = "colorMode";
 struct JsEnumInt {
     std::string_view enumName;
     int32_t enumInt;
@@ -226,6 +228,14 @@ ImmersiveOptions UiMaterialNapi::ParseImmersiveOptions(napi_env env, napi_value 
         if (blendMode >= static_cast<int32_t>(MaterialColorBlendMode::LINEAR_MIX) &&
             blendMode <= static_cast<int32_t>(MaterialColorBlendMode::TINTED_GLASS)) {
             options.colorBlendMode = static_cast<MaterialColorBlendMode>(blendMode);
+        }
+    }
+    napi_value napiColorModeParam = GetNamedProperty(env, value, COLOR_MODE_NAME);
+    if (GetValueType(env, napiColorModeParam) == napi_number) {
+        int32_t colorMode = GetCInt32(napiColorModeParam, env);
+        if (colorMode >= static_cast<int32_t>(ThemeColorMode::SYSTEM) &&
+            colorMode <= static_cast<int32_t>(ThemeColorMode::DARK)) {
+            options.userColorMode = static_cast<ThemeColorMode>(colorMode);
         }
     }
     if (CheckIsECStyle(options.style)) {

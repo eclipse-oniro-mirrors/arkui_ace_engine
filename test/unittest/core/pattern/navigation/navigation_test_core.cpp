@@ -95,6 +95,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationStartTest001, TestSiz
         V2::NAVDESTINATION_VIEW_ETS_TAG, 412, AceType::MakeRefPtr<Pattern>(), true);
     ASSERT_NE(navigationNode, nullptr);
     ASSERT_NE(topDestination, nullptr);
+    topDestination->AttachToMainTree();
     auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     ASSERT_NE(mockUiSessionManager, nullptr);
 
@@ -125,6 +126,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopIdentityTest001, T
         V2::NAVIGATION_VIEW_ETS_TAG, 421, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     auto pattern = navigation->GetPattern<NavigationPattern>();
     pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigation->AttachToMainTree();
     auto target = FrameNode::CreateFrameNode(
         V2::NAVDESTINATION_VIEW_ETS_TAG, 422, AceType::MakeRefPtr<Pattern>(), true);
     auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
@@ -160,6 +162,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopFallbackTest001, T
         V2::NAVIGATION_VIEW_ETS_TAG, 423, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     auto pattern = navigation->GetPattern<NavigationPattern>();
     pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigation->AttachToMainTree();
     auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 424, AceType::MakeRefPtr<Pattern>(), true);
     auto home = FrameNode::CreateFrameNode(
         V2::NAVDESTINATION_VIEW_ETS_TAG, 425, AceType::MakeRefPtr<Pattern>(), true);
@@ -203,6 +206,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopFallbackTest002, T
         V2::NAVIGATION_VIEW_ETS_TAG, 426, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     auto pattern = navigation->GetPattern<NavigationPattern>();
     pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigation->AttachToMainTree();
     auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 427, AceType::MakeRefPtr<Pattern>(), true);
     navigation->SetNavBarNode(navBar);
     navigation->SetUseHomeDestination(false);
@@ -237,6 +241,8 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopDestinationFinishT
         V2::NAVDESTINATION_VIEW_ETS_TAG, 429, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     destination->GetPattern<NavDestinationPattern>()->SetNavigationNode(navigation);
     destination->SetInCurrentStack(true);
+    destination->AttachToMainTree();
+    navigation->AttachToMainTree();
     auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     destination->SetSystemTransitionType(NavigationSystemTransitionType::FADE);
     for (auto operation : { NavigationOperation::POP, NavigationOperation::PUSH }) {
@@ -347,6 +353,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationHomeGroupFinishTest00
         V2::NAVDESTINATION_VIEW_ETS_TAG, 454, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     home->GetPattern<NavDestinationPattern>()->SetNavigationNode(navigation);
     home->SetIsHomeDestination(true);
+    navigation->AttachToMainTree();
     auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(1);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, _)).Times(0);
@@ -378,6 +385,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationCustomPopFinishTest00
         V2::NAVIGATION_VIEW_ETS_TAG, 430, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     auto pattern = navigation->GetPattern<NavigationPattern>();
     pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigation->AttachToMainTree();
     auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 431, AceType::MakeRefPtr<Pattern>(), true);
     navigation->SetNavBarNode(navBar);
     navigation->SetUseHomeDestination(false);
@@ -419,6 +427,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopDispatchTest001, T
         V2::NAVIGATION_VIEW_ETS_TAG, 433, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     auto pattern = navigation->GetPattern<NavigationPattern>();
     pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigation->AttachToMainTree();
     auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 434, AceType::MakeRefPtr<Pattern>(), true);
     navigation->SetNavBarNode(navBar);
     navigation->SetUseHomeDestination(false);
@@ -457,6 +466,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationReplaceDispatchTest00
     auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(
         V2::NAVDESTINATION_VIEW_ETS_TAG, 436, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     destination->GetPattern<NavDestinationPattern>()->SetNavigationNode(navigation);
+    destination->AttachToMainTree();
     auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, HasSubstr("\"$ID\":436"))).Times(1);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, HasSubstr("\"$ID\":436"))).Times(1);
@@ -482,6 +492,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationCustomPopExpiredTarge
         V2::NAVIGATION_VIEW_ETS_TAG, 440, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     auto pattern = navigation->GetPattern<NavigationPattern>();
     pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    navigation->AttachToMainTree();
     auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 441, AceType::MakeRefPtr<Pattern>(), true);
     navigation->SetNavBarNode(navBar);
     navigation->SetUseHomeDestination(false);

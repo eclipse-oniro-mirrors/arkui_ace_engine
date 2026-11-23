@@ -1122,7 +1122,6 @@ void BubblePattern::UpdateArrowWidth(const CalcDimension& dimension)
     if (dimension.Value() > 0 && dimension.Unit() != DimensionUnit::PERCENT) {
         popupLayoutProp->UpdateArrowWidth(dimension);
     }
-
     host->MarkModifyDone();
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 }

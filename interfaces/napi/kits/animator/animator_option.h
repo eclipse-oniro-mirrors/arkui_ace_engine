@@ -17,7 +17,9 @@
 #define FOUNDATION_ACE_INTERFACE_INNERKITS_ANIMATOR_OPTION_H
 
 #include <cstdint>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "napi/native_api.h"
@@ -40,9 +42,10 @@ struct AnimatorOption {
 
     std::string ToString() const
     {
-        return "AnimatorOption:[" + std::to_string(duration) + "," + std::to_string(delay) + "," +
-               std::to_string(iterations) + "," + std::to_string(begin) + "," + std::to_string(end) + "," + easing +
-               "," + fill + "," + direction + "]";
+        std::stringstream ss;
+        ss << "option:[" << duration << "," << delay << "," << iterations << "," << std::fixed <<
+            std::setprecision(2) << begin << "," << end << "," << easing << "," << fill << "," << direction << "]";
+        return ss.str();
     }
 };
 

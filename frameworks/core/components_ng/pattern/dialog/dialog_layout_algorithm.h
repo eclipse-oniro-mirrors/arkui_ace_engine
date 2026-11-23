@@ -92,7 +92,7 @@ private:
     bool SetAlignmentSwitchLessThanAPITwelve(const SizeF& maxSize, const SizeF& childSize, OffsetF& topLeftPoint);
     bool IsAlignmentByWholeScreen();
     void CaculateMaxSize(SizeF& maxSize);
-    bool IsDialogTouchingBoundary(OffsetF topLeftPoint, SizeF childSize, SizeF selfSize);
+        bool IsDialogTouchingBoundary(OffsetF topLeftPoint, SizeF childSize, SizeF selfSize);
     void MultipleDialog(const RefPtr<DialogLayoutProperty>& dialogProp, const SizeF& childSize, const SizeF& selfSize,
         const RefPtr<OverlayManager> subOverlayManager, const RefPtr<DialogPattern>& dialogPattern);
     void ProcessMaskRect(std::optional<DimensionRect> maskRect, const RefPtr<FrameNode>& dialog, bool isMask = false);

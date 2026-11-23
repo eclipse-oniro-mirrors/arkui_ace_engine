@@ -59,5 +59,6 @@ function exportComponent() {
 function exportView() {
   globalThis.MenuItemGroup = JSMenuItemGroup;
 }
+
 function loadComponent() {}
 export default { ArkMenuItemGroupComponent, createComponent, exportComponent, exportView, loadComponent };

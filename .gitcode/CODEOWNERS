@@ -117,6 +117,7 @@ adapter/ohos/osal/accessibility/ @ArkUI_ability_group
 adapter/ohos/osal/ace_checker.cpp @arkui_framework_xnode
 adapter/ohos/osal/ace_engine_ext.cpp @ArkUI_Event
 adapter/ohos/osal/ace_trace.cpp @arkui_framework_xnode
+adapter/ohos/osal/agent_input_reporter.cpp @ArkUI_Event
 adapter/ohos/osal/anr_thread.cpp @arkui_framework_xnode
 adapter/ohos/osal/app_bar_helper_impl.cpp @ArkUI_ability_group
 adapter/ohos/osal/background_task_helper_ohos.cpp @arkui_framework_xnode
@@ -707,6 +708,8 @@ frameworks/bridge/declarative_frontend/ark_direct_component/src/arktextclock.ts 
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktextpicker.ts @huawei_g_five
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktoggle.ts @arkuipopupwindow_all
 frameworks/bridge/declarative_frontend/ark_direct_component/src/arktoolbaritem.ts @ArkUI_ability_group
+frameworks/bridge/declarative_frontend/ark_direct_component/src/arktabs.ts @arkui_navigation
+frameworks/bridge/declarative_frontend/ark_direct_component/src/arktabcontent.ts @arkui_navigation
 frameworks/bridge/declarative_frontend/ark_layoutalgorithm/ @arkuilayout1
 frameworks/bridge/declarative_frontend/ark_lazylayoutalgorithm/ @arkuiscroll
 frameworks/bridge/declarative_frontend/ark_mock/ @arkuieco3
@@ -1912,6 +1915,8 @@ frameworks/core/common/task_runners.cpp @arkui_framework_xnode
 frameworks/core/common/task_runners.h @arkui_framework_xnode
 frameworks/core/common/text_field_manager.cpp @huawei_g_five
 frameworks/core/common/text_field_manager.h @huawei_g_five
+frameworks/core/common/text_field_manager_ng.cpp @huawei_g_five
+frameworks/core/common/text_field_manager_ng.h @huawei_g_five
 frameworks/core/common/thread_checker.cpp @arkui_framework_xnode
 frameworks/core/common/thread_checker.h @arkui_framework_xnode
 frameworks/core/common/thread_container.cpp @arkui_framework_xnode
@@ -2466,6 +2471,8 @@ frameworks/core/components_ng/pattern/calendar_picker/ @arkui001
 frameworks/core/components_ng/pattern/canvas/ @arkuilayout1
 frameworks/core/components_ng/pattern/checkbox/ @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/checkboxgroup/ @arkuipopupwindow_all
+frameworks/core/components_ng/pattern/command/ui_command_security_gate.cpp @arkui_framework_xnode
+frameworks/core/components_ng/pattern/command/ui_command_security_gate.h @arkui_framework_xnode
 frameworks/core/components_ng/pattern/common_text/ @huawei_g_five
 frameworks/core/components_ng/pattern/common_view/ @ArkUI_Event
 frameworks/core/components_ng/pattern/container_modal/ @ArkUI_ability_group
@@ -3104,6 +3111,7 @@ interfaces/native/event/ui_input_event_impl.h @ArkUI_Event
 interfaces/native/libace.ndk.json @arkui_architecture
 interfaces/native/native_animate.h @arkuicodepulse
 interfaces/native/native_dialog.h @arkuipopupwindow_all
+interfaces/native/native_material.h @arkuicodepulse
 interfaces/native/native_error_message_macros.h @arkui_framework_xnode
 interfaces/native/native_error_message_wrapper.cpp @arkui_framework_xnode
 interfaces/native/native_error_message_wrapper.h @arkui_framework_xnode
@@ -3756,6 +3764,7 @@ test/unittest/core/pattern/overlay/sheet_popup_test_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_five_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_four_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_ng.cpp @arkuicodepulse
+test/unittest/core/pattern/overlay/sheet_presentation_test_nine_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_seven_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_six_ng.cpp @arkuicodepulse
 test/unittest/core/pattern/overlay/sheet_presentation_test_three_ng.cpp @arkuicodepulse

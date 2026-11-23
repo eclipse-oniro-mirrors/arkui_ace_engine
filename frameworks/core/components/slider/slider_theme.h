@@ -385,7 +385,7 @@ private:
     Dimension insetTrackThickness_;
     Dimension insetHotBlockShadowWidth_;
 
-    // none slider mode
+    //none slider mode
     Dimension noneBlockHotSize_;
     Dimension noneTrackThickness_;
 

@@ -29,6 +29,7 @@ namespace OHOS::Ace::NG {
 class FrameNode;
 class OverlayManager;
 class SheetObject;
+class SheetTheme;
 
 struct ArkUISheetPatternInnerModifier {
     void (*sheetInteractiveDismiss)(const RefPtr<FrameNode>& sheetNode, BindSheetDismissReason reason);
@@ -115,6 +116,8 @@ struct ArkUISheetPatternInnerModifier {
         bool isPartialUpdate);
     void (*sheetUpdateSheetScrollBar)(const RefPtr<FrameNode>& sheetPageNode, const SheetStyle& sheetStyle);
     bool (*sheetIsOnDisappearing)(const RefPtr<FrameNode>& sheetNode);
+    void (*sheetUpdateBackgroundColorIfNoMaterialColor)(const RefPtr<FrameNode>& sheetNode,
+        const SheetStyle& sheetStyle, const RefPtr<SheetTheme>& sheetTheme);
 };
 
 namespace InnerModifier {

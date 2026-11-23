@@ -40,7 +40,7 @@ void ImagePerfPreview::EndRecordImageLoadStat(
         id, imageType.c_str(), size.first, size.second, state);
 }
 
-void ImagePerfPreview::AddLoadComponent(int32_t nodeId)
+void ImagePerfPreview::AddLoadComponent(int32_t nodeId, int32_t sourceType, bool isVisible)
 {
 }
 
@@ -48,7 +48,11 @@ void ImagePerfPreview::DeleteLoadComponent(int32_t nodeId)
 {
 }
 
-void ImagePerfPreview::CompleteLoadComponent(int32_t nodeId)
+void ImagePerfPreview::CompleteLoadComponent(int32_t nodeId, bool isVisible)
+{
+}
+
+void ImagePerfPreview::AttachComponent(int32_t nodeId)
 {
 }
 } // namespace OHOS::Ace

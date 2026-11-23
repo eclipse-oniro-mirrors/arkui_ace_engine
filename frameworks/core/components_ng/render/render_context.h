@@ -683,6 +683,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, SystemBarEffect, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FrontHueRotate, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FrontColorBlend, Color);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FrontColorFilterEffect, std::vector<float>);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, LinearGradientBlur, NG::LinearGradientBlurPara);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, Magnifier, MagnifierParams);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, DynamicLightUpRate, float);
@@ -1123,6 +1124,7 @@ protected:
     virtual void OnSystemBarEffectUpdate(bool systemBarEffect) {}
     virtual void OnFrontHueRotateUpdate(float value) {}
     virtual void OnFrontColorBlendUpdate(const Color& value) {}
+    virtual void OnFrontColorFilterEffectUpdate(const std::vector<float>& matrix) {}
     virtual void OnLinearGradientBlurUpdate(const NG::LinearGradientBlurPara& blurPara) {}
     virtual void OnMagnifierUpdate(const MagnifierParams& magnifierParams) {}
     virtual void OnDynamicLightUpRateUpdate(const float rate) {}

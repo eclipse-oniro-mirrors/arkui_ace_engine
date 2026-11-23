@@ -43,6 +43,7 @@ public:
     static void IsImplicitAnimationOpen(const JSCallbackInfo& info);
     static void IsChildInAnimation(const JSCallbackInfo& info);
     static void IsChildOnMainTree(const JSCallbackInfo& info);
+    static void SetAllowReuseInAnimation(const JSCallbackInfo& info);
 };
 
 } // namespace OHOS::Ace::Framework

@@ -27,6 +27,7 @@
 namespace OHOS::Ace::NG {
 
 class LazyLayoutPattern;
+class StickyHeaderPattern;
 
 // Ancestor WaterFlow + whether the path crosses a FlowItem (a path through FlowItem makes the WaterFlow's
 // lane count irrelevant to the lazy contract).
@@ -74,6 +75,8 @@ struct ACE_FORCE_EXPORT LazyLayoutUtils {
         const std::vector<std::string>& extraAllowedTags = {});
     // Find the first LazyLayoutPattern through a proxy chain whose FrameNodes were explicitly marked as
     // participating in lazy layout. Ordinary wrapper/content FrameNodes are traversal boundaries.
+    // Resolve sticky sections without publishing or consuming a lazy-layout request.
+    static RefPtr<StickyHeaderPattern> GetStickyHeaderPattern(const RefPtr<UINode>& node);
     static RefPtr<LazyLayoutPattern> GetLazyLayoutPattern(const RefPtr<UINode>& node);
 
     // Called after Measure: unchanged geometry and GONE are valid; deferred/pre-make measurement is not.

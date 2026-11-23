@@ -18,6 +18,7 @@ import { uiUtils } from './base/uiUtilsImpl';
 import { MonitorFunctionDecorator } from './decoratorImpl/decoratorMonitor';
 import { ExtendableComponent } from '@component/extendableComponent';
 import { BusinessError } from '@ohos.base';
+import { PlaceholderOptions } from '@ohos.arkui.placeholderRegister';
 import { canBeObserved as canBeObservedImpl } from './tools/stateMgmtDFX';
 import { CustomComponentV2, CustomComponentLifecycle, CustomComponentContextImpl } from '@component/customComponent';
 import {
@@ -421,6 +422,64 @@ export interface CustomComponentContext {
     registerActiveAndInactiveCallback(active?: ActiveAndInactiveCallbackType,
       inactive?: ActiveAndInactiveCallbackType): void;
 
+    /**
+     * Enables asynchronous loading of this custom component. The framework builds
+     * the component's content in a subsequent frame (or when idle) instead of the
+     * current one, so a heavy component no longer blocks the first build of its
+     * siblings during the same frame.
+     *
+     * Effective only once per component instance, and only when called inside the
+     * component's construction window (the constructor body, including the
+     * @ComponentInit-decorated method). Calls at any later time are ignored; among
+     * effective calls the first one wins and later calls never rewrite the
+     * configuration.
+     *
+     * @param { CustomComponentAsyncLoadOptions } [options] - Configuration of asynchronous loading. The default value
+     *     **undefined** indicates that no placeholder is displayed before loading completes and the default timeout
+     *     (**1000** ms) is used.
+     * @syscap SystemCapability.ArkUI.ArkUI.Full
+     * @stagemodelonly
+     * @since 26.1.0 static
+     */
+    enableAsyncLoad(options?: CustomComponentAsyncLoadOptions): void;
+
+}
+
+/**
+ * CustomComponentAsyncLoadOptions is the configuration of asynchronous loading of a custom component.
+ *
+ * @syscap SystemCapability.ArkUI.ArkUI.Full
+ * @stagemodelonly
+ * @since 26.1.0 static
+ */
+export interface CustomComponentAsyncLoadOptions {
+    /**
+     * Placeholder displayed while the custom component is being loaded asynchronously. The value is a
+     * PlaceholderOptions object: **id** refers to a template registered through the placeholder register,
+     * and **size** is a layout suggestion of the SizeOptions type. When set, it acts as the placeholder
+     * root's ideal size during measurement (per axis a number means vp, a unit-suffixed string keeps its
+     * unit; a Resource degrades to "unset"); an unset axis keeps the placeholder template's own layout.
+     *
+     * If **placeholder** is not configured, or its **id** is empty or not registered, no placeholder is
+     * displayed before asynchronous loading completes.
+     *
+     * @syscap SystemCapability.ArkUI.ArkUI.Full
+     * @stagemodelonly
+     * @since 26.1.0 static
+     */
+    placeholder?: PlaceholderOptions;
+
+    /**
+     * Timeout threshold of asynchronous loading, in ms. A **positive** value forces the loading after the
+     * specified duration; **0** forces the loading in the following frames without further waiting; a
+     * **negative** value means never forcing the loading. The default value **undefined** means the
+     * default timeout of **1000** ms.
+     *
+     * @syscap SystemCapability.ArkUI.ArkUI.Full
+     * @stagemodelonly
+     * @since 26.1.0 static
+     */
+    timeout?: int;
 }
 
 /**

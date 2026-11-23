@@ -609,6 +609,7 @@ public:
     static void JsBlendMode(const JSCallbackInfo& info);
     static void JsAdvancedBlendMode(const JSCallbackInfo& info);
     static void JsGrayScale(const JSCallbackInfo& info);
+    static void JsColorFilterEffect(const JSCallbackInfo& info);
     static void JsBrightness(const JSCallbackInfo& info);
     static void JsContrast(const JSCallbackInfo& info);
     static void JsSaturate(const JSCallbackInfo& info);

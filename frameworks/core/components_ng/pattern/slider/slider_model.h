@@ -71,7 +71,7 @@ public:
         END,
         CLICK,
     };
-
+    
     class SliderValidRange final : public AceType {
     public:
         SliderValidRange() = default;

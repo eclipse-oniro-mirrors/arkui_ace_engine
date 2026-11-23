@@ -17,8 +17,10 @@
 
 #include <gmock/gmock.h>
 
+#include "core/components_ng/base/scroll_viewport_coordinator.h"
 #include "core/common/thp_extra_manager.h"
 #include "mock_pipeline_context.h"
+#include "core/pipeline_ng/async_load_scheduler.h"
 
 #include "base/memory/ace_type.h"
 #include "core/common/ai/ai_write_adapter.h"
@@ -369,6 +371,36 @@ const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceh
         scrollPlaceholderManager_->SetPipelineContext(WeakClaim(this));
     }
     return scrollPlaceholderManager_;
+}
+
+void PipelineContext::RegisterAsyncLoadIdleEntry(const WeakPtr<UINode>& node)
+{
+    // Test mock: the scheduler's idle set is driven by timestamps and OnIdle/
+    // FlushAsyncLoadTask callbacks that the mock harness does not pump; entries
+    // only need to register without crashing so CustomNode paths stay testable.
+}
+
+void PipelineContext::RemoveAsyncLoadIdleEntry(const WeakPtr<UINode>& node) {}
+
+// Unit-test link units include the pattern archive (custom_node_base.o calls
+// InBuildScope) without the pipeline target, so the real definitions in
+// async_load_scheduler.cpp are absent. Provide storage and functional
+// definitions here — identical semantics, so the suppression UTs stay green.
+thread_local int32_t AsyncLoadScheduler::buildScopeDepth_ = 0;
+
+void AsyncLoadScheduler::EnterBuildScope()
+{
+    ++buildScopeDepth_;
+}
+
+void AsyncLoadScheduler::ExitBuildScope()
+{
+    --buildScopeDepth_;
+}
+
+bool AsyncLoadScheduler::InBuildScope()
+{
+    return buildScopeDepth_ > 0;
 }
 
 float PipelineContext::GetCurrentRootWidth()
@@ -1006,6 +1038,14 @@ void PipelineContext::AddBuildFinishCallBack(std::function<void()>&& callback)
 void PipelineContext::AddPredictTask(PredictTask&& task)
 {
     predictTasks_.emplace_back(task);
+}
+
+RefPtr<ScrollViewportCoordinator> PipelineContext::GetScrollViewportCoordinator()
+{
+    if (!scrollViewportCoordinator_) {
+        scrollViewportCoordinator_ = MakeRefPtr<ScrollViewportCoordinator>();
+    }
+    return scrollViewportCoordinator_;
 }
 
 void PipelineContext::AddAfterLayoutTask(std::function<void()>&& task, bool isFlushInImplicitAnimationTask)

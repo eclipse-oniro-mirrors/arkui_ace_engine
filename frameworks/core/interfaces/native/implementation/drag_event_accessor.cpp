@@ -252,6 +252,12 @@ Ark_Float64 GetGlobalDisplayYImpl(Ark_DragEvent peer)
     const auto value = PipelineBase::Px2VpWithCurrentDensity(peer->dragInfo->GetGlobalDisplayY());
     return Converter::ArkValue<Ark_Float64>(value);
 }
+void SetDragWindowVisibleImpl(Ark_DragEvent peer, Ark_Boolean visible)
+{
+    CHECK_NULL_VOID(peer);
+    CHECK_NULL_VOID(peer->dragInfo);
+    peer->dragInfo->SetDragWindowVisible(Convert<bool>(visible));
+}
 Ark_DragBehavior GetDragBehaviorImpl(Ark_DragEvent peer)
 {
     auto defaultReturn = ArkValue<Ark_DragBehavior>(DragBehavior::MOVE);
@@ -374,6 +380,7 @@ const GENERATED_ArkUIDragEventAccessor* GetDragEventAccessor()
         DragEventAccessor::IsRemoteImpl,
         DragEventAccessor::GetGlobalDisplayXImpl,
         DragEventAccessor::GetGlobalDisplayYImpl,
+        DragEventAccessor::SetDragWindowVisibleImpl,
         DragEventAccessor::GetDragBehaviorImpl,
         DragEventAccessor::SetDragBehaviorImpl,
         DragEventAccessor::GetUseCustomDropAnimationImpl,

@@ -68,6 +68,10 @@ struct RepeatRidNodeInfo {
     WeakPtr<UINode> rootNode;
     WeakPtr<UINode> syntaxNode;
     bool isActive;
+    // last L1 index of the node (original index space), recorded while the node stays
+    // in L1; consumed once the node drops out of L1 to decide whether deactivation
+    // may wait for a transition out, see ArkoalaLazyNode::SetNodeInactive
+    std::optional<int32_t> prevL1Index;
 };
 
 /**
@@ -85,14 +89,14 @@ public:
     using CreateItemCb = std::function<RefPtr<UINode>(int32_t, bool)>;
     using UpdateRangeCb = std::function<void(int32_t, int32_t, int32_t, int32_t, bool)>;
     using ClearCacheCb = std::function<void()>;
-    using releaseItemByIndexCb = std::function<void(int32_t)>;
+    using ReleaseItemByIndexCb = std::function<void(int32_t)>;
 
     void SetTotalCount(int32_t value)
     {
         totalCount_ = value;
     }
 
-    void SetCallbacks(CreateItemCb create, UpdateRangeCb update, ClearCacheCb clearer, releaseItemByIndexCb release)
+    void SetCallbacks(CreateItemCb create, UpdateRangeCb update, ClearCacheCb clearer, ReleaseItemByIndexCb release)
     {
         createItem_ = std::move(create);
         updateRange_ = std::move(update);
@@ -110,6 +114,9 @@ public:
     bool IsChildOnMainTree(int32_t rid);
     bool IsAllowAnimation();
     bool IsImplicitAnimationOpen();
+    // Whether any currently built item subtree contains a custom component root
+    // (a JsView-tagged node, created by the frontend for each struct component).
+    bool HasCustomComponent();
 
     RefPtr<UINode> GetFrameChildByIndex(uint32_t index, bool needBuild, bool isCache, bool addToRenderTree) override;
 
@@ -138,6 +145,18 @@ public:
     {
         isLoop_ = isLoop;
     }
+
+    void OnAttachToMainTree(bool recursive) override;
+    void OnDetachFromMainTree(bool recursive, PipelineContext* context = nullptr) override;
+
+    /**
+     * tri-state reuse-in-animation permission (effective in Repeat mode only).
+     * Explicitly false opts this node out of reuse during implicit animations and
+     * switches the direct Grid / WaterFlow parent to the sync-cache-in-layout mode
+     * while attached; nullopt / true keep the default behavior.
+     * See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void SetAllowReuseInAnimation(std::optional<bool> allow);
 
     void SetOptions(LazyForEachOptions options)
     {
@@ -203,12 +222,47 @@ public:
     void PostMemOptTask();
 
     void SetRepeatMemoryOptimizationStrategy(int32_t strategy);
+    void ClearCacheAfterAnimation();
 
 private:
     RefPtr<UINode> GetFrameChildByIndexImpl(int32_t index, bool needBuild, bool isCache, bool addToRenderTree);
+    // Returns the L1 child at index, building it through createItem_ when allowed;
+    // nullptr when the child neither exists nor can be built.
+    RefPtr<UINode> GetOrCreateL1Child(int32_t index, bool needBuild, bool isCache);
     void RebuildCache();
+    // Last L1 index recorded for the rid of node's child (nullopt when unknown); read
+    // during a rebuild before the rid bookkeeping in RebuildCache refreshes it.
+    std::optional<int32_t> GetPrevL1IndexOfNode(const RefPtr<UINode>& node) const;
+    // Remove node4Index_ entries other than index that already hold the real item
+    // of child (the first child of child, the rid node): the frontend reuse pool
+    // can return the same real item for a different index (same-template cross-key
+    // reuse, or a recycled elmtId), which wrapper-identity dedup cannot see, so
+    // node4Index_ would map one item under two indices and RebuildCache would
+    // deactivate a still-visible node through the out-of-active-range one.
+    // Called right before mapping child at index, so the following Put makes
+    // index the only mapping of the item.
+    void RemoveDuplicatedItem(const RefPtr<UINode>& child, int32_t index);
     bool IsInActiveRange(int32_t index, const ActiveRangeParam& param) const;
     bool IsInCacheRange(int32_t index, const ActiveRangeParam& param) const;
+
+    // Set the node inactive. SetActive(false) is deferred via
+    // NeedSetInActiveAfterTransitionOut only when all conditions hold:
+    // 1. an implicit animation is currently running;
+    // 2. the node is about to be removed from the render tree, i.e. the caller
+    //    calls OnRemoveFromParent on it right after;
+    // 3. the last L1 index of the node (RepeatRidNodeInfo::prevL1Index, recorded
+    //    before a rerender replaces the index mapping) is inside the previous
+    //    active range (prevActiveRangeParam_), the range in effect while the node
+    //    was last on screen, so removing the node runs a transition out that
+    //    finishes and calls SetInActiveAfterTransitionOut.
+    // Otherwise SetActive(false) is applied immediately.
+    // A pending deferred flag is cancelled when the node is reactivated or returns
+    // to the render tree (RebuildCache / GetChild), so a transition out finishing
+    // later cannot deactivate a node that is visible again.
+    // Same mechanism as RepeatVirtualScroll2Node::SetFrameNodeInactive.
+    void SetNodeInactive(const RefPtr<UINode>& node, bool removeFromTree,
+        const std::optional<int32_t>& oldIndex);
+
     // Memory-optimization retention cap, mirroring LazyForEachBuilder::ReduceCacheCount
     // (lazy_for_each_builder.cpp): clearAll -> 0; low-DDR device -> 0; otherwise 2.
     static int32_t GetMaxCacheCountForMemOpt(bool clearAll);
@@ -264,11 +318,21 @@ private:
 
     // false if in LazyForEach, true if in Repeat
     bool isRepeat_ = false;
+    // tri-state reuse-in-animation permission (Repeat mode only); explicitly false
+    // switches the direct Grid / WaterFlow parent to the sync-cache-in-layout mode
+    // while attached
+    std::optional<bool> isAllowReuseInAnimation_;
+    // Grid / WaterFlow frame node holding this node's sync-cache-in-layout reference
+    WeakPtr<FrameNode> syncCacheHost_;
     // ArkoalaLazyNode is not instance of FrameNode, needs to propagate active state to all items inside
     bool isActive_ = true;
     // true if in Swiper loop mode
     bool isLoop_ = false;
     ActiveRangeParam activeRangeParam_ = { -1, -1, -1, -1 };
+    // range of the previous DoSetActiveChildRange run, recorded before
+    // activeRangeParam_ gets replaced; read by SetNodeInactive to evaluate a
+    // node's last L1 index against the range in effect while it was on screen
+    ActiveRangeParam prevActiveRangeParam_ = { -1, -1, -1, -1 };
     // true if parent isn't scroll container
     bool needBuildAll_ = true;
 
@@ -280,7 +344,7 @@ private:
     CreateItemCb createItem_;
     UpdateRangeCb updateRange_;
     ClearCacheCb clearCache_;
-    releaseItemByIndexCb releaseItemByIndex_;
+    ReleaseItemByIndexCb releaseItemByIndex_;
     int32_t totalCount_ = 0;
 
     // re-assembled by GetChildren called from idle task
@@ -305,6 +369,9 @@ private:
     bool needPreBuild_ = false;
     int64_t cacheTaskPostTime_ = 0;
     int64_t setActiveRangeTime_ = 0;
+
+    bool hasCustomComponent_ = false;
+    bool needClearCacheAfterAnimation_ = false;
 
     RepeatMemoryOptimizationStrategy repeatMemoryOptimizationStrategy_ =
       RepeatMemoryOptimizationStrategy::DEFAULT;

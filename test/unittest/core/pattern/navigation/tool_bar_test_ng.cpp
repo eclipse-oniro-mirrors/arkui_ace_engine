@@ -1877,7 +1877,7 @@ HWTEST_F(ToolBarTestNg, UpdateBackgroundStyleMultiThread, TestSize.Level1)
 HWTEST_F(ToolBarTestNg, NavToolbarOnThemeScopeUpdateHostNull001, TestSize.Level1)
 {
     auto frameNode = FrameNode::CreateFrameNode("BackButton", ElementRegister::GetInstance()->MakeUniqueId(),
-        []() { return AceType::MakeRefPtr<NavToolbarPattern>(); });
+        []() { return AceType::MakeRefPtr<NavToolbarPattern>(); }());
     ASSERT_NE(frameNode, nullptr);
     auto navToolbarPattern = frameNode->GetPattern<NavToolbarPattern>();
     ASSERT_NE(navToolbarPattern, nullptr);

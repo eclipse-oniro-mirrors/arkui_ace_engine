@@ -33,7 +33,9 @@ import { Theme } from '@ohos/arkui/theme';
 import { DecoratedVariableBase } from '../stateManagement/decoratorImpl/decoratorBase';
 import { IDecoratorBaseRegistry } from '../stateManagement/decorator';
 import { IEnvironmentValueBase, IEnvVariable, EnvDecoratedVariable } from '../stateManagement/decoratorImpl/decoratorEnv';
-import { ActiveAndInactiveCallbackType, CustomComponentContext } from '../stateManagement/utils';
+import { ActiveAndInactiveCallbackType, CustomComponentAsyncLoadOptions,
+    CustomComponentContext } from '../stateManagement/utils';
+import { ArkUIAniCustomNodeModule } from "arkui.ani";
 import { CustomComponentContextImpl } from './customComponent.ets';
 import { ObserveSingleton } from '../stateManagement/base/observeSingleton';
 import { ExtendableComponentDFX } from './extendableComponentDFX';
@@ -44,6 +46,26 @@ export class ExtendableComponentInternal {
     public static fromPtr(ptr: KPointer): ExtendableComponent {
         throw new Error("TBD");
     }
+}
+
+// Resolved asynchronous-loading configuration stored after an effective
+// enableAsyncLoad request and pushed to the native node on every attach
+// (timeout already resolved; '' means "no placeholder"/"unset axis").
+// JSON payload delivered over the ani bridge — the same format the dynamic
+// bridge carries, so the native parsing is shared. Optional/empty members are
+// omitted to keep "unset" distinguishable from "set to empty".
+interface AsyncLoadDeliveryPayload {
+    timeout: int;
+    placeholderId?: string;
+    width?: string;
+    height?: string;
+}
+
+interface AsyncLoadResolvedConfig {
+    timeoutMs: int;
+    placeholderId?: string;
+    sizeWidth: string;
+    sizeHeight: string;
 }
 
 export interface LifeCycle {
@@ -126,6 +148,16 @@ export abstract class ExtendableComponent implements LifeCycle, IVariableOwner {
     private providedVars_: Map<string, IProvideDecoratedVariable<object>> = new Map<string, IProvideDecoratedVariable<object>>();
     private providedVarsV2_: Map<string, IProviderDecoratedVariable<object>> = new Map<string, IProviderDecoratedVariable<object>>();
     private delegate_?: IExtendableComponent;
+    // Resolved asynchronous-loading configuration (resolved timeout and
+    // placeholder id) once an effective enableAsyncLoad request has been made.
+    // Persisted for the whole instance lifetime so that every (re-)attach of the
+    // component pushes the configuration to the freshly created native node,
+    // mirroring the dynamic side where the config lives on the JS view and is
+    // re-read on every native node creation.
+    private __asyncLoadConfig__Internal?: AsyncLoadResolvedConfig;
+    // True once the first effective enableAsyncLoad request has been accepted
+    // (first request wins; later requests never rewrite).
+    private __asyncLoadRequested__Internal: boolean = false;
     private localStoragebackStore_?: LocalStorage | undefined = undefined;
     private backLocalStorage_?: LocalStorage | undefined = undefined;
     private useSharedStorage_?: boolean | undefined = undefined;
@@ -627,6 +659,131 @@ export abstract class ExtendableComponent implements LifeCycle, IVariableOwner {
     
     __getPeerNode__Internal(): PeerNode | undefined {
         return this.delegate_?.getPeerNode();
+    }
+
+    // Default timeout of asynchronous loading in ms (API contract, frozen).
+    private static readonly ASYNC_LOAD_DEFAULT_TIMEOUT_MS: int = 1000;
+    // Resolved value for "never force-load" (negative timeout).
+    private static readonly ASYNC_LOAD_TIMEOUT_NEVER: int = -1;
+
+    /**
+     * Resolves an `options.timeout` into the integer millisecond value the native
+     * side consumes, so the bridge only ever carries a plain int32. The option is
+     * typed `int` (a 32-bit domain), so only undefined and the sign apply here; the
+     * dynamic-side resolver additionally guards NaN / +/-Infinity / fractions and
+     * clamps out-of-int32 values, none of which an int can carry:
+     *   undefined   -> 1000 (framework default)
+     *   negative    -> -1   (never time out)
+     *   otherwise   -> used as is
+     */
+    private static __resolveAsyncLoadTimeoutMs__Internal(timeout?: int): int {
+        if (timeout === undefined) {
+            return ExtendableComponent.ASYNC_LOAD_DEFAULT_TIMEOUT_MS;
+        }
+        if (timeout < 0) {
+            return ExtendableComponent.ASYNC_LOAD_TIMEOUT_NEVER;
+        }
+        return timeout;
+    }
+
+    /**
+     * Stores the asynchronous-loading configuration for this component instance.
+     *
+     * Reached by apps only through the CustomComponentContext returned by
+     * UIUtils.getCustomComponentContext(); framework internal.
+     *
+     * Effective only once, and only inside the construction window:
+     * on the static paradigm the window is bounded by the delegate being set —
+     * the user constructor (including the @ComponentInit-decorated method) runs
+     * before the framework creates the CustomDelegate, everything afterwards is
+     * out of window and ignored. The first effective request wins — later calls,
+     * even with different options, never rewrite the configuration (first request wins).
+     *
+     * Unlike the dynamic side, the native peer does not exist yet at this point,
+     * so the resolved configuration is stored here and pushed by
+     * __deliverAsyncLoadConfig__Internal when the peer is created, which always
+     * happens before the first build is driven (delivery is
+     * ordered before first build, the deferral itself lives in native).
+     */
+    __enableAsyncLoad__Internal(options?: CustomComponentAsyncLoadOptions): void {
+        const ownerTag = Class.of(this as Object).getName();
+        if (this.delegate_ !== undefined) {
+            // Out-of-window calls are ignored without any observable effect,
+            // but are recorded as a maintainability warning log.
+            console.warn(`${ownerTag}: enableAsyncLoad ignored: outside the construction window`);
+            return;
+        }
+        if (this.__asyncLoadRequested__Internal) {
+            console.warn(`${ownerTag}: enableAsyncLoad ignored: already requested, first request wins`);
+            return;
+        }
+        this.__asyncLoadRequested__Internal = true;
+        const placeholder = options?.placeholder;
+        let placeholderId = '';
+        let sizeWidth = '';
+        let sizeHeight = '';
+        if (placeholder !== undefined) {
+            const size = placeholder.size;
+            if (size !== undefined) {
+                // Stringify keeps the unit: numbers become bare strings meaning vp,
+                // suffixed strings ("100%", "10px") keep their unit; a Resource
+                // stringifies unusably and degrades to "unset" on the native side.
+                if (size.width !== undefined) {
+                    sizeWidth = String(size.width);
+                }
+                if (size.height !== undefined) {
+                    sizeHeight = String(size.height);
+                }
+            }
+            const id = placeholder.id;
+            if (id !== undefined) {
+                if (id !== '') {
+                    placeholderId = id;
+                }
+            }
+            if (placeholderId === '') {
+                // A configured placeholder whose id is empty or not a string
+                // degrades to "no placeholder", recorded as a maintainability warning.
+                console.warn(`${ownerTag}: enableAsyncLoad: placeholder configured but id is empty or not a string, ` +
+                    `placeholder ignored`);
+            }
+        }
+        const config: AsyncLoadResolvedConfig = {
+            timeoutMs: ExtendableComponent.__resolveAsyncLoadTimeoutMs__Internal(options?.timeout),
+            sizeWidth: sizeWidth,
+            sizeHeight: sizeHeight
+        };
+        if (placeholderId !== '') {
+            config.placeholderId = placeholderId;
+        }
+        this.__asyncLoadConfig__Internal = config;
+    }
+
+    /**
+     * Pushes the stored asynchronous-loading configuration (if any) to the native
+     * node behind `peer`. Called by ArkComponentRoot right after the peer is
+     * created for this component, before the first build is driven. Re-invoked on
+     * every (re-)attach: each attach creates a fresh native node that starts with
+     * no configuration, mirroring the dynamic side where node creation re-reads
+     * the configuration stored on the JS view. No-op when enableAsyncLoad was
+     * never effectively requested.
+     */
+    __deliverAsyncLoadConfig__Internal(peer: PeerNode): void {
+        const config = this.__asyncLoadConfig__Internal;
+        if (config === undefined) {
+            return;
+        }
+        const payload: AsyncLoadDeliveryPayload = { timeout: config.timeoutMs };
+        if (config.placeholderId !== undefined && config.placeholderId !== '') {
+            payload.placeholderId = config.placeholderId;
+        }
+        if (config.sizeWidth !== '') {
+            payload.width = config.sizeWidth;
+        }
+        if (config.sizeHeight !== '') {
+            payload.height = config.sizeHeight;
+        }
+        ArkUIAniCustomNodeModule._CustomNode_SetAsyncLoadConfig(peer.peer.ptr, JSON.stringify(payload));
     }
 
     /**

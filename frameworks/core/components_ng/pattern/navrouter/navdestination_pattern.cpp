@@ -320,7 +320,7 @@ void NavDestinationPattern::UpdateBackgroundColorIfNeeded(RefPtr<NavDestinationG
     auto renderContext = hostNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     if (IsUserDefinedBgColor()) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "User defined Background color: %{public}s",
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "User defined Background color: %{public}s",
             renderContext->GetBackgroundColor()->ColorToString().c_str());
         return;
     }
@@ -1043,7 +1043,7 @@ void NavDestinationPattern::CheckIfOrientationChanged()
     auto hostNode = AceType::DynamicCast<NavDestinationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
     if (hostNode->GetNavDestinationMode() == NavDestinationMode::DIALOG) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "Setting Orientation is not supported in dialog mode");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "Setting Orientation is not supported in dialog mode");
         return;
     }
 
@@ -1093,7 +1093,7 @@ void NavDestinationPattern::CheckIfStatusBarConfigChanged()
     auto hostNode = AceType::DynamicCast<NavDestinationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
     if (hostNode->GetNavDestinationMode() == NavDestinationMode::DIALOG) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "enable/disable statusBar is not supported in dialog mode");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "enable/disable statusBar is not supported in dialog mode");
         return;
     }
 
@@ -1136,7 +1136,7 @@ void NavDestinationPattern::CheckIfNavigationIndicatorConfigChagned()
     auto hostNode = AceType::DynamicCast<NavDestinationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
     if (hostNode->GetNavDestinationMode() == NavDestinationMode::DIALOG) {
-        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "enable/disable navIndicator is not supported in dialog mode");
+        TAG_LOGD(AceLogTag::ACE_NAVIGATION, "enable/disable navIndicator is not supported in dialog mode");
         return;
     }
 

@@ -7033,6 +7033,14 @@
         "name": "OH_ArkUI_NativeModule_ImmersiveMaterial_GetMaterialColor"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_ImmersiveMaterial_SetColorMode"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_NativeModule_ImmersiveMaterial_GetColorMode"
+    },
+    {
         "first_introduced": "26.0.0",
         "name": "OH_ArkUI_NativeModule_ImmersiveMaterial_SetApplyShadow"
     },

@@ -97,7 +97,9 @@ void GridIrregularLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     const int32_t cacheCnt = props->GetCachedCountValue(info_.defCachedCount_) * info_.crossCount_;
     if (props->GetShowCachedItemsValue(false)) {
         SyncPreloadItems(cacheCnt);
-    } else {
+    } else if (!IsSyncCacheLayoutEnabled(wrapper_)) {
+        // Sync-cache-in-layout strategy: cache items are built, measured and deactivated
+        // synchronously during Layout (SyncLayoutCacheItems); skip the delayed task.
         PreloadItems(cacheCnt);
     }
 }
@@ -116,7 +118,17 @@ void GridIrregularLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     if (!props->HasCachedCount()) {
         info_.UpdateDefaultCachedCount();
     }
-    auto cachedItemCnt = LayoutChildren(info.currentOffset_, cacheLines);
+    // Resolve the strategy once per Layout: LayoutChildren below used to re-check it per
+    // item, walking host -> pattern -> flag every time. syncCacheLayout gates the
+    // Layout-phase sync cache itself (mutually exclusive with shown caches);
+    // syncCacheLayoutChild only tells LayoutChildren that the feature is attached, so its
+    // index-window adjustments also cover shown caches and stay inert without the child.
+    const bool syncCacheLayoutChild = IsSyncCacheLayoutEnabled(layoutWrapper);
+    const bool syncCacheLayout = !props->GetShowCachedItemsValue(false) && syncCacheLayoutChild;
+    if (syncCacheLayout) {
+        SyncLayoutCacheItems(cacheLines * info_.crossCount_);
+    }
+    auto cachedItemCnt = LayoutChildren(info.currentOffset_, cacheLines, syncCacheLayout, syncCacheLayoutChild);
 
     if (!props->GetShowCachedItemsValue(false)) {
         // only use accurate counting method when cached items need to be shown
@@ -551,11 +563,12 @@ void AdjustStartOffset(const std::map<int32_t, float>& lineHeights, int32_t star
 }
 } // namespace
 
-std::pair<int32_t, int32_t> GridIrregularLayoutAlgorithm::LayoutChildren(float mainOffset, int32_t cacheLine)
+std::pair<int32_t, int32_t> GridIrregularLayoutAlgorithm::LayoutChildren(
+    float mainOffset, int32_t cacheLine, bool syncCacheLayout, bool syncCacheLayoutChild)
 {
     const auto& info = info_;
     const auto& props = DynamicCast<GridLayoutProperty>(wrapper_->GetLayoutProperty());
-    const Alignment align = GetAlignment(info.axis_, props);
+    const bool showCachedItems = props->GetShowCachedItemsValue(false);
 
     const auto& padding = *wrapper_->GetGeometryNode()->GetPadding();
     mainOffset += info.axis_ == Axis::HORIZONTAL ? 0.0f : padding.top.value_or(0.0f);
@@ -563,9 +576,12 @@ std::pair<int32_t, int32_t> GridIrregularLayoutAlgorithm::LayoutChildren(float m
 
     auto frameSize = wrapper_->GetGeometryNode()->GetFrameSize();
     MinusPaddingToSize(padding, frameSize);
-    const bool isRtl = props->GetNonAutoLayoutDirection() == TextDirection::RTL;
     const int32_t cacheStartLine = info.startMainLineIndex_ - cacheLine;
     AdjustStartOffset(info.lineHeightMap_, info.startMainLineIndex_, cacheStartLine, mainGap_, mainOffset);
+
+    const TileLayoutContext ctx { GetAlignment(info.axis_, props), std::move(crossPos), frameSize,
+        props->GetNonAutoLayoutDirection() == TextDirection::RTL, padding.left.value_or(0.0f) };
+    const ItemRange range = GetItemRange(cacheLine, syncCacheLayoutChild);
 
     std::pair<int32_t, int32_t> cacheCnt = { 0, 0 };
     auto endIt = info.gridMatrix_.upper_bound(std::max(info.endMainLineIndex_ + cacheLine, info.startMainLineIndex_));
@@ -574,50 +590,130 @@ std::pair<int32_t, int32_t> GridIrregularLayoutAlgorithm::LayoutChildren(float m
         if (lineHeightIt == info.lineHeightMap_.end()) {
             continue;
         }
-        const bool isCache = !props->GetShowCachedItemsValue(false) &&
+        // lines outside the viewport belong to the cache area; with shown caches those
+        // items are laid out like visible ones (isCache == false)
+        const bool isCache = !showCachedItems &&
                              (it->first < info.startMainLineIndex_ || it->first > info.endMainLineIndex_);
-        const auto& row = it->second;
-        for (const auto& [c, itemIdx] : row) {
-            if (itemIdx < 0 || (itemIdx == 0 && (it->first > 0 || c > 0))) {
-                // not top-left tile
-                continue;
-            }
-            auto child = wrapper_->GetChildByIndex(itemIdx, isCache);
-            if (!child) {
-                continue;
-            }
-
-            if (it->first < info.startMainLineIndex_) {
-                ++cacheCnt.first;
-            } else if (it->first > info.endMainLineIndex_) {
-                ++cacheCnt.second;
-            }
-
-            SizeF blockSize = SizeF(crossLens_.at(c), lineHeightIt->second, info.axis_);
-            auto childSize = child->GetGeometryNode()->GetMarginFrameSize();
-            auto alignPos = Alignment::GetAlignPosition(blockSize, childSize, align);
-
-            OffsetF offset = OffsetF(crossPos[c], mainOffset, info.axis_);
-
-            if (isRtl) {
-                offset.SetX(frameSize.Width() - offset.GetX() - childSize.Width());
-            }
-            offset += OffsetF { padding.left.value_or(0.0f), 0.0f };
-            child->GetGeometryNode()->SetMarginFrameOffset(offset + alignPos);
-            if (!isCache && child->CheckNeedForceMeasureAndLayout()) {
-                child->Layout();
-            } else {
-                child->GetHostNode()->ForceSyncGeometryNode();
-            }
-            auto frameNode = DynamicCast<FrameNode>(child);
-            if (frameNode) {
-                frameNode->MarkAndCheckNewOpIncNode(info.axis_);
-            }
-        }
+        LayoutMatrixLine(it->first, it->second, lineHeightIt->second, isCache, syncCacheLayout, syncCacheLayoutChild,
+            range, ctx, mainOffset, cacheCnt);
         // add mainGap below the item
         mainOffset += lineHeightIt->second + mainGap_;
     }
     return cacheCnt;
+}
+
+// Sync-cache-layout isolation: the window only narrows when a sync-cache-layout child
+// is attached (GridPattern::IsSyncCacheLayoutEnabled, the Repeat v2 animation scenario);
+// every other configuration keeps the historical row-based behavior (bounds
+// [0, childrenCount - 1] never skip, line-based counting). The active range is
+// index-based — the range also reported through SetActiveChildRange
+// ([startIndex_ - cacheCnt, startIndex_) / (endIndex_, endIndex_ + cacheCnt])) — and
+// with irregular items the row-based walk in LayoutMatrixLine and that window diverge:
+// when the starting line is backtracked to a straddling item's top row (CheckMultiRow),
+// the line lies above the display top and items beside the straddler share it with
+// smaller indices — with cachedCount = 0 they fall outside [startIndex_, endIndex_]
+// even though their line is walked as a viewport line, and head cache lines likewise
+// hold top-left items below startIndex_ - cacheCnt. Such an item lies outside the
+// range reported to the lazy controller; skip it instead of building and laying it
+// out — it is measured once it actually enters the window (viewport fill / sync
+// pass / preload). An item attached outside the range by the solve
+// (MeasureLineWithIrregulars measures whole backtracked lines to record their
+// heights) is deactivated by the controller in the same frame (LazyForEachBuilder::
+// SetActiveChildRange expires out-of-range nodes), so no stale node stays on the
+// render tree. Lines that are really visible never hold out-of-bounds items (at most
+// crossCount - 1 items precede startIndex_ on its line, and those belong to the
+// window whenever cachedCount > 0).
+GridIrregularLayoutAlgorithm::ItemRange GridIrregularLayoutAlgorithm::GetItemRange(
+    int32_t cacheLine, bool syncCacheLayoutChild) const
+{
+    const auto& info = info_;
+    ItemRange range = { 0, info.GetChildrenCount() - 1 };
+    if (syncCacheLayoutChild) {
+        const int32_t cacheItemCnt = cacheLine * info.crossCount_;
+        range.head = std::max(info.startIndex_ - cacheItemCnt, 0);
+        range.tail = std::min(info.endIndex_ + cacheItemCnt, range.tail);
+    }
+    return range;
+}
+
+// count by index side, not by line: with shown caches the cache is the index
+// window, so an in-window item beside the straddler on the starting line
+// counts as head cache even though its line is a viewport line — the line-based
+// count could report a range (start - cacheStart, ...) missing items laid out
+// and shown here. For regular grids both counts are identical, and the
+// !showCachedItems counts are overwritten in Layout(). Without the
+// sync-cache-layout child keep the historical line-based counting.
+void GridIrregularLayoutAlgorithm::CountCacheItem(int32_t itemIdx, int32_t lineIdx, bool syncCacheLayoutChild,
+    std::pair<int32_t, int32_t>& cacheCnt) const
+{
+    if (syncCacheLayoutChild) {
+        if (itemIdx < info_.startIndex_) {
+            ++cacheCnt.first;
+        } else if (itemIdx > info_.endIndex_) {
+            ++cacheCnt.second;
+        }
+    } else if (lineIdx < info_.startMainLineIndex_) {
+        ++cacheCnt.first;
+    } else if (lineIdx > info_.endMainLineIndex_) {
+        ++cacheCnt.second;
+    }
+}
+
+void GridIrregularLayoutAlgorithm::LayoutMatrixLine(int32_t lineIdx, const std::map<int32_t, int32_t>& row,
+    float lineHeight, bool isCache, bool syncCacheLayout, bool syncCacheLayoutChild, const ItemRange& range,
+    const TileLayoutContext& ctx, float mainPos, std::pair<int32_t, int32_t>& cacheCnt)
+{
+    for (const auto& [c, itemIdx] : row) {
+        if (syncCacheLayoutChild && (itemIdx < range.head || itemIdx > range.tail)) {
+            continue;
+        }
+        auto child = GetTileChild(itemIdx, lineIdx, c, isCache);
+        if (!child) {
+            continue;
+        }
+        CountCacheItem(itemIdx, lineIdx, syncCacheLayoutChild, cacheCnt);
+
+        SizeF blockSize = SizeF(crossLens_.at(c), lineHeight, info_.axis_);
+        auto childSize = child->GetGeometryNode()->GetMarginFrameSize();
+        auto alignPos = Alignment::GetAlignPosition(blockSize, childSize, ctx.align);
+        LayoutChildAtTile(child, ctx.crossPos[c], mainPos, alignPos, childSize, ctx.frameSize, ctx.isRtl,
+            ctx.paddingOffset, isCache, syncCacheLayout);
+    }
+}
+
+RefPtr<LayoutWrapper> GridIrregularLayoutAlgorithm::GetTileChild(
+    int32_t itemIdx, int32_t mainLine, int32_t col, bool isCache)
+{
+    if (itemIdx < 0 || (itemIdx == 0 && (mainLine > 0 || col > 0))) {
+        // not top-left tile
+        return nullptr;
+    }
+    return wrapper_->GetChildByIndex(itemIdx, isCache);
+}
+
+// Positions one child tile (offset + alignment, RTL flip) and lays it out — or only syncs
+// its geometry for clean cache items — mirroring the per-item steps of the loop above.
+void GridIrregularLayoutAlgorithm::LayoutChildAtTile(const RefPtr<LayoutWrapper>& child, float crossOffset,
+    float mainPos, const OffsetF& alignPos, const SizeF& childSize, const SizeF& frameSize, bool isRtl,
+    float paddingOffset, bool isCache, bool syncCacheLayout)
+{
+    OffsetF offset = OffsetF(crossOffset, mainPos, info_.axis_);
+
+    if (isRtl) {
+        offset.SetX(frameSize.Width() - offset.GetX() - childSize.Width());
+    }
+    offset += OffsetF { paddingOffset, 0.0f };
+    child->GetGeometryNode()->SetMarginFrameOffset(offset + alignPos);
+    DeactivateSyncCacheItem(child, isCache, syncCacheLayout);
+    if (!isCache && child->CheckNeedForceMeasureAndLayout()) {
+        child->Layout();
+    } else {
+        child->GetHostNode()->ForceSyncGeometryNode();
+    }
+    auto frameNode = DynamicCast<FrameNode>(child);
+    if (frameNode) {
+        frameNode->MarkAndCheckNewOpIncNode(info_.axis_);
+    }
 }
 
 std::vector<float> GridIrregularLayoutAlgorithm::CalculateCrossPositions(const PaddingPropertyF& padding)
@@ -792,8 +888,32 @@ void GridIrregularLayoutAlgorithm::SyncPreloadItems(int32_t cacheCnt)
     const int32_t end = std::min(info_.endIndex_ + cacheCnt, info_.GetChildrenCount() - 1);
     GridIrregularFiller filler(&info_, wrapper_);
     FillParams param { crossLens_, crossGap_, mainGap_ };
-    auto it = info_.FindInMatrix(start);
-    filler.MeasureBackwardToTarget(param, it->first, info_.startMainLineIndex_ - 1);
+    if (IsSyncCacheLayoutEnabled(wrapper_)) {
+        // The preload window is index-based, so collect the head side by index as well —
+        // the same collection as SyncLayoutCacheItems and the tail FillToTarget below. The
+        // previous row-based MeasureBackwardToTarget measured every item sharing a head
+        // cache row with a window item: when the starting row is backtracked to a
+        // straddling item's top row (CheckMultiRow), a head cache row holds row-mates
+        // below startIndex_ - cacheCnt, and those were built and attached here
+        // (isCache = false) only to be laid out and shown although the range reported by
+        // SetActiveChildRange never includes them. Measuring exactly the window keeps the
+        // shown cache equal to it; a skipped row-mate keeps its historical line heights
+        // and is measured once it enters the window, which happens before its line can
+        // reach the viewport (the window precedes it by cacheCnt items).
+        for (int32_t idx = info_.startIndex_ - 1; idx >= start; --idx) {
+            const auto pos = info_.GetItemPos(idx);
+            if (pos.first < 0 || pos.second < 0) {
+                // never placed (e.g. head rows above the range solved after a reload); it
+                // is measured once it enters the viewport
+                continue;
+            }
+            filler.MeasureItem(param, idx, pos.first, pos.second, false);
+        }
+    } else {
+        // without a sync-cache-layout child keep the historical row-based collection
+        auto it = info_.FindInMatrix(start);
+        filler.MeasureBackwardToTarget(param, it->first, info_.startMainLineIndex_ - 1);
+    }
     filler.FillToTarget(param, end, info_.endMainLineIndex_);
 }
 
@@ -846,6 +966,69 @@ void GridIrregularLayoutAlgorithm::PreloadItems(int32_t cacheCnt)
             item->SetActive(false);
             return true;
         });
+}
+
+void GridIrregularLayoutAlgorithm::SyncLayoutCacheItems(int32_t cacheCnt)
+{
+    // Extend the matrix records up to the tail cache bound without measuring (head records
+    // exist by the class invariant that the matrix is filled from the first row), so
+    // GetItemPos resolves a position for every collected item.
+    GridIrregularFiller filler(&info_, wrapper_);
+    filler.FillMatrixOnly(std::min(info_.GetChildrenCount(), info_.endIndex_ + cacheCnt));
+    // Collection: both cache windows are collected unconditionally, mirroring the regular
+    // grid's SyncLayoutCacheItems (FillNewLineForward / FillCacheLineAtEnd re-run their
+    // fill every sync frame). The lazy probe cannot serve as the filter here: it resolves
+    // through the frontend caches and returns an already existing node (prebuilt for the
+    // cache range, or reused with stale geometry after a data change / an insertion above
+    // the preload area) with clean dirty flags, which the flag-based CheckNeedCacheLayout
+    // would skip — yet nothing else would record the line heights those lines need to be
+    // positioned by LayoutChildren, so such an item is never re-laid-out.
+    // Re-collecting on later frames stays cheap: MeasureItem activates the node before
+    // measuring and FrameNode::Measure skips on an unchanged constraint.
+    std::list<int32_t> itemsToBuild;
+    for (int32_t i = 1; i <= cacheCnt; ++i) {
+        const int32_t l = info_.startIndex_ - i;
+        if (l >= 0) {
+            itemsToBuild.emplace_back(l);
+        }
+        const int32_t r = info_.endIndex_ + i;
+        if (r < info_.GetChildrenCount()) {
+            itemsToBuild.emplace_back(r);
+        }
+    }
+
+    const FillParams param { crossLens_, crossGap_, mainGap_ };
+    for (const int32_t itemIdx : itemsToBuild) {
+        const auto pos = info_.GetItemPos(itemIdx);
+        if (pos.first < 0 || pos.second < 0) {
+            continue;
+        }
+        // MeasureItem builds the item on the cache path (not attached to the render tree),
+        // measures it with the span-adjusted constraint and records matrix / line heights —
+        // the same steps the preload callback performs outside the layout pass.
+        if (filler.MeasureItem(param, itemIdx, pos.first, pos.second, true).first < 0) {
+            continue;
+        }
+        auto item = GetGridItem(wrapper_, itemIdx, false, true);
+        CHECK_NULL_CONTINUE(item);
+        // Re-lay the subtree so a changed size repositions the item's children before
+        // LayoutChildren syncs geometry for cache items.
+        item->Layout();
+        item->SetActive(false);
+    }
+}
+
+void GridIrregularLayoutAlgorithm::DeactivateSyncCacheItem(
+    const RefPtr<LayoutWrapper>& child, bool isCache, bool syncCacheLayout)
+{
+    if (!isCache || !syncCacheLayout) {
+        return;
+    }
+    // Sync-cache-in-layout: deactivate cache items explicitly in the same frame,
+    // mirroring List's per-item SetActive(show) during cached item layout.
+    // A straddling item is only visited at its top-left tile, so the row its
+    // tile starts in decides, matching the fetch in LayoutChildren.
+    child->SetActive(false);
 }
 
 void GridIrregularLayoutAlgorithm::AdaptToChildMainSize(

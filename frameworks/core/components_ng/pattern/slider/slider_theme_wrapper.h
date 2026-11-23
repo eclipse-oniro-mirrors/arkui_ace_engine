@@ -12,18 +12,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 #ifndef FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SLIDER_SLIDER_THEME_WRAPPER_H
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SLIDER_SLIDER_THEME_WRAPPER_H
-
+ 
 #include <memory>
-
+ 
 #include "base/memory/ace_type.h"
 #include "core/components/slider/slider_theme.h"
 #include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
-
+ 
 /**
  * SliderThemeWrapper defines colors and styles for Slider and Slider components
  * basing on TokenTheme's data.
@@ -31,7 +31,7 @@ namespace OHOS::Ace::NG {
  */
 class SliderThemeWrapper : public SliderTheme {
     DECLARE_ACE_TYPE(SliderThemeWrapper, SliderTheme);
-
+ 
 public:
     class WrapperBuilder : public Builder {
     public:
@@ -49,9 +49,9 @@ public:
             return wrapper;
         }
     };
-
+ 
     ~SliderThemeWrapper() override = default;
-
+ 
     void ApplyTokenTheme(const TokenTheme& theme) override
     {
         if (auto themeColors = theme.Colors(); themeColors) {
@@ -62,10 +62,10 @@ public:
             markerColor_ = themeColors->CompBackgroundSecondary();
         }
     }
-
+ 
 protected:
     SliderThemeWrapper() = default;
 };
-
+ 
 } // namespace
 #endif

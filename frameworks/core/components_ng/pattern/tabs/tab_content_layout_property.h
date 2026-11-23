@@ -63,6 +63,7 @@ public:
         BadgeToJsonValue(jsonValue, filter);
         json->PutExtAttr("tabBar", jsonValue->ToString().c_str(), filter);
         SidebarSectionToJsonValue(json, filter);
+        KeepAliveToJsonValue(json, filter);
     }
 
     void FromJson(const std::unique_ptr<JsonValue>& json) override
@@ -83,6 +84,7 @@ public:
 private:
     void BadgeToJsonValue(std::unique_ptr<JsonValue>& jsonValue, const InspectorFilter& filter) const;
     void SidebarSectionToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
+    void KeepAliveToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
 };
 
 } // namespace OHOS::Ace::NG

@@ -392,6 +392,7 @@ private:
     void PostNavDestRecycleTask();
     void CancelNavDestRecycleTask();
     void ExecuteNavDestRecycle();
+    static bool IsVisibleOnRenderTree(const RefPtr<FrameNode>& host);
 
 private:
     RefPtr<DrawableDescriptor> drawable_;

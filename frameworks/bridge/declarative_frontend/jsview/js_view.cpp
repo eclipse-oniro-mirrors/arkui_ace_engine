@@ -26,6 +26,7 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "base/subwindow/subwindow_manager.h"
+#include "base/utils/string_utils.h"
 #include "base/utils/system_properties.h"
 #include "base/utils/utils.h"
 #include "bridge/common/utils/engine_helper.h"
@@ -47,8 +48,10 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_full_update_model.h"
+#include "core/components_ng/base/async_load_config.h"
 #include "core/components_ng/base/view_full_update_model_ng.h"
 #include "core/components_ng/base/view_partial_update_model.h"
+#include "core/components_ng/pattern/custom/custom_node_base.h"
 #include "core/components_ng/base/view_partial_update_model_ng.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
@@ -919,7 +922,8 @@ RefPtr<AceType> JSViewPartialUpdate::CreateViewNode(bool isTitleNode, bool isCus
         .creatorId = GetCreatorId(),
         .jsViewName = GetJSViewName(),
         .isV2 = GetJSIsV2(),
-        .reusableMemOptStrategy = GetJSReusableMemOptStrategy() };
+        .reusableMemOptStrategy = GetJSReusableMemOptStrategy(),
+        .asyncLoadConfig = GetJSAsyncLoadConfig() };
 
     auto measureFunc = [weak = AceType::WeakClaim(this)](NG::LayoutWrapper* layoutWrapper) -> void {
         auto jsView = weak.Upgrade();
@@ -1506,6 +1510,25 @@ void JSViewPartialUpdate::JSSetIsV2(const bool isV2)
     isV2_ = isV2;
 }
 
+void JSViewPartialUpdate::JSSetAsyncLoadConfig(const std::string& asyncLoadConfig)
+{
+    // Malformed or empty payload clears the configuration, which keeps the component on the
+    // existing synchronous path rather than half-enabling asynchronous loading. Parsing is
+    // shared with the static-paradigm bridge (CustomNodeBase::ParseAsyncLoadConfigJson).
+    asyncLoadConfig_.reset();
+    if (asyncLoadConfig.empty()) {
+        return;
+    }
+    auto config = NG::CustomNodeBase::ParseAsyncLoadConfigJson(asyncLoadConfig);
+    if (!config) {
+        TAG_LOGW(AceLogTag::ACE_STATE_MGMT, "AsyncLoadConfig: payload is not a JSON object, ignored");
+        return;
+    }
+    TAG_LOGD(AceLogTag::ACE_STATE_MGMT, "AsyncLoadConfig: timeout set %{public}d, placeholder set %{public}d",
+        config->timeoutMs.has_value(), config->HasPlaceholder());
+    asyncLoadConfig_ = std::move(config);
+}
+
 napi_value GetDialogController(napi_env env)
 {
     napi_value globalValue = nullptr;
@@ -1807,6 +1830,8 @@ void JSViewPartialUpdate::JSBind(BindingTarget object)
     JSClass<JSViewPartialUpdate>::Method("setIsV2", &JSViewPartialUpdate::JSSetIsV2);
     JSClass<JSViewPartialUpdate>::Method(
         "setReusableMemOptStrategy", &JSViewPartialUpdate::JSSetReusableMemOptStrategy);
+    JSClass<JSViewPartialUpdate>::Method(
+        "setAsyncLoadConfig", &JSViewPartialUpdate::JSSetAsyncLoadConfig);
     JSClass<JSViewPartialUpdate>::Method("startMemOpt", &JSViewPartialUpdate::JSStartMemOpt);
     JSClass<JSViewPartialUpdate>::Method(
         "requestProgressiveRelease", &JSViewPartialUpdate::JSRequestProgressiveRelease);

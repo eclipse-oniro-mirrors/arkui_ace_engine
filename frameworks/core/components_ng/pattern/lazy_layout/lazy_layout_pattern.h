@@ -20,11 +20,12 @@
 #include <optional>
 
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/pattern/pattern.h"
 
 namespace OHOS::Ace::NG {
-class ACE_FORCE_EXPORT LazyLayoutPattern : public Pattern {
-    DECLARE_ACE_TYPE(LazyLayoutPattern, Pattern);
+class ACE_FORCE_EXPORT LazyLayoutPattern : public Pattern, public StickyHeaderPattern {
+    DECLARE_ACE_TYPE(LazyLayoutPattern, Pattern, StickyHeaderPattern);
 public:
     void OnAttachToFrameNode() override;
 
@@ -37,7 +38,7 @@ public:
     {
         return std::nullopt;
     }
-    virtual bool HasStickyHeader() const
+    bool HasStickyHeader() const override
     {
         return false;
     }
@@ -54,9 +55,9 @@ public:
     LayoutWrapper* SwapPremeasureWrapper(LayoutWrapper* wrapper);
 
     // LazyColumnLayout publishes handoff gaps, defers mid-layout invalidation, and clears the state on detach.
-    void PublishNextStickyHeaderGap(const std::optional<float>& gap);
+    void PublishNextStickyHeaderGap(const std::optional<float>& gap) override;
 
-    const std::optional<float>& GetNextStickyHeaderGap() const
+    const std::optional<float>& GetNextStickyHeaderGap() const override
     {
         return nextStickyHeaderGap_;
     }

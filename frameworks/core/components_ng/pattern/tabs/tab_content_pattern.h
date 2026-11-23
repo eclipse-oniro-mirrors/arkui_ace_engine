@@ -384,6 +384,16 @@ public:
         return sidebarSection_;
     }
 
+    void SetKeepAlive(bool keepAlive)
+    {
+        keepAlive_ = keepAlive;
+    }
+
+    bool GetKeepAlive() const
+    {
+        return keepAlive_;
+    }
+
     const BottomTabBarStyle& GetBottomTabBarStyle() const
     {
         return bottomTabBarStyle_;
@@ -691,6 +701,7 @@ private:
     TabContentDefaultVisibility lastAppliedVisibility_;
     std::optional<OHOS::Ace::SidebarSection> sidebarSection_;
     std::optional<OHOS::Ace::SidebarSection> lastAppliedSidebarSection_;
+    bool keepAlive_ = false;
 
     bool firstTimeLayout_ = true;
     bool secondTimeLayout_ = false;

@@ -51,6 +51,24 @@ public:
         safeAreaPad_ = safeAreaPad;
     }
 
+    /**
+     * @brief Whether this WaterFlow instance runs the sync-cache-in-layout strategy
+     * (List-style cache layout).
+     *
+     * Per-instance switch: enabled while the host WaterFlowPattern holds at least
+     * one reference from an attached Repeat-family node (RepeatNode /
+     * RepeatVirtualScroll2Node / ArkoalaLazyNode in Repeat mode) whose
+     * isAllowReuseInAnimation_ is explicitly false — see
+     * WaterFlowPattern::AddSyncCacheLayoutChild /
+     * LazyForEachUtils::ToggleParentSyncCacheLayout. When enabled, cache-range items
+     * are built, measured, positioned and deactivated synchronously inside the
+     * current-frame Layout task when showCache is false, instead of being preloaded
+     * asynchronously in the predict phase.
+     *
+     * @param layoutWrapper layout wrapper of the WaterFlow being laid out.
+     */
+    bool IsSyncCacheLayoutEnabled(LayoutWrapper* layoutWrapper) const;
+
     virtual void StartCacheLayout()
     { /* callback when cache layout starts */
     }
@@ -79,6 +97,9 @@ public:
     int32_t measuredEndIndex_ = -1;
 
 protected:
+    void MeasureEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, const SizeF& size);
+    void LayoutEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd,
+        std::optional<float> layoutOffset = std::nullopt);
     void BeginTargetPreparation();
     bool YieldTargetPreparation(LayoutWrapper* wrapper);
     void ReleaseTargetPreparationItems(LayoutWrapper* wrapper);

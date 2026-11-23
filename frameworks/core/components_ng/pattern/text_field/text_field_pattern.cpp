@@ -1041,17 +1041,18 @@ void TextFieldPattern::UpdateCaretInfoToController(bool forceUpdate)
 {
     CHECK_NULL_VOID(HasFocus());
 #if defined(CROSS_PLATFORM)
-#if defined(IOS_PLATFORM)
-    if (editingValue_ && editingValue_->selection.IsValid() &&
-        editingValue_->selection.GetEnd() < selectController_->GetCaretIndex()) {
-#else
+    // The selection in a platform event is the keyboard's autocorrect buffer anchor,
+    // not a real caret command: replaying it back into the engine caret drags the
+    // caret to a stale position. Only real text-appending events may snap the caret
+    // (same as the platform-specific branch). Selection-only events never reach this
+    // guard as caret commands: they are applied in HandleEditingEventCrossPlatform
+    // (CARET_SET) before the caret is pushed back, so a native caret move is echoed
+    // to the adapter with its new position instead of being overwritten here.
     if (editingValue_ && editingValue_->selection.IsValid() &&
         editingValue_->selection.GetEnd() < selectController_->GetCaretIndex() && !editingValue_->appendText.empty()) {
-#endif
         SetCaretPosition(editingValue_->selection.GetEnd());
     }
     if (editingValue_ && editingValue_->selection.IsValid()) {
-
         editingValue_->selection.Update(-1);
     }
 #endif
@@ -5830,12 +5831,13 @@ bool TextFieldPattern::RequestKeyboardCrossPlatForm(bool isFocusViewChanged)
     CHECK_NULL_RETURN(tmpHost, false);
     auto context = tmpHost->GetContextRefPtr();
     CHECK_NULL_RETURN(context, false);
-#ifdef CROSS_PLATFORM
     TextInputConfiguration config;
     config.type = keyboard_;
     config.action = GetTextInputActionValue(GetDefaultTextInputAction());
     config.inputFilter = GetInputFilter();
     config.maxLength = GetMaxLength();
+    config.insertNewlineOnEnter =
+        config.action == TextInputAction::NEW_LINE && IsTextArea() && !textAreaBlurOnSubmit_ && GetInputFilter() != "\n";
     if (keyboard_ == TextInputType::VISIBLE_PASSWORD || keyboard_ == TextInputType::NEW_PASSWORD) {
         config.obscureText = textObscured_;
     }
@@ -5843,6 +5845,7 @@ bool TextFieldPattern::RequestKeyboardCrossPlatForm(bool isFocusViewChanged)
     value.text = contentController_->GetTextValue();
     value.hint = UtfUtils::Str16DebugToStr8(GetPlaceHolder());
     value.selection.Update(selectController_->GetStartIndex(), selectController_->GetEndIndex());
+#ifdef CROSS_PLATFORM
     auto inputMethodManager = InputMethodManager::GetInstance();
     CHECK_NULL_RETURN(inputMethodManager, false);
     inputMethodManager->Attach(WeakClaim(this), config, context->GetTaskExecutor(), GetInstanceId());
@@ -5850,25 +5853,12 @@ bool TextFieldPattern::RequestKeyboardCrossPlatForm(bool isFocusViewChanged)
     inputMethodManager->ShowKeyboard(isFocusViewChanged, GetInstanceId());
 #else
     if (!HasConnection()) {
-        TextInputConfiguration config;
-        config.type = keyboard_;
-        config.action = GetTextInputActionValue(GetDefaultTextInputAction());
-        config.inputFilter = GetInputFilter();
-        config.maxLength = GetMaxLength();
-        if (keyboard_ == TextInputType::VISIBLE_PASSWORD || keyboard_ == TextInputType::NEW_PASSWORD) {
-            config.obscureText = textObscured_;
-        }
         connection_ = TextInputProxy::GetInstance().Attach(
             WeakClaim(this), config, context->GetTaskExecutor(), GetInstanceId());
-
         if (!HasConnection()) {
             return false;
         }
     }
-    TextEditingValue value;
-    value.text = contentController_->GetTextValue();
-    value.hint = UtfUtils::Str16DebugToStr8(GetPlaceHolder());
-    value.selection.Update(selectController_->GetStartIndex(), selectController_->GetEndIndex());
     connection_->SetEditingState(value, GetInstanceId());
     connection_->Show(isFocusViewChanged, GetInstanceId());
 #endif
@@ -7105,6 +7095,76 @@ bool TextFieldPattern::ProcessFocusIndexAction()
     return true;
 }
 
+#if defined(IOS_PLATFORM)
+void TextFieldPattern::UpdateFloatingCursor(FloatingCursorState state, double x, double y)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (state == FloatingCursorState::END) {
+        // Drag finished: echo the landed caret back to the keyboard so its
+        // autocorrect session continues from the new position.
+        StartTwinkling();
+        UpdateCaretInfoToController();
+        host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+        return;
+    }
+    // BEGIN/UPDATE: (x, y) is in the adapter window space (same space as
+    // GetEditingBoxY); convert to this node's local space and reuse the
+    // click-to-caret hit test, which clamps the point into the text area.
+    auto globalOffset = GetGlobalOffset();
+    Offset local(static_cast<float>(x) - globalOffset.GetX(),
+        static_cast<float>(y) - globalOffset.GetY());
+    auto clickLocalOffset = GetCaretClickLocalOffset(local);
+    UpdateCaretByClick(clickLocalOffset);
+    host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+}
+
+Rect TextFieldPattern::GetCaretWindowRect()
+{
+    CHECK_NULL_RETURN(selectController_, Rect());
+    auto caretRect = selectController_->GetCaretRect();
+    auto globalOffset = GetGlobalOffset();
+    return Rect(globalOffset.GetX() + caretRect.Left(), globalOffset.GetY() + caretRect.Top(),
+        caretRect.Width(), caretRect.Height());
+}
+
+int32_t TextFieldPattern::GetIndexAfterLineMove(int32_t fromIndex, bool isUp, int32_t lines)
+{
+    CHECK_NULL_RETURN(selectController_, -1);
+    if (lines <= 0) {
+        return fromIndex;
+    }
+    if (!IsTextArea() && !IsSelected()) {
+        // Same fallback as CursorMoveUp/DownOperation for single-line fields.
+        return isUp ? 0 : static_cast<int32_t>(GetTextUtf16Value().length());
+    }
+    // Mirror CursorMoveUp/DownOperation's point math around the ANCHOR index
+    // (not the current caret: UIKit accumulates consecutive arrow presses as
+    // growing offsets from the pre-gesture caret). GetCaretRectByIndex and
+    // ConvertTouchOffsetToPosition are pure queries.
+    auto caretRect = selectController_->GetCaretRectByIndex(fromIndex, TextAffinity::DOWNSTREAM);
+    float lineHeight = PreferredLineHeight();
+    float offsetX = caretRect.GetX();
+    float offsetY = isUp ? caretRect.GetY() - (lines - 0.5f) * lineHeight
+                         : caretRect.GetY() + caretRect.Height() + (lines - 0.5f) * lineHeight;
+    auto index = selectController_->ConvertTouchOffsetToPosition(Offset(offsetX, offsetY));
+    return index;
+}
+
+int32_t TextFieldPattern::GetCaretIndexAtPoint(double x, double y)
+{
+    CHECK_NULL_RETURN(selectController_, -1);
+    // Same window->local conversion as UpdateFloatingCursor, then reuse the
+    // click-to-caret hit test (GetCaretClickLocalOffset clamps TextArea probes
+    // into the text area). ConvertTouchOffsetToPosition is a pure query.
+    auto globalOffset = GetGlobalOffset();
+    Offset local(static_cast<float>(x) - globalOffset.GetX(),
+        static_cast<float>(y) - globalOffset.GetY());
+    auto clickLocalOffset = GetCaretClickLocalOffset(local);
+    return selectController_->ConvertTouchOffsetToPosition(clickLocalOffset);
+}
+#endif
+
 void TextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyboard)
 {
     if (!HasFocus()) {
@@ -7120,9 +7180,24 @@ void TextFieldPattern::PerformAction(TextInputAction action, bool forceCloseKeyb
     CHECK_NULL_VOID(paintProperty);
     if (IsTextArea() && action == TextInputAction::NEW_LINE) {
         if (!textAreaBlurOnSubmit_) {
+#if defined(IOS_PLATFORM)
+            // When the platform text delegate drives this action (soft keyboard),
+            // the native editor inserts '\n' itself (insertNewlineOnEnter) so the
+            // keyboard resets its autocorrect session at the line break; inserting
+            // here too would duplicate the newline. When Enter arrives from the key
+            // event path (physical keyboard while the soft keyboard is closed), the
+            // event never goes through shouldChangeTextInRange/insertText, so
+            // nobody else inserts and PerformAction must do it.
+            bool platformWillInsertNewline = platformWillInsertNewline_;
+            platformWillInsertNewline_ = false;
+            if (!platformWillInsertNewline && GetInputFilter() != "\n") {
+                InsertValue(u"\n", true);
+            }
+#else
             if (GetInputFilter() != "\n") {
                 InsertValue(u"\n", true);
             }
+#endif
         } else {
             CloseKeyboard(forceCloseKeyboard, false);
             TextFieldLostFocusToViewRoot();
@@ -7318,11 +7393,22 @@ bool TextFieldPattern::HandleEditingEventCrossPlatform(const std::shared_ptr<Tex
         return false;
     }
 #endif
-#ifdef ANDROID_PLATFORM
+#if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
     if (value->appendText.empty()) {
-        // update cursor position only
-        if (value->selection.IsValid() && value->selection.GetStart() == value->selection.GetEnd() &&
-            !value->text.empty()) {
+        // Selection-only event (no appended text, no delete). Apply it as a real
+        // caret move: it is either the IME caret echo or a native caret
+        // update from setSelectedTextRange: (e.g. hardware keyboard navigation
+        // while the soft keyboard is closed). Dropping it would clear the event
+        // selection and push the stale engine caret back to the adapter, so
+        // later input lands at the wrong offset.
+        bool isRealCaretMove = value->selection.IsValid() &&
+            value->selection.GetStart() == value->selection.GetEnd() && !value->text.empty();
+#ifdef IOS_PLATFORM
+        // On iOS, selections riding on composing/unmark events are the keyboard's
+        // temporary autocorrect anchors, not caret commands; keep skipping those.
+        isRealCaretMove = isRealCaretMove && !value->compose.IsValid() && !value->unmarkText;
+#endif
+        if (isRealCaretMove) {
             inputOperations_.emplace(InputOperation::CARET_SET);
             CaretSetInfo info = { .pos = value->selection.GetEnd(), .text = value->text};
             caretMoveOperation_.emplace(info);

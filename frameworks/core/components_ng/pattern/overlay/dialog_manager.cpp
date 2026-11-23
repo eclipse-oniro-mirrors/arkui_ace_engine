@@ -219,14 +219,23 @@ bool DialogManager::HandleSmoothImmersiveMaterial(
     CHECK_NULL_RETURN(systemMaterial, false);
     auto options = systemMaterial->GetImmersiveOptions();
     if (options && !options->materialColor.has_value() && !options->colorResObj) {
-        auto pipelineContext = columnNode->GetContext();
-        CHECK_NULL_RETURN(pipelineContext, false);
-        auto themeManager = pipelineContext->GetThemeManager();
-        CHECK_NULL_RETURN(themeManager, false);
-        auto themeContants = themeManager->GetThemeConstants();
-        CHECK_NULL_RETURN(themeContants, false);
         auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
-        auto backgroundColor = themeContants->GetColor(resId);
+        auto backgroundColor = Color::TRANSPARENT;
+        if (options->userColorMode != ThemeColorMode::SYSTEM) {
+            auto userColorMode =
+                options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT;
+            auto userColor = MaterialUtils::GetColorByMode(columnNode, userColorMode, static_cast<uint32_t>(resId));
+            CHECK_NULL_RETURN(userColor, false);
+            backgroundColor = userColor.value();
+        } else {
+            auto pipelineContext = columnNode->GetContext();
+            CHECK_NULL_RETURN(pipelineContext, false);
+            auto themeManager = pipelineContext->GetThemeManager();
+            CHECK_NULL_RETURN(themeManager, false);
+            auto themeContants = themeManager->GetThemeConstants();
+            CHECK_NULL_RETURN(themeContants, false);
+            backgroundColor = themeContants->GetColor(resId);
+        }
         auto copiedMaterial = systemMaterial->Copy();
         CHECK_NULL_RETURN(copiedMaterial, false);
         auto copiedOptions = copiedMaterial->GetImmersiveOptions();

@@ -15,6 +15,11 @@
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/pipeline_ng/pipeline_context.h"
+
+#include "core/components_ng/base/scroll_viewport_coordinator.h"
+#include "core/pipeline_ng/async_load_scheduler.h"
+
+#include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/inspector_occlusion_collector.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -1451,18 +1456,13 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
             FlushFocusScroll();
         }
     }
-    if (SystemProperties::GetContainerDeleteFlag()) {
-        if (isNeedCallbackAreaChange_) {
-            isNeedCallbackAreaChange_ = false;
-            RenderContext::SetNeedCallbackNodeChange(true);
-            HandleOnAreaChangeEvent(nanoTimestamp);
-            HandleVisibleAreaChangeEvent(nanoTimestamp);
-        } else {
-            ACE_SCOPED_TRACE("SkipAreaChangeEvent");
-        }
-    } else {
+    if (isNeedCallbackAreaChange_) {
+        isNeedCallbackAreaChange_ = false;
+        RenderContext::SetNeedCallbackNodeChange(true);
         HandleOnAreaChangeEvent(nanoTimestamp);
         HandleVisibleAreaChangeEvent(nanoTimestamp);
+    } else {
+        ACE_SCOPED_TRACE("SkipAreaChangeEvent");
     }
     UpdateFormLinkInfos();
     FlushDragEventVoluntarily();
@@ -6789,6 +6789,9 @@ void PipelineContext::OnIdle(int64_t deadline)
     if (scrollPlaceholderManager_ && scrollPlaceholderManager_->HasPendingRealBuild()) {
         scrollPlaceholderManager_->FlushRealBuild(deadline - TIME_THRESHOLD);
     }
+    // Custom-component asynchronous loading, normal path: the same idle window
+    // as FlushRealBuild, consuming deferred builds with the remaining frame budget.
+    GetAsyncLoadScheduler()->FlushIdleBuild(deadline - TIME_THRESHOLD);
     currentTime = GetSysTimestamp();
     if (currentTime < deadline) {
         auto frontend = GetFrontend();
@@ -6833,6 +6836,19 @@ void PipelineContext::Finish(bool /* autoFinish */) const
 void PipelineContext::AddAfterLayoutTask(std::function<void()>&& task, bool isFlushInImplicitAnimationTask)
 {
     taskScheduler_->AddAfterLayoutTask(std::move(task), isFlushInImplicitAnimationTask);
+}
+
+RefPtr<ScrollViewportCoordinator> PipelineContext::GetScrollViewportCoordinator()
+{
+    if (!scrollViewportCoordinator_) {
+        scrollViewportCoordinator_ = MakeRefPtr<ScrollViewportCoordinator>();
+        AddPersistAfterLayoutTask([weak = WeakClaim(this)]() {
+            auto pipeline = weak.Upgrade();
+            CHECK_NULL_VOID(pipeline);
+            pipeline->scrollViewportCoordinator_->Flush(AceType::RawPtr(pipeline));
+        });
+    }
+    return scrollViewportCoordinator_;
 }
 
 void PipelineContext::AddPersistAfterLayoutTask(std::function<void()>&& task)
@@ -8970,6 +8986,12 @@ void PipelineContext::AddAsyncLoadTask(std::function<void()>&& task)
 
 void PipelineContext::FlushAsyncLoadTask()
 {
+    // Custom-component asynchronous loading timeout checkpoint: this flush
+    // runs inside the per-frame vsync handling, the designed timestamp-comparison
+    // point. Reset the per-frame force budget first, then transfer expired
+    // idle entries into this queue so they execute as forced builds below (timeout
+    // backstop). Existing queue semantics are untouched.
+    GetAsyncLoadScheduler()->OnVsyncFlush(GetSysTimestamp());
     auto asyncLoadTasks = std::move(asyncLoadTasks_);
     for (auto& task : asyncLoadTasks) {
         task();
@@ -9084,6 +9106,24 @@ const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceh
         }
     });
     return scrollPlaceholderManager_;
+}
+
+void PipelineContext::RegisterAsyncLoadIdleEntry(const WeakPtr<UINode>& node)
+{
+    GetAsyncLoadScheduler()->RegisterIdleEntry(node);
+}
+
+void PipelineContext::RemoveAsyncLoadIdleEntry(const WeakPtr<UINode>& node)
+{
+    GetAsyncLoadScheduler()->RemoveIdleEntry(node);
+}
+
+AsyncLoadScheduler* PipelineContext::GetAsyncLoadScheduler()
+{
+    if (!asyncLoadScheduler_) {
+        asyncLoadScheduler_ = std::make_unique<AsyncLoadScheduler>(*this);
+    }
+    return asyncLoadScheduler_.get();
 }
 
 const RefPtr<ForceSplitManager>& PipelineContext::GetForceSplitManager() const

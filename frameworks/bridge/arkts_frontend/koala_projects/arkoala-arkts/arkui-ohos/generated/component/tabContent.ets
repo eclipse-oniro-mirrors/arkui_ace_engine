@@ -606,6 +606,18 @@ export class ArkTabContentPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabContentAttribute_setSidebarSection(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setKeepAliveAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabContentAttribute_setKeepAlive(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setTabBarVisibilityAttribute(visibility: TabVisibility, displayMode: TabBarDisplayMode | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (displayMode !== undefined) {
@@ -698,6 +710,9 @@ export interface TabContentAttribute extends CommonMethod {
     sidebarSection(value: SidebarSection | undefined): this {
         throw new Error('Unimplemented method sidebarSection')
     }
+    keepAlive(value: boolean | undefined): this {
+        throw new Error('Unimplemented method keepAlive')
+    }
     tabBarVisibility(visibility: TabVisibility, displayMode: TabBarDisplayMode | undefined): this {
         throw new Error('Unimplemented method tabBarVisibility')
     }
@@ -733,6 +748,11 @@ export class ArkTabContentComponent extends ArkCommonMethodComponent implements 
     public sidebarSection(value: SidebarSection | undefined): this {
         const value_casted = value as (SidebarSection | undefined)
         this.getPeer()?.setSidebarSectionAttribute(value_casted)
+        return this
+    }
+    public keepAlive(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setKeepAliveAttribute(value_casted)
         return this
     }
     public tabBarVisibility(visibility: TabVisibility, displayMode: TabBarDisplayMode | undefined): this {

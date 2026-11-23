@@ -43,9 +43,9 @@ void ImagePerfOhos::EndRecordImageLoadStat(
         id, imageType.c_str(), size.first, size.second, state);
 }
 
-void ImagePerfOhos::AddLoadComponent(int32_t nodeId)
+void ImagePerfOhos::AddLoadComponent(int32_t nodeId, int32_t sourceType, bool isVisible)
 {
-    HiviewDFX::PerfMonitorAdapter::GetInstance().AddLoadComponent(nodeId);
+    HiviewDFX::PerfMonitorAdapter::GetInstance().AddLoadComponent(nodeId, sourceType, isVisible);
 }
 
 void ImagePerfOhos::DeleteLoadComponent(int32_t nodeId)
@@ -53,8 +53,13 @@ void ImagePerfOhos::DeleteLoadComponent(int32_t nodeId)
     HiviewDFX::PerfMonitorAdapter::GetInstance().DeleteLoadComponent(nodeId);
 }
 
-void ImagePerfOhos::CompleteLoadComponent(int32_t nodeId)
+void ImagePerfOhos::CompleteLoadComponent(int32_t nodeId, bool isVisible)
 {
-    HiviewDFX::PerfMonitorAdapter::GetInstance().CompleteLoadComponent(nodeId);
+    HiviewDFX::PerfMonitorAdapter::GetInstance().CompleteLoadComponent(nodeId, isVisible);
+}
+
+void ImagePerfOhos::AttachComponent(int32_t nodeId)
+{
+    HiviewDFX::PerfMonitorAdapter::GetInstance().AttachComponent(nodeId);
 }
 } // namespace OHOS::Ace

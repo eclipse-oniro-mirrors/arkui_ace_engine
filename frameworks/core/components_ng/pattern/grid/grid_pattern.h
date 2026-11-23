@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_GRID_GRID_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_GRID_GRID_PATTERN_H
 
+#include <algorithm>
 #include <list>
 #include <map>
 #include <memory>
@@ -475,6 +476,28 @@ public:
     void CollectCachedIndexes(std::unordered_set<int32_t>& cachedIndexes, int32_t startLine,
         int32_t endLine) const;
 
+    /**
+     * @brief Sync-cache-in-layout per-instance switch, driven by attached Repeat-family
+     * nodes (RepeatNode / RepeatVirtualScroll2Node / ArkoalaLazyNode / ArkoalaForEachNode
+     * in Repeat mode) whose isAllowReuseInAnimation_ is explicitly false. Each qualifying node holds
+     * one reference from attach to detach; while any reference is held, the
+     * scrollable Grid builds, measures, positions and deactivates cache-range items
+     * synchronously in the current-frame Layout instead of the async predict preload.
+     * See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void AddSyncCacheLayoutChild()
+    {
+        ++syncCacheLayoutChildCount_;
+    }
+    void RemoveSyncCacheLayoutChild()
+    {
+        syncCacheLayoutChildCount_ = std::max(syncCacheLayoutChildCount_ - 1, 0);
+    }
+    bool IsSyncCacheLayoutEnabled() const
+    {
+        return syncCacheLayoutChildCount_ > 0;
+    }
+
 private:
     void DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
@@ -485,6 +508,9 @@ private:
     // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
     float snapGeometryEstimatedOffset_ = 0.0f;
     float snapGeometryStableOffset_ = 0.0f;
+
+    // number of attached Repeat-family nodes holding the sync-cache-in-layout mode
+    int32_t syncCacheLayoutChildCount_ = 0;
 
     /**
      * @brief calculate where startMainLine_ should be after spring animation.

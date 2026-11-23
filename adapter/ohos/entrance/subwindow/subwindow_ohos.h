@@ -78,10 +78,10 @@ public:
     void HideMenuNG(bool showPreviewAnimation, bool startDrag) override;
     void UpdateHideMenuOffsetNG(
         const NG::OffsetF& offset, float menuScale, bool isRedragStart, int32_t menuWrapperId = -1) override;
-    void ContextMenuSwitchDragPreviewAnimationtNG(const RefPtr<NG::FrameNode>& dragPreviewNode,
-        const NG::OffsetF& offset) override;
     void UpdatePreviewPosition() override;
     bool GetMenuPreviewCenter(NG::OffsetF& offset) override;
+    void ContextMenuSwitchDragPreviewAnimationtNG(const RefPtr<NG::FrameNode>& dragPreviewNode,
+        const NG::OffsetF& offset) override;
     void ShowPopup(const RefPtr<Component>& newComponent, bool disableTouchEvent = true) override;
     void ShowPopupNG(int32_t targetId, const NG::PopupInfo& popupInfo,
         const std::function<void(int32_t)>&& onWillDismiss = nullptr, bool interactiveDismiss = true) override;
@@ -305,6 +305,7 @@ private:
         std::function<void(int32_t, int32_t)>&& callback);
     void ShowActionMenuForService(const std::string& title, const std::vector<ButtonInfo>& button,
         std::function<void(int32_t, int32_t)>&& callback);
+
     RefPtr<PipelineBase> GetChildPipelineContext() const;
     std::function<void()> GetInitToastDelayTask(const NG::ToastInfo& toastInfo,
         std::function<void(int32_t)>&& callback);

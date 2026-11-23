@@ -46,3 +46,4 @@ void OverlayContainerPattern::BeforeCreateLayoutWrapper()
     }
 }
 } // namespace OHOS::Ace::NG
+

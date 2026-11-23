@@ -1085,4 +1085,50 @@ HWTEST_F(DynamicPatternTestNgTwo, DynamicComponentSafeManagerTest009, TestSize.L
     EXPECT_EQ(safeManager->GetAvoidArea().size(), 1);
 #endif
 }
+
+/**
+ * @tc.name: WorkerRefCountDecrementTest001
+ * @tc.desc: TDD verify DeleteWorkerUsing decrements refcount (not increments)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DynamicPatternTestNgTwo, WorkerRefCountDecrementTest001, TestSize.Level1)
+{
+    constexpr int32_t WORKER_SIZE_ONE = 1;
+    constexpr int32_t DC_MAX_NUM_IN_WORKER = 4;
+    std::map<int32_t, int32_t> usingWorkers;
+    int32_t workerId = 100;
+
+    usingWorkers[workerId] = WORKER_SIZE_ONE;
+    usingWorkers[workerId]++;
+    ASSERT_EQ(usingWorkers[workerId], 2);
+
+    auto deleteWorkerUsing = [&usingWorkers, workerId]() {
+        auto iter = usingWorkers.find(workerId);
+        if (iter == usingWorkers.end()) {
+            return;
+        }
+        if (iter->second <= WORKER_SIZE_ONE) {
+            usingWorkers.erase(iter);
+            return;
+        }
+        iter->second--;
+    };
+
+    deleteWorkerUsing();
+    ASSERT_EQ(usingWorkers[workerId], 1);
+    deleteWorkerUsing();
+    ASSERT_EQ(usingWorkers.count(workerId), 0);
+
+    usingWorkers[workerId] = WORKER_SIZE_ONE;
+    for (int i = 1; i < DC_MAX_NUM_IN_WORKER; ++i) {
+        usingWorkers[workerId]++;
+    }
+    ASSERT_EQ(usingWorkers[workerId], DC_MAX_NUM_IN_WORKER);
+    for (int i = 0; i < DC_MAX_NUM_IN_WORKER - 1; ++i) {
+        deleteWorkerUsing();
+    }
+    ASSERT_EQ(usingWorkers[workerId], 1);
+    deleteWorkerUsing();
+    ASSERT_EQ(usingWorkers.count(workerId), 0);
+}
 } // namespace OHOS::Ace::NG

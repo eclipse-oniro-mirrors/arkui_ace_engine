@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 
+#include <cstdint>
 #include <list>
 #include <map>
 #include <optional>
@@ -24,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/components_ng/pattern/sticky_header_pattern.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -31,6 +33,7 @@
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_info_base.h"
 #include "core/components_ng/pattern/waterflow/water_flow_content_modifier.h"
+#include <algorithm>
 
 namespace OHOS::Ace::NG {
 class WaterFlowAccessibilityProperty;
@@ -39,8 +42,8 @@ class WaterFlowLayoutProperty;
 class WaterFlowSections;
 struct WaterFlowFastScrollState;
 
-class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
-    DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern);
+class ACE_EXPORT WaterFlowPattern : public ScrollablePattern, public StickyHeaderPattern {
+    DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern, StickyHeaderPattern);
 
 public:
     ~WaterFlowPattern() override;
@@ -171,6 +174,15 @@ public:
 
     bool UpdateStartIndex(int32_t index);
 
+    void SetEdge(bool isHeader, const RefPtr<UINode>& edge, uint64_t generation);
+    void SetEdgeContent(bool isHeader, const RefPtr<UINode>& content);
+    bool HasStickyHeader() const override;
+    void UpdateEdgePositions() override;
+    void OnDetachFromFrameNode(FrameNode* frameNode) override;
+    WaterFlowChildIndexMap GetEdgeIndexMap() const;
+    int32_t GetDataCount() const;
+    // Keep header first and footer last without including either in FlowItem/Sections indices.
+    void SyncEdgeSlots();
     void AddFooter(const RefPtr<NG::UINode>& footer);
 
     void ResetLayoutInfo();
@@ -345,6 +357,29 @@ public:
     }
 
     int32_t GetFirstIndex() const override;
+
+    /**
+     * @brief Sync-cache-in-layout per-instance switch, driven by attached Repeat-family
+     * nodes (RepeatNode / RepeatVirtualScroll2Node / ArkoalaLazyNode / ArkoalaForEachNode
+     * in Repeat mode) whose isAllowReuseInAnimation_ is explicitly false. Each qualifying node holds
+     * one reference from attach to detach; while any reference is held, the
+     * scrollable WaterFlow builds, measures, positions and deactivates cache-range
+     * items synchronously in the current-frame Layout instead of the async predict
+     * preload. See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void AddSyncCacheLayoutChild()
+    {
+        ++syncCacheLayoutChildCount_;
+    }
+    void RemoveSyncCacheLayoutChild()
+    {
+        syncCacheLayoutChildCount_ = std::max(syncCacheLayoutChildCount_ - 1, 0);
+    }
+    bool IsSyncCacheLayoutEnabled() const
+    {
+        return syncCacheLayoutChildCount_ > 0;
+    }
+
 private:
     void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
@@ -382,6 +417,11 @@ private:
     double GetTopEdgeEffectPos() const;
     SizeF GetContentSize() const;
     void MarkDirtyNodeSelf();
+    void EnableEdgeSlots();
+    RefPtr<UINode> GetStickyFooter() const override
+    {
+        return footer_.Upgrade();
+    }
     // align to the very top via precise index jump when a backToTop animation settles short of the top
     void CheckBackToTopFallback();
     void OnScrollEndCallback() override;
@@ -485,6 +525,9 @@ private:
     bool legacyScrollFinishing_ = false;
     bool legacyScrollRetried_ = false;
     bool pendingMisalignmentCheck_ = false;
+
+    // number of attached Repeat-family nodes holding the sync-cache-in-layout mode
+    int32_t syncCacheLayoutChildCount_ = 0;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H

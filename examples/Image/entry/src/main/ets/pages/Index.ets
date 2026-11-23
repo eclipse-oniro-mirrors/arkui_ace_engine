@@ -38,6 +38,22 @@ struct Index {
             console.log('router ImageExample003');
             router.pushUrl({ url: 'pages/example/ImageExample003' })
           })
+          Button('router ImageDecodeQualityMatrixExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageDecodeQualityMatrixExample' })
+          })
+
+          Button('router ImageOnCompleteFieldsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageOnCompleteFieldsExample' })
+          })
+
+          Button('router ImageAutoResizeDynamicExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageAutoResizeDynamicExample' })
+          })
+
+          Button('router ImageSourceSizeDownsampleExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageSourceSizeDownsampleExample' })
+          })
+
 
           Button('router ImageExample004').onClick(() => {
             console.log('router ImageExample004');
@@ -248,6 +264,22 @@ struct Index {
             console.log('router ImageExample090');
             router.pushUrl({ url: 'pages/example/ImageExample090' })
           })
+          Button('router ImageOnErrorDetailExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageOnErrorDetailExample' })
+          })
+
+          Button('router ImageRetryReloadKeyExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageRetryReloadKeyExample' })
+          })
+
+          Button('router ImageEventTimelineExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageEventTimelineExample' })
+          })
+
+          Button('router ImageErrorV20FieldsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageErrorV20FieldsExample' })
+          })
+
 
           Button('router ImageExample091').onClick(() => {
             console.log('router ImageExample091');
@@ -268,6 +300,22 @@ struct Index {
             console.log('router ImageReloadKeyExample');
             router.pushUrl({ url: 'pages/example/ImageReloadKeyExample' })
           })
+          Button('router ImagePrivacySensitiveScenesExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImagePrivacySensitiveScenesExample' })
+          })
+
+          Button('router ImageCopyDragCombinedExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageCopyDragCombinedExample' })
+          })
+
+          Button('router ImageAnalyzerOptionsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageAnalyzerOptionsExample' })
+          })
+
+          Button('router ImageAltV22Example').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageAltV22Example' })
+          })
+
 
           Button('router ImageReloadKeyScenarioExample').onClick(() => {
             console.log('router ImageReloadKeyScenarioExample');
@@ -283,6 +331,22 @@ struct Index {
             console.log('router ImageBase64SvgExample');
             router.pushUrl({ url: 'pages/example/ImageBase64SvgExample' })
           })
+          Button('router ImageMatrixPipelineExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageMatrixPipelineExample' })
+          })
+
+          Button('router ImageOrientationFlipExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageOrientationFlipExample' })
+          })
+
+          Button('router ImageHdrDynamicRangeExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageHdrDynamicRangeExample' })
+          })
+
+          Button('router ImageMatrixAntialiasedExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageMatrixAntialiasedExample' })
+          })
+
 
           Button('router ImageContentDetectionExample').onClick(() => {
             console.log('router ImageContentDetectionExample');
@@ -313,6 +377,22 @@ struct Index {
             console.log('router ImageAvatarGalleryExample');
             router.pushUrl({ url: 'pages/example/ImageAvatarGalleryExample' })
           })
+          Button('router ImageSvg2FeatureWalkthroughExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageSvg2FeatureWalkthroughExample' })
+          })
+
+          Button('router ImageFillColorFormsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageFillColorFormsExample' })
+          })
+
+          Button('router ImageRenderModeConstraintsExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageRenderModeConstraintsExample' })
+          })
+
+          Button('router ImageResizableSliceLatticeExample').onClick(() {
+            router.pushUrl({ url: 'pages/example/ImageResizableSliceLatticeExample' })
+          })
+
 
           Button('router ImagePixelMapTransformExample').onClick(() => {
             router.pushUrl({ url: 'pages/example/ImagePixelMapTransformExample' })

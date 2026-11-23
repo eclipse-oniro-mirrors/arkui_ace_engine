@@ -149,7 +149,12 @@ void SetFontWeightRes(ArkUINodeHandle node, ArkUI_CharPtr fontWeight, void* font
     auto* frameNode = GetFrameNode(node);
     CHECK_NULL_VOID(frameNode);
     std::string fontWeightStr = fontWeight;
-    TextTimerModelNG::SetFontWeight(frameNode, Framework::ConvertStrToFontWeight(fontWeightStr));
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    CHECK_NULL_VOID(pipelineContext);
+    auto theme = pipelineContext->GetTheme<TextTheme>();
+    CHECK_NULL_VOID(theme);
+    TextTimerModelNG::SetFontWeight(
+        frameNode, Framework::ConvertStrToFontWeight(fontWeightStr, theme->GetTextStyle().GetFontWeight()));
     TextTimerModelNG::SetFontWeightByUser(frameNode, true);
     if (SystemProperties::ConfigChangePerform()) {
         if (fontWeightRawPtr) {

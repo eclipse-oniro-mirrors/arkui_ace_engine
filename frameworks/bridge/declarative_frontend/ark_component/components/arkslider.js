@@ -12,7 +12,6 @@
      * See the License for the specific language governing permissions and
      * limitations under the License.
      */
-
 function loadComponent() {
   if (loadComponent.componentObj === undefined && globalThis.__ArkComponent__ !== undefined) {
     class ArkSliderStepOptions {
@@ -620,8 +619,9 @@ function loadComponent() {
     SliderContentModifier.identity = Symbol('sliderContentModifier');
     loadComponent.componentObj = {'component' : ArkSliderComponent };
   }
- return loadComponent.componentObj;
+  return loadComponent.componentObj;
 }
+
 class JSSlider extends JSViewAbstract {
   static create(params) {
     getUINativeModule().slider.create(params);

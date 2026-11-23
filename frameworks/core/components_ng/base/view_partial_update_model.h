@@ -29,6 +29,8 @@
 
 namespace OHOS::Ace {
 
+struct AsyncLoadConfig;
+
 struct NodeInfoPU {
     std::function<void()> appearFunc;
     std::function<void()> didBuildFunc;
@@ -68,6 +70,9 @@ struct NodeInfoPU {
     std::string jsViewName;
     bool isV2 = false;
     int32_t reusableMemOptStrategy = -1;
+    // Asynchronous-loading configuration; null for components that did not call
+    // enableAsyncLoad, which keeps them on the existing synchronous path.
+    std::shared_ptr<AsyncLoadConfig> asyncLoadConfig;
     NG::ExtraInfo extraInfo;
 };
 

@@ -336,7 +336,6 @@ void ButtonLayoutAlgorithm::PerformMeasureSelf(LayoutWrapper* layoutWrapper)
         CHECK_NULL_VOID(context);
         auto buttonTheme = context->GetTheme<ButtonTheme>();
         CHECK_NULL_VOID(buttonTheme);
-
         auto defaultHeight = GetDefaultHeight(layoutWrapper);
         auto buttonType = buttonLayoutProperty->GetType().value_or(ButtonType::CAPSULE);
         if (buttonType == ButtonType::CIRCLE) {

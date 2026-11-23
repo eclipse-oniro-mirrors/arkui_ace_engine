@@ -358,6 +358,43 @@ HWTEST_F(UIContentTddTest, XComponentAngleConcurrentSetAndGet001, TestSize.Level
 }
 
 /**
+ * @tc.name: XComponentAngleConcurrentSetAndGet002
+ * @tc.desc: Test concurrent Set and Get with high thread count to verify shared_mutex protection
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentTddTest, XComponentAngleConcurrentSetAndGet002, TestSize.Level1)
+{
+    UIContent::SetXComponentCompensationAngle("");
+
+    const int setThreadCount = 20;
+    const int getThreadCount = 50;
+    std::vector<std::thread> threads;
+
+    for (int i = 0; i < setThreadCount; ++i) {
+        threads.emplace_back([i]() {
+            std::string config = R"({"angle": )" + std::to_string(i * 5.0) + R"(})";
+            UIContent::SetXComponentCompensationAngle(config);
+        });
+    }
+
+    for (int i = 0; i < getThreadCount; ++i) {
+        threads.emplace_back([]() {
+            for (int j = 0; j < 100; ++j) {
+                const std::string& config = UIContent::GetXComponentCompensationAngle();
+                (void)config;
+            }
+        });
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    const std::string& finalConfig = UIContent::GetXComponentCompensationAngle();
+    EXPECT_FALSE(finalConfig.empty());
+}
+
+/**
  * @tc.name: SetUIExtensionDensityFollowHost001
  * @tc.desc: Test SetUIExtensionDensityFollowHost interface existence
  * @tc.type: FUNC

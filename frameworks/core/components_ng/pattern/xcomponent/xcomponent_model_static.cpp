@@ -53,6 +53,13 @@ private:
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     void OnWindowHide() override;
     void OnWindowShow() override;
+    // visibility lifecycle hooks are virtual on XComponentPattern and overridden by
+    // XComponentPatternV2; without these overrides the V2 implementations answer for
+    // this pattern in the !isBindNative_ mode too, reading surfaceHolder-path state
+    // (hasSurfaceInitialized_/usesSuperMethod_) that mode never sets
+    bool IsSurfaceLifecycleReady() const override;
+    void OnVisibilityLifecycleCreate() override;
+    void OnVisibilityLifecycleDestroy() override;
     void OnRebuildFrame() override;
     void OnModifyDone() override;
     void DumpInfo() override;
@@ -283,6 +290,24 @@ void XComponentStaticPattern::OnWindowHide()
 void XComponentStaticPattern::OnWindowShow()
 {
     XCOMPONENT_STATIC_PATTERN_METHOD(OnWindowShow);
+}
+
+bool XComponentStaticPattern::IsSurfaceLifecycleReady() const
+{
+    // the surface lifecycle driver follows isBindNative_, so the readiness check
+    // must dispatch the same way the lifecycle hooks do
+    return isBindNative_ ? XComponentPatternV2::IsSurfaceLifecycleReady()
+                         : XComponentPattern::IsSurfaceLifecycleReady();
+}
+
+void XComponentStaticPattern::OnVisibilityLifecycleCreate()
+{
+    XCOMPONENT_STATIC_PATTERN_METHOD(OnVisibilityLifecycleCreate);
+}
+
+void XComponentStaticPattern::OnVisibilityLifecycleDestroy()
+{
+    XCOMPONENT_STATIC_PATTERN_METHOD(OnVisibilityLifecycleDestroy);
 }
 
 void XComponentStaticPattern::OnRebuildFrame()

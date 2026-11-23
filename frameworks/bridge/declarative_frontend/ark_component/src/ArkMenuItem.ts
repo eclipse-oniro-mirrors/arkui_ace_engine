@@ -140,7 +140,7 @@ class MenuItemOnChangeModifier extends ModifierWithKey<(selected: boolean) => vo
   applyPeer(node: KNode, reset: boolean): void {
     if (reset) {
       getUINativeModule().menuitem.resetOnChange(node);
-    } else{
+    } else {
       getUINativeModule().menuitem.setOnChange(node, this.value);
     }
   }

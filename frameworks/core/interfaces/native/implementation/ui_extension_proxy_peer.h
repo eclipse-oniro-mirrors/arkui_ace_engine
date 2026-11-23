@@ -18,6 +18,7 @@
 #include "base/memory/ace_type.h"
 #ifdef WINDOW_SCENE_SUPPORTED
 #include <mutex>
+#include <shared_mutex>
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
 #include "frameworks/core/interfaces/native/implementation/ui_extension_proxy_peer_base.h"
 #endif //WINDOW_SCENE_SUPPORTED
@@ -38,6 +39,7 @@ struct UIExtensionProxyPeerHost : public AceType {
 #ifdef WINDOW_SCENE_SUPPORTED
     inline void SetProxy(const ProxyRefPtr& proxy)
     {
+        std::unique_lock<std::shared_mutex> lock(proxyMutex_);
         proxy_ = proxy;
     }
 
@@ -48,6 +50,7 @@ struct UIExtensionProxyPeerHost : public AceType {
     
     inline PatternRefPtr GetPattern()
     {
+        std::shared_lock<std::shared_mutex> lock(proxyMutex_);
         CHECK_NULL_RETURN(proxy_, nullptr);
         return proxy_->GetPattern();
     }
@@ -120,6 +123,7 @@ private:
             return (item.first == id);
         });
     }
+    std::shared_mutex proxyMutex_;
     ProxyRefPtr proxy_;
     CallbackFuncPairList onSyncCallbackList_;
     CallbackFuncPairList onAsyncCallbackList_;

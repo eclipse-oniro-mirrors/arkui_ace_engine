@@ -2495,4 +2495,239 @@ HWTEST_F(DragDropManagerTestNg, DisableArkuiAnimation003, TestSize.Level1)
     dragDropManager->DisableArkuiAnimation(containerId, frameRenderContext);
 }
 
+/**
+ * @tc.name: DragDropManagerDragWindowVisible001
+ * @tc.desc: Test developer hides drag window in enter/move callbacks with same-value dedup.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNg, DragDropManagerDragWindowVisible001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct a DragDropManager and a target node with drag callbacks.
+     */
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(dragEvent, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+
+    /**
+     * @tc.steps: step2. the visible flag is not set, nothing happens.
+     * @tc.expected: step2. no hide state is recorded.
+     */
+    dragDropManager->HandleDragWindowVisibleByDeveloper(dragEvent, frameNode);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step3. hide the window in an enter/move callback, then repeat the same value.
+     * @tc.expected: step3. the hide IPC is issued exactly once and the owner node is recorded.
+     */
+    dragEvent->SetDragWindowVisible(false);
+    EXPECT_CALL(*mock, SetDragWindowVisible(false, _)).Times(1).WillOnce(Return(0));
+    dragDropManager->HandleDragWindowVisibleByDeveloper(dragEvent, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    EXPECT_TRUE(dragDropManager->dragWindowHideNode_.Upgrade() == frameNode);
+    dragDropManager->HandleDragWindowVisibleByDeveloper(dragEvent, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerDragWindowVisible002
+ * @tc.desc: Test the drag window is restored when the pointer leaves the hide node range or the
+ *           node is destroyed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNg, DragDropManagerDragWindowVisible002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct a DragDropManager and hide the window for a target node.
+     */
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(dragEvent, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    dragEvent->SetDragWindowVisible(false);
+    EXPECT_CALL(*mock, SetDragWindowVisible(false, _)).Times(1).WillOnce(Return(0));
+    dragDropManager->HandleDragWindowVisibleByDeveloper(dragEvent, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step2. the pointer moves outside the range of the hide node.
+     * @tc.expected: step2. the drag window is restored visible and the hide state is cleared.
+     */
+    EXPECT_CALL(*mock, SetDragWindowVisible(true, _)).Times(1).WillOnce(Return(0));
+    Point farPoint(1000.0f, 1000.0f);
+    dragDropManager->UpdateDragWindowVisibleByDeveloper(farPoint);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    EXPECT_TRUE(dragDropManager->dragWindowHideNode_.Upgrade() == nullptr);
+    testing::Mock::VerifyAndClearExpectations(mock);
+
+    /**
+     * @tc.steps: step3. hide for a node which is then destroyed during the drag.
+     * @tc.expected: step3. the next move restores the drag window visible.
+     */
+    EXPECT_CALL(*mock, SetDragWindowVisible(false, _)).Times(1).WillOnce(Return(0));
+    dragDropManager->HandleDragWindowVisibleByDeveloper(dragEvent, frameNode);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    frameNode.Reset();
+    EXPECT_CALL(*mock, SetDragWindowVisible(true, _)).Times(1).WillOnce(Return(0));
+    dragDropManager->UpdateDragWindowVisibleByDeveloper(Point(1.0f, 1.0f));
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerDragWindowVisible003
+ * @tc.desc: Test framework internal restore paths are gated while the developer hide is active.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNg, DragDropManagerDragWindowVisible003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. hide the window, then transfer the drag window to the drag framework.
+     * @tc.expected: step1. no SetDragWindowVisible call is issued at all.
+     */
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto mock = AceType::DynamicCast<MockInteractionInterface>(MockInteractionInterface::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    // isDragFwkShow_ defaults to true (the framework owns the window); flip it so the transfer
+    // actually runs its body.
+    dragDropManager->isDragFwkShow_ = false;
+    EXPECT_CALL(*mock, SetDragWindowVisible(_, _)).Times(0);
+    dragDropManager->TransDragWindowToDragFwk(WINDOW_ID);
+    EXPECT_TRUE(dragDropManager->isDragFwkShow_);
+    testing::Mock::VerifyAndClearExpectations(mock);
+
+    /**
+     * @tc.steps: step2. transfer the drag window without a developer hide.
+     * @tc.expected: step2. the transfer shows the drag window as before.
+     */
+    auto dragDropManagerNoHide = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManagerNoHide, nullptr);
+    dragDropManagerNoHide->isDragFwkShow_ = false;
+    EXPECT_CALL(*mock, SetDragWindowVisible(true, _)).Times(1).WillOnce(Return(0));
+    dragDropManagerNoHide->TransDragWindowToDragFwk(WINDOW_ID);
+    testing::Mock::VerifyAndClearExpectations(mock);
+
+    /**
+     * @tc.steps: step3. with the hide still active, reset the drag status on drop without a
+     *             custom animation.
+     * @tc.expected: step3. the window stays invisible (no SetDragWindowVisible(true) is issued)
+     *               and the hide state is cleared.
+     */
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    DragDropRet dragDropRet;
+    dragDropRet.result = DragRet::DRAG_SUCCESS;
+    dragDropRet.hasCustomAnimation = false;
+    EXPECT_CALL(*mock, StopDrag(_, _)).Times(1).WillOnce(Return(0));
+    EXPECT_CALL(*mock, SetDragWindowVisible(false, _)).Times(1).WillOnce(Return(0));
+    dragDropManager->ResetDragDropStatus(Point(1.0f, 1.0f), dragDropRet, WINDOW_ID);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    testing::Mock::VerifyAndClearExpectations(mock);
+}
+
+/**
+ * @tc.name: DragDropManagerDragWindowVisible004
+ * @tc.desc: Test the hide state is cleared on cancel/reset and ignored without a target node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNg, DragDropManagerDragWindowVisible004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. hide the window, then the drag is cancelled.
+     * @tc.expected: step1. the hide state is cleared.
+     */
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    dragDropManager->onDragCancel();
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step2. hide at drag start, then the state is reset including the first-move guard.
+     * @tc.expected: step2. the hide state and the guard flag are both cleared.
+     */
+    dragDropManager->NotifyDragWindowVisibleByDeveloper(frameNode, false);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    EXPECT_TRUE(dragDropManager->skipInitialDragMoveVisibleCheck_);
+    dragDropManager->ResetDragWindowHiddenByDeveloper();
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    EXPECT_FALSE(dragDropManager->skipInitialDragMoveVisibleCheck_);
+
+    /**
+     * @tc.steps: step3. hide is requested while no target node is hit.
+     * @tc.expected: step3. the request is ignored without a crash and no state is recorded.
+     */
+    auto dragEvent = AceType::MakeRefPtr<OHOS::Ace::DragEvent>();
+    ASSERT_NE(dragEvent, nullptr);
+    dragEvent->SetDragWindowVisible(false);
+    dragDropManager->HandleDragWindowVisibleByDeveloper(dragEvent, nullptr);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+}
+
+/**
+ * @tc.name: DragDropManagerDragWindowVisible005
+ * @tc.desc: Test a hide requested in onDragLeave is not applied while onDragEnter is applied.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropManagerTestNg, DragDropManagerDragWindowVisible005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct a target node with onDrop/onDragLeave/onDragEnter callbacks.
+     */
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(NODE_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(frameNode, nullptr);
+    auto eventHub = frameNode->GetEventHub<EventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    eventHub->SetOnDrop([](const RefPtr<OHOS::Ace::DragEvent>& /* event */, const std::string& /* info */) {});
+    bool leaveCallbackRun = false;
+    auto onDragLeave = [&leaveCallbackRun](const RefPtr<OHOS::Ace::DragEvent>& event, const std::string& /* info */) {
+        leaveCallbackRun = true;
+        event->SetDragWindowVisible(false);
+    };
+    eventHub->SetOnDragLeave(std::move(onDragLeave));
+
+    /**
+     * @tc.steps: step2. fire a LEAVE event whose callback requests hiding the window.
+     * @tc.expected: step2. the callback runs but the hide state is not applied.
+     */
+    DragPointerEvent pointerEvent;
+    dragDropManager->FireOnDragEvent(frameNode, pointerEvent, DragEventType::LEAVE, EXTRA_INFO);
+    EXPECT_TRUE(leaveCallbackRun);
+    EXPECT_FALSE(dragDropManager->IsDragWindowHiddenByDeveloper());
+
+    /**
+     * @tc.steps: step3. fire an ENTER event whose callback requests hiding the window.
+     * @tc.expected: step3. the hide state is applied with the node recorded as owner.
+     */
+    bool enterCallbackRun = false;
+    auto onDragEnter = [&enterCallbackRun](const RefPtr<OHOS::Ace::DragEvent>& event, const std::string& /* info */) {
+        enterCallbackRun = true;
+        event->SetDragWindowVisible(false);
+    };
+    eventHub->SetOnDragEnter(std::move(onDragEnter));
+    dragDropManager->FireOnDragEvent(frameNode, pointerEvent, DragEventType::ENTER, EXTRA_INFO);
+    EXPECT_TRUE(enterCallbackRun);
+    EXPECT_TRUE(dragDropManager->IsDragWindowHiddenByDeveloper());
+    EXPECT_TRUE(dragDropManager->dragWindowHideNode_.Upgrade() == frameNode);
+}
+
 } // namespace OHOS::Ace::NG

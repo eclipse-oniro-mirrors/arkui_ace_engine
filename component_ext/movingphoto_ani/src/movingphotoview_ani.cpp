@@ -22,9 +22,6 @@ namespace {
 static constexpr int32_t US_CONVERT = 1000;
 }
 
-std::unique_ptr<NG::MovingPhotoModelNG> NG::MovingPhotoModelNG::instance_ = nullptr;
-std::mutex NG::MovingPhotoModelNG::mutex_;
-
 ani_long MovingPhotoAni::CreateMovingPhotoNode([[maybe_unused]] ani_env *env, [[maybe_unused]] ani_class object,
     ani_int peerId, ani_int flags)
 {

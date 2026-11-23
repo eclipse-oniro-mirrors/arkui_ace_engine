@@ -45,7 +45,6 @@ class CheckboxGroupSelectedColorModifier extends ModifierWithKey<ResourceColor> 
   }
 }
 
-
 class CheckboxGroupUnselectedColorModifier extends ModifierWithKey<ResourceColor> {
   constructor(value: ResourceColor) {
     super(value);

@@ -4723,7 +4723,9 @@ void OverlayManager::SetSheetBackgroundColor(const RefPtr<FrameNode>& sheetNode,
             sheetNode->GetRenderContext()->UpdateBackgroundColor(
                 sheetStyle.backgroundColor.value_or(sheetTheme->GetSheetBackgoundColor()));
         } else if (sheetStyle.systemMaterial && SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
-            sheetNode->GetRenderContext()->UpdateBackgroundColor(sheetTheme->GetSheetBackgoundColor());
+            auto* sheetPatternModifier = NG::NodeModifier::GetSheetPatternInnerModifier();
+            CHECK_NULL_VOID(sheetPatternModifier);
+            sheetPatternModifier->sheetUpdateBackgroundColorIfNoMaterialColor(sheetNode, sheetStyle, sheetTheme);
         }
     }
 }
@@ -5539,7 +5541,10 @@ void OverlayManager::RemovePixelMapAnimation(bool startDrag, double x, double y,
         auto dragDropManager = pipeline->GetDragDropManager();
         CHECK_NULL_VOID(dragDropManager);
         DragEventActuator::ExecutePreDragAction(PreDragStatus::PREVIEW_LANDING_FINISHED);
-        if (!dragDropManager->IsNeedDisplayInSubwindow() && !isSubwindowOverlay && dragDropManager->IsDragging()) {
+        if (!dragDropManager->IsNeedDisplayInSubwindow() && !isSubwindowOverlay && dragDropManager->IsDragging() &&
+            !dragDropManager->IsDragWindowHiddenByDeveloper()) {
+            // The developer hide has a higher priority than this framework-internal restore path;
+            // restoring here would flash the drag window hidden in onDragStart.
             InteractionInterface::GetInstance()->SetDragWindowVisible(true);
         }
         auto overlayManager = weak.Upgrade();

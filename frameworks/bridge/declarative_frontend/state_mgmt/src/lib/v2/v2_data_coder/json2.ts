@@ -16,8 +16,12 @@
 class JSON2 {
   /**
    * JSON-like stringify with refs, cycles, and special types (Map, Set, Date, etc.)
+   * allowNullPropertyValues (default false, opt-in): when true, null property values
+   * are serialized as native JSON null; when false the historical TypeError is kept
+   * (PersistenceV2 behavior must stay byte-identical — only RecoverableStorage opts in).
    */
-  static stringify<T>(value: T, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false): string {
+  static stringify<T>(value: T, ignoreReadOnlyProperties: ReadOnlyPropertyFilter = false,
+    allowNullPropertyValues: boolean = false): string {
     // visited objects along with their assigned refIDs
     const visited = new Map<object, string>();
 
@@ -25,7 +29,7 @@ class JSON2 {
       const root = isRoot ? value : undefined;
       return JSON.stringify(value, function(key: string, value: unknown) {
         return JSON2.replaceValue_(this, key, value, root,
-          visited, serialize, serializeSendable, ignoreReadOnlyProperties);
+          visited, serialize, serializeSendable, ignoreReadOnlyProperties, allowNullPropertyValues);
       });
     };
 
@@ -46,11 +50,19 @@ class JSON2 {
     visited: Map<object, string>,
     serialize: (v: unknown, isRoot?: boolean) => string,
     serializeSendable: (v: unknown) => string,
-    ignoreReadOnlyProperties: ReadOnlyPropertyFilter): unknown {
+    ignoreReadOnlyProperties: ReadOnlyPropertyFilter,
+    allowNullPropertyValues: boolean): unknown {
     // don't trust JSON replacer's arg 'val' (it turns Date objects into strings)
     const value = obj[key];
 
     if (value === null) {
+      // Opt-in only (RecoverableStorage): null round-trips as native JSON null — the
+      // reviver's parseTRP returns no tag for null, decodeTypedValue_ passes it through,
+      // DataCoder.restorePropValue assigns it. Default (PersistenceV2 callers): keep the
+      // historical throw so existing behavior is untouched.
+      if (allowNullPropertyValues) {
+        return value;
+      }
       throw new TypeError('Cannot read property __proto__ of null');
     }
     if (typeof value !== 'object') {

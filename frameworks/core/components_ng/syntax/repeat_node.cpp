@@ -262,6 +262,11 @@ void RepeatNode::InitAllChildrenDragManager(bool init)
 
 bool RepeatNode::IsAllowAnimation()
 {
+    // RepeatOptions.allowReuseInAnimation explicitly set (highest priority):
+    // animation is allowed iff reuse during animation is disallowed
+    if (isAllowReuseInAnimation_.has_value()) {
+        return !isAllowReuseInAnimation_.value();
+    }
     auto parent = GetParentFrameNode();
     if (!parent) {
         TAG_LOGI(AceLogTag::ACE_REPEAT,
@@ -270,6 +275,38 @@ bool RepeatNode::IsAllowAnimation()
     }
     return parent->GetTag() == V2::LIST_ETS_TAG &&
         !LazyForEachUtils::IsIdInRepeatAnimationAllowReuseSet(parent->GetInspectorIdValue(""));
+}
+
+void RepeatNode::OnAttachToMainTree(bool recursive)
+{
+    ForEachBaseNode::OnAttachToMainTree(recursive);
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), true, isAllowReuseInAnimation_, true, syncCacheHost_);
+}
+
+void RepeatNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
+{
+    LazyForEachUtils::ToggleParentSyncCacheLayout(
+        Claim(this), false, isAllowReuseInAnimation_, true, syncCacheHost_);
+    ForEachBaseNode::OnDetachFromMainTree(recursive, context);
+}
+
+void RepeatNode::SetAllowReuseInAnimation(std::optional<bool> allow)
+{
+    if (isAllowReuseInAnimation_ == allow) {
+        return;
+    }
+    // The option can arrive after the node is already attached: native create()
+    // pushes and mounts the node synchronously, TS sets the option right afterwards,
+    // so the attach-time toggle above may have run with the previous value (unset).
+    // Re-run the toggle for the transition while attached: release the reference
+    // held for the old value, register for the new one when it now qualifies.
+    if (IsOnMainTree()) {
+        LazyForEachUtils::ToggleParentSyncCacheLayout(
+            Claim(this), false, isAllowReuseInAnimation_, true, syncCacheHost_);
+        LazyForEachUtils::ToggleParentSyncCacheLayout(Claim(this), true, allow, true, syncCacheHost_);
+    }
+    isAllowReuseInAnimation_ = allow;
 }
 
 bool RepeatNode::IsChildInAnimation(uint32_t fromIndex)

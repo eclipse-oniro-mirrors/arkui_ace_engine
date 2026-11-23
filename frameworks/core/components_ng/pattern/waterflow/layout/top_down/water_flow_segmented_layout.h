@@ -160,8 +160,9 @@ private:
      * @param idx FlowItem index.
      * @param padding top-left padding of WaterFlow component.
      * @param isReverse need to layout in reverse.
+     * @param syncCacheLayout whether the sync-cache-in-layout strategy is enabled.
      */
-    void LayoutItem(int32_t idx, float crossPos, const OffsetF& padding, bool isReverse);
+    void LayoutItem(int32_t idx, float crossPos, const OffsetF& padding, bool isReverse, bool syncCacheLayout);
 
     void MeasureOnJump(int32_t jumpIdx);
 
@@ -182,6 +183,16 @@ private:
     float SolveJumpOffset(const WaterFlowLayoutInfo::ItemInfo& item) const;
 
     void SyncPreloadItem(LayoutWrapper* host, int32_t itemIdx) override;
+
+    /**
+     * @brief Sync-cache-in-layout strategy: build, measure and deactivate cache-range
+     *        FlowItems synchronously inside the current-frame Layout when showCache is
+     *        false, instead of posting the delayed preload task. Gated by
+     *        WaterFlowLayoutBase::IsSyncCacheLayoutEnabled.
+     *
+     * @param cachedCount number of FlowItems to cache on each side of the viewport.
+     */
+    void SyncLayoutCacheItems(int32_t cachedCount);
 
     void MeasureRemainingLazyChild(int32_t startIdx, int32_t endIdx, bool forward = true) override;
 

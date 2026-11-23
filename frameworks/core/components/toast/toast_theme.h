@@ -71,7 +71,7 @@ public:
             theme->toastLimitHeightRatio_ =
                 toastPattern->GetAttr<double>("toast_limit_height_ratio", toastLimitHeightRatio);
             theme->bgThemeColorMode_ =
-                static_cast<uint32_t>(toastPattern->GetAttr<double>("toast_bg_theme_color_mode", 0));
+                    static_cast<uint32_t>(toastPattern->GetAttr<double>("toast_bg_theme_color_mode", 0));
 
             if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
                 theme->padding_ = Edge(toastPattern->GetAttr<Dimension>("toast_padding_level8", 0.0_vp).Value(),
@@ -217,27 +217,27 @@ public:
     {
         return bgThemeColorMode_;
     }
-
+ 
     int32_t GetAlign() const
     {
         return toastAlign_;
     }
-
+ 
     TextAlign GetMultiLineTextAlign() const
     {
         return multiLineTextAlign_;
     }
-
+ 
     double GetToastLimitHeightRatio() const
     {
         return toastLimitHeightRatio_;
     }
-    
+
     ShadowStyle GetToastShadowStyle() const
     {
         return toastShadowStyle_;
     }
-    
+
     int GetToastBackgroundBlurStyle() const
     {
         return toastBackgroundBlurStyle_;

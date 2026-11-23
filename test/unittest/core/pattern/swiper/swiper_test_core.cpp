@@ -33,6 +33,7 @@
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/root/root_pattern.h"
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 
@@ -805,6 +806,95 @@ HWTEST_F(SwiperDeviceRegressionTest, SelectedTabIdentityChangesAtSameIndex, Test
         a_.clear();
         b_.clear();
     }
+}
+
+/**
+ * @tc.name: HandleTabsCachedMaxCountKeepAlive001
+ * @tc.desc: HandleTabsCachedMaxCount returns early when there is no Tabs ancestor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, HandleTabsCachedMaxCountKeepAlive001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto swiperNode = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 700, pattern, true);
+    ASSERT_NE(swiperNode, nullptr);
+    pattern->hasTabsAncestor_ = false;
+    pattern->HandleTabsCachedMaxCount(0, 0);
+    EXPECT_TRUE(pattern->itemsNeedClean_.empty());
+}
+
+/**
+ * @tc.name: HandleTabsCachedMaxCountKeepAlive002
+ * @tc.desc: HandleTabsCachedMaxCount skips TabContent whose keepAlive is true when building itemsNeedClean_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, HandleTabsCachedMaxCountKeepAlive002, TestSize.Level1)
+{
+    auto tabsNode = FrameNode::CreateFrameNode(V2::TABS_ETS_TAG, 710, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(tabsNode, nullptr);
+    auto tabsLayoutProperty = AceType::MakeRefPtr<TabsLayoutProperty>();
+    ASSERT_NE(tabsLayoutProperty, nullptr);
+    tabsLayoutProperty->UpdateCachedMaxCount(0);
+    tabsNode->layoutProperty_ = tabsLayoutProperty;
+
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto swiperNode = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 711, pattern, true);
+    ASSERT_NE(swiperNode, nullptr);
+    tabsNode->AddChild(swiperNode);
+    pattern->hasTabsAncestor_ = true;
+
+    constexpr int32_t itemCount = 4;
+    std::vector<RefPtr<FrameNode>> children;
+    for (int32_t i = 0; i < itemCount; ++i) {
+        auto tabContentPattern = AceType::MakeRefPtr<TabContentPattern>(nullptr);
+        auto child = FrameNode::CreateFrameNode(V2::TAB_CONTENT_ITEM_ETS_TAG, 720 + i, tabContentPattern, true);
+        ASSERT_NE(child, nullptr);
+        swiperNode->AddChild(child);
+        children.emplace_back(child);
+    }
+    children[0]->GetPattern<TabContentPattern>()->SetKeepAlive(true);
+    children[1]->GetPattern<TabContentPattern>()->SetKeepAlive(false);
+
+    pattern->HandleTabsCachedMaxCount(2, 2);
+
+    EXPECT_EQ(pattern->itemsNeedClean_.count(0), 0U);
+    EXPECT_EQ(pattern->itemsNeedClean_.count(1), 1U);
+    EXPECT_EQ(pattern->itemsNeedClean_.count(2), 0U);
+    EXPECT_EQ(pattern->itemsNeedClean_.count(3), 1U);
+}
+
+/**
+ * @tc.name: HandleTabsCachedMaxCountKeepAlive003
+ * @tc.desc: HandleTabsCachedMaxCount cleans all non-keepAlive TabContent when none is within the cache range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, HandleTabsCachedMaxCountKeepAlive003, TestSize.Level1)
+{
+    auto tabsNode = FrameNode::CreateFrameNode(V2::TABS_ETS_TAG, 730, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(tabsNode, nullptr);
+    auto tabsLayoutProperty = AceType::MakeRefPtr<TabsLayoutProperty>();
+    ASSERT_NE(tabsLayoutProperty, nullptr);
+    tabsLayoutProperty->UpdateCachedMaxCount(0);
+    tabsNode->layoutProperty_ = tabsLayoutProperty;
+
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto swiperNode = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 731, pattern, true);
+    ASSERT_NE(swiperNode, nullptr);
+    tabsNode->AddChild(swiperNode);
+    pattern->hasTabsAncestor_ = true;
+
+    constexpr int32_t itemCount = 3;
+    for (int32_t i = 0; i < itemCount; ++i) {
+        auto tabContentPattern = AceType::MakeRefPtr<TabContentPattern>(nullptr);
+        auto child = FrameNode::CreateFrameNode(V2::TAB_CONTENT_ITEM_ETS_TAG, 740 + i, tabContentPattern, true);
+        ASSERT_NE(child, nullptr);
+        child->GetPattern<TabContentPattern>()->SetKeepAlive(true);
+        swiperNode->AddChild(child);
+    }
+
+    pattern->HandleTabsCachedMaxCount(1, 1);
+
+    EXPECT_TRUE(pattern->itemsNeedClean_.empty());
 }
 
 } // namespace OHOS::Ace::NG

@@ -273,9 +273,9 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderGroupMixedIndex001, TestS
 /**
  * @tc.name: ScrollPlaceholderCommitAndRetire001
  * @tc.desc: The framed real-build closure builds the real item through the existing
- *           acquisition and the layout-round reconcile retires the shell from the
- *           host; placeholders left over an already-built slot are retired by the
- *           reconcile (real child wins, shell never rebuilds over it).
+ *           acquisition and retires the shell in the same commit so it cannot
+ *           paint over the real item. The following layout-round reconcile keeps
+ *           both tables consistent without rebuilding the shell.
  * @tc.type: FUNC
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestSize.Level1)
@@ -312,9 +312,11 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     // Real build: the real child enters the tree at the same slot index.
     EXPECT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
     EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) != nullptr);
-    EXPECT_FALSE(pattern_->retiringPlaceholderShells_.empty());
+    EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
+    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
+    EXPECT_FALSE(IsChildOfHost(shell));
 
-    // Reconcile retires the shell: unmounted from the host, tables cleared.
+    // Reconcile remains safe after the commit has already retired the shell.
     pattern_->ReconcileScrollPlaceholderItems(-1, -1);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());

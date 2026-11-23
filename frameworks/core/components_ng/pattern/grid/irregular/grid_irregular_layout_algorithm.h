@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_GRID_GRID_IRREGULAR_LAYOUT_ALGORITHM_H
 
 #include "base/utils/noncopyable.h"
+#include "core/components/common/properties/alignment.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/grid/grid_layout_base_algorithm.h"
 #include "core/components_ng/pattern/grid/grid_layout_info.h"
@@ -101,12 +102,58 @@ private:
     void CheckForReset();
 
     /**
+     * @brief Per-tile geometry shared by one LayoutChildren pass: tile alignment,
+     *        cross positions, padding-free frame size for the RTL flip, left padding.
+     */
+    struct TileLayoutContext {
+        Alignment align;
+        std::vector<float> crossPos;
+        SizeF frameSize;
+        bool isRtl = false;
+        float paddingOffset = 0.0f;
+    };
+
+    /**
+     * @brief Inclusive item-index window; items outside it are skipped during layout.
+     */
+    struct ItemRange {
+        int32_t head = 0;
+        int32_t tail = -1;
+    };
+
+    /**
      * @brief Performs the layout of the children based on the main offset.
      * @param mainOffset The main offset of the layout.
      * @param cacheLine number of lines of cache items to layout
+     * @param syncCacheLayout whether the sync-cache-in-layout strategy is enabled.
+     * @param syncCacheLayoutChild whether a sync-cache-layout child is attached
+     *        (GridPattern::IsSyncCacheLayoutEnabled); gates the index-window adjustments
+     *        so they stay inert for grids without the feature.
      * @return number of cached items laid out in front and back
      */
-    std::pair<int32_t, int32_t> LayoutChildren(float mainOffset, int32_t cacheLine);
+    std::pair<int32_t, int32_t> LayoutChildren(
+        float mainOffset, int32_t cacheLine, bool syncCacheLayout, bool syncCacheLayoutChild);
+
+    /**
+     * @brief Resolves the item-index window of the layout walk.
+     * @param cacheLine number of lines of cache items to layout.
+     * @param syncCacheLayoutChild whether a sync-cache-layout child is attached.
+     * @return [head, tail] bounds; [0, childrenCount - 1] without the feature.
+     */
+    ItemRange GetItemRange(int32_t cacheLine, bool syncCacheLayoutChild) const;
+
+    /**
+     * @brief Lays out every item of matrix line [lineIdx] at main-axis position [mainPos].
+     */
+    void LayoutMatrixLine(int32_t lineIdx, const std::map<int32_t, int32_t>& row, float lineHeight, bool isCache,
+        bool syncCacheLayout, bool syncCacheLayoutChild, const ItemRange& range, const TileLayoutContext& ctx,
+        float mainPos, std::pair<int32_t, int32_t>& cacheCnt);
+
+    /**
+     * @brief Counts [itemIdx] into the head or tail cache count of the layout pass.
+     */
+    void CountCacheItem(int32_t itemIdx, int32_t lineIdx, bool syncCacheLayoutChild,
+        std::pair<int32_t, int32_t>& cacheCnt) const;
 
     /**
      * @brief Update variables in GridLayoutInfo at the end of Layout.
@@ -169,6 +216,33 @@ private:
      * @brief immediately create & measure GridItems in cache range.
      */
     void SyncPreloadItems(int32_t cacheCnt);
+    /**
+     * @brief Sync-cache-in-layout strategy: build, measure and deactivate cache-range
+     *        GridItems synchronously inside the current-frame Layout when showCache is
+     *        false, instead of posting the delayed preload task. Gated by
+     *        GridLayoutBaseAlgorithm::IsSyncCacheLayoutEnabled.
+     */
+    void SyncLayoutCacheItems(int32_t cacheCnt);
+    /**
+     * @brief Sync-cache-in-layout: deactivates a cache-range item in the same frame.
+     *        [syncCacheLayout] is the strategy resolved once by the Layout caller.
+     */
+    void DeactivateSyncCacheItem(const RefPtr<LayoutWrapper>& child, bool isCache, bool syncCacheLayout);
+
+    /**
+     * @brief Returns the child of the tile's top-left item, or nullptr when [itemIdx] is
+     *        not a top-left tile of the matrix or the child is not built.
+     */
+    RefPtr<LayoutWrapper> GetTileChild(int32_t itemIdx, int32_t mainLine, int32_t col, bool isCache);
+
+    /**
+     * @brief Positions one child tile inside its block (cross offset, main position,
+     *        alignment, RTL flip, padding) and lays it out, or only syncs its geometry
+     *        for clean cache items, then checks the new-op-inc node.
+     */
+    void LayoutChildAtTile(const RefPtr<LayoutWrapper>& child, float crossOffset, float mainPos,
+        const OffsetF& alignPos, const SizeF& childSize, const SizeF& frameSize, bool isRtl, float paddingOffset,
+        bool isCache, bool syncCacheLayout);
 
     void AdaptToChildMainSize(RefPtr<GridLayoutProperty>& gridLayoutProperty, float mainSize, SizeF idealSize);
 

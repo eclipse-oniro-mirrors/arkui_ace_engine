@@ -40,6 +40,7 @@
 #include "base/geometry/shape.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/i18n/localization.h"
+#include "base/image/image_color_filter.h"
 #include "base/json/json_util.h"
 #include "base/log/ace_scoring_log.h"
 #include "base/log/log.h"
@@ -9293,6 +9294,21 @@ void JSViewAbstract::JsGrayScale(const JSCallbackInfo& info)
     ViewAbstractModel::GetInstance()->SetGrayScale(value);
 }
 
+void JSViewAbstract::JsColorFilterEffect(const JSCallbackInfo& info)
+{
+    if (info.Length() < 1 || !info[0]->IsObject()) {
+        ViewAbstractModel::GetInstance()->ResetColorFilterEffect();
+        return;
+    }
+    auto* imageColorFilter = JSRef<JSObject>::Cast(info[0])->Unwrap<ImageColorFilter>();
+    if (imageColorFilter &&
+        imageColorFilter->GetColorFilterMatrix().size() == ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        ViewAbstractModel::GetInstance()->SetColorFilterEffect(imageColorFilter->GetColorFilterMatrix());
+    } else {
+        ViewAbstractModel::GetInstance()->ResetColorFilterEffect();
+    }
+}
+
 void JSViewAbstract::JsBrightness(const JSCallbackInfo& info)
 {
     CalcDimension value;
@@ -10429,6 +10445,7 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
     JSClass<JSViewAbstract>::StaticMethod("blendMode", &JSViewAbstract::JsBlendMode);
     JSClass<JSViewAbstract>::StaticMethod("advancedBlendMode", &JSViewAbstract::JsAdvancedBlendMode);
     JSClass<JSViewAbstract>::StaticMethod("grayscale", &JSViewAbstract::JsGrayScale);
+    JSClass<JSViewAbstract>::StaticMethod("colorFilterEffect", &JSViewAbstract::JsColorFilterEffect);
     JSClass<JSViewAbstract>::StaticMethod("focusable", &JSViewAbstract::JsFocusable);
     JSClass<JSViewAbstract>::StaticMethod("tabStop", &JSViewAbstract::JsTabStop);
     JSClass<JSViewAbstract>::StaticMethod("nextFocus", &JSViewAbstract::JsNextFocus);

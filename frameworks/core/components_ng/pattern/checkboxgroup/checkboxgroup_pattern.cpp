@@ -465,7 +465,7 @@ void CheckBoxGroupPattern::UpdateCheckBoxStatus(const RefPtr<FrameNode>& frameNo
     std::vector<std::string> vec;
     auto status =
         select ? CheckBoxGroupPaintProperty::SelectStatus::ALL : CheckBoxGroupPaintProperty::SelectStatus::NONE;
-    for (auto && node : list) {
+    for (auto&& node : list) {
         if (!node) {
             continue;
         }

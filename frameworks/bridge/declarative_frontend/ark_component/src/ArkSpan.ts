@@ -648,6 +648,10 @@ class ArkSpanComponent {
     throw new BusinessError(100201, 'grayscale function not supported in attributeModifier scenario.');
   }
 
+  colorFilterEffect(filter: ColorFilter | undefined): this {
+    throw new BusinessError(100201, 'colorFilterEffect function not supported in attributeModifier scenario.');
+  }
+
   colorBlend(value: Color | string | Resource): this {
     throw new BusinessError(100201, 'colorBlend function not supported in attributeModifier scenario.');
   }

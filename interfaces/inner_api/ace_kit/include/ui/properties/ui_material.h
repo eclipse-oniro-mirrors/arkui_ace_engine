@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "ui/base/ace_type.h"
+#include "ui/properties/blur_style_option.h"
 #include "ui/properties/color.h"
 #include "ui/properties/ui_material_enums.h"
 #include "ui/resource/resource_object.h"
@@ -41,6 +42,7 @@ struct ImmersiveOptions {
     UiMaterialStyle style = UiMaterialStyle::REGULAR;
     ColorMode colorMode = ColorMode::COLOR_MODE_UNDEFINED;
     MaterialColorBlendMode colorBlendMode = MaterialColorBlendMode::LINEAR_MIX;
+    ThemeColorMode userColorMode = ThemeColorMode::SYSTEM;
 
     /** ------------------ bool params ------------------ */
     bool colorInvert = false;

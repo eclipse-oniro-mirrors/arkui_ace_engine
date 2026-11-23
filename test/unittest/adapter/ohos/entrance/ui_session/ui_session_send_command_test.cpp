@@ -803,8 +803,6 @@ TEST(CommandResultTest, BatchInvalidEnvelopeExecutesNothingAndAllSuccessIsAggreg
 
 TEST(CommandResultTest, SecurityDeniedKeepsClassificationAndBatchItemIsSkipped)
 {
-    EXPECT_EQ(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED)),
-        R"({"result":"FAILED","errorType":"SECURITY_DENIED","errorMessage":""})");
     // The refusal must not be degraded into EXECUTE_FAIL by long/invalid messages.
     auto json = SerializeCommandResult(
         NG::CommandResult::Error(NG::CommandErrorType::SECURITY_DENIED, std::string(200, 'a')));

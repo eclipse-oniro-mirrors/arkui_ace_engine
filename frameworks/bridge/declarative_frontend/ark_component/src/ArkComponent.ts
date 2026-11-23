@@ -839,6 +839,20 @@ class GrayscaleModifier extends ModifierWithKey<number> {
   }
 }
 
+class ColorFilterEffectModifier extends ModifierWithKey<ColorFilter | undefined> {
+  constructor(value: ColorFilter | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('colorFilterEffect');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset || this.value === undefined) {
+      getUINativeModule().common.resetColorFilterEffect(node);
+    } else {
+      getUINativeModule().common.setColorFilterEffect(node, this.value);
+    }
+  }
+}
+
 class ContrastModifier extends ModifierWithKey<number> {
   constructor(value: number) {
     super(value);
@@ -5357,6 +5371,11 @@ class ArkComponent {
     } else {
       modifierWithKey(this._modifiersWithKeys, GrayscaleModifier.identity, GrayscaleModifier, value);
     }
+    return this;
+  }
+
+  colorFilterEffect(filter: ColorFilter | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, ColorFilterEffectModifier.identity, ColorFilterEffectModifier, filter);
     return this;
   }
 

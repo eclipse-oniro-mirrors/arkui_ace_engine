@@ -28,9 +28,10 @@ public:
     virtual void StartRecordImageLoadStat(int64_t id) {}
     virtual void EndRecordImageLoadStat(int64_t id, const std::string& imageType, std::pair<int, int> size, int state)
     {}
-    virtual void AddLoadComponent(int32_t nodeId) {}
+    virtual void AddLoadComponent(int32_t nodeId, int32_t sourceType = 0, bool isVisible = false) {}
     virtual void DeleteLoadComponent(int32_t nodeId) {}
-    virtual void CompleteLoadComponent(int32_t nodeId) {}
+    virtual void CompleteLoadComponent(int32_t nodeId, bool isVisible = false) {}
+    virtual void AttachComponent(int32_t nodeId) {}
     virtual ~ImagePerf() = default;
 
     static ImagePerf* GetPerfMonitor();
