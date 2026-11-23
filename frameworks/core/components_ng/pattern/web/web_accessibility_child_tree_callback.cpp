@@ -28,12 +28,27 @@ bool WebAccessibilityChildTreeCallback::OnRegister(uint32_t windowId, int32_t tr
         return false;
     }
     if (isReg_) {
+        if (treeId == registeredTreeId_) {
+            return true;
+        }
+        // The accessibility tree id may be assigned asynchronously after a premature registration
+        // (e.g. triggered by InitializeAccessibility with a not-ready tree id). Re-register the child
+        // tree with the new id, otherwise the registration keeps the stale parent tree id forever.
+        if (!pattern->OnAccessibilityChildTreeRegister()) {
+            TAG_LOGE(AceLogTag::ACE_WEB, "OnRegister, re-register child tree failed");
+            return false;
+        }
+        pattern->SetAccessibilityState(true, isDelayed_);
+        registeredTreeId_ = treeId;
+        isDelayed_ = false;
         return true;
     }
     if (!pattern->OnAccessibilityChildTreeRegister()) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "OnRegister, register child tree failed");
         return false;
     }
     pattern->SetAccessibilityState(true, isDelayed_);
+    registeredTreeId_ = treeId;
     isDelayed_ = false;
     isReg_ = true;
     return true;
@@ -49,10 +64,12 @@ bool WebAccessibilityChildTreeCallback::OnDeregister()
         return true;
     }
     if (!pattern->OnAccessibilityChildTreeDeregister()) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "OnDeregister, deregister child tree failed");
         return false;
     }
     pattern->SetAccessibilityState(false);
     isReg_ = false;
+    registeredTreeId_ = 0;
     return true;
 }
 
@@ -79,6 +96,7 @@ void WebAccessibilityChildTreeCallback::OnClearRegisterFlag()
         return;
     }
     isReg_ = false;
+    registeredTreeId_ = 0;
 }
 
 void WebAccessibilityChildTreeCallback::SetIsDelayed(bool isDelayed)

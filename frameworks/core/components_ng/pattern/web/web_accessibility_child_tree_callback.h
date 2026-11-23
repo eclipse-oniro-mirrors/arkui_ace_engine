@@ -45,6 +45,7 @@ public:
 private:
     bool isReg_ = false;
     bool isDelayed_ = false;
+    int32_t registeredTreeId_ = 0;
     WeakPtr<WebPattern> weakPattern_;
 };
 } // namespace OHOS::Ace::NG
