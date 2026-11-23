@@ -726,6 +726,10 @@ void ImagePattern::OnImageDataReady()
 
     if (CheckIfNeedLayout()) {
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        if (isDecodeCacheReactivated_ && geometryNode->GetContentSize().IsPositive()) {
+            isDecodeCacheReactivated_ = false;
+            StartDecoding(geometryNode->GetContentSize());
+        }
         return;
     }
 
@@ -1161,6 +1165,7 @@ bool ImagePattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, 
     if (config.skipMeasure || dirty->SkipMeasureContent()) {
         return false;
     }
+    isDecodeCacheReactivated_ = false;
     const auto& dstSize = dirty->GetGeometryNode()->GetContentSize();
     StartDecoding(dstSize);
     LoadingContext();
@@ -1788,9 +1793,13 @@ void ImagePattern::SetDecodeCacheActive(bool active)
         }
         DoRecycleImageData("decodeWindow", "DecodeWindowDeactivate", false);
     } else {
+        bool wasRecycled = isRecycledImage_;
         isRecycledImage_ = false;
         if (loadingCtx_ && !image_) {
             isImageReloadNeeded_ = true;
+        }
+        if (wasRecycled) {
+            isDecodeCacheReactivated_ = true;
         }
         LoadImageDataIfNeed();
     }
