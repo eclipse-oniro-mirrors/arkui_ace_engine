@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_BASE_EXECUTOR_H
 
 #include <string>
+#include <utility>
 
 #include "base/memory/referenced.h"
 #include "core/components_ng/relaxed_interaction/frame_node_finder.h"
@@ -39,6 +40,18 @@ public:
     virtual std::string GetType() const = 0;
 
     virtual bool IsSingleStep() const = 0;
+
+    // P2 security seam: stamp deny callback and identity before execution.
+    virtual void SetDenyCallback(RelaxedDenyCallback callback, const RelaxedCommandIdentity& identity)
+    {
+        denyCallback_ = std::move(callback);
+        identity_ = identity;
+    }
+
+    bool IsDenied(const PointF& coordinates) const
+    {
+        return denyCallback_ && denyCallback_(coordinates, identity_);
+    }
 
     virtual std::string GetDescription() const
     {
@@ -65,6 +78,8 @@ protected:
     bool IsTargetDeniedAt(double x, double y);
     WeakPtr<PipelineContext> context_;
     ExecutionState failureState_ = ExecutionState::FAILED;
+    RelaxedDenyCallback denyCallback_;
+    RelaxedCommandIdentity identity_;
 };
 
 } // namespace OHOS::Ace::NG

@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_RELAXED_INTERACTION_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_RELAXED_INTERACTION_MANAGER_H
 
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -25,6 +26,10 @@
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
+
+namespace OHOS::Ace {
+class JsonValue;
+} // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
 
@@ -44,23 +49,49 @@ public:
     ProcessResult ProcessCommand(
         const std::string& jsonStr, const std::function<void(ExecutionState)>& finishCallback);
     ProcessResult ProcessCommand(const std::string& jsonStr,
-        const std::function<void(ExecutionState)>& finishCallback, bool interruptibleByUser);
+        const std::function<void(ExecutionState)>& finishCallback, bool interruptibleByUser, bool isPcCommand = false);
 
     ExecutionState ExecuteNextStep();
 
     bool HasPendingWorkflow() const;
+    bool IsContextAvailable() const;
 
     void Clear();
     void Clear(ExecutionState reason);
 
+    // P2 security seam: deny check consulted by executors before injection.
+    void SetDenyCallback(RelaxedDenyCallback callback);
+
+    // P2 conflict matrix: input class of the workflow being executed.
+    bool IsPointerClassInjectionRunning() const;
+    bool IsKeyClassInjectionRunning() const;
+
+    enum class UserInput { POINTER, KEY, OTHER };
+    void InterruptForUserInput(UserInput input, bool interruptLegacy = true);
+
+    // Per-command execution timeout; kept configurable for host tests.
+    void SetCommandTimeoutMs(int32_t timeoutMs)
+    {
+        commandTimeoutMs_ = timeoutMs > 0 ? timeoutMs : DEFAULT_COMMAND_TIMEOUT_MS;
+    }
+
+    static constexpr int32_t DEFAULT_COMMAND_TIMEOUT_MS = 5000;
+
 private:
     ProcessResult ProcessCommandInternal(const std::string& jsonStr,
         const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics,
-        bool interruptibleByUser = false);
+        bool interruptibleByUser = false, bool isPcCommand = false);
+    ProcessResult ParseAndEnqueueCommand(const std::unique_ptr<JsonValue>& json,
+        const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics,
+        bool interruptibleByUser, bool isPcCommand);
     void ClearInterruptedWorkflows(bool currentStepFinished = false);
     bool HandleDeferredClear(ExecutorResult result, ExecutionState& state);
     ExecutionState DoExecuteNextStep(std::function<void(ExecutionState)>& finishCallback);
+    ExecutionState ExecuteStepWithoutWorkflow(ExecutorResult result);
     ExecutionState ExecuteLegacyWorkflow(ExecutorResult result);
+    void CompleteCurrentWorkflow(std::function<void(ExecutionState)>& finishCallback, bool stepFinished);
+    // Completes the running workflow with TIMEOUT when it exceeds the per-command timeout.
+    bool HandleWorkflowTimeout(std::function<void(ExecutionState)>& timeoutCallback);
     std::string ExecutionStateToString(ExecutionState state);
     std::string ExecutorsToString(const std::vector<std::unique_ptr<BaseExecutor>>& executors);
 
@@ -83,6 +114,9 @@ private:
         // controller(agent) relayed by the UISession caller (see SecurityAuthInfo).
         bool needSecurityAuth = false;
         uint64_t agentTokenId = UINT64_MAX;
+        std::string commandType;
+        std::chrono::steady_clock::time_point startTime {};
+        bool isPcCommand = false;
     };
     enum class ExecutionPhase {
         IDLE,
@@ -93,6 +127,7 @@ private:
     std::deque<std::function<void(ExecutionState)>> pendingUserCompletions_;
     ExecutionPhase executionPhase_ = ExecutionPhase::IDLE;
     ExecutionState clearReason_ = ExecutionState::FAILED;
+    int32_t commandTimeoutMs_ = DEFAULT_COMMAND_TIMEOUT_MS;
 };
 
 } // namespace OHOS::Ace::NG

@@ -17,6 +17,7 @@
 
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -100,6 +101,74 @@ TouchEvent RelaxedEventFactory::CreateTouchEvent(const PointF& coordinates, Touc
     auto touchPoint = CreateTouchPoint(coordinates, touchType);
     auto event = BuildTouchEvent(touchPoint, touchType);
     event.pointers.emplace_back(touchPoint);
+    return event;
+}
+
+MouseEvent RelaxedEventFactory::CreateMouseEvent(const PointF& coordinates, MouseAction action,
+    MouseButton button, int32_t pressedButtons, const std::vector<KeyCode>& pressedKeyCodes)
+{
+    MouseEvent event;
+    auto now = std::chrono::high_resolution_clock::now();
+    event.x = coordinates.GetX();
+    event.y = coordinates.GetY();
+    event.screenX = coordinates.GetX();
+    event.screenY = coordinates.GetY();
+    event.globalDisplayX = coordinates.GetX();
+    event.globalDisplayY = coordinates.GetY();
+    event.time = now;
+    event.action = action;
+    event.button = button;
+    event.pressedButtons = pressedButtons;
+    event.pressedKeyCodes_ = pressedKeyCodes;
+    event.sourceType = SourceType::MOUSE;
+    event.sourceTool = SourceTool::MOUSE;
+    event.isInjected = true;
+    event.deviceId = 0;
+    event.originalId = 0;
+    return event;
+}
+
+AxisEvent RelaxedEventFactory::CreateAxisEvent(const PointF& coordinates, double delta,
+    const std::vector<KeyCode>& pressedCodes)
+{
+    return CreateAxisEvent(coordinates, Offset(), delta, pressedCodes, WheelScrollDirection::VERTICAL);
+}
+
+AxisEvent RelaxedEventFactory::CreateAxisEvent(const PointF& coordinates, const Offset& windowOffset, double delta,
+    const std::vector<KeyCode>& pressedCodes, WheelScrollDirection direction, AxisAction action)
+{
+    AxisEvent event;
+    auto now = std::chrono::high_resolution_clock::now();
+    event.x = coordinates.GetX();
+    event.y = coordinates.GetY();
+    event.screenX = coordinates.GetX() + windowOffset.GetX();
+    event.screenY = coordinates.GetY() + windowOffset.GetY();
+    event.globalDisplayX = coordinates.GetX() + windowOffset.GetX();
+    event.globalDisplayY = coordinates.GetY() + windowOffset.GetY();
+    event.time = now;
+    if (direction == WheelScrollDirection::HORIZONTAL) {
+        event.horizontalAxis = delta;
+        event.axes = 1U << static_cast<uint32_t>(AxisType::HORIZONTAL_AXIS);
+    } else {
+        event.verticalAxis = delta;
+        event.axes = 1U << static_cast<uint32_t>(AxisType::VERTICAL_AXIS);
+    }
+    event.action = action;
+    event.sourceType = SourceType::MOUSE;
+    event.sourceTool = SourceTool::MOUSE;
+    event.pressedCodes = pressedCodes;
+    event.isInjected = true;
+    event.deviceId = 0;
+    return event;
+}
+
+KeyEvent RelaxedEventFactory::CreateKeyEvent(KeyCode code, KeyAction action,
+    const std::vector<KeyCode>& pressedCodes, int32_t repeatTime)
+{
+    KeyEvent event(code, action, pressedCodes, repeatTime, std::chrono::high_resolution_clock::now(), 0, 0,
+        SourceType::KEYBOARD, {});
+    event.isInjected = true;
+    event.msg = RELAXED_INJECTED_KEY_MESSAGE;
     return event;
 }
 

@@ -21,9 +21,12 @@
 #include "core/components_ng/relaxed_interaction/parsers/content_switch_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/fallback_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/key_command_parser.h"
+#include "core/components_ng/relaxed_interaction/parsers/press_and_move_command_parser.h"
+#include "core/components_ng/relaxed_interaction/parsers/press_key_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/scroll_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/tap_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/slide_command_parser.h"
+#include "core/components_ng/relaxed_interaction/parsers/wheel_scroll_command_parser.h"
 
 namespace OHOS::Ace::NG {
 
@@ -44,6 +47,9 @@ void ExecutorGenerator::RegisterDefaultParsers()
     parserRegistry_[SCROLL] = std::make_unique<ScrollCommandParser>(context_);
     parserRegistry_[TAP] = std::make_unique<TapCommandParser>(context_);
     parserRegistry_[SLIDE] = std::make_unique<SlideCommandParser>(context_);
+    parserRegistry_[PRESS_KEY] = std::make_unique<PressKeyCommandParser>(context_);
+    parserRegistry_[WHEEL_SCROLL] = std::make_unique<WheelScrollCommandParser>(context_);
+    parserRegistry_[PRESS_AND_MOVE] = std::make_unique<PressAndMoveCommandParser>(context_);
 }
 
 bool ExecutorGenerator::ValidateCommand(const std::unique_ptr<JsonValue>& json)
@@ -68,6 +74,10 @@ bool ExecutorGenerator::ValidateCommand(const std::unique_ptr<JsonValue>& json)
     if (type == KEY) {
         return KeyCommandParser::Validate(cmd);
     }
+    // PC input commands: parameter validation is enforced by their parsers.
+    if (type == PRESS_KEY || type == WHEEL_SCROLL || type == PRESS_AND_MOVE) {
+        return true;
+    }
     return type == BACKPRESS;
 }
 
@@ -80,22 +90,31 @@ std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::ParseInjectionComm
     auto cmd = json->GetValue(CMD_KEY);
     const auto type = cmd->GetString(TYPE_KEY);
     if (type == SCROLL) {
-        return ScrollCommandParser(context_).ParseInjectionCommand(cmd);
+        return StampDenyContext(ScrollCommandParser(context_).ParseInjectionCommand(cmd));
     }
     if (type == KEY) {
-        return KeyCommandParser(context_).Parse(cmd);
+        return StampDenyContext(KeyCommandParser(context_).Parse(cmd));
     }
-    return ParseRegularCmd(json);
+    return StampDenyContext(ParseRegularCmd(json));
 }
 
 std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::ParseCommand(const std::unique_ptr<JsonValue>& json)
 {
     if (json->Contains(FALLBACK_CMD_KEY)) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "parse fallback command");
-        return ParseFallbackCmd(json);
+        return StampDenyContext(ParseFallbackCmd(json));
     }
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "parse regular command");
-    return ParseRegularCmd(json);
+    return StampDenyContext(ParseRegularCmd(json));
+}
+
+std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::StampDenyContext(
+    std::vector<std::unique_ptr<BaseExecutor>> executors)
+{
+    for (auto& executor : executors) {
+        executor->SetDenyCallback(denyCallback_, identity_);
+    }
+    return executors;
 }
 
 std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::ParseFallbackCmd(const std::unique_ptr<JsonValue>& json)

@@ -75,6 +75,20 @@ constexpr char SPLIT_CONFIG_CHANGED[] = R"({"_splitBatch":true})";
 
 std::string SelectPageSceneRules(const std::string& json, const std::string& sceneType);
 
+bool IsPcGlobalCommand(const std::string& command)
+{
+    auto json = InspectorJsonUtil::ParseJsonString(command);
+    if (!json || !json->IsObject() || json->Contains("fallback_cmd")) {
+        return false;
+    }
+    auto cmd = json->GetValue("cmd");
+    if (!cmd || !cmd->IsObject()) {
+        return false;
+    }
+    auto type = cmd->GetString("type");
+    return type == "click" || type == "press_key" || type == "wheel_scroll" || type == "press_and_move";
+}
+
 bool IsValidPageSceneId(const std::string& id)
 {
     if (id.empty() || id.size() > PAGE_SCENE_MAX_ID_LENGTH) {
@@ -2838,7 +2852,9 @@ void UiSessionManagerOhos::SendCommandWithResult(const std::string& command,
         sendFunction(command, finishCallback, securityAuth);
         return;
     }
-    finishCallback(R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
+    finishCallback(IsPcGlobalCommand(command)
+        ? R"({"result":"FAILED","errorType":"CONTEXT_UNAVAILABLE","errorMessage":"UI context is unavailable"})"
+        : R"({"result":"FAILED","errorType":"EXECUTE_FAIL","errorMessage":""})");
 }
 
 void UiSessionManagerOhos::SaveSendCommandFunction(SendCommandFunction&& function)

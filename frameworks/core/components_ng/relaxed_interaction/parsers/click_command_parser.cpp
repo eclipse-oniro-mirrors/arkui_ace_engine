@@ -20,10 +20,95 @@
 
 #include "base/geometry/ng/point_t.h"
 #include "base/log/log.h"
+#include "core/components_ng/relaxed_interaction/executors/mouse_click_executor.h"
 #include "core/components_ng/relaxed_interaction/executors/strict_click_executor.h"
 #include "core/components_ng/relaxed_interaction/executors/simulate_touch_executor.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr int32_t MAX_CLICK_COUNT = 3;
+
+bool ParseMouseButton(const JsonValue& source, ClickInput& input)
+{
+    const bool hasMouseButton = source.Contains("mouse_button");
+    if (!hasMouseButton && !source.Contains("button")) {
+        return true;
+    }
+    auto button = source.GetValue(hasMouseButton ? "mouse_button" : "button");
+    if (!button || !button->IsString()) {
+        return false;
+    }
+    if (hasMouseButton && source.Contains("button")) {
+        auto legacyButton = source.GetValue("button");
+        if (!legacyButton->IsString() || legacyButton->GetString() != button->GetString()) {
+            return false;
+        }
+    }
+    input.button = button->GetString();
+    if (input.button != "left" && input.button != "right" && input.button != "middle" &&
+        input.button != "forward" && input.button != "back") {
+        return false;
+    }
+    input.hasButton = true;
+    return true;
+}
+
+bool ParseClickCount(const JsonValue& source, ClickInput& input)
+{
+    if (!source.Contains("click_count")) {
+        return true;
+    }
+    auto count = source.GetValue("click_count");
+    if (!count || !count->IsNumber() || count->GetDouble() != count->GetInt()) {
+        return false;
+    }
+    input.clickCount = count->GetInt();
+    if (input.clickCount < 1 || input.clickCount > MAX_CLICK_COUNT) {
+        return false;
+    }
+    // Only an explicit button switches to the mouse device; click_count alone keeps the
+    // touch-compatible path per the requirement.
+    return true;
+}
+
+bool AppendModifiers(const JsonValue& modifier, std::vector<std::string>& modifiers)
+{
+    if (modifier.IsString()) {
+        modifiers.emplace_back(modifier.GetString());
+        return true;
+    }
+    if (!modifier.IsArray()) {
+        return false;
+    }
+    for (int32_t i = 0; i < modifier.GetArraySize(); ++i) {
+        auto item = modifier.GetArrayItem(i);
+        if (!item || !item->IsString()) {
+            return false;
+        }
+        modifiers.emplace_back(item->GetString());
+    }
+    return true;
+}
+
+bool ParseClickModifiers(const JsonValue& source, ClickInput& input)
+{
+    const char* modifierKey = source.Contains("modifier") ? "modifier" : "modifiers";
+    if (!source.Contains(modifierKey)) {
+        return true;
+    }
+    auto modifier = source.GetValue(modifierKey);
+    if (!modifier || !AppendModifiers(*modifier, input.modifiers)) {
+        return false;
+    }
+    for (const auto& value : input.modifiers) {
+        if (value != "ctrl" && value != "shift" && value != "alt") {
+            return false;
+        }
+    }
+    // Modifiers alone must not switch the input device; only an explicit button does.
+    return true;
+}
+} // namespace
 
 ClickCommandParser::ClickCommandParser(WeakPtr<PipelineContext> context) : BaseCommandParser(context) {}
 
@@ -34,7 +119,32 @@ std::vector<std::unique_ptr<BaseExecutor>> ClickCommandParser::Parse(const std::
     if (!ParseParameters(json, mode, coordinates)) {
         return {};
     }
+    // PC mouse options route to the dedicated mouse click executor; button remains a compatibility alias.
+    ClickInput pcInput;
+    pcInput.coordinates = coordinates;
+    if (!ParsePcOptions(json.get(), pcInput)) {
+        return {};
+    }
+    if (pcInput.hasButton) {
+        std::vector<std::unique_ptr<BaseExecutor>> executors;
+        executors.emplace_back(std::make_unique<MouseClickExecutor>(context_, pcInput));
+        return executors;
+    }
     return CreateExecutor(mode, coordinates);
+}
+
+bool ClickCommandParser::ParsePcOptions(const JsonValue* cmdJson, ClickInput& input)
+{
+    const auto* source = cmdJson;
+    auto actionInfo = cmdJson->GetValue("action_info");
+    if (actionInfo && actionInfo->IsObject()) {
+        source = actionInfo.get();
+    }
+    if (!source->Contains("mouse_button") && !source->Contains("button") && !source->Contains("click_count") &&
+        !source->Contains("modifier") && !source->Contains("modifiers")) {
+        return true;
+    }
+    return ParseMouseButton(*source, input) && ParseClickCount(*source, input) && ParseClickModifiers(*source, input);
 }
 
 bool ClickCommandParser::Validate(const std::unique_ptr<JsonValue>& json)

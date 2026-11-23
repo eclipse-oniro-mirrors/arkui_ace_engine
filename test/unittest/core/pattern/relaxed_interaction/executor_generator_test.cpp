@@ -473,7 +473,7 @@ HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_TypeNotString_Ret
 HWTEST_F(ExecutorGeneratorConstructorTest, Constructor_RegisterDefaultParsers_AllRegistered, TestSize.Level1)
 {
     ExecutorGenerator generator(mockPipelineContext_);
-    EXPECT_EQ(generator.parserRegistry_.size(), 7u);
+    EXPECT_EQ(generator.parserRegistry_.size(), 10u);
     EXPECT_NE(generator.parserRegistry_.find(BACKPRESS), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(FALLBACK), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(CLICK), generator.parserRegistry_.end());

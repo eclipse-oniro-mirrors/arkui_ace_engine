@@ -30,6 +30,7 @@
 #include "adapter/ohos/entrance/ui_session/ui_session_command_result.h"
 #include "core/components_ng/pattern/command/command_validation.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 
 namespace OHOS::Ace {
 namespace {
@@ -706,6 +707,39 @@ TEST(CommandResultTest, JsonContractAndUtf8Boundaries)
     auto root = cJSON_Parse(json.c_str());
     ASSERT_NE(root, nullptr);
     cJSON_Delete(root);
+}
+
+TEST(CommandResultTest, PcUnavailableCodesPreserveMessagesAndLegacyContract)
+{
+    struct UnavailableResult {
+        NG::RelaxedCommandErrorType type;
+        const char* name;
+        const char* message;
+    };
+    const UnavailableResult cases[] = {
+        { NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE, "TARGET_UNAVAILABLE", "target is unavailable" },
+        { NG::RelaxedCommandErrorType::CONTEXT_UNAVAILABLE, "CONTEXT_UNAVAILABLE", "UI context is unavailable" },
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.name);
+        auto json = SerializeCommandResult(NG::RelaxedCommandResult::Error(item.type, item.message));
+
+        const std::string escapedMessage = std::string(item.message) + ": \"target\"\\path\n";
+        json = SerializeCommandResult(NG::RelaxedCommandResult::Error(item.type, escapedMessage));
+        EXPECT_NE(json.find(R"(\"target\")"), std::string::npos);
+        EXPECT_NE(json.find(R"(\\path)"), std::string::npos);
+        EXPECT_NE(json.find(R"(\u000a)"), std::string::npos);
+        auto root = cJSON_Parse(json.c_str());
+        ASSERT_NE(root, nullptr);
+        EXPECT_EQ(cJSON_GetArraySize(root), 3);
+        EXPECT_STREQ(cJSON_GetObjectItemCaseSensitive(root, "result")->valuestring, "FAILED");
+        EXPECT_STREQ(cJSON_GetObjectItemCaseSensitive(root, "errorType")->valuestring, item.name);
+        EXPECT_STREQ(cJSON_GetObjectItemCaseSensitive(root, "errorMessage")->valuestring, escapedMessage.c_str());
+        cJSON_Delete(root);
+    }
+    EXPECT_EQ(SerializeCommandResult(NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::NODE_NOT_FOUND)),
+        R"({"result":"FAILED","errorType":"NODE_NOT_FOUND","errorMessage":""})");
+    EXPECT_EQ(SerializeCommandResult(NG::RelaxedCommandResult::Success()), R"({"result":"SUCCESS"})");
 }
 
 TEST(CommandResultTest, BatchReportsEveryItemInOrderAndContinuesAfterFailure)

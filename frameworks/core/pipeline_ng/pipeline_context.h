@@ -59,6 +59,7 @@ namespace OHOS::Ace::NG {
     class AsyncLoadScheduler;
     class RecycleManager;
     class RenderContext;
+    struct RelaxedCommandResult;
     struct UITreeRequestState;
 }
 
@@ -280,7 +281,8 @@ public:
     ProcessResult ProcessCommand(const std::string& command,
         const std::function<void(ExecutionState)>& completion);
     void ProcessCommand(const std::string& command);
-    void ProcessCommandWithResult(const std::string& command, const std::function<void(const CommandResult&)>& finish);
+    void ProcessCommandWithResult(const std::string& command,
+        const std::function<void(const RelaxedCommandResult&)>& finish);
 
     // ReDispatch KeyEvent from Web process.
     void ReDispatch(KeyEvent& keyEvent);

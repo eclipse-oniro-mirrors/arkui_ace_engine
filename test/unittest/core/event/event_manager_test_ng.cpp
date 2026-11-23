@@ -19,6 +19,7 @@
 #include "core/common/container_consts.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -1910,15 +1911,15 @@ protected:
         int32_t callbackCount = 0;
         eventManager->ProcessCommandWithResult(R"({"cmd":{"type":"backpress"}})",
             [] { ADD_FAILURE() << "A rejected command must not request a frame"; },
-            [&callbackCount](const CommandResult& result) {
+            [&callbackCount](const RelaxedCommandResult& result) {
                 ++callbackCount;
                 EXPECT_EQ(ContainerScope::CurrentId(), COMMAND_INSTANCE_ID);
                 EXPECT_FALSE(result.success);
 #ifdef RELAXED_INTERACTION_SUPPORT
                 // The fixture has a container without a pipeline.
-                EXPECT_EQ(result.errorType, CommandErrorType::EXECUTE_FAIL);
+                EXPECT_EQ(result.errorType, RelaxedCommandErrorType::EXECUTE_FAIL);
 #else
-                EXPECT_EQ(result.errorType, CommandErrorType::INVALID_COMMAND);
+                EXPECT_EQ(result.errorType, RelaxedCommandErrorType::INVALID_COMMAND);
 #endif
             });
         EXPECT_EQ(callbackCount, 1);
@@ -1962,12 +1963,12 @@ HWTEST_F(EventManagerCommandScopeTest, ProcessCommandWithResultReentrantScope, T
     int32_t innerCount = 0;
     auto requestFrame = [] { ADD_FAILURE() << "A rejected command must not request a frame"; };
     outerManager->ProcessCommandWithResult(R"({"cmd":{"type":"backpress"}})", requestFrame,
-        [&](const CommandResult& result) {
+        [&](const RelaxedCommandResult& result) {
             ++outerCount;
             EXPECT_FALSE(result.success);
             EXPECT_EQ(ContainerScope::CurrentId(), COMMAND_INSTANCE_ID);
             innerManager->ProcessCommandWithResult(R"({"cmd":{"type":"backpress"}})", requestFrame,
-                [&innerCount](const CommandResult& innerResult) {
+                [&innerCount](const RelaxedCommandResult& innerResult) {
                     ++innerCount;
                     EXPECT_FALSE(innerResult.success);
                     EXPECT_EQ(ContainerScope::CurrentId(), OTHER_INSTANCE_ID);

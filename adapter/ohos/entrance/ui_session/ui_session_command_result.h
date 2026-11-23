@@ -20,9 +20,11 @@
 
 namespace OHOS::Ace::NG {
 struct CommandResult;
+struct RelaxedCommandResult;
 }
 
 namespace OHOS::Ace {
 std::string SerializeCommandResult(const NG::CommandResult& result);
+std::string SerializeCommandResult(const NG::RelaxedCommandResult& result);
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_ADAPTER_OHOS_UI_SESSION_COMMAND_RESULT_H

@@ -179,6 +179,7 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 #include "core/components_ng/token_theme/brand_color_info.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/render/adapter/rosen_render_context.h"
@@ -6726,6 +6727,28 @@ bool IsKeyCodeNumber(const std::unique_ptr<JsonValue>& json)
         number <= std::numeric_limits<int32_t>::max();
 }
 
+bool IsPcGlobalCommand(const std::unique_ptr<JsonValue>& json)
+{
+    if (!json || !json->IsObject() || json->Contains("fallback_cmd")) {
+        return false;
+    }
+    auto cmd = json->GetValue("cmd");
+    if (!cmd || !cmd->IsObject()) {
+        return false;
+    }
+    auto type = cmd->GetString("type");
+    return type == "click" || type == "press_key" || type == "wheel_scroll" || type == "press_and_move";
+}
+
+std::string GlobalCommandContextError(const std::string& command)
+{
+    auto pcCommand = IsPcGlobalCommand(JsonUtil::ParseJsonString(command));
+    return SerializeCommandResult(pcCommand
+        ? NG::RelaxedCommandResult::Error(
+            NG::RelaxedCommandErrorType::CONTEXT_UNAVAILABLE, "UI context is unavailable")
+        : NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::EXECUTE_FAIL));
+}
+
 NG::CommandResult ExecuteKeyCodeWithResult(
     const std::unique_ptr<JsonValue>& json, const RefPtr<NG::PipelineContext>& pipeline)
 {
@@ -6819,6 +6842,11 @@ void ExecuteRelaxedCommandWithResult(const std::string& command,
         finishCallback(SerializeCommandResult(accessibilityResult));
         return;
     }
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject()) {
+        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::INVALID_PARAM)));
+        return;
+    }
     auto batch = UiSessionBatchCommand::Parse(command);
     if (batch.status != BatchParseStatus::NOT_BATCH) {
         AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
@@ -6829,9 +6857,9 @@ void ExecuteRelaxedCommandWithResult(const std::string& command,
         return;
     }
     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-    if (!pipeline) {
+    if (!pipeline || (IsPcGlobalCommand(json) && pipeline->IsDestroyed())) {
         AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
-        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        finishCallback(GlobalCommandContextError(command));
         return;
     }
     AceAsyncTraceEnd(0, "SendCommand.Request.Callback.Global");
@@ -6839,7 +6867,7 @@ void ExecuteRelaxedCommandWithResult(const std::string& command,
     // workflow and restores it before each execution step, so queued commands cannot
     // inherit the context of a later SendCommand.
     NG::UiCommandSecurityGate::SetContext(MakeSecurityContext(securityAuth));
-    pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::CommandResult& result) {
+    pipeline->ProcessCommandWithResult(command, [finishCallback](const NG::RelaxedCommandResult& result) {
         finishCallback(SerializeCommandResult(result));
     });
 }
@@ -6933,7 +6961,7 @@ void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
 {
     auto taskExecutor = weakTaskExecutor.Upgrade();
     if (!taskExecutor) {
-        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        finishCallback(GlobalCommandContextError(command));
         return;
     }
     bool posted = taskExecutor->PostTask(
@@ -6946,7 +6974,7 @@ void PostGlobalCommandWithResult(const WeakPtr<TaskExecutor>& weakTaskExecutor,
         },
         TaskExecutor::TaskType::UI, "UiSessionSendCommandWithResult");
     if (!posted) {
-        finishCallback(SerializeCommandResult(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL)));
+        finishCallback(GlobalCommandContextError(command));
     }
 }
 } // namespace
