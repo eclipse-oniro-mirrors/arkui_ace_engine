@@ -780,6 +780,9 @@ bool MarqueePattern::IsRunMarquee()
     auto geoNode = host->GetGeometryNode();
     CHECK_NULL_RETURN(geoNode, false);
     auto marqueeSize = geoNode->GetFrameSize();
+    if (LessOrEqual(marqueeSize.Width(), 0.0f)) {
+        return false;
+    }
     auto textNode = DynamicCast<FrameNode>(host->GetFirstChild());
     CHECK_NULL_RETURN(textNode, false);
     auto textGeoNode = textNode->GetGeometryNode();
