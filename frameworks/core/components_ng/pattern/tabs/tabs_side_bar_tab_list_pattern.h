@@ -102,6 +102,12 @@ public:
     //              search filter (ApplySearchFilter), and rebuild paths.
     void RefreshSidebarTabVisibilityAndLayout();
 
+    // Re-apply theme colors (section title text color, arrow stroke color) when
+    // the color configuration (dark/light mode) changes. OnColorConfigurationUpdate
+    // is invoked on every dark/light switch path (FrameNode::NotifyColorModeChange
+    // always fires it alongside OnColorModeChange), so this single hook is sufficient.
+    void OnColorConfigurationUpdate() override;
+
     // Apply centralized tab view customization (visibilityMap + sectionMap + orderMap).
     // Computes the merged sort order and re-arranges sidebar tab items accordingly.
     void ApplyTabViewCustomization(const std::optional<TabViewCustomization>& customization);
@@ -177,6 +183,10 @@ public:
 private:
     void OnModifyDone() override;
     void OnFontScaleConfigurationUpdate() override;
+    // Re-apply section title text color and arrow stroke color from the latest TabTheme.
+    void RefreshSectionHeaderColors();
+    // Whether the tab item container currently holds any section header node.
+    bool HasSectionHeaders() const;
     void UpdateTabItemStyle(int32_t index, bool selected);
     RefPtr<FrameNode> GetOrCreateTabItemNode(int32_t id);
     void UpdateTabItemTextAndIconColor(int32_t selectedIndex);

@@ -398,14 +398,20 @@ void SetSidebarSectionImpl(Ark_NativePointer node, const Opt_SidebarSection* val
     CHECK_NULL_VOID(frameNode);
     auto optValue = Converter::GetOptPtr(value);
     if (!optValue) {
+        // undefined — reset the section so switching between a value and
+        // undefined re-groups the sidebar correctly.
+        SidebarSection emptySection;
+        emptySection.title = "";
+        TabContentModelNG::SetSidebarSection(frameNode, emptySection);
         return;
     }
     const auto& section = optValue.value();
     SidebarSection sidebarSection;
     sidebarSection.title = Converter::OptConvert<std::string>(section.title).value_or("");
     sidebarSection.resourceTitleObject = GetResourceObjectFromResourceStr(section.title);
+    // Parse "order" - optional number, range [0, INT32_MAX), out-of-range treated as unset
     auto orderOpt = Converter::GetOptPtr(&section.order);
-    if (orderOpt) {
+    if (orderOpt && orderOpt.value() >= 0 && orderOpt.value() < INT32_MAX) {
         sidebarSection.order = static_cast<int32_t>(orderOpt.value());
     }
     auto titleStyleOpt = Converter::GetOptPtr(&section.titleStyle);
