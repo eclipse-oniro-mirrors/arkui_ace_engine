@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_RICH_EDITOR_RICH_EDITOR_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_RICH_EDITOR_RICH_EDITOR_PATTERN_H
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -461,6 +462,12 @@ public:
     void UpdateEditingValue(const std::shared_ptr<TextEditingValue>& value, bool needFireChangeEvent = true) override;
     void HandleEditingDeleteEvent(const std::shared_ptr<TextEditingValue>& value);
     void PerformAction(TextInputAction action, bool forceCloseKeyboard = true) override;
+#if defined(IOS_PLATFORM)
+    void UpdateFloatingCursor(FloatingCursorState state, double x, double y) override;
+    Rect GetCaretWindowRect() override;
+    int32_t GetIndexAfterLineMove(int32_t fromIndex, bool isUp, int32_t lines) override;
+    int32_t GetCaretIndexAtPoint(double x, double y) override;
+#endif
     bool IsIMEOperation(OperationType operationType);
     void InsertValue(const std::string& insertValue, bool isIME = false) override;
     void InsertValue(const std::u16string& insertValue, bool isIME = false) override;
@@ -1443,6 +1450,7 @@ private:
     }
     void SetCancelButtonIconColor(const Color& color);
     void UpdateCaretInfoToController();
+    void PushCaretInfoToInputMethod();
     IMEClient GetIMEClientInfo();
     void FireOnWillAttachIME(IMEClient& imeClient);
     void ReportShiftAndDirectionEvent(const KeyEvent& keyEvent);
@@ -1689,6 +1697,7 @@ private:
     int32_t insertValueLength_ = 0;
     int32_t lastCaretPosition_ = 0;
     int32_t caretPosition_ = 0;
+    std::atomic<bool> caretInfoPushPending_ { false };
     int32_t caretSpanIndex_ = -1;
     long long timestamp_ = 0;
     CaretAffinityPolicy caretAffinityPolicy_ = CaretAffinityPolicy::DEFAULT;
