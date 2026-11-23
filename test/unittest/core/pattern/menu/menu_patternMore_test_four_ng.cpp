@@ -243,8 +243,9 @@ HWTEST_F(MenuLayoutTddCoverageTestNg, CheckHeightReason_BottomMiddle_001, TestSi
     // and not mounted further, so GetPaintRectOffset() returns (0, 0); we drive
     // BOTTOM / MIDDLE by shifting propTargetOffset_ instead (avoids needing a
     // paint-offset setter that does not exist on FrameNode).
-    auto parentMenu = FrameNode::CreateFrameNode(
-        V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<MenuPattern>(0, "", MenuType::MENU));
+    auto parentMenu = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<MenuPattern>(0, "", MenuType::MENU));
     ASSERT_NE(parentMenu, nullptr);
     auto menuItemNode = FrameNode::CreateFrameNode(
         V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<MenuItemPattern>());
@@ -530,10 +531,12 @@ HWTEST_F(MenuPatternTddCoverageTestNg, GetInnerMenuCount_MenuEtsTagBranch_001, T
     ASSERT_NE(pattern, nullptr);
 
     // Mount two MENU_ETS_TAG children: first child matches MENU_ETS_TAG branch.
-    auto child1 = FrameNode::CreateFrameNode(
-        V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<MenuPattern>(0, "", MenuType::MENU));
-    auto child2 = FrameNode::CreateFrameNode(
-        V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<MenuPattern>(0, "", MenuType::MENU));
+    auto child1 = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<MenuPattern>(0, "", MenuType::MENU));
+    auto child2 = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<MenuPattern>(0, "", MenuType::MENU));
     ASSERT_NE(child1, nullptr);
     ASSERT_NE(child2, nullptr);
     child1->MountToParent(host);

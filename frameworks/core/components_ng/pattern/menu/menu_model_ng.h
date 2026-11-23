@@ -34,7 +34,7 @@ public:
     void SetBorderRadius(const std::optional<Dimension>& radiusTopLeft, const std::optional<Dimension>& radiusTopRight,
         const std::optional<Dimension>& radiusBottomLeft, const std::optional<Dimension>& radiusBottomRight) override;
     void SetExpandingMode(const SubMenuExpandingMode& expandingMode) override;
-    void SetBorderRadius(const NG::BorderRadiusProperty& borderRadius) override;    
+    void SetBorderRadius(const NG::BorderRadiusProperty& borderRadius) override;
     void SetExpandSymbol(const std::function<void(WeakPtr<NG::FrameNode>)>& expandSymbol) override;
     void SetItemDivider(const V2::ItemDivider& divider, const DividerMode& mode) override;
     void SetItemGroupDivider(const V2::ItemDivider& divider, const DividerMode& mode) override;
@@ -68,13 +68,13 @@ public:
     static void CreateWithFontFamilyResourceObj(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
         MenuFamilyType type);
     static void UpdateFontColorSetByUser(bool setByUser);
-   
+
 private:
     static void SetMenuDimensionValue(MenuDimensionType type, RefPtr<NG::FrameNode>& node, CalcDimension& result);
     static void SetMenuColorValue(MenuColorType type, RefPtr<NG::FrameNode>& node, Color& color);
     static std::string ColorTypeToString(const MenuColorType menuColorType);
     static std::string DimensionTypeToString(const MenuDimensionType menuDimensionType);
     static std::string FamilyTypeToString(const MenuFamilyType type);
- };
+};
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_MENU_MENU_MODEL_NG_H
