@@ -85,13 +85,14 @@ RefPtr<Modifier> CheckBoxPaintMethod::GetContentModifier(PaintWrapper* paintWrap
 
 void CheckBoxPaintMethod::UpdateCheckboxColors(const RefPtr<CheckBoxPaintProperty>& paintProperty)
 {
-    if (paintProperty->GetCheckBoxSelectedColorFlagByUserValue(false)) {
+    if (paintProperty->HasCheckBoxSelectedColor() || paintProperty->GetCheckBoxSelectedColorFlagByUserValue(false)) {
         checkboxModifier_->SetUserActiveColor(paintProperty->GetCheckBoxSelectedColorValue());
     }
-    if (paintProperty->GetCheckBoxUnSelectedColorFlagByUserValue(false)) {
+    if (paintProperty->HasCheckBoxUnSelectedColor() ||
+        paintProperty->GetCheckBoxUnSelectedColorFlagByUserValue(false)) {
         checkboxModifier_->SetInActiveColor(paintProperty->GetCheckBoxUnSelectedColorValue());
     }
-    if (paintProperty->GetCheckBoxCheckMarkColorFlagByUserValue(false)) {
+    if (paintProperty->HasCheckBoxCheckMarkColor() || paintProperty->GetCheckBoxCheckMarkColorFlagByUserValue(false)) {
         checkboxModifier_->SetPointColor(paintProperty->GetCheckBoxCheckMarkColorValue());
     }
     if (paintProperty->HasCheckBoxSelectedStyle()) {

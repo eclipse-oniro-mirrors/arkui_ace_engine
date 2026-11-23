@@ -819,7 +819,7 @@ void ButtonPattern::OnMaterialDisable()
     CHECK_NULL_VOID(renderContext);
     auto layoutProperty = GetLayoutProperty<ButtonLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
-    auto buttonTheme = host->GetTheme<ButtonTheme>(true);
+    auto buttonTheme = host->GetTheme<ButtonTheme>(false);
     CHECK_NULL_VOID(buttonTheme);
     ButtonStyleMode buttonStyle = layoutProperty->GetButtonStyle().value_or(ButtonStyleMode::EMPHASIZE);
     ButtonRole buttonRole = layoutProperty->GetButtonRole().value_or(ButtonRole::NORMAL);
@@ -1159,7 +1159,7 @@ void ButtonPattern::HandleBackgroundColor()
     CHECK_NULL_VOID(renderContext);
     auto layoutProperty = GetLayoutProperty<ButtonLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
-    auto buttonTheme = host->GetTheme<ButtonTheme>(true);
+    auto buttonTheme = host->GetTheme<ButtonTheme>(false);
     CHECK_NULL_VOID(buttonTheme);
     ButtonStyleMode buttonStyle = layoutProperty->GetButtonStyle().value_or(ButtonStyleMode::EMPHASIZE);
     ButtonRole buttonRole = layoutProperty->GetButtonRole().value_or(ButtonRole::NORMAL);
