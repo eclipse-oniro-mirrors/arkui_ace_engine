@@ -35,7 +35,6 @@
 #include "core/components_ng/gestures/recognizers/exclusive_recognizer.h"
 #include "core/components_ng/gestures/recognizers/parallel_recognizer.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_proxy.h"
-#include "core/components_ng/manager/drag_drop/drag_snapshot_request.h"
 #include "core/event/pointer_event.h"
 #include "core/gestures/gesture_info.h"
 #include "core/components/common/properties/placement.h"
@@ -168,6 +167,7 @@ class EventHub;
 class OverlayManager;
 class PipelineContext;
 class DragDropManager;
+class DragSnapshotRequest;
 struct DragStartContext;
 
 // The gesture event hub is mainly used to handle common gesture events.
@@ -397,6 +397,9 @@ public:
     int32_t RegisterCoordinationListener(const RefPtr<PipelineBase>& context);
     DragDropInfo GetDragDropInfo(const GestureEvent& info, const RefPtr<FrameNode> frameNode,
         DragDropInfo& dragPreviewInfo, const RefPtr<OHOS::Ace::DragEvent>& dragEvent);
+    void ResetStaleDragWindowHideState(const RefPtr<FrameNode>& frameNode);
+    void RecordDragWindowHideOnDragStart(
+        const RefPtr<OHOS::Ace::DragEvent>& dragEvent, const RefPtr<FrameNode>& frameNode);
     RefPtr<UnifiedData> GetUnifiedData(const std::string& frameTag, DragDropInfo& dragDropInfo,
         const RefPtr<OHOS::Ace::DragEvent>& dragEvent);
     std::vector<RefPtr<FrameNode>> ResolveAutoHideTargetsByUniqueId(

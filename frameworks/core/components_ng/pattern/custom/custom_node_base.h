@@ -18,6 +18,7 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "base/memory/ace_type.h"
@@ -29,6 +30,7 @@
 #include "core/pipeline/base/element_register.h"
 
 namespace OHOS::Ace {
+struct AsyncLoadConfig;
 namespace NG {
 class CustomNodeBase;
 }
@@ -95,6 +97,10 @@ enum class StaReusableMemOptStrategy {
     ENABLE_AUTO_CACHE_OPTIMIZATION = 1
 };
 
+// Asynchronous-loading state machine: NONE -> PENDING ->
+// LOADING -> DONE (PENDING/FORCED -> DONE); value semantics in custom_node_base.cpp.
+enum class AsyncLoadState { NONE, PENDING, LOADING, FORCED, DONE };
+
 class ACE_FORCE_EXPORT CustomNodeBase : public virtual TypeInfoBase {
     DECLARE_ACE_TYPE(CustomNodeBase, TypeInfoBase);
 
@@ -130,6 +136,43 @@ public:
 
     void SetDidBuildFunction(std::function<void()>&& didBuildFunc);
     void FireDidBuild();
+
+    // Asynchronous-loading configuration (definition in async_load_config.h; kept out
+    // of this widely-included header) and shared state machine, see custom_node_base.cpp.
+    void SetAsyncLoadConfig(std::shared_ptr<AsyncLoadConfig>&& config);
+    bool HasAsyncLoadConfig() const;
+    const AsyncLoadConfig* GetAsyncLoadConfig() const;
+    // --- State machine, shared by both host node kinds ---
+    bool IsAsyncLoadPending() const;
+    bool IsAsyncLoadDeferred() const;
+    // First-build gate, evaluated solely inside TryStartAsyncLoad (single source
+    // of truth): defers only when enabled, untouched and on the main tree. The
+    // flag is supplied by the host (CustomNodeBase is not a UINode), and the
+    // host's "content not built yet" marker comes from HasUnbuiltContent below.
+    // Descendants created while an ancestor's asynchronous build is executing are
+    // suppressed (the ancestor's budget/timeout machinery already covers them).
+    bool ShouldStartAsyncLoad(bool onMainTree) const;
+    // The "ancestor asynchronous build executing" nesting scope lives in
+    // AsyncLoadScheduler (the driver side); suppression is checked there.
+
+    // --- Lifecycle shared by both hosts (single implementation) ---
+    // Returns true when the caller must defer its synchronous build pass: the
+    // deferral engaged just now, or an earlier call already engaged it (a
+    // hammering synchronous caller can never build a deferred node). Returns
+    // false when the node keeps synchronous semantics this pass.
+    bool TryStartAsyncLoad();
+    void RunAsyncLoadOnIdle(int64_t deadline);
+    void ForceLoad();
+    void SettleAsyncLoadDone(bool wasForced);
+    void MountAsyncLoadPlaceholder();
+    void DetachAsyncLoadPlaceholder();
+    int64_t GetAsyncLoadResolvedTimeoutMs() const;
+    static RefPtr<UINode> AcquireAsyncLoadPlaceholder(const RefPtr<UINode>& host, const AsyncLoadConfig& config);
+    // Shared JSON bridge parser (dynamic setAsyncLoadConfig and the static ani
+    // delivery use one payload format, one converter). Returns nullptr when the
+    // payload is malformed or not a JSON object.
+    static std::shared_ptr<AsyncLoadConfig> ParseAsyncLoadConfigJson(const std::string& payload);
+    static void DetachAsyncLoadPlaceholder(RefPtr<UINode> placeholder);
 
     void SetDestroyFunction(std::function<void()>&& destroyFunc);
     void FireOnDisappear();
@@ -231,6 +274,25 @@ protected:
     bool executeFireOnAppear_ = false;
     std::string reuseId_;
     std::string creatorId_;
+    // Async-load timeout field: the resolved integer
+    // (>0 expire / =0 next frame / <0 never). The countdown start timestamp is
+    // stamped on the scheduler's idle entry at (re)registration — nothing on the
+    // node needs to remember it.
+    AsyncLoadState asyncLoadState_ = AsyncLoadState::NONE;
+    int64_t resolvedTimeoutMs_ = 0;
+    bool asyncLoadSuppressed_ = false;
+    RefPtr<UINode> asyncLoadPlaceholder_;
+
+    // Host-specific mechanics for the shared lifecycle above.
+    virtual RefPtr<UINode> GetAsyncLoadHost() = 0;          // the owning UINode
+    virtual bool HasUnbuiltContent() const = 0;             // "content not built yet" marker
+    virtual bool ExecuteAsyncBuild(int64_t deadline) = 0;   // budgeted content build
+    virtual void FlushAsyncLoadCompletion(bool wasForced) = 0; // structural refresh
+    // Terminal cleanup: hosts holding slice-retained build state release it when
+    // the machine settles DONE (a natural completion has already cleared it; a
+    // degenerate settle must not keep a parked subtree alive on a finished node).
+    // Recycle-pool entry keeps the state by design (resume on reuse).
+    virtual void ReleaseAsyncBuildState() {}
 
 private:
     friend UINode* RefPtrTraits<CustomNodeBase>::GetOwner(const CustomNodeBase* view);
@@ -242,6 +304,7 @@ private:
     std::function<void()> appearFunc_;
     std::function<void()> didBuildFunc_;
     std::function<void()> destroyFunc_;
+    std::shared_ptr<AsyncLoadConfig> asyncLoadConfig_;
     std::function<void()> pageTransitionFunc_;
     std::function<void(bool)> reloadFunc_;
     std::function<void()> completeReloadFunc_;

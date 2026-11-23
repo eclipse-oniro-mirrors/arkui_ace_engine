@@ -170,6 +170,13 @@ public:
     void SetUseDataLoadParams(bool useDataLoadParams);
     bool IsUseDataLoadParams() const;
 
+    // Developer controls the visibility of the MSDP drag window. Only takes effect while the
+    // pointer stays within the range of the node receiving the current drag callback; leaving
+    // the range restores the default visibility automatically.
+    void SetDragWindowVisible(bool dragWindowVisible);
+    bool GetDragWindowVisible() const;
+    bool IsDragWindowVisibleChanged() const;
+
     // only use for ArkTs1.2 begin
     RefPtr<PixelMap> GetDragDropInfoPixelMap() const;
     void* GetDragDropInfoCustomNode() const;
@@ -221,6 +228,8 @@ private:
     RefPtr<PixelMap> dragDropInfoPixelMap_;
     void* dragDropInfoCustomNode_;
     std::string dragDropInfoExtraInfo_;
+    bool dragWindowVisible_ = true;
+    bool isDragWindowVisibleChanged_ = false;
 };
 
 class NotifyDragEvent : public DragEvent {

@@ -34,6 +34,7 @@
 #include "core/common/thread_checker.h"
 #include "core/components_ng/base/extension_handler.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/pattern/render_node/render_node_pattern.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node_pattern.h"
@@ -74,6 +75,7 @@
 #include "frameworks/base/subwindow/subwindow_manager.h"
 #include "core/components_ng/token_theme/token_colors.h"
 #include "ui/base/geometry/ng/size_t.h"
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -144,6 +146,16 @@ ani_boolean IsTransPageEnabled(ArkUI_Int32 instanceId)
         return true;
     }
     return context->IsTransPageEnabled();
+}
+
+void SetDynamicDimming(const std::string& key, double dimming, ArkUI_Int32 instanceId)
+{
+    ContainerScope scope(instanceId);
+    auto frameNode = NG::Inspector::GetFrameNodeByKey(key);
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    renderContext->UpdateDynamicDimDegree(static_cast<float>(std::clamp(dimming, 0.0, 1.0)));
 }
 
 ani_ref* GetHostContext(ArkUI_Int32 key)
@@ -1447,6 +1459,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .getPageRootNode = OHOS::Ace::NG::GetPageRootNodeInStatic,
         .isEasySplit = OHOS::Ace::NG::IsEasySplit,
         .isTransPageEnabled = OHOS::Ace::NG::IsTransPageEnabled,
+        .setDynamicDimming = OHOS::Ace::NG::SetDynamicDimming,
         .dumpLogPrint = OHOS::Ace::NG::DumpLogPrintImpl,
         .getBuilderNodeParentViewId = OHOS::Ace::NG::GetBuilderNodeParentViewId,
         .setOnNodeDestroyEvent = OHOS::Ace::NG::SetOnNodeDestroyEvent,

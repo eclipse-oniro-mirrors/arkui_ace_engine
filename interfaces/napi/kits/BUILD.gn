@@ -27,7 +27,7 @@ config("ace_napi_config") {
     "//third_party/zlib",
   ]
   cflags_cc = []
-  defines = []
+  defines = ace_common_defines
   if (use_mingw_win) {
     cflags_cc += [ "-std=c++17" ]
   }
@@ -38,15 +38,10 @@ config("ace_napi_config") {
 
   if (use_hilog) {
     include_dirs += [ "$hilog_root/interfaces/native/innerkits/include" ]
-    defines += [ "USE_HILOG" ]
   }
 
   if (is_mac) {
     cflags_cc = [ "-O0" ]
-  }
-
-  if (enable_ace_instance_log) {
-    defines += [ "ACE_INSTANCE_LOG" ]
   }
 }
 

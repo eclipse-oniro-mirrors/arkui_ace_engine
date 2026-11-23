@@ -3490,11 +3490,13 @@ void JsAccessibilityManager::RegisterUIExtBusinessConsumeCallback()
 
 AccessibilityParentRectInfo JsAccessibilityManager::GetUECAccessibilityParentRectInfo() const
 {
+    std::lock_guard<std::mutex> lock(uecRectInfoMutex_);
     return uecRectInfo_;
 }
 
 void JsAccessibilityManager::UpdateUECAccessibilityParentRectInfo(const AccessibilityParentRectInfo& info)
 {
+    std::lock_guard<std::mutex> lock(uecRectInfoMutex_);
     uecRectInfo_ = info;
 }
 

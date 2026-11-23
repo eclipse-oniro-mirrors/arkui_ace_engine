@@ -84,12 +84,10 @@ public:
     {
         pointColor_->Set(LinearColor(pointColor));
     }
-
     void SetactiveColor(const Color& activeColor)
     {
         activeColor_->Set(LinearColor(activeColor));
     }
-
     void SetinactiveColor(const Color& inactiveColor)
     {
         inactiveColor_->Set(LinearColor(inactiveColor));

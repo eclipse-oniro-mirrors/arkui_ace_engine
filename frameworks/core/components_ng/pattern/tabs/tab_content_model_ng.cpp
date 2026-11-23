@@ -2094,6 +2094,14 @@ void TabContentModelNG::SetSidebarSection(FrameNode* node, const SidebarSection&
     }
 }
 
+void TabContentModelNG::SetKeepAlive(FrameNode* node, bool keepAlive)
+{
+    CHECK_NULL_VOID(node);
+    auto pattern = node->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetKeepAlive(keepAlive);
+}
+
 void TabContentModelNG::CreateSidebarSectionTitleWithResourceObj(
     FrameNode* frameNode, const RefPtr<ResourceObject>& resObj)
 {

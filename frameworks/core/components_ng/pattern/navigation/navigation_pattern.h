@@ -411,7 +411,7 @@ public:
     {
         auto currentProxy = GetTopNavigationProxy();
         if (currentProxy && !currentProxy->GetIsFinished()) {
-            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "not support to update callback during animation");
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "cannot update callback during animation");
             return;
         }
         onTransition_ = std::move(navigationAnimation);

@@ -158,7 +158,7 @@ class ArkCheckboxComponent extends ArkComponent implements CheckboxAttribute {
     }
     return this.checkboxNode.getFrameNode();
   }
-  onChange(callback:OnCheckboxChangeCallback):this{
+  onChange(callback: OnCheckboxChangeCallback): this {
     modifierWithKey(this._modifiersWithKeys, CheckBoxOnChangeModifier.identity, CheckBoxOnChangeModifier, callback);
     return this;
   }
@@ -418,7 +418,7 @@ class CheckboxUnselectedColorModifier extends ModifierWithKey<ResourceColor> {
     return !isBaseOrResourceEqual(this.stageValue, this.value);
   }
 }
-class CheckBoxOnChangeModifier extends ModifierWithKey<OnCheckboxChangeCallback>{
+class CheckBoxOnChangeModifier extends ModifierWithKey<OnCheckboxChangeCallback> {
   constructor(value: OnCheckboxChangeCallback) {
     super(value);
   }

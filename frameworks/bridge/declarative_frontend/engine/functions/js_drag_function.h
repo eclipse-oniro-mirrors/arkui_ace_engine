@@ -77,6 +77,7 @@ public:
     void GetPreviewRect(const JSCallbackInfo& args);
     void SetUseCustomDropAnimation(const JSCallbackInfo& args);
     void GetUseCustomDropAnimation(const JSCallbackInfo& args);
+    void SetDragWindowVisible(const JSCallbackInfo& args);
     void SetDragAnimationType(const JSCallbackInfo& args);
     void GetDragAnimationType(const JSCallbackInfo& args);
     void SetDragInfo(const JSCallbackInfo& args);

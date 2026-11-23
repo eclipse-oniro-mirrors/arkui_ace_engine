@@ -252,6 +252,27 @@ private:
     void SyncPreloadItem(LayoutWrapper* host, int32_t itemIdx) override;
     void PreloadFixOffsetCacheIfNeeded(int32_t cacheCount);
     void SyncPreloadFixOffsetCache(int32_t cacheCount);
+
+    /**
+     * @brief Fill the cache range around the viewport with the strategy picked for this
+     *        frame: showCachedItems -> SyncPreloadItems, sync-cache-in-layout (gated by
+     *        WaterFlowLayoutBase::IsSyncCacheLayoutEnabled) -> SyncLayoutCacheItems in the
+     *        current frame, otherwise the async PreloadItems idle task. Also runs
+     *        PreloadFixOffsetCacheIfNeeded unless the sync-cache strategy already covers
+     *        the same range.
+     */
+    void FillCacheRange(int32_t cacheCount);
+
+    /**
+     * @brief Sync-cache-in-layout strategy: build and measure the cache-range items on both
+     *        sides of the viewport synchronously at the end of the current-frame Measure,
+     *        instead of posting the idle predict task. Each filled item is built on the
+     *        cache path, measured, laid out and deactivated in place (see MeasureChild);
+     *        Layout's RecoverCacheItems / LayoutSection then position and sync them in the
+     *        same frame, and SetActiveChildRange keeps the cache range deactivated.
+     *        Gated by WaterFlowLayoutBase::IsSyncCacheLayoutEnabled when showCache is false.
+     */
+    void SyncLayoutCacheItems(int32_t cacheCount);
     bool GetItemMainRange(int32_t itemIdx, float& itemStart, float& itemEnd) const;
     bool ItemIntersectsActiveBounds(int32_t itemIdx, float startBound, float endBound) const;
     void ExpandActiveRangeInFixOffset(int32_t cacheCount, int32_t& activeStartIndex, int32_t& activeEndIndex) const;

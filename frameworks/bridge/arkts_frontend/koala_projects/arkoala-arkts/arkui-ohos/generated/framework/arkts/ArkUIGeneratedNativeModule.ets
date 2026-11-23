@@ -2484,6 +2484,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabContentAttribute_setSidebarSection(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabContentAttribute_setKeepAlive(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabContentAttribute_setTabBarVisibility(ptr: KPointer, visibility: KInt, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Tabs_construct(id: KInt, flags: KInt): KPointer
@@ -4746,6 +4748,8 @@ export class ArkUIGeneratedNativeModule {
     native static _DragEvent_getGlobalDisplayX(ptr: KPointer): KDouble
     @ani.unsafe.Direct
     native static _DragEvent_getGlobalDisplayY(ptr: KPointer): KDouble
+    @ani.unsafe.Quick
+    native static _DragEvent_setDragWindowVisible(ptr: KPointer, visible: boolean): void
     @ani.unsafe.Direct
     native static _DragEvent_getDragBehavior(ptr: KPointer): KInt
     @ani.unsafe.Direct
@@ -4946,7 +4950,6 @@ export class ArkUIGeneratedNativeModule {
     native static _FrameNodeExtender_destroyPeer(peer: KPointer): void
     @ani.unsafe.Direct
     native static _FrameNodeExtender_isModifiable(peer: KPointer): boolean
-    @ani.unsafe.Direct
     native static _FrameNodeExtender_dispatchInputEvent(peer: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): boolean
     @ani.unsafe.Direct
     native static _FrameNodeExtender_dispatchKeyEvent(peer: KPointer, event: KPointer): boolean

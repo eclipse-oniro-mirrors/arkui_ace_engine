@@ -318,6 +318,7 @@ type topBarFloatingStyleOptions = object;
 type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable' | 'top';
 type TabsSidebarDisplayStyle = 'embed' | 'displace';
 type TabsSidebarSearchableOptions = object;
+type TabsSidebarTitleBarOptions = object;
 type TabBarDisplayMode = 'bottomTabbar' | 'sidebar' | 'topTabbar';
 type TabsBreakpointType<T> = object;
 type TabVisibility = 'visible' | 'hidden';

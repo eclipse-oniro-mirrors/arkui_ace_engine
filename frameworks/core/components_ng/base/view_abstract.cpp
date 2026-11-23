@@ -29,6 +29,7 @@
 #include "base/geometry/calc_dimension_rect.h"
 #include "base/geometry/response_region.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
+#include "base/image/image_color_filter.h"
 #include "base/log/log_wrapper.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "base/utils/feature_param.h"
@@ -6558,6 +6559,45 @@ void ViewAbstract::SetGrayScale(const Dimension& grayScale)
         return;
     }
     ACE_UPDATE_RENDER_CONTEXT(FrontGrayScale, grayScale);
+}
+
+void ViewAbstract::SetColorFilterEffect(const std::vector<float>& matrix)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    SetColorFilterEffect(frameNode, matrix);
+}
+
+void ViewAbstract::SetColorFilterEffect(FrameNode* frameNode, const std::vector<float>& matrix)
+{
+    if (matrix.size() != Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        ResetColorFilterEffect(frameNode);
+        return;
+    }
+    ACE_UPDATE_NODE_RENDER_CONTEXT(FrontColorFilterEffect, matrix, frameNode);
+}
+
+void ViewAbstract::ResetColorFilterEffect()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ResetColorFilterEffect(frameNode);
+}
+
+void ViewAbstract::ResetColorFilterEffect(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (!renderContext->HasFrontColorFilterEffect()) {
+        return;
+    }
+    renderContext->OnFrontColorFilterEffectUpdate(std::vector<float>{});
+    renderContext->ResetFrontColorFilterEffect();
 }
 
 void ViewAbstract::SetGrayScale(FrameNode* frameNode, const Dimension& grayScale)

@@ -208,6 +208,19 @@ void JSRepeat::GetActiveRange(const JSCallbackInfo& info)
     info.SetReturnValue(activeRange);
 }
 
+// signature is
+// value: boolean
+// Called once at Repeat creation when RepeatOptions.allowReuseInAnimation is
+// explicitly set; forwards the tri-state value to the RepeatNode being rendered.
+void JSRepeat::SetAllowReuseInAnimation(const JSCallbackInfo& info)
+{
+    if ((info.Length() != 1) || !info[0]->IsBoolean()) {
+        TAG_LOGW(AceLogTag::ACE_REPEAT, "Invalid arguments for Repeat.SetAllowReuseInAnimation");
+        return;
+    }
+    RepeatModel::GetInstance()->SetAllowReuseInAnimation(info[0]->ToBoolean());
+}
+
 void JSRepeat::JSBind(BindingTarget globalObj)
 {
     JSClass<JSRepeat>::Declare("RepeatNative");
@@ -222,6 +235,7 @@ void JSRepeat::JSBind(BindingTarget globalObj)
     JSClass<JSRepeat>::StaticMethod("isImplicitAnimationOpen", &JSRepeat::IsImplicitAnimationOpen);
     JSClass<JSRepeat>::StaticMethod("isChildInAnimation", &JSRepeat::IsChildInAnimation);
     JSClass<JSRepeat>::StaticMethod("getActiveRange", &JSRepeat::GetActiveRange);
+    JSClass<JSRepeat>::StaticMethod("setAllowReuseInAnimation", &JSRepeat::SetAllowReuseInAnimation);
     JSClass<JSRepeat>::Bind<>(globalObj);
 }
 

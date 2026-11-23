@@ -321,6 +321,10 @@ class __RepeatVirtualScroll2Impl<T> {
     // once at Repeat creation (immutable afterwards on the node side)
     private controller_?: RepeatController;
 
+    // from RepeatOptions.allowReuseInAnimation (creation-time option),
+    // forwarded to the native node once at creation, see pu_repeat.ts
+    private allowReuseInAnimation_?: boolean;
+
     // update from C++ when MoveData happens
     // reset from C++ when FireOnMove happens
     private moveFromTo_?: [number, number] = undefined;
@@ -473,6 +477,7 @@ class __RepeatVirtualScroll2Impl<T> {
         this.onMoveHandler_ = config.onMoveHandler;
         this.itemDragEventHandler_ = config.itemDragEventHandler;
         this.controller_ = config.controller;
+        this.allowReuseInAnimation_ = config.allowReuseInAnimation;
 
         this.owningViewV2_ = config.owningView_;
         if ((this.owningViewV2_ instanceof ViewV2) && ('onLazyLoading' in config)) {
@@ -550,6 +555,12 @@ class __RepeatVirtualScroll2Impl<T> {
         // init controller (RepeatOptions.controller API): bind once at
         // creation, the native side keeps the first binding (immutable, spec R-8)
         this.updateController();
+
+        // forward RepeatOptions.allowReuseInAnimation once at creation; undefined keeps
+        // the native tri-state unset (defaults: false for a List parent, true otherwise)
+        if (this.allowReuseInAnimation_ !== undefined) {
+            RepeatVirtualScroll2Native.setAllowReuseInAnimation(this.repeatElmtId_, this.allowReuseInAnimation_);
+        }
 
         stateMgmtConsole.debug(`${this.constructor.name}(${this.repeatElmtId_}) initialRender() data array length: `,
             `${this.arr_.length}, totalCount: ${this.totalCount()} - done`);

@@ -461,7 +461,7 @@ static napi_value JSFinish(napi_env env, napi_callback_info info)
     if (!animator) {
         return nullptr;
     }
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator finish, id:%{public}d", animator->GetId());
+    TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnim finish,%{public}d", animator->GetId());
     animator->Finish();
     napi_value result = nullptr;
     napi_get_null(env, &result);
@@ -727,7 +727,7 @@ static napi_value SetOnfinish(napi_env env, napi_callback_info info)
             return;
         }
         ACE_SCOPED_TRACE("jsAnimator finishCallback, id:%d", id);
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnimator call onFinish, id:%{public}d", id);
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "jsAnim call onFinish,%{public}d", id);
         result = napi_call_function(env, NULL, onfinish, 0, NULL, &ret);
         if (result != napi_ok) {
             TAG_LOGW(

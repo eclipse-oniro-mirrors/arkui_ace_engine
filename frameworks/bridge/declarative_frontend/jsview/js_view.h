@@ -26,6 +26,10 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_functions.h"
 
+namespace OHOS::Ace {
+struct AsyncLoadConfig;
+}
+
 namespace OHOS::Ace::Framework {
 
 class JSView : public JSViewAbstract, public AceType {
@@ -416,6 +420,15 @@ public:
         return reusableMemOptStrategy_;
     }
 
+    // Receives the serialized async-load configuration pushed by the puv2 side
+    // through nativeViewPartialUpdate.setAsyncLoadConfig(); push-only boundary.
+    void JSSetAsyncLoadConfig(const std::string& asyncLoadConfig);
+
+    std::shared_ptr<AsyncLoadConfig> GetJSAsyncLoadConfig() const
+    {
+        return asyncLoadConfig_;
+    }
+
     void JSStartMemOpt();
     void JSRequestProgressiveRelease();
 
@@ -482,6 +495,7 @@ private:
     bool isRecycleRerender_ = false;
     bool isV2_ = false;
     int32_t reusableMemOptStrategy_ = -1;
+    std::shared_ptr<AsyncLoadConfig> asyncLoadConfig_;
     bool executedAboutToRender_ = false;
     bool executedOnRenderDone_ = false;
     bool executedRender_ = false;

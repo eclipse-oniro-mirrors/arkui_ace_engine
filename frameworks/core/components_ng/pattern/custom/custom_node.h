@@ -81,6 +81,23 @@ public:
     void Build(std::shared_ptr<std::list<ExtraInfo>> extraInfos) override;
     void NodeDidBuild();
 
+    // --- Asynchronous loading (enableAsyncLoad); state machine on CustomNodeBase ---
+    // First build defers the content (OnAppear + renderFunction unissued); the
+    // pipeline later drives RunAsyncLoadOnIdle (budgeted) or ForceLoad (timeout).
+    RefPtr<UINode> GetAsyncLoadHost() override;
+    // Unconsumed render function = content not built yet: content pre-built off
+    // the main tree (lazy caches, reuse-pool preRender) mounts with the build
+    // already done and must keep showing that content directly, instead of
+    // entering a meaningless deferral beside built content.
+    bool HasUnbuiltContent() const override
+    {
+        return renderFunction_ != nullptr;
+    }
+    bool ExecuteAsyncBuild(int64_t deadline) override;
+    void FlushAsyncLoadCompletion(bool wasForced) override;
+    bool ExecuteRenderItem(RenderFunction& renderFunction, int64_t deadline);
+    // Placeholder shown while deferred; unusable id leaves the node invisible.
+
     int32_t FrameCount() const override
     {
         return 1;

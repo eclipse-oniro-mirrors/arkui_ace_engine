@@ -14,8 +14,17 @@
  */
 
 #include "core/components_ng/pattern/custom/custom_node_base.h"
+#include "core/pipeline_ng/async_load_scheduler.h"
+#include "base/json/json_util.h"
+#include "base/utils/string_utils.h"
 
+#include <cmath>
+
+#include "base/utils/time_util.h"
+#include "core/components_ng/base/async_load_config.h"
 #include "core/components_ng/pattern/recycle_view/recycle_manager.h"
+#include "core/components_ng/property/layout_constraint.h"
+#include "core/components_ng/property/measure_utils.h"
 #include "core/components_ng/syntax/lazy_for_each_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -80,6 +89,305 @@ void CustomNodeBase::SetAppearFunction(std::function<void()>&& appearFunc)
 void CustomNodeBase::SetDidBuildFunction(std::function<void()>&& didBuildFunc)
 {
     didBuildFunc_ = std::move(didBuildFunc);
+}
+
+void CustomNodeBase::SetAsyncLoadConfig(std::shared_ptr<AsyncLoadConfig>&& config)
+{
+    if (AsyncLoadScheduler::InBuildScope()) {
+        // Born inside an ancestor's in-progress asynchronous build: ignore the
+        // request (sticky, so re-delivery on later re-attach cannot re-enable it).
+        asyncLoadSuppressed_ = true;
+        auto* owner = RefPtrTraits<CustomNodeBase>::GetOwner(this);
+        TAG_LOGD(AceLogTag::ACE_STATE_MGMT,
+            "AsyncLoad ignored: node %{public}d created inside an in-progress asynchronous build",
+            owner ? owner->GetId() : 0);
+        return;
+    }
+    asyncLoadConfig_ = std::move(config);
+}
+
+bool CustomNodeBase::HasAsyncLoadConfig() const
+{
+    return asyncLoadConfig_ != nullptr;
+}
+
+const AsyncLoadConfig* CustomNodeBase::GetAsyncLoadConfig() const
+{
+    return asyncLoadConfig_.get();
+}
+
+// --- Asynchronous-loading state machine ---
+// Implementation bodies live here so the widely-included header only carries
+// declarations (header fan-out gate).
+
+bool CustomNodeBase::IsAsyncLoadPending() const
+{
+    return asyncLoadState_ == AsyncLoadState::PENDING || asyncLoadState_ == AsyncLoadState::LOADING
+        || asyncLoadState_ == AsyncLoadState::FORCED;
+}
+
+// True while the content is still deferred (not yet built). Layout-path build
+// entry points must not render the component in this window, and
+// custom measure/layout callbacks are suppressed while deferred.
+bool CustomNodeBase::IsAsyncLoadDeferred() const
+{
+    return asyncLoadState_ == AsyncLoadState::PENDING || asyncLoadState_ == AsyncLoadState::LOADING;
+}
+
+// First-content-build gate shared by every build entry: Build() itself plus the
+// layout-path entries (AdjustLayoutWrapperTree / GetFrameChildByIndex /
+// RenderCustomChild) — update paths such as if/else branch flips or runtime-added
+// array items never pass through Build(). Detached prebuild chains keep synchronous
+// semantics through the on-tree flag .
+bool CustomNodeBase::ShouldStartAsyncLoad(bool onMainTree) const
+{
+    return asyncLoadState_ == AsyncLoadState::NONE && !asyncLoadSuppressed_ && HasAsyncLoadConfig()
+        && onMainTree && HasUnbuiltContent();
+}
+
+
+namespace {
+// Default timeout of asynchronous loading in ms (API contract, frozen).
+constexpr int64_t DEFAULT_ASYNC_LOAD_TIMEOUT_MS = 1000;
+} // namespace
+
+bool CustomNodeBase::TryStartAsyncLoad()
+{
+    // Deferred by an earlier call: nothing to engage here, but the caller must
+    // keep deferring — a hammering synchronous caller (e.g. Render() re-entry)
+    // can never build a deferred node. Idle-slicing LOADING and backstop FORCED
+    // re-entries do not take this branch and still pass through to build.
+    if (asyncLoadState_ == AsyncLoadState::PENDING) {
+        return true;
+    }
+    auto host = GetAsyncLoadHost();
+    CHECK_NULL_RETURN(host, false);
+    // Single evaluation point of the first-build gate: callers may invoke this
+    // unguarded — a detached prebuild chain, a suppressed descendant or an
+    // already-built node simply keeps synchronous semantics (GetContext() would
+    // otherwise fall back to the ambient pipeline for detached nodes).
+    if (!ShouldStartAsyncLoad(host->IsOnMainTree())) {
+        return false;
+    }
+    auto context = host->GetContext();
+    if (!context) {
+        return false; // the caller keeps synchronous semantics; never stall
+    }
+    const AsyncLoadConfig* config = GetAsyncLoadConfig();
+    CHECK_NULL_RETURN(config, false);
+    resolvedTimeoutMs_ = static_cast<int64_t>(config->timeoutMs.value_or(DEFAULT_ASYNC_LOAD_TIMEOUT_MS));
+    asyncLoadState_ = AsyncLoadState::PENDING;
+    TAG_LOGI(AceLogTag::ACE_STATE_MGMT,
+        "AsyncLoad register: node %{public}d, placeholder configured %{public}d, resolvedTimeoutMs %{public}lld",
+        host->GetId(), config->HasPlaceholder(), static_cast<long long>(resolvedTimeoutMs_));
+    // Register into the pipeline idle set; the entry snapshots the timer fields
+    // (remounts re-register with a fresh timer).
+    context->RegisterAsyncLoadIdleEntry(WeakPtr<UINode>(host));
+    MountAsyncLoadPlaceholder();
+    return true;
+}
+
+void CustomNodeBase::RunAsyncLoadOnIdle(int64_t deadline)
+{
+    if (!IsAsyncLoadDeferred()) {
+        return;
+    }
+    asyncLoadState_ = AsyncLoadState::LOADING;
+    // The scheduler brackets this call with its build scope: descendants created
+    // during the build keep synchronous semantics. Hosts whose build settles
+    // internally (CustomNode via NodeDidBuild) report a completed build while no
+    // longer pending, so the settle below no-ops for them.
+    bool completed = ExecuteAsyncBuild(deadline);
+    if (completed && IsAsyncLoadPending()) {
+        SettleAsyncLoadDone(false);
+    }
+}
+
+void CustomNodeBase::ForceLoad()
+{
+    if (!IsAsyncLoadPending()) {
+        return;
+    }
+    asyncLoadState_ = AsyncLoadState::FORCED;
+    auto host = GetAsyncLoadHost();
+    TAG_LOGI(AceLogTag::ACE_STATE_MGMT, "AsyncLoad force-load begin: node %{public}d",
+        host ? host->GetId() : 0);
+    // deadline 0 means no budget limit: build the whole content synchronously so the
+    // component is guaranteed to reach the screen (timeout backstop). The scheduler
+    // brackets this call with its build scope (descendant suppression).
+    ExecuteAsyncBuild(0);
+    if (IsAsyncLoadPending()) {
+        // Degenerate completion (nothing left to build): settle anyway so the node
+        // does not stay tracked and the placeholder does not linger.
+        SettleAsyncLoadDone(true);
+    }
+    FlushAsyncLoadCompletion(true);
+}
+
+void CustomNodeBase::SettleAsyncLoadDone(bool wasForced)
+{
+    // DONE is terminal; the swap happens exactly once. Content is mounted by now, so
+    // the placeholder goes away within the same frame: never a frame with neither,
+    // nor two visible children. The idle-set entry is dropped by the pipeline
+    // consumer on the same completion signal.
+    asyncLoadState_ = AsyncLoadState::DONE;
+    DetachAsyncLoadPlaceholder();
+    // Slice-retained build state must not outlive the machine: a degenerate
+    // settle (nothing left to build) can still carry a parked partial subtree.
+    ReleaseAsyncBuildState();
+    auto host = GetAsyncLoadHost();
+    TAG_LOGI(AceLogTag::ACE_STATE_MGMT, "AsyncLoad done: node %{public}d, %{public}s",
+        host ? host->GetId() : 0, wasForced ? "forced" : "natural");
+    if (!wasForced) {
+        // Natural completion happens outside the layout pass (idle slice): the host
+        // issues the structural flush so the swap reaches the screen automatically.
+        FlushAsyncLoadCompletion(false);
+    }
+}
+
+void CustomNodeBase::MountAsyncLoadPlaceholder()
+{
+    if (asyncLoadPlaceholder_) {
+        return;
+    }
+    const AsyncLoadConfig* config = GetAsyncLoadConfig();
+    CHECK_NULL_VOID(config);
+    auto host = GetAsyncLoadHost();
+    CHECK_NULL_VOID(host);
+    asyncLoadPlaceholder_ = AcquireAsyncLoadPlaceholder(host, *config);
+}
+
+void CustomNodeBase::DetachAsyncLoadPlaceholder()
+{
+    auto placeholder = asyncLoadPlaceholder_;
+    if (!placeholder) {
+        return;
+    }
+    asyncLoadPlaceholder_.Reset();
+    CustomNodeBase::DetachAsyncLoadPlaceholder(std::move(placeholder));
+}
+
+int64_t CustomNodeBase::GetAsyncLoadResolvedTimeoutMs() const
+{
+    return resolvedTimeoutMs_;
+}
+
+// Shared JSON bridge parser: {"placeholderId"?: string, "timeout"?: int,
+// "width"/"height"?: string}. Suggested sizes cross as strings — numbers were
+// stringified on the caller side and mean vp; suffixed strings ("100%", "10px")
+// keep their unit (same mapping as the scroll-placeholder bridges). Unparsable
+// values stay unset. Returns nullptr when the payload is malformed.
+std::shared_ptr<AsyncLoadConfig> CustomNodeBase::ParseAsyncLoadConfigJson(const std::string& payload)
+{
+    auto configJson = JsonUtil::ParseJsonString(payload);
+    if (!configJson || !configJson->IsObject()) {
+        return nullptr;
+    }
+    auto config = std::make_shared<AsyncLoadConfig>();
+    auto placeholderId = configJson->GetValue("placeholderId");
+    if (placeholderId && placeholderId->IsString()) {
+        config->placeholderId = placeholderId->GetString();
+    }
+    auto timeout = configJson->GetValue("timeout");
+    if (timeout && timeout->IsNumber()) {
+        config->timeoutMs = timeout->GetInt();
+    }
+    auto width = configJson->GetValue("width");
+    if (width && width->IsString()) {
+        config->sizeWidth = StringUtils::StringToDimension(width->GetString(), true);
+    }
+    auto height = configJson->GetValue("height");
+    if (height && height->IsString()) {
+        config->sizeHeight = StringUtils::StringToDimension(height->GetString(), true);
+    }
+    return config;
+}
+
+// Consume the scroll-placeholder template registry (read-only reuse); no
+// system default is substituted for an empty or unregistered id (no substitution rules from the placeholder module).
+namespace {
+void ApplyPlaceholderSuggestedSize(const RefPtr<UINode>& placeholder, const AsyncLoadConfig& config);
+}
+
+RefPtr<UINode> CustomNodeBase::AcquireAsyncLoadPlaceholder(
+    const RefPtr<UINode>& host, const AsyncLoadConfig& config)
+{
+    CHECK_NULL_RETURN(host, nullptr);
+    auto context = host->GetContext();
+    CHECK_NULL_RETURN(context, nullptr);
+    auto scrollManager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_RETURN(scrollManager, nullptr);
+    if (!config.HasPlaceholder()) {
+        // Not configured: the component stays invisible until its content is ready.
+        return nullptr;
+    }
+    if (!scrollManager->IsTemplateRegistered(config.placeholderId)) {
+        // An unregistered (or already unregistered) id degrades to "no
+        // placeholder" for the caller, but is recorded as a maintainability
+        // warning log (hilog), not an error code.
+        TAG_LOGW(AceLogTag::ACE_STATE_MGMT,
+            "AsyncLoad placeholder id '%{public}s' is not registered, no placeholder shown",
+            config.placeholderId.c_str());
+        return nullptr;
+    }
+    auto placeholder = scrollManager->AcquireTemplateInstance(config.placeholderId);
+    if (!placeholder) {
+        return nullptr;
+    }
+    placeholder->MountToParent(host);
+    ApplyPlaceholderSuggestedSize(placeholder, config);
+    return placeholder;
+}
+
+// Suggested size (PlaceholderOptions.size): acts as the placeholder root's
+// ideal size during measurement, mirroring the scroll-placeholder shell
+// (same validity contract: non-finite/non-positive or px-unnormalizable
+// dimensions are dropped as unusable; a suggested size overrides the
+// template root's own user-defined size for this instance, an unset axis
+// keeps the template's layout).
+namespace {
+void ApplyPlaceholderSuggestedSize(const RefPtr<UINode>& placeholder, const AsyncLoadConfig& config)
+{
+    if (!config.sizeWidth.has_value() && !config.sizeHeight.has_value()) {
+        return;
+    }
+    auto frame = AceType::DynamicCast<FrameNode>(placeholder);
+    if (!frame) {
+        TAG_LOGD(AceLogTag::ACE_STATE_MGMT,
+            "AsyncLoad placeholder suggested size ignored: root is not a FrameNode");
+        return;
+    }
+    auto context = frame->GetContext();
+    auto scaleProperty = context ? ScaleProperty::CreateScaleProperty(context) : ScaleProperty();
+    auto isSuggestedSizeUsable = [&scaleProperty](const Dimension& dim) {
+        if (!std::isfinite(dim.Value()) || LessNotEqual(dim.Value(), 0.0)) {
+            return false;
+        }
+        auto px = ConvertToPx(CalcLength(dim), scaleProperty, 0.0f, {});
+        return !px.has_value() || std::isfinite(px.value());
+    };
+    CalcSize idealSize;
+    bool hasUsableDimension = false;
+    if (config.sizeWidth.has_value() && isSuggestedSizeUsable(config.sizeWidth.value())) {
+        idealSize.SetWidth(CalcLength(config.sizeWidth.value()));
+        hasUsableDimension = true;
+    }
+    if (config.sizeHeight.has_value() && isSuggestedSizeUsable(config.sizeHeight.value())) {
+        idealSize.SetHeight(CalcLength(config.sizeHeight.value()));
+        hasUsableDimension = true;
+    }
+    if (hasUsableDimension) {
+        frame->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+    }
+}
+} // namespace
+
+void CustomNodeBase::DetachAsyncLoadPlaceholder(RefPtr<UINode> placeholder)
+{
+    auto parent = placeholder ? placeholder->GetParent() : nullptr;
+    if (parent) {
+        parent->RemoveChild(placeholder);
+    }
 }
 
 void CustomNodeBase::SetUpdateFunction(std::function<void()>&& updateFunc)

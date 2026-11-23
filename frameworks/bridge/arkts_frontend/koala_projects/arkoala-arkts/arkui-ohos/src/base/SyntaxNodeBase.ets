@@ -31,13 +31,13 @@ export function isNeedDestroyImmediately(ptr: KPointer): boolean {
     return detachedRootPtrsNeedDestroyImmediately.has(ptr);
 }
 
-export function resgisterDetachedRootPtrNeedDestroyImmediately(ptr: KPointer): void {
+export function registerDetachedRootPtrNeedDestroyImmediately(ptr: KPointer): void {
     if (ptr !== nullptr) {
         detachedRootPtrsNeedDestroyImmediately.add(ptr);
     }
 }
 
-export function unresgisterDetachedRootPtrNeedDestroyImmediately(ptr: KPointer): void {
+export function unregisterDetachedRootPtrNeedDestroyImmediately(ptr: KPointer): void {
     detachedRootPtrsNeedDestroyImmediately.delete(ptr);
 }
 
@@ -86,6 +86,16 @@ export class ForEachNodePeer extends PeerNode {
         allowSiblingReorder: boolean = false) {
         super(peerPtr, id, name, flags, PeerNodeType, allowSiblingReorder)
     }
+
+    // forwards RepeatOptions.allowReuseInAnimation (creation-time option) to the
+    // native node: explicitly false makes the direct Grid / WaterFlow parent of this
+    // node run the sync-cache-in-layout strategy; unset keeps the native tri-state
+    // (defaults: false for a List parent, true otherwise). Only the full-load Repeat
+    // branch (virtualScroll({ disableVirtualScroll: true })) creates this peer with
+    // isRepeat = true.
+    setAllowReuseInAnimation(allow: boolean): void {
+        ArkUIAniModule._Repeat_SetAllowReuseInAnimation(this.getPeerPtr(), allow ? 1 : 0)
+    }
 }
 
 export class LazyNodePeer extends PeerNode {
@@ -125,7 +135,41 @@ export class LazyNodePeer extends PeerNode {
         if (!this._reusePool) {
             return undefined
         }
-        return this.tryReuseFromPool(reuseKey, reuseKey)
+        const candidate = this.tryReuseFromPool(reuseKey, reuseKey)
+        if (candidate !== undefined) {
+            return candidate
+        }
+        if (this.isRepeatNodeHasCustomComponent()) {
+            return undefined
+        }
+        // On-demand same-template fallback. Within one frame the backend builds newly
+        // visible items (layout measure, GetFrameChildByIndex) BEFORE the active-range
+        // push that feeds prepareRepeatReusePlan (end of layout, ListLayoutAlgorithm::
+        // ProcessCacheCount -> SetActiveChildRange), so the plan for a scrolled-in item
+        // is routinely not built yet. Item keys are unique, so the exact-key fallback
+        // above almost never hits while scrolling; mirror the plan's second pass here
+        // so cross-item reuse does not depend on that ordering. Gates stay in
+        // canReuseCandidate (cross-key reuse is still rejected during implicit
+        // animations), and pool consumption stays atomic (getLastNode pops).
+        const templateKey = this.extractRepeatTemplateKey(reuseKey)
+        const reusePool: Map<string, ReusablePool> | undefined = this._reusePool
+        if (templateKey && reusePool) {
+            const reuseKeys: string[] = []
+            reusePool.forEach((_: ReusablePool, k: string) => {
+                reuseKeys.push(k)
+            })
+            for (const sourceReuseKey of reuseKeys) {
+                if (sourceReuseKey === reuseKey ||
+                    this.extractRepeatTemplateKey(sourceReuseKey) !== templateKey) {
+                    continue
+                }
+                const sameTemplate = this.tryReuseFromPool(sourceReuseKey, reuseKey)
+                if (sameTemplate !== undefined) {
+                    return sameTemplate
+                }
+            }
+        }
+        return undefined
     }
 
     override recycle(reuseKey: string, child: Disposable, id: KoalaCallsiteKey): boolean {
@@ -212,6 +256,18 @@ export class LazyNodePeer extends PeerNode {
 
     isRepeatNodeImplicitAnimationOpen(): boolean {
         return ArkUIAniModule._Repeat_IsImplicitAnimationOpen(this.getPeerPtr()) !== 0
+    }
+
+    isRepeatNodeHasCustomComponent(): boolean {
+        return ArkUIAniModule._Repeat_HasCustomComponent(this.getPeerPtr()) !== 0
+    }
+
+    // forwards RepeatOptions.allowReuseInAnimation (creation-time option) to the
+    // native node: explicitly false makes the direct Grid / WaterFlow parent of this
+    // node run the sync-cache-in-layout strategy; unset keeps the native tri-state
+    // (defaults: false for a List parent, true otherwise)
+    setAllowReuseInAnimation(allow: boolean): void {
+        ArkUIAniModule._Repeat_SetAllowReuseInAnimation(this.getPeerPtr(), allow ? 1 : 0)
     }
 
     prepareRepeatReusePlan(targetReuseKeys: string[]): void {
@@ -309,6 +365,13 @@ export class LazyNodePeer extends PeerNode {
     }
 
     private canReuseCandidate(candidate: Disposable, sourceReuseKey: string, targetReuseKey: string): boolean {
+        // ArkoalaLazyNode::IsAllowAnimation is false when reuse during animation is
+        // permitted (RepeatOptions.allowReuseInAnimation set to true, or unset with a
+        // non-List parent container): the candidate is then freely reusable and the
+        // main-tree / animation gating below is skipped.
+        if (!this.isRepeatNodeAllowAnimation()) {
+            return true
+        }
         const candidateNode = GetReusableScopeNode(candidate)
         if (!(candidateNode instanceof SyntaxItemPeer)) {
             return false

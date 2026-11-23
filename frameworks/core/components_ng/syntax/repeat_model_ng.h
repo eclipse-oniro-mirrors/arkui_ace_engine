@@ -48,6 +48,7 @@ public:
     bool IsImplicitAnimationOpen() override;
     bool IsChildInAnimation(uint32_t fromIndex) override;
     std::pair<int32_t, int32_t> GetActiveRange() override;
+    void SetAllowReuseInAnimation(std::optional<bool> allowReuseInAnimation) override;
 };
 } // namespace OHOS::Ace::NG
 

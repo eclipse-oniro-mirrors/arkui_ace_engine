@@ -76,7 +76,9 @@ enum class TabJsResType {
     SIDEBAR_DIVIDER_STROKE_WIDTH,
     SIDEBAR_DIVIDER_COLOR,
     SIDEBAR_DIVIDER_START_MARGIN,
-    SIDEBAR_DIVIDER_END_MARGIN
+    SIDEBAR_DIVIDER_END_MARGIN,
+    SIDEBAR_TITLE_BAR_ICON,
+    SIDEBAR_TITLE_BAR_TEXT
 };
 
 struct TabsItemDivider final {
@@ -273,6 +275,7 @@ public:
     virtual void SetSidebarBottomBar(const RefPtr<AceType>& bottomBar) {}
     virtual void SetSidebarSearchableOptions(const NG::TabsSidebarSearchableOptions& options) {}
     virtual void SetShowSidebarControlButton(bool showControlButton) {}
+    virtual void SetSidebarTitleBar(const NG::TabsSidebarTitleBarOptions& options) {}
     virtual void SetBarDisplayModeBreakpoint(const NG::TabBarDisplayModeBreakpoint& breakpoint) {}
     virtual void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) {}
     virtual void SetKeepTabBarInSideBar(bool keepTabBarInSideBar) {}

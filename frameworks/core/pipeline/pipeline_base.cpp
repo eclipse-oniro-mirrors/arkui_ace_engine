@@ -1190,7 +1190,7 @@ void PipelineBase::Destroy()
     touchPluginPipelineContext_.clear();
     virtualKeyBoardCallback_.clear();
     formLinkInfoMap_.clear();
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "Pipeline destroyed, %{public}zu finish callbacks unexecuted, count: %{public}s",
+    TAG_LOGI(AceLogTag::ACE_ANIMATION, "pipeline destroyed, unexecuted:%{public}zu, %{public}s",
         finishFunctions_.size(), GetUnexecutedFinishCount().c_str());
     finishFunctions_.clear();
     finishCount_.clear();

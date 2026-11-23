@@ -17,6 +17,7 @@ test_sources = [
   "calendar_dialog_pattern_test_ng.cpp",
   "calendar_dialog_view_test_ng.cpp",
   "calendar_picker_layout_algorithm_test.cpp",
+  "calendar_picker_model_test_ng.cpp",
   "calendar_picker_pattern_test.cpp",
   "calendar_picker_pattern_test_ng.cpp",
   "calendar_picker_resource_test.cpp",

@@ -51,6 +51,11 @@ public:
         return MakeRefPtr<TabsSideBarTabListLayoutAlgorithm>();
     }
 
+    FocusPattern GetFocusPattern() const override
+    {
+        return { FocusType::SCOPE, true };
+    }
+
     void SetSwiperController(const RefPtr<SwiperController>& controller)
     {
         swiperController_ = controller;

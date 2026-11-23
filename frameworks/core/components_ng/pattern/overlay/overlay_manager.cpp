@@ -5541,7 +5541,10 @@ void OverlayManager::RemovePixelMapAnimation(bool startDrag, double x, double y,
         auto dragDropManager = pipeline->GetDragDropManager();
         CHECK_NULL_VOID(dragDropManager);
         DragEventActuator::ExecutePreDragAction(PreDragStatus::PREVIEW_LANDING_FINISHED);
-        if (!dragDropManager->IsNeedDisplayInSubwindow() && !isSubwindowOverlay && dragDropManager->IsDragging()) {
+        if (!dragDropManager->IsNeedDisplayInSubwindow() && !isSubwindowOverlay && dragDropManager->IsDragging() &&
+            !dragDropManager->IsDragWindowHiddenByDeveloper()) {
+            // The developer hide has a higher priority than this framework-internal restore path;
+            // restoring here would flash the drag window hidden in onDragStart.
             InteractionInterface::GetInstance()->SetDragWindowVisible(true);
         }
         auto overlayManager = weak.Upgrade();

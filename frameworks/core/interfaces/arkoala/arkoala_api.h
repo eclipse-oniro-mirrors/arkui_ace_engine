@@ -2866,6 +2866,12 @@ struct ArkUITabsSidebarSearchableOptions {
     ArkUI_Bool isNull;
 };
 
+struct ArkUITabsSidebarTitleBarOptions {
+    ArkUI_CharPtr text;
+    ArkUI_CharPtr icon;
+    ArkUI_Bool isNull;
+};
+
 struct ArkUITabBarDisplayModeBreakpoint {
     ArkUI_Int32 sm;
     ArkUI_Int32 md;
@@ -3970,6 +3976,8 @@ struct ArkUICommonModifier {
     void (*registerNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys,
         std::function<void()>&& callback);
     void (*unregisterNodeKeyboardShortcut)(ArkUINodeHandle node, const std::string& value, uint8_t keys);
+    void (*setColorFilterEffect)(ArkUINodeHandle node, const ArkUI_Float32* matrix, ArkUI_Int32 size);
+    void (*resetColorFilterEffect)(ArkUINodeHandle node);
 };
 
 struct ArkUICommonShapeModifier {
@@ -5884,6 +5892,8 @@ struct ArkUITabsModifier {
     void (*resetSidebarSearchable)(ArkUINodeHandle node);
     void (*setShowSidebarControlButton)(ArkUINodeHandle node, ArkUI_Bool showControlButton);
     void (*resetShowSidebarControlButton)(ArkUINodeHandle node);
+    void (*setSidebarTitleBar)(ArkUINodeHandle node, struct ArkUITabsSidebarTitleBarOptions* options);
+    void (*resetSidebarTitleBar)(ArkUINodeHandle node);
     void (*setBarDisplayModeBreakpoint)(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint);
     void (*resetBarDisplayModeBreakpoint)(ArkUINodeHandle node);
     void (*setOnBarDisplayModeChange)(ArkUINodeHandle node, void* callback);
@@ -5978,6 +5988,8 @@ struct ArkUITabContentModifier {
     void (*setSidebarSection)(ArkUINodeHandle node, ArkUI_CharPtr title, ArkUI_Bool hasOrder, ArkUI_Int32 order,
         ArkUI_Int32 titleStyle, ArkUI_VoidPtr resObjRawPtr);
     void (*resetSidebarSection)(ArkUINodeHandle node);
+    void (*setKeepAlive)(ArkUINodeHandle node, ArkUI_Bool keepAlive);
+    void (*resetKeepAlive)(ArkUINodeHandle node);
 };
 
 struct ArkUITabsControllerModifier {

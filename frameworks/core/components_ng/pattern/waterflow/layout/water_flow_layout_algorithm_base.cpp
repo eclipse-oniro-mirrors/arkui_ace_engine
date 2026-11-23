@@ -166,6 +166,16 @@ void ApplyContentClipFixOffset(const RectF& clipRect, const RefPtr<WaterFlowLayo
 }
 } // namespace
 
+bool WaterFlowLayoutBase::IsSyncCacheLayoutEnabled(LayoutWrapper* layoutWrapper) const
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    auto pattern = host->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsSyncCacheLayoutEnabled();
+}
+
 void WaterFlowLayoutBase::PreloadItems(
     LayoutWrapper* host, const RefPtr<WaterFlowLayoutInfoBase>& info, int32_t cacheCount)
 {

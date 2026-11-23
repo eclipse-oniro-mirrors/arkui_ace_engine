@@ -512,7 +512,8 @@ void ComponentSnapshot::Create(
     CreateWithCleanup(customNode, std::move(callback), enableInspector, param, nullptr, flag);
 }
 
-void ComponentSnapshot::CreateWithCleanup(const RefPtr<AceType>& customNode, JsCallback&& callback, bool enableInspector,
+void ComponentSnapshot::CreateWithCleanup(
+    const RefPtr<AceType>& customNode, JsCallback&& callback, bool enableInspector,
     const SnapshotParam& param, const std::function<void(std::function<void()>)>& onReady, bool flag)
 {
     if (!customNode) {

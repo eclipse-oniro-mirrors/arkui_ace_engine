@@ -4450,6 +4450,7 @@
       "OHOS::Ace::LogWrapper::GetBriefFileName(char const*)";
       "OHOS::Ace::MaterialUtils::CallSetMaterial(OHOS::Ace::NG::FrameNode*, OHOS::Ace::UiMaterial const*)";
       "OHOS::Ace::MaterialUtils::CheckMaterialValid(int)";
+      "OHOS::Ace::MaterialUtils::GetColorByMode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::ColorMode, unsigned int)";
       "OHOS::Ace::MaterialUtils::GetConfiguredMaterialState()";
       "OHOS::Ace::MaterialUtils::GetConfiguredMaterialType()";
       "OHOS::Ace::MaterialUtils::GetImmersiveShadow(float)";
@@ -4520,6 +4521,11 @@
       "OHOS::Ace::NG::CustomNodeBase::ResetRecycle()";
       "OHOS::Ace::NG::CustomNodeBase::SetRecycleRenderFunc(std::__h::function<void ()>&&)";
       "OHOS::Ace::NG::CustomNodeBase::SetReuseId(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::NG::CustomNodeBase::SetAsyncLoadConfig(std::__h::shared_ptr<OHOS::Ace::AsyncLoadConfig>&&)";
+      "OHOS::Ace::NG::CustomNodeBase::ParseAsyncLoadConfigJson(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::NG::AsyncLoadScheduler::EnterBuildScope()";
+      "OHOS::Ace::NG::AsyncLoadScheduler::ExitBuildScope()";
+      "OHOS::Ace::NG::AsyncLoadScheduler::InBuildScope()";
       "OHOS::Ace::NG::CustomNodeStatic::ConstructCustomNode(int, std::__h::function<void (OHOS::Ace::NG::LayoutWrapper*)>&&, std::__h::function<void (OHOS::Ace::NG::LayoutWrapper*)>&&, std::__h::function<void (OHOS::Ace::NG::LayoutWrapper*)>&&)";
       "OHOS::Ace::NG::CustomNodeStatic::DidDefaultLayout(OHOS::Ace::RefPtr<OHOS::Ace::NG::CustomMeasureLayoutNode> const&)";
       "OHOS::Ace::NG::CustomNodeStatic::DidDefaultMeasure(OHOS::Ace::RefPtr<OHOS::Ace::NG::CustomMeasureLayoutNode> const&)";
@@ -4580,6 +4586,7 @@
       "OHOS::Ace::NG::FocusHub::SetFocusType(OHOS::Ace::NG::FocusType)";
       "OHOS::Ace::NG::FocusHub::SetIsDefaultFocus(bool)";
       "OHOS::Ace::NG::FocusHub::SetPaintColor(OHOS::Ace::Color const&)";
+      "OHOS::Ace::NG::FocusHub::SetPaintWidth(OHOS::Ace::Dimension const&)";
       "OHOS::Ace::NG::FocusHub::SetParentFocusable(bool)";
       "OHOS::Ace::NG::FrameNode::AddToOcclusionMap(bool)";
       "OHOS::Ace::NG::FrameNode::CreateAnimatablePropertyFloat(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&, float, std::__h::function<void (float)> const&, OHOS::Ace::PropertyUnit const&)";

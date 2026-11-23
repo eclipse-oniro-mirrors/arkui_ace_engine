@@ -26,6 +26,7 @@ class ImageColorFilter : public AceType {
     DECLARE_ACE_TYPE(ImageColorFilter, AceType);
 
 public:
+    static constexpr int32_t COLOR_FILTER_MATRIX_SIZE = 20;
     ImageColorFilter() = default;
     ~ImageColorFilter() override = default;
     void SetColorFilterMatrix(const std::vector<float>&& matrix)

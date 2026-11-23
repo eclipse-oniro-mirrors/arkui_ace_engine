@@ -1,7 +1,7 @@
 # Drag Framework Context
 
-> 文档版本：v1.0
-> 更新时间：2026-08-01
+> 文档版本：v1.1
+> 更新时间：2026-11-13
 > 来源：`docs/context_registry.json` 主题 `DragFramework`
 
 ## 定位
@@ -22,12 +22,16 @@
 | SpringLoading 状态机 | `frameworks/core/components_ng/manager/drag_drop/drag_drop_spring_loading/` | 拖拽停留检测、计时和 BEGIN/UPDATE/END/CANCEL 状态处理；这是延迟/周期回调状态机，不是物理弹簧动画。 |
 | 预览动画与内部 Action | `frameworks/core/components_ng/manager/drag_drop/utils/` | 预览动画和内部 DragAction 数据模型。 |
 | 全局/系统动作桥接 | `frameworks/core/components_ng/manager/drag_drop/drag_drop_global_controller.*`、`drag_drop_func_wrapper.*`、`drag_drop_controller_func_wrapper.*` | 延迟结束、全局会话状态和程序化起拖的内部桥接。 |
+| 开发者拖拽窗显隐状态 | `frameworks/core/components_ng/manager/drag_drop/drag_drop_manager.cpp` | 查找 `HandleDragWindowVisibleByDeveloper`、`UpdateDragWindowVisibleByDeveloper`、`RestoreDragWindowVisibleFromDeveloper`、`ResetDragWindowHiddenByDeveloper`，定位隐藏与显示记录。 |
+| 起拖时隐藏记录与门禁 | `frameworks/core/components_ng/event/gesture_event_hub_drag.cpp` | 查找 `RecordDragWindowHideOnDragStart`、`ResetStaleDragWindowHideState`；`GetDragDropInfo` 内 onDragStart 回调前清理残留、回调后记录；3 处防止框架内部恢复闪烁。 |
+| 拖拽窗显隐标志载体 | `frameworks/core/gestures/drag_event.h`、`frameworks/core/gestures/drag_event.cpp` | `SetDragWindowVisible/GetDragWindowVisible/IsDragWindowVisibleChanged`；标志随每次 `FireOnDragEvent` 新建的 DragEvent 实例传递，不跨事件残留。 |
 
 ### API 入口
 
 | 范围 | 稳定路径 | 说明 |
 |---|---|---|
 | ArkTS/C 公共合同 | `docs/kb/capabilities/drag-capability.md` | 拖拽框架不单独定义应用侧签名；从对应通用能力 KB 路由到动态/静态 SDK 和 C header。 |
+| 开发者拖拽窗显隐接口 | `frameworks/bridge/declarative_frontend/ark_component/types/index.d.ts`、`frameworks/bridge/declarative_frontend/engine/functions/js_drag_function.cpp` | 向开发者提供动静态设置接口。 |
 | 系统交互抽象 | `frameworks/core/common/interaction/interaction_interface.h` | ArkUI 与平台交互实现之间的稳定抽象边界。 |
 | 内部代理 | `frameworks/core/components_ng/manager/drag_drop/drag_drop_proxy.h` | 仅用于框架内部模拟/代理路径，不作为系统会话结束的公共合同。 |
 
@@ -64,11 +68,14 @@
 | 起拖前状态或取消行为异常 | `drag_drop_initiating/` 与 `drag_event` 路径。 |
 | 预览、Overlay 或落放动画异常 | `drag_event`、`DragDropManager` 和 `utils/drag_animation_helper`。 |
 | 悬停响应没有触发或被取消 | `drag_drop_spring_loading/` 与 `DragDropManager` 的 ENTER/MOVE/LEAVE 调用点。 |
+| setDragWindowVisible 隐藏后拖拽窗闪现/意外恢复 | `drag_drop_manager.cpp` 门禁点清单（见「开发者拖拽窗显隐控制」节）与 `gesture_event_hub_drag.cpp` 三处 lambda 门禁；新增恢复路径未接门禁是最常见原因。 |
+| 第二次拖拽会话隐藏请求不生效 | 跨会话残留：检查隐藏态清理点清单（落放终止路径尾部 + `OnDragStartForDragEvent` 入口）是否被绕过。 |
 
 ## 调试入口
 
 - 使用 `rg -n "OnDragEvent|GetDragCallback|StartDrag" frameworks adapter` 快速定位系统事件、起拖和结束回调边界。
 - 使用 `rg -n "DragDropSpringLoading|NotifyDragSpringLoading" frameworks/core/components_ng` 检查悬停检测状态机与 Manager 驱动关系。
+- 使用 `rg -n "IsDragWindowHiddenByDeveloper|DragWindowVisibleByDeveloper" frameworks test` 检查开发者拖拽窗显隐的门禁点、清理点与对应单测。
 - 从 `test/unittest/core/manager/drag_drop/` 选择对应状态机或 Manager 用例，再回溯生产路径。
 
 ## 相关主题

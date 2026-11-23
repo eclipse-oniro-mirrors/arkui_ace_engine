@@ -75,7 +75,7 @@ void MenuViewStatic::RemoveMenuHoverScaleStatus(int32_t targetId)
 {
     menuHoverStatusStatic_.erase(targetId);
 }
- 
+
 MenuHoverScaleStatus MenuViewStatic::GetMenuHoverScaleStatus(int32_t targetId)
 {
     auto result = menuHoverStatusStatic_.find(targetId);

@@ -98,6 +98,7 @@ public:
 #ifdef SUPPORT_DIGITAL_CROWN
     void ResetDigitalCrownSensitivity() override;
 #endif
+
     static void UpdateComponentColor(FrameNode* frameNode, const SliderColorType sliderColorType);
     static void CreateWithColorResourceObj(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
         const SliderColorType sliderColorType);

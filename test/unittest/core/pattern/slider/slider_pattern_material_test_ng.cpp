@@ -1048,10 +1048,10 @@ HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_StartLongPressTimer_Image_00
     auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
     ASSERT_NE(paintProperty, nullptr);
     paintProperty->UpdateBlockType(SliderModelNG::BlockStyleType::IMAGE);
-    
+
     auto pattern = frameNode->GetPattern<SliderPattern>();
     ASSERT_NE(pattern, nullptr);
-    
+
     pattern->StartLongPressTimer();
 }
 

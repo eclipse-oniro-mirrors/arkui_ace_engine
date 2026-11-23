@@ -56,6 +56,7 @@ class RSUIDirector;
 }
 
 namespace OHOS::Ace::NG {
+    class AsyncLoadScheduler;
     class RecycleManager;
     class RenderContext;
     struct UITreeRequestState;
@@ -909,6 +910,11 @@ public:
     // that never register a placeholder template (zero overhead for the legacy path).
     const RefPtr<ScrollPlaceholderManager>& GetOrCreateScrollPlaceholderManager();
 
+    // --- Custom-component asynchronous loading (thin facades over AsyncLoadScheduler) ---
+    void RegisterAsyncLoadIdleEntry(const WeakPtr<UINode>& node);
+    void RemoveAsyncLoadIdleEntry(const WeakPtr<UINode>& node);
+    AsyncLoadScheduler* GetAsyncLoadScheduler();
+
     const RefPtr<NavigationManager>& GetNavigationManager() const;
 
     const RefPtr<ForceSplitManager>& GetForceSplitManager() const;
@@ -1710,6 +1716,10 @@ private:
     std::list<FrameInfo> dumpFrameInfos_;
     std::list<std::function<void()>> animationClosuresList_;
     std::list<std::function<void()>> asyncLoadTasks_;
+
+    // Scheduling state and algorithms live in AsyncLoadScheduler (lazy-created,
+    // same lifetime as this context); the force queue stays asyncLoadTasks_ below.
+    std::unique_ptr<AsyncLoadScheduler> asyncLoadScheduler_;
 
     mutable std::mutex navigationMutex_;
     std::map<std::string, WeakPtr<FrameNode>> navigationNodes_;

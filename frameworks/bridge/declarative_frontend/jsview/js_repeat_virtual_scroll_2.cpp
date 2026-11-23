@@ -480,6 +480,20 @@ void JSRepeatVirtualScroll2::IsChildOnMainTree(const JSCallbackInfo& info)
     info.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(result)));
 }
 
+// SetAllowReuseInAnimation is called once at Repeat creation, when
+// RepeatOptions.allowReuseInAnimation is explicitly set. It reads the positional
+// arguments repeatElmtId (number) and value (boolean), and forwards the tri-state
+// value to the node resolved by repeatElmtId.
+void JSRepeatVirtualScroll2::SetAllowReuseInAnimation(const JSCallbackInfo& info)
+{
+    if (!info[0]->IsNumber() || !info[1]->IsBoolean()) {
+        TAG_LOGE(AceLogTag::ACE_REPEAT, "JSRepeatVirtualScroll2::SetAllowReuseInAnimation - invalid parameters ERROR");
+        return;
+    }
+    auto repeatElmtId = info[0]->ToNumber<int32_t>();
+    RepeatVirtualScroll2Model::GetInstance()->SetAllowReuseInAnimation(repeatElmtId, info[1]->ToBoolean());
+}
+
 void JSRepeatVirtualScroll2::JSBind(BindingTarget globalObj)
 {
     JSClass<JSRepeatVirtualScroll2>::Declare("RepeatVirtualScroll2Native");
@@ -503,6 +517,8 @@ void JSRepeatVirtualScroll2::JSBind(BindingTarget globalObj)
         "isImplicitAnimationOpen", &JSRepeatVirtualScroll2::IsImplicitAnimationOpen);
     JSClass<JSRepeatVirtualScroll2>::StaticMethod("isChildInAnimation", &JSRepeatVirtualScroll2::IsChildInAnimation);
     JSClass<JSRepeatVirtualScroll2>::StaticMethod("isChildOnMainTree", &JSRepeatVirtualScroll2::IsChildOnMainTree);
+    JSClass<JSRepeatVirtualScroll2>::StaticMethod(
+        "setAllowReuseInAnimation", &JSRepeatVirtualScroll2::SetAllowReuseInAnimation);
     JSClass<JSRepeatVirtualScroll2>::Bind<>(globalObj);
 }
 

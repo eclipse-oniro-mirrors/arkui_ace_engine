@@ -206,7 +206,6 @@ bool ToastView::ApplyDefaultMaterial(
     if (SystemProperties::GetUiMaterialLevel() == UiMaterialLevel::SMOOTH) {
         return DialogManager::HandleSmoothImmersiveMaterial(toastNode, defaultMaterial);
     }
-
     renderContext->UpdateBackBlurStyle(std::nullopt);
     renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
     ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(toastNode), AceType::RawPtr(defaultMaterial));
@@ -348,8 +347,7 @@ Shadow ToastView::GetToastShadow(
             shadow = shadowTheme->GetShadow(shadowStyle, colorMode);
         }
     }
-
-    return shadow;
+        return shadow;
 }
 
 void ToastView::UpdateToastShadow(

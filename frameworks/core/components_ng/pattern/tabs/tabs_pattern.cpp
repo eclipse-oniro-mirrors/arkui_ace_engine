@@ -34,6 +34,7 @@
 #include "core/common/visual_effect/transparency_utils.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components/common/properties/blur_style_option.h"
 #include "core/components/tab_bar/tabs_event.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/base/view_abstract.h"
@@ -122,6 +123,8 @@ constexpr int32_t INVERT_COLOR_ANIMATION_DURATION = 133;
 const char TAB_BAR_ETS_TAG[] = "TabBar";
 const char TABS_BACKGROUND_MASK_ETS_TAG[] = "BackgroundMask";
 const char NAVDESTINATION_VIEW_ETS_TAG[] = "NavDestination";
+const char TABS_SIDE_BAR_TAG[] = "TabsSideBar";
+
 constexpr Dimension DEFAULT_DIVIDER_STROKE_WIDTH = 1.0_vp;
 } // namespace
 
@@ -828,6 +831,24 @@ void TabsPattern::RecoverInnerOnGestureRecognizerJudgeBegin()
     gestureHub->SetInnerNodeGestureRecognizerJudge(false);
 }
 
+namespace {
+RefPtr<FocusHub> GetSideBarFocusHub(const RefPtr<FrameNode>& sideBarNode)
+{
+    CHECK_NULL_RETURN(sideBarNode, nullptr);
+    return sideBarNode->GetFocusHub();
+}
+
+// Whether the sidebar is placed on the physical left edge (LTR + START or RTL + END).
+bool IsSidebarOnLeft(const RefPtr<TabsLayoutProperty>& property)
+{
+    CHECK_NULL_RETURN(property, true);
+    auto sideBarPosition = property->GetSidebarPositionValue(BarPosition::START);
+    bool isRTL = property->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    return (!isRTL && sideBarPosition == BarPosition::START) ||
+        (isRTL && sideBarPosition == BarPosition::END);
+}
+} // namespace
+
 ScopeFocusAlgorithm TabsPattern::GetScopeFocusAlgorithm()
 {
     auto property = GetLayoutProperty<TabsLayoutProperty>();
@@ -845,6 +866,51 @@ ScopeFocusAlgorithm TabsPattern::GetScopeFocusAlgorithm()
             }
             return nextFocusNode.Upgrade() != currFocusNode.Upgrade();
         });
+}
+
+WeakPtr<FocusHub> TabsPattern::GetNextFocusNodeInSideBarMode(FocusStep step, const RefPtr<FocusHub>& curFocusNode,
+    const RefPtr<FocusHub>& swiperFocusNode, const RefPtr<TabsLayoutProperty>& property, bool& handled)
+{
+    auto sideBarFocusNode = GetSideBarFocusHub(GetSideBarNode());
+    if (!sideBarFocusNode) {
+        handled = false;
+        return nullptr;
+    }
+    // The sidebar exists: this handler owns the transfer decision from here on, so the caller
+    // must not fall back to the legacy (hidden) TabBar logic.
+    handled = true;
+    auto sideBarPosition = property->GetSidebarPositionValue(BarPosition::START);
+    auto isRTL = property->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    auto curFrameName = curFocusNode->GetFrameName();
+    if (curFrameName == TABS_SIDE_BAR_TAG) {
+        // The sidebar is always a left/right panel, so only the horizontal direction matters.
+        if (sideBarPosition == BarPosition::START) {
+            if (step == FocusStep::TAB || (isRTL ? step == FocusStep::LEFT : step == FocusStep::RIGHT)) {
+                return AceType::WeakClaim(AceType::RawPtr(swiperFocusNode));
+            }
+        } else {
+            if (step == FocusStep::SHIFT_TAB || (isRTL ? step == FocusStep::RIGHT : step == FocusStep::LEFT)) {
+                return AceType::WeakClaim(AceType::RawPtr(swiperFocusNode));
+            }
+        }
+    } else if (curFrameName == V2::SWIPER_ETS_TAG) {
+        // The sidebar is always a left/right panel, so only the horizontal direction matters.
+        if (sideBarPosition == BarPosition::START) {
+            if (step == FocusStep::SHIFT_TAB || (isRTL ? step == FocusStep::RIGHT : step == FocusStep::LEFT)) {
+                return AceType::WeakClaim(AceType::RawPtr(sideBarFocusNode));
+            }
+        } else {
+            if (step == FocusStep::TAB || (isRTL ? step == FocusStep::LEFT : step == FocusStep::RIGHT)) {
+                return AceType::WeakClaim(AceType::RawPtr(sideBarFocusNode));
+            }
+        }
+        if (step == FocusStep::LEFT_END || step == FocusStep::RIGHT_END || step == FocusStep::UP_END ||
+            step == FocusStep::DOWN_END) {
+            return AceType::WeakClaim(AceType::RawPtr(swiperFocusNode));
+        }
+    }
+    // The TabBar is hidden in sidebar mode, so never transfer focus to it.
+    return nullptr;
 }
 
 WeakPtr<FocusHub> TabsPattern::GetNextFocusNode(FocusStep step, const WeakPtr<FocusHub>& currentFocusNode)
@@ -868,6 +934,16 @@ WeakPtr<FocusHub> TabsPattern::GetNextFocusNode(FocusStep step, const WeakPtr<Fo
     CHECK_NULL_RETURN(swiperNode, nullptr);
     auto swiperFocusNode = swiperNode->GetFocusHub();
     CHECK_NULL_RETURN(swiperFocusNode, nullptr);
+
+    // In sidebar display mode the TabBar is hidden and the sidebar scope takes its place
+    // in the Tabs focus chain, so transfer focus between the sidebar and the Swiper.
+    if (GetActiveBarDisplayMode() == TabBarDisplayMode::SIDEBAR) {
+        bool handled = false;
+        auto sideBarNext = GetNextFocusNodeInSideBarMode(step, curFocusNode, swiperFocusNode, property, handled);
+        if (handled) {
+            return sideBarNext;
+        }
+    }
 
     if (curFocusNode->GetFrameName() == TAB_BAR_ETS_TAG) {
         if (tabBarPosition == BarPosition::START) {
@@ -920,17 +996,39 @@ void TabsPattern::InitFocusEvent()
     focusHub->SetOnGetNextFocusNodeFunc(getNextFocusNodeFunc);
 }
 
+RefPtr<FocusHub> TabsPattern::GetCurrentFocusNodeInSideBarMode(FocusIntension intension,
+    const RefPtr<FocusHub>& sideBarFocusHub, const RefPtr<FocusHub>& swiperFocusHub,
+    const RefPtr<TabsLayoutProperty>& property)
+{
+    // The sidebar is always a left/right panel, so the axis is always vertical here.
+    // first/last follow the logical order (sidebarPosition), independent of RTL.
+    auto sideBarPosition = property->GetSidebarPositionValue(BarPosition::START);
+    auto firstFocusHub = sideBarPosition == BarPosition::START ? sideBarFocusHub : swiperFocusHub;
+    auto lastFocusHub = sideBarPosition == BarPosition::START ? swiperFocusHub : sideBarFocusHub;
+    if (intension == FocusIntension::TAB || intension == FocusIntension::SELECT ||
+        intension == FocusIntension::HOME) {
+        return firstFocusHub;
+    } else if (intension == FocusIntension::SHIFT_TAB || intension == FocusIntension::END) {
+        return lastFocusHub;
+    }
+    if (intension == FocusIntension::DOWN || intension == FocusIntension::UP) {
+        return firstFocusHub;
+    }
+    // LEFT/RIGHT are physical directions: land on the region the focus comes from.
+    // IsSidebarOnLeft resolves sidebarPosition together with RTL to the physical left edge.
+    bool sideBarOnLeft = IsSidebarOnLeft(property);
+    if (intension == FocusIntension::LEFT) {
+        return sideBarOnLeft ? swiperFocusHub : sideBarFocusHub;
+    } else if (intension == FocusIntension::RIGHT) {
+        return sideBarOnLeft ? sideBarFocusHub : swiperFocusHub;
+    }
+    return nullptr;
+}
+
 RefPtr<FocusHub> TabsPattern::GetCurrentFocusNode(FocusIntension intension)
 {
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_RETURN(tabsNode, nullptr);
-    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
-    CHECK_NULL_RETURN(tabBarNode, nullptr);
-    auto tabBarFocusHub = tabBarNode->GetFocusHub();
-    CHECK_NULL_RETURN(tabBarFocusHub, nullptr);
-    if (!tabBarFocusHub->GetFocusable()) {
-        return nullptr;
-    }
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_RETURN(swiperNode, nullptr);
     auto swiperFocusHub = swiperNode->GetFocusHub();
@@ -938,6 +1036,21 @@ RefPtr<FocusHub> TabsPattern::GetCurrentFocusNode(FocusIntension intension)
 
     auto property = GetLayoutProperty<TabsLayoutProperty>();
     CHECK_NULL_RETURN(property, nullptr);
+    // In sidebar display mode the TabBar is hidden; the sidebar scope takes its place in the
+    // Tabs focus chain. Its own algorithm decides which sidebar region gets the focus.
+    if (GetActiveBarDisplayMode() == TabBarDisplayMode::SIDEBAR) {
+        auto sideBarFocusHub = GetSideBarFocusHub(GetSideBarNode());
+        if (sideBarFocusHub) {
+            return GetCurrentFocusNodeInSideBarMode(intension, sideBarFocusHub, swiperFocusHub, property);
+        }
+    }
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_RETURN(tabBarNode, nullptr);
+    auto tabBarFocusHub = tabBarNode->GetFocusHub();
+    CHECK_NULL_RETURN(tabBarFocusHub, nullptr);
+    if (!tabBarFocusHub->GetFocusable()) {
+        return nullptr;
+    }
     auto axis = property->GetAxis().value_or(Axis::HORIZONTAL);
     auto barPosition = property->GetTabBarPosition().value_or(BarPosition::START);
     auto isRTL = property->GetNonAutoLayoutDirection() == TextDirection::RTL;
@@ -1639,11 +1752,11 @@ void TabsPattern::UpdateBgMaskNode()
     CHECK_NULL_VOID(property);
     auto style = property->GetBarFloatingStyle();
     Color baseColor(MASK_COLOR_LIGHT);
-    ColorMode colorInvertColorMode = GetColorInvertColorMode();
+    ColorMode maskColorMode = GetBarMaskColorMode();
     if (style.has_value() && style->maskColor.has_value()) {
         baseColor = style->maskColor.value();
-    } else if (colorInvertColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
-        if (colorInvertColorMode == ColorMode::DARK) {
+    } else if (maskColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
+        if (maskColorMode == ColorMode::DARK) {
             baseColor = Color(MASK_COLOR_DARK);
         }
     } else {
@@ -2079,6 +2192,9 @@ bool TabsPattern::IsColorInvertEnabled()
     if (!options || !options->colorInvert) {
         return false;
     }
+    if (options->userColorMode != ThemeColorMode::SYSTEM) {
+        return false;
+    }
     auto materialLevel = SystemProperties::GetUiMaterialLevel();
     if (materialLevel != UiMaterialLevel::EXQUISITE && materialLevel != UiMaterialLevel::GENTLE) {
         return false;
@@ -2097,6 +2213,20 @@ ColorMode TabsPattern::GetColorInvertColorMode()
         return isColorPickerDark_.value() ? ColorMode::DARK : ColorMode::LIGHT;
     }
     return ColorMode::COLOR_MODE_UNDEFINED;
+}
+
+ColorMode TabsPattern::GetBarMaskColorMode()
+{
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(property, ColorMode::COLOR_MODE_UNDEFINED);
+    auto style = property->GetBarFloatingStyle();
+    if (style.has_value() && style->systemMaterial) {
+        const auto& options = style->systemMaterial->GetImmersiveOptions();
+        if (options && options->userColorMode != ThemeColorMode::SYSTEM) {
+            return options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT;
+        }
+    }
+    return GetColorInvertColorMode();
 }
 
 void TabsPattern::InitColorPickerIfNeeded()
@@ -2697,6 +2827,9 @@ void TabsPattern::SyncPropertiesToSideBar()
     // 4. Sync showSidebarControlButton
     sideBarPattern->SetShowSidebarControlButton(showSidebarControlButton_);
 
+    // 4.1 Sync sidebarTitleBar
+    sideBarPattern->SetSidebarTitleBarOptions(sidebarTitleBarOptions_);
+
     // 5. Replay bar modifier on the sidebar node first (matches tabBar execution order
     // where barModifier is applied before bar* properties, so bar* can override modifier)
     if (barModifierApply_) {
@@ -2774,6 +2907,12 @@ void TabsPattern::UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode)
     } else {
         if (showSidebarControlButton_ && !collapseButtonNode_) {
             UpdateCollapseButtonIfNeeded();
+            if (sideBarNode_) {
+                auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+                if (sideBarPattern) {
+                    sideBarPattern->UpdateTitleBarContent();
+                }
+            }
         }
     }
 }

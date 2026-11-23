@@ -19,12 +19,16 @@
 
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/tab_bar/tab_theme.h"
+#include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_content_node.h"
+#include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
+#include "core/components_ng/syntax/shallow_builder.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -90,6 +94,90 @@ void SetupSideBarPattern(RefPtr<FrameNode>& sideBarNode, RefPtr<TabsSideBarPatte
     auto tabList = CreateTestNode(V2::TABS_SIDE_BAR_TAB_LIST_TAG);
     pattern->tabListNode_ = tabList;
     tabList->MountToParent(sideBarNode);
+}
+
+constexpr char TABS_SIDE_BAR_SECTION_HEADER_TAG[] = "TabsSidebarSectionHeader";
+
+// Build a minimal TabsNode + Swiper with itemCount real TabContentNodes and a sidebar
+// tab list whose tab items are keyed by each TabContentNode's sideBarTabBarItemId.
+// This mirrors the real node relationships required by
+// TabsSideBarTabListPattern::FindSwiperIndexForTabItem.
+struct SideBarFocusTree {
+    RefPtr<TabsNode> tabsNode;
+    RefPtr<FrameNode> swiperNode;
+    RefPtr<FrameNode> hostNode;
+    RefPtr<FrameNode> columnNode;
+    RefPtr<TabsSideBarTabListPattern> pattern;
+    std::vector<RefPtr<FrameNode>> tabItems;
+
+    void Build(int32_t itemCount)
+    {
+        tabsNode = AceType::MakeRefPtr<TabsNode>(
+            V2::TABS_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<TabsPattern>(), false);
+        tabsNode->InitializePatternAndContext();
+        ElementRegister::GetInstance()->AddUINode(tabsNode);
+        swiperNode = FrameNode::GetOrCreateFrameNode(
+            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            []() { return AceType::MakeRefPtr<SwiperPattern>(); });
+        swiperNode->MountToParent(tabsNode);
+
+        pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+        hostNode = FrameNode::CreateFrameNode(
+            V2::TABS_SIDE_BAR_TAB_LIST_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        hostNode->GetOrCreateFocusHub();
+        columnNode = FrameNode::CreateFrameNode(
+            V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        columnNode->MountToParent(hostNode);
+
+        for (int32_t i = 0; i < itemCount; ++i) {
+            auto tabContentNode = TabContentNode::GetOrCreateTabContentNode(
+                V2::TAB_CONTENT_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+                []() -> RefPtr<Pattern> {
+                    auto shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(nullptr);
+                    return AceType::MakeRefPtr<TabContentPattern>(shallowBuilder);
+                });
+            tabContentNode->MountToParent(swiperNode);
+            auto tabItemNode = FrameNode::GetOrCreateFrameNode(
+                "TabsSideBarTabItem", tabContentNode->GetSideBarTabBarItemId(),
+                []() { return AceType::MakeRefPtr<LinearLayoutPattern>(false); });
+            tabItemNode->MountToParent(columnNode);
+            tabItemNode->GetOrCreateFocusHub();
+            tabItems.push_back(tabItemNode);
+        }
+        pattern->SetColumnNode(columnNode);
+        pattern->SetTabsNode(tabsNode);
+    }
+
+    void InsertSectionHeader(int32_t slot)
+    {
+        auto headerNode = FrameNode::CreateFrameNode(
+            TABS_SIDE_BAR_SECTION_HEADER_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        columnNode->AddChild(headerNode, slot);
+    }
+};
+
+// Attach a minimal sidebar node (TabsSideBarPattern + tab list) to the Tabs pattern and
+// switch the bar display mode to SIDEBAR so that focus routing uses the tab list.
+RefPtr<FrameNode> AttachSideBarNode(
+    const RefPtr<TabsPattern>& tabsPattern, RefPtr<FrameNode>& outTabListNode)
+{
+    auto sideBarNode = FrameNode::CreateFrameNode(V2::TABS_SIDE_BAR_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TabsSideBarPattern>());
+    // TabsPattern::GetSideBarFocusHub() only returns an existing hub, so create it here.
+    sideBarNode->GetOrCreateFocusHub();
+    auto sideBarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
+    auto tabListNode = FrameNode::CreateFrameNode(V2::TABS_SIDE_BAR_TAB_LIST_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    tabListNode->MountToParent(sideBarNode);
+    tabListNode->GetOrCreateFocusHub();
+    sideBarPattern->tabListNode_ = tabListNode;
+    tabsPattern->sideBarNode_ = sideBarNode;
+    tabsPattern->SetCurrentBarDisplayMode(TabBarDisplayMode::SIDEBAR);
+    outTabListNode = tabListNode;
+    return sideBarNode;
 }
 } // namespace
 
@@ -864,6 +952,198 @@ HWTEST_F(TabsSidebarTestNg, SidebarBottomBarTest006, TestSize.Level1)
     auto containerRect = bottomBarContainer->GetGeometryNode()->GetFrameRect();
     auto sideBarRect = sideBarNode->GetGeometryNode()->GetFrameRect();
     EXPECT_TRUE(containerRect.Bottom() <= sideBarRect.Bottom() + 1.0f);
+}
+
+/**
+ * @tc.name: SideBarTabListFocusPatternTest001
+ * @tc.desc: Test TabsSideBarTabListPattern::GetFocusPattern returns SCOPE and focusable
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, SideBarTabListFocusPatternTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Build a sidebar tab list tree
+     * @tc.expected: FocusPattern is SCOPE and focusable
+     */
+    SideBarFocusTree tree;
+    tree.Build(2);
+    auto focusPattern = tree.pattern->GetFocusPattern();
+    EXPECT_EQ(focusPattern.GetFocusType(), FocusType::SCOPE);
+    EXPECT_TRUE(focusPattern.GetFocusable());
+}
+
+/**
+ * @tc.name: TabsSideBarFocusCurrentNodeTest001
+ * @tc.desc: Test TabsPattern::GetCurrentFocusNode in SIDEBAR mode with SidebarPosition START
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, TabsSideBarFocusCurrentNodeTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs, attach a sidebar tab list, switch to SIDEBAR mode
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    RefPtr<FrameNode> tabListNode;
+    auto sideBarNode = AttachSideBarNode(pattern_, tabListNode);
+    auto sideBarFocusHub = sideBarNode->GetFocusHub();
+    auto swiperFocusHub = swiperNode_->GetOrCreateFocusHub();
+    ASSERT_NE(sideBarFocusHub, nullptr);
+    ASSERT_NE(swiperFocusHub, nullptr);
+
+    /**
+     * @tc.steps: step2. Sidebar at START: TAB/DOWN/UP enter the sidebar, SHIFT_TAB enters the swiper
+     * @tc.expected: Focus entry lands on the expected hub
+     */
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::TAB), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::DOWN), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::UP), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::SHIFT_TAB), swiperFocusHub);
+    // LEFT enters from the right edge (swiper), RIGHT enters from the left edge (sidebar).
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::LEFT), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::RIGHT), sideBarFocusHub);
+}
+
+/**
+ * @tc.name: TabsSideBarFocusCurrentNodeTest002
+ * @tc.desc: Test TabsPattern::GetCurrentFocusNode in SIDEBAR mode with SidebarPosition END
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, TabsSideBarFocusCurrentNodeTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs, attach a sidebar tab list, switch to SIDEBAR mode, set position END
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    RefPtr<FrameNode> tabListNode;
+    auto sideBarNode = AttachSideBarNode(pattern_, tabListNode);
+    auto sideBarFocusHub = sideBarNode->GetFocusHub();
+    auto swiperFocusHub = swiperNode_->GetOrCreateFocusHub();
+    ASSERT_NE(sideBarFocusHub, nullptr);
+    ASSERT_NE(swiperFocusHub, nullptr);
+
+    /**
+     * @tc.steps: step2. Sidebar at END: TAB/DOWN/UP enter the swiper, SHIFT_TAB enters the sidebar
+     * @tc.expected: Focus entry lands on the expected hub
+     */
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::TAB), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::DOWN), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::UP), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::SHIFT_TAB), sideBarFocusHub);
+    // LEFT enters from the right edge (sidebar), RIGHT enters from the left edge (swiper).
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::LEFT), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetCurrentFocusNode(FocusIntension::RIGHT), swiperFocusHub);
+}
+
+/**
+ * @tc.name: TabsSideBarFocusNextNodeTest001
+ * @tc.desc: Test TabsPattern::GetNextFocusNode transfer between tab list and swiper (START)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, TabsSideBarFocusNextNodeTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs, attach a sidebar tab list, switch to SIDEBAR mode
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    RefPtr<FrameNode> tabListNode;
+    auto sideBarNode = AttachSideBarNode(pattern_, tabListNode);
+    auto sideBarFocusHub = sideBarNode->GetFocusHub();
+    auto swiperFocusHub = swiperNode_->GetOrCreateFocusHub();
+    // GetNextFocusNode() resolves the legacy TabBar hub before the sidebar branch.
+    tabBarNode_->GetOrCreateFocusHub();
+    ASSERT_NE(sideBarFocusHub, nullptr);
+    ASSERT_NE(swiperFocusHub, nullptr);
+    WeakPtr<FocusHub> sideBarWeak = AceType::WeakClaim(AceType::RawPtr(sideBarFocusHub));
+    WeakPtr<FocusHub> swiperWeak = AceType::WeakClaim(AceType::RawPtr(swiperFocusHub));
+
+    /**
+     * @tc.steps: step2. sidebar -> swiper on TAB / RIGHT, swiper -> sidebar on SHIFT_TAB / LEFT
+     * @tc.expected: Focus transfers to the expected hub, other directions return nullptr
+     */
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::TAB, sideBarWeak).Upgrade(), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::RIGHT, sideBarWeak).Upgrade(), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::LEFT, sideBarWeak).Upgrade(), nullptr);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::SHIFT_TAB, swiperWeak).Upgrade(), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::LEFT, swiperWeak).Upgrade(), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::RIGHT, swiperWeak).Upgrade(), nullptr);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::DOWN_END, swiperWeak).Upgrade(), swiperFocusHub);
+}
+
+/**
+ * @tc.name: TabsSideBarFocusNextNodeTest002
+ * @tc.desc: Test TabsPattern::GetNextFocusNode direction reversal with SidebarPosition END
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, TabsSideBarFocusNextNodeTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs, attach sidebar tab list, switch to SIDEBAR mode, set position END
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    RefPtr<FrameNode> tabListNode;
+    auto sideBarNode = AttachSideBarNode(pattern_, tabListNode);
+    auto sideBarFocusHub = sideBarNode->GetFocusHub();
+    auto swiperFocusHub = swiperNode_->GetOrCreateFocusHub();
+    // GetNextFocusNode() resolves the legacy TabBar hub before the sidebar branch.
+    tabBarNode_->GetOrCreateFocusHub();
+    ASSERT_NE(sideBarFocusHub, nullptr);
+    ASSERT_NE(swiperFocusHub, nullptr);
+    WeakPtr<FocusHub> sideBarWeak = AceType::WeakClaim(AceType::RawPtr(sideBarFocusHub));
+    WeakPtr<FocusHub> swiperWeak = AceType::WeakClaim(AceType::RawPtr(swiperFocusHub));
+
+    /**
+     * @tc.steps: step2. sidebar -> swiper on LEFT, swiper -> sidebar on RIGHT
+     * @tc.expected: Directions are reversed compared with SidebarPosition START
+     */
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::LEFT, sideBarWeak).Upgrade(), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::RIGHT, sideBarWeak).Upgrade(), nullptr);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::RIGHT, swiperWeak).Upgrade(), sideBarFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::LEFT, swiperWeak).Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: TabsSideBarFocusNextNodeTest003
+ * @tc.desc: Test TabsPattern::GetNextFocusNode keeps existing behavior when not in SIDEBAR mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarTestNg, TabsSideBarFocusNextNodeTest003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs in default (non-sidebar) mode
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+    auto tabBarFocusHub = tabBarNode_->GetOrCreateFocusHub();
+    auto swiperFocusHub = swiperNode_->GetOrCreateFocusHub();
+    ASSERT_NE(tabBarFocusHub, nullptr);
+    ASSERT_NE(swiperFocusHub, nullptr);
+    WeakPtr<FocusHub> tabBarWeak = AceType::WeakClaim(AceType::RawPtr(tabBarFocusHub));
+    WeakPtr<FocusHub> swiperWeak = AceType::WeakClaim(AceType::RawPtr(swiperFocusHub));
+
+    /**
+     * @tc.steps: step2. TabBar -> swiper on TAB, swiper -> TabBar on SHIFT_TAB
+     * @tc.expected: Legacy TabBar <-> Swiper routing is preserved
+     */
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::TAB, tabBarWeak).Upgrade(), swiperFocusHub);
+    EXPECT_EQ(pattern_->GetNextFocusNode(FocusStep::SHIFT_TAB, swiperWeak).Upgrade(), tabBarFocusHub);
 }
 
 /**

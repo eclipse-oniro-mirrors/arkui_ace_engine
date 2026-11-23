@@ -29,6 +29,7 @@ RefPtr<UiMaterial> CreateUiMaterialFromHandle(ArkUI_ImmersiveMaterialHandle hand
     if (handle->materialColorByUser) {
         options.materialColor = Color(handle->materialColor);
     }
+    options.userColorMode = static_cast<ThemeColorMode>(handle->colorMode);
     options.applyShadow = handle->applyShadow;
     if (handle->hasInteractive) {
         options.interactive = handle->interactive;
@@ -58,6 +59,7 @@ bool CreateHandleFromUiMaterial(const RefPtr<UiMaterial>& material, ArkUI_Immers
         out->materialColorByUser = true;
         out->materialColor = options->materialColor.value().GetValue();
     }
+    out->colorMode = static_cast<ArkUI_ColorMode>(options->userColorMode);
     out->applyShadow = options->applyShadow;
     if (options->interactive.has_value()) {
         out->hasInteractive = true;

@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_SYNTAX_ARKOALA_FOR_EACH_NODE_H
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 #include "base/utils/macros.h"
 #include "core/components_ng/base/frame_node.h"
@@ -71,12 +72,32 @@ public:
     void InitAllChildrenDragManager(bool init);
     void DoSetActiveChildRange(int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool showCache) final;
 
+    void OnAttachToMainTree(bool recursive) override;
+    void OnDetachFromMainTree(bool recursive, PipelineContext* context = nullptr) override;
+
+    /**
+     * tri-state reuse-in-animation permission (effective in Repeat mode only).
+     * Explicitly false opts this node out of reuse during implicit animations and
+     * switches the direct Grid / WaterFlow parent to the sync-cache-in-layout mode
+     * while attached; nullopt / true keep the default behavior.
+     * See LazyForEachUtils::ToggleParentSyncCacheLayout.
+     */
+    void SetAllowReuseInAnimation(std::optional<bool> allow);
+
     void DumpInfo() override;
 
 private:
     ACE_DISALLOW_COPY_AND_MOVE(ArkoalaForEachNode);
 
     bool isRepeat_ = false;
+
+    // tri-state reuse-in-animation permission (Repeat mode only); explicitly false
+    // switches the direct Grid / WaterFlow parent to the sync-cache-in-layout mode
+    // while attached
+    std::optional<bool> isAllowReuseInAnimation_;
+    // Grid / WaterFlow frame node holding this node's sync-cache-in-layout reference
+    WeakPtr<FrameNode> syncCacheHost_;
+
     ActiveRangeParam activeRangeParam_ = { -1, -1, -1, -1 };
     UpdateRangeCb updateRange_;
 };

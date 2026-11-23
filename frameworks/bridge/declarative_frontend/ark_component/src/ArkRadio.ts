@@ -378,7 +378,7 @@ class RadioContentModifier extends ModifierWithKey<ContentModifier<RadioConfigur
     radioComponent.setContentModifier(this.value); 
   }
 }
-class RadioOnChangeModifier extends ModifierWithKey<(isChecked: boolean) => void>{
+class RadioOnChangeModifier extends ModifierWithKey<(isChecked: boolean) => void> {
   constructor(value:(isChecked: boolean) => void) {
     super(value);
   }

@@ -1079,6 +1079,16 @@ public:
         ViewAbstract::SetGrayScale(value);
     }
 
+    void SetColorFilterEffect(const std::vector<float>& matrix) override
+    {
+        ViewAbstract::SetColorFilterEffect(matrix);
+    }
+
+    void ResetColorFilterEffect() override
+    {
+        ViewAbstract::ResetColorFilterEffect();
+    }
+
     void SetContrast(const Dimension& value) override
     {
         ViewAbstract::SetContrast(value);

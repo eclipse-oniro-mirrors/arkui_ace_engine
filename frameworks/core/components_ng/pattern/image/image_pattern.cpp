@@ -517,10 +517,20 @@ void ImagePattern::ReportPerfData(const RefPtr<NG::FrameNode>& host, int32_t sta
 
 void ImagePattern::ReportCompleteLoadEvent(const RefPtr<FrameNode>& host)
 {
+    if (host->GetId() == INVALID_ID) {
+        return;
+    }
     auto pipeline = host->GetContext();
     if (pipeline) {
-        ImagePerf::GetPerfMonitor()->CompleteLoadComponent(host->GetId());
+        bool isVisible = IsVisibleOnRenderTree(host);
+        ImagePerf::GetPerfMonitor()->CompleteLoadComponent(host->GetId(), isVisible);
     }
+}
+
+bool ImagePattern::IsVisibleOnRenderTree(const RefPtr<FrameNode>& host)
+{
+    auto renderContext = host->GetRenderContext();
+    return renderContext && renderContext->IsOnRenderTree();
 }
 
  void ImagePattern::ReportImageSuccessInfo(const RefPtr<FrameNode>& host)
@@ -1258,13 +1268,16 @@ void ImagePattern::LoadImage(const ImageSourceInfo& src, bool needLayout)
     if (onProgressCallback_) {
         loadingCtx_->SetOnProgressCallback(std::move(onProgressCallback_));
     }
+    
     if (!needLayout) {
         loadingCtx_->FinishMeasure();
     } else {
         CHECK_NULL_VOID(host);
         auto pipeline = host->GetContext();
-        if (pipeline && host->GetId() != INVALID_ID && src.IsValid()) {
-            ImagePerf::GetPerfMonitor()->AddLoadComponent(host->GetId());
+        if (pipeline && host->GetId() != INVALID_ID && src.IsValid() && src.GetSrcType() != SrcType::UNSUPPORTED) {
+            bool isVisible = IsVisibleOnRenderTree(host);
+            ImagePerf::GetPerfMonitor()->AddLoadComponent(
+                host->GetId(), static_cast<int32_t>(src.GetSrcType()), isVisible);
         }
     }
     ClearReloadFlagsAfterLoad();
@@ -1874,6 +1887,12 @@ void ImagePattern::OnAttachToMainRenderTree()
         TAG_LOGD(AceLogTag::ACE_IMAGE, "OnAttachToMainRenderTree reload ImageData: %{public}s-%{private}s",
             imageDfxConfig_.ToStringWithoutSrc().c_str(), imageDfxConfig_.GetImageSrc().c_str());
         LoadImageDataIfNeed();
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    if (pipeline && host->GetId() != INVALID_ID) {
+        ImagePerf::GetPerfMonitor()->AttachComponent(host->GetId());
     }
 }
 

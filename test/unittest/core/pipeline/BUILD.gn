@@ -20,6 +20,7 @@ ace_unittest("pipeline_context_test_ng") {
   sources = [
     "$ace_root/adapter/ohos/osal/ressched_report.cpp",
     "$ace_root/adapter/ohos/osal/thp_extra_manager_impl.cpp",
+    "$ace_root/frameworks/base/json/json_util.cpp",
     "$ace_root/frameworks/base/log/ace_tracker.cpp",
     "$ace_root/frameworks/base/mousestyle/mouse_style.cpp",
     "$ace_root/frameworks/base/ressched/ressched_click_optimizer.cpp",
@@ -27,18 +28,18 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/frameworks/base/ressched/ressched_touch_optimizer.cpp",
     "$ace_root/frameworks/base/ressched/taihang_optimizer.cpp",
     "$ace_root/frameworks/core/common/input_event_monitor_manager.cpp",
+    "$ace_root/frameworks/core/components_ng/dump_utils/dump_util.cpp",
     "$ace_root/frameworks/core/components_ng/manager/form_event/form_event_manager.cpp",
     "$ace_root/frameworks/core/components_ng/manager/form_gesture/form_gesture_manager.cpp",
-    "$ace_root/frameworks/core/components_ng/dump_utils/dump_util.cpp",
-    "$ace_root/frameworks/core/components_ng/pattern/app_bar/atomic_service_pattern.cpp",
     "$ace_root/frameworks/core/components_ng/manager/material/material_processor.cpp",
     "$ace_root/frameworks/core/components_ng/manager/material/material_processor_helper.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/app_bar/atomic_service_pattern.cpp",
+    "$ace_root/frameworks/core/event/event_info_convertor.cpp",
     "$ace_root/frameworks/core/event/resample_algo.cpp",
     "$ace_root/frameworks/core/pipeline/container_window_manager.cpp",
     "$ace_root/frameworks/core/pipeline/pipeline_base.cpp",
+    "$ace_root/frameworks/core/pipeline_ng/async_load_scheduler.cpp",
     "$ace_root/frameworks/core/pipeline_ng/pipeline_context.cpp",
-    "$ace_root/frameworks/core/event/event_info_convertor.cpp",
-    "$ace_root/frameworks/base/json/json_util.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_cpu_boost.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_dynamic_module_helper.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_event_report.cpp",
@@ -80,7 +81,6 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/frameworks/core/common/mock_container.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_data_detector_adapter.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_data_detector_mgr.cpp",
-    "$ace_root/test/mock/frameworks/core/common/mock_text_ai_utils.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_font_loader_ng.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_font_manager.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_frontend.cpp",
@@ -98,6 +98,7 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/frameworks/core/common/mock_setting_data_manager.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_stylus_detector_default.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_stylus_detector_mgr.cpp",
+    "$ace_root/test/mock/frameworks/core/common/mock_text_ai_utils.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_text_share_adapter.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_text_translation_adapter.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_text_translation_mgr.cpp",
@@ -114,6 +115,11 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/frameworks/core/components_ng/pattern/mock_container_modal_utils.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/pattern/text/text_layout_adapter/mock_text_layout_adapter.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/pattern/text_field/bridge/mock_text_area_modifier.cpp",
+    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_animated_image.cpp",
+    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_component_snapshot.cpp",
+    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_path_painter.cpp",
+    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_pixmap_image.cpp",
+    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_ui_material_filter_creator.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_animation_utils.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_canvas_image.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_font_collection.cpp",
@@ -122,11 +128,6 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_render_context.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_render_surface_creator.cpp",
     "$ace_root/test/mock/frameworks/core/components_ng/render/mock_texteffect.cpp",
-    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_animated_image.cpp",
-    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_component_snapshot.cpp",
-    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_path_painter.cpp",
-    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_pixmap_image.cpp",
-    "$ace_root/test/mock/frameworks/core/components_ng/render/adapter/mock_ui_material_filter_creator.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_point_event.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_statusbar_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_touch_event.cpp",
@@ -136,10 +137,10 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/frameworks/core/image/mock_image_source_info.cpp",
     "$ace_root/test/mock/frameworks/core/pipeline/mock_element_register.cpp",
     "$ace_root/test/mock/frameworks/core/rosen/testing_typography_style.cpp",
+    "$ace_root/test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.cpp",
     "$ace_root/test/mock/interfaces/mock_ace_forward_compatibility.cpp",
     "$ace_root/test/mock/interfaces/mock_content_modifier.cpp",
     "$ace_root/test/mock/interfaces/mock_uicontent_getter.cpp",
-    "$ace_root/test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.cpp",
     "environment_manager_test_ng.cpp",
     "mock_input_method_manager.cpp",
     "pipeline_context_isolated_thread_test.cpp",
@@ -155,8 +156,8 @@ ace_unittest("pipeline_context_test_ng") {
     "right_mouse_mapping_test_ng.cpp",
   ]
   external_deps = [
-    "c_utils:utils",
     "cJSON:cjson",
+    "c_utils:utils",
     "graphic_2d:2d_graphics",
     "napi:ace_napi",
   ]
@@ -180,7 +181,5 @@ ace_unittest("compatible_manager_test_ng") {
   ]
   external_deps = [ "bounds_checking_function:libsec_static" ]
   extra_deps = []
-  extra_deps += [
-    "$ace_root/test/unittest:ace_unittest_log",
-  ]
+  extra_deps += [ "$ace_root/test/unittest:ace_unittest_log" ]
 }

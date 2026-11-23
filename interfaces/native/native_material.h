@@ -249,6 +249,39 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_GetMaterialColor(
     ArkUI_ImmersiveMaterialHandle material, uint32_t* color);
 
 /**
+ * @brief Sets the color mode of an immersive material object. The color mode fixes the light/dark mode of the
+ * material, which takes precedence over withTheme and colorInvert, and is independent of the system theme.
+ * This affects only the material effect, leaving child components and other properties unchanged.
+ * If not set, the default value is {@link ARKUI_COLOR_MODE_SYSTEM}.
+ *
+ * @param material Pointer to material object. The type is {@link ArkUI_ImmersiveMaterialHandle}.
+ * @param colorMode The color mode of the material. Default value is
+ *        {@link ARKUI_COLOR_MODE_SYSTEM}.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
+ *         </ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_SetColorMode(
+    ArkUI_ImmersiveMaterialHandle material, ArkUI_ColorMode colorMode);
+
+/**
+ * @brief Gets the color mode of an immersive material object.
+ *
+ * @param material Pointer to material object. The type is {@link ArkUI_ImmersiveMaterialHandle}.
+ * @param colorMode Pointer to the variable that receives the color mode. Default value is
+ *        {@link ARKUI_COLOR_MODE_SYSTEM}.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
+ *         </ul>
+ * @since 26.1.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_ImmersiveMaterial_GetColorMode(
+    ArkUI_ImmersiveMaterialHandle material, ArkUI_ColorMode* colorMode);
+
+/**
  * @brief Sets the apply shadow attribute of an immersive material object. This parameter is effective for all levels
  * of materials. When this parameter is true, the shadow effect in the material takes effect, taking precedence over
  * the shadow general property. When this parameter is false, the shadow general property takes effect, and the

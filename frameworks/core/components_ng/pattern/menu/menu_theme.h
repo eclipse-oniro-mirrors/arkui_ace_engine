@@ -344,7 +344,7 @@ public:
     {
         return hasBackBlur_;
     }
-
+    
     float GetBigFontSizeScale() const
     {
         return bigFontSizeScale_;

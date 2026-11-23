@@ -19,12 +19,28 @@
 #define protected public
 
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
+#include "base/image/image_color_filter.h"
 #include "core/components/common/properties/ui_material.h"
 
 using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
+namespace {
+bool IsVectorNearEqual(const std::vector<float>& left, const std::vector<float>& right)
+{
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < left.size(); ++i) {
+        if (!NearEqual(left[i], right[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+} // namespace
+
 /**
  * @tc.name: SetTranslateTest001
  * @tc.desc: Test the SetTranslate function of View_Abstract
@@ -1371,6 +1387,83 @@ HWTEST_F(ViewAbstractTestNg, SetVibrancyMode002, TestSize.Level1)
     EXPECT_EQ(rc->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::DARKEN);
 
     g_uiMaterialLevel = backupLevel;
+}
+
+/**
+ * @tc.name: SetColorFilterEffect001
+ * @tc.desc: Test SetColorFilterEffect with valid 20-element matrix
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetColorFilterEffect001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    std::vector<float> matrix(Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE, 0.5f);
+    matrix[0] = 1.0f;
+    matrix[18] = 0.125f;
+    ViewAbstract::SetColorFilterEffect(AceType::RawPtr(node), matrix);
+    EXPECT_TRUE(rc->HasFrontColorFilterEffect());
+    auto value = rc->GetFrontColorFilterEffect();
+    ASSERT_TRUE(value.has_value());
+    EXPECT_TRUE(IsVectorNearEqual(matrix, value.value()));
+}
+
+/**
+ * @tc.name: SetColorFilterEffect002
+ * @tc.desc: Test SetColorFilterEffect with invalid matrix size triggers reset
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetColorFilterEffect002, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    std::vector<float> shortMatrix = { 1.0f, 2.0f, 3.0f };
+    ViewAbstract::SetColorFilterEffect(AceType::RawPtr(node), shortMatrix);
+    EXPECT_FALSE(rc->HasFrontColorFilterEffect());
+    std::vector<float> longMatrix(Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE + 5, 1.0f);
+    ViewAbstract::SetColorFilterEffect(AceType::RawPtr(node), longMatrix);
+    EXPECT_FALSE(rc->HasFrontColorFilterEffect());
+    std::vector<float> emptyMatrix;
+    ViewAbstract::SetColorFilterEffect(AceType::RawPtr(node), emptyMatrix);
+    EXPECT_FALSE(rc->HasFrontColorFilterEffect());
+}
+
+/**
+ * @tc.name: ResetColorFilterEffect001
+ * @tc.desc: Test ResetColorFilterEffect clears property after set
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ResetColorFilterEffect001, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    std::vector<float> matrix(Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE, 0.5f);
+    ViewAbstract::SetColorFilterEffect(AceType::RawPtr(node), matrix);
+    ASSERT_TRUE(rc->HasFrontColorFilterEffect());
+    ViewAbstract::ResetColorFilterEffect(AceType::RawPtr(node));
+    EXPECT_FALSE(rc->HasFrontColorFilterEffect());
+    auto value = rc->GetFrontColorFilterEffect();
+    EXPECT_FALSE(value.has_value());
+}
+
+/**
+ * @tc.name: ResetColorFilterEffect002
+ * @tc.desc: Test ResetColorFilterEffect on never-set node and nullptr does not crash
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, ResetColorFilterEffect002, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    EXPECT_FALSE(rc->HasFrontColorFilterEffect());
+    ViewAbstract::ResetColorFilterEffect(AceType::RawPtr(node));
+    EXPECT_FALSE(rc->HasFrontColorFilterEffect());
+    ViewAbstract::ResetColorFilterEffect(nullptr);
+    SUCCEED();
 }
 
 } // namespace OHOS::Ace::NG

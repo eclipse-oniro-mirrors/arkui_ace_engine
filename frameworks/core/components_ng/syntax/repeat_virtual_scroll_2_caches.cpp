@@ -224,6 +224,20 @@ std::optional<IndexType> RepeatVirtualScroll2Caches::GetL1Index4Rid(RIDType rid)
     return std::nullopt;
 }
 
+void RepeatVirtualScroll2Caches::RecordPrevL1Rid4Index()
+{
+    TAG_LOGD(AceLogTag::ACE_REPEAT, "RecordPrevL1Rid4Index");
+
+    // record the old index -> RID mapping before it gets replaced, so the
+    // pre-rerender L1 index of a node remains look-up-able
+    prevL1Rid4Index_ = l1Rid4Index_;
+    // keep the rid -> index reverse in sync for the O(log n) lookup in GetPrevL1Index4RID
+    prevL1Index4Rid_.clear();
+    for (const auto& [index, rid] : prevL1Rid4Index_) {
+        prevL1Index4Rid_[rid] = index;
+    }
+}
+
 void RepeatVirtualScroll2Caches::UpdateL1Rid4Index(std::map<int32_t, uint32_t> l1Rd4Index)
 {
     TAG_LOGD(AceLogTag::ACE_REPEAT, "UpdateL1Rid4Index");
@@ -235,6 +249,35 @@ void RepeatVirtualScroll2Caches::UpdateL1Rid4Index(std::map<int32_t, uint32_t> l
         UpdateIsL1(cacheItem, GetL1Index4RID(rid) != std::nullopt);
         TAG_LOGD(AceLogTag::ACE_REPEAT, "DumpCacheItem: %{public}s", DumpCacheItem(cacheItem).c_str());
     });
+}
+
+std::optional<IndexType> RepeatVirtualScroll2Caches::GetPrevL1Index4RID(RIDType rid) const
+{
+    const auto iter = prevL1Index4Rid_.find(rid);
+    if (iter != prevL1Index4Rid_.end()) {
+        return iter->second;
+    }
+    return std::nullopt;
+}
+
+std::optional<IndexType> RepeatVirtualScroll2Caches::GetPrevL1Index4Node(const RefPtr<UINode>& node) const
+{
+    if (node == nullptr) {
+        return std::nullopt;
+    }
+    for (const auto iter : prevL1Rid4Index_) {
+        const auto cacheIter = cacheItem4Rid_.find(iter.second);
+        if (cacheIter != cacheItem4Rid_.end() && cacheIter->second->node_ == node) {
+            return iter.first;
+        }
+    }
+    return std::nullopt;
+}
+
+void RepeatVirtualScroll2Caches::ClearPrevL1Rid4Index()
+{
+    prevL1Rid4Index_.clear();
+    prevL1Index4Rid_.clear();
 }
 
 std::optional<IndexType> RepeatVirtualScroll2Caches::GetL1Index4RID(RIDType rid) const

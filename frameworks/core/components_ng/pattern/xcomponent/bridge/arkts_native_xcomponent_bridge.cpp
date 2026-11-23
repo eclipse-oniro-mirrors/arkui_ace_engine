@@ -359,99 +359,6 @@ bool ParseJsBlendMode(EcmaVM* vm, const Local<JSValueRef>& blendModeArg, const L
     }
     return true;
 }
-
-// Merged fast path of ArkTSUtils::GetNativeNode + ArkTSUtils::IsJsView: the IsBoolean/ToBoolean
-// checks on firstArg are evaluated once instead of twice. Semantics are identical to calling the
-// two functions separately; ArkTSUtils is left untouched because the bridge lives in a separate
-// library from libace_compatible.z.so and must not add cross-library symbol dependencies.
-bool GetNativeNodeAndIsJsView(
-    ArkUINodeHandle& nativeNode, bool& isJsView, const Local<JSValueRef>& firstArg, const EcmaVM* vm)
-{
-    isJsView = false;
-    if (firstArg->IsNativePointer(vm)) {
-        nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
-        return true;
-    }
-    if (firstArg->IsBoolean() && firstArg->ToBoolean(vm)->Value()) {
-        nativeNode = reinterpret_cast<ArkUINodeHandle>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
-        isJsView = true;
-        return true;
-    }
-    return false;
-}
-
-// Direct replacement for getXComponentModifier()->getXComponentType() function-pointer dispatch
-// within this bridge; keeps the modifier's null-node fallback to the ViewStackProcessor top node.
-XComponentType GetXComponentTypeFromNode(ArkUINodeHandle nativeNode)
-{
-    auto* frameNode =
-        nativeNode ? reinterpret_cast<FrameNode*>(nativeNode) : ViewStackProcessor::GetInstance()->GetMainFrameNode();
-    CHECK_NULL_RETURN(frameNode, XComponentType::UNKNOWN);
-    return XComponentModelNG::GetType(frameNode);
-}
-
-void SetJsViewOpacity(EcmaVM* vm, ArkUINodeHandle nativeNode, XComponentType type, const Local<JSValueRef>& secondArg)
-{
-    if (type == XComponentType::SURFACE || type == XComponentType::COMPONENT) {
-        return;
-    }
-    RefPtr<ResourceObject> opacityResObj;
-    double opacity;
-    if (!ArkTSUtils::ParseJsDouble(vm, secondArg, opacity, opacityResObj)) {
-        GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentOpacity(nativeNode);
-        return;
-    }
-    if (SystemProperties::ConfigChangePerform() && opacityResObj) {
-        GetArkUINodeModifiers()->getXComponentModifier()->createWithOpacityResourceObj(
-            nativeNode, AceType::RawPtr(opacityResObj));
-        return;
-    }
-    if (AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_ELEVEN)) {
-        opacity = std::clamp(opacity, 0.0, 1.0);
-    } else {
-        if (opacity > MAX_OPACITY || LessNotEqual(opacity, 0.0)) {
-            opacity = MAX_OPACITY;
-        }
-    }
-    GetArkUINodeModifiers()->getXComponentModifier()->setXComponentOpacity(nativeNode, opacity);
-}
-
-LoadEvent CreateOnLoadEvent(
-    EcmaVM* vm, bool isJsView, const panda::Local<panda::FunctionRef>& jsFunc, FrameNode* frameNode)
-{
-    return [isJsView, func = panda::CopyableGlobal(vm, jsFunc), node = AceType::WeakClaim(frameNode)](
-               const std::string& xcomponentId) {
-        auto vm = func.GetEcmaVM();
-        CHECK_NULL_VOID(ArkTSUtils::CheckJavaScriptScope(vm));
-        ACE_UINODE_TRACE(node);
-        panda::LocalScope pandaScope(vm);
-        panda::TryCatch trycatch(vm);
-        ACE_SCORING_EVENT("XComponent.onLoad");
-        PipelineContext::SetCallBackNode(node);
-        std::vector<Local<JSValueRef>> argv;
-#ifdef XCOMPONENT_SUPPORTED
-        Local<JSValueRef> jsVal;
-        if (Framework::XComponentClient::GetInstance().GetJSVal(const_cast<EcmaVM*>(vm), xcomponentId, jsVal)) {
-            argv.emplace_back(jsVal);
-            auto controller = Framework::XComponentClient::GetInstance()
-                                  .GetControllerFromJSXComponentControllersMap(xcomponentId);
-            auto* bindingController = controller
-                ? static_cast<Framework::JSXComponentControllerBinding*>(AceType::RawPtr(controller))
-                : nullptr;
-            if (bindingController) {
-                bindingController->SetXComponentContext(Framework::JSRef<Framework::JSVal>(Framework::JSVal(jsVal)));
-            }
-        }
-#endif
-        auto result = func->Call(vm, func.ToLocal(), argv.data(), argv.size());
-        if (isJsView) {
-            TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] onLoad triggers", xcomponentId.c_str());
-            ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
-        } else {
-            TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] onLoad", xcomponentId.c_str());
-        }
-    };
-}
 } // namespace
 
 XComponentType XComponentBridge::ConvertToXComponentType(const std::string& type)
@@ -866,7 +773,7 @@ ArkUINativeModuleValue XComponentBridge::SetXComponentInitialize(ArkUIRuntimeCal
         GetArkUINodeModifiers()->getXComponentModifier()->setXComponentLibraryname(nativeNode, libraryName.c_str());
     }
     if ((librarynameArg->IsNull() || librarynameArg->IsUndefined()) && xcomponentController &&
-        !controllerObj->IsUndefined()) {
+        !controllerObj.IsNull() && !controllerObj->IsUndefined()) {
         SetControllerCallback(runtimeCallInfo);
     }
     HandleDetachCallback(runtimeCallInfo);
@@ -935,9 +842,9 @@ ArkUINativeModuleValue XComponentBridge::SetBackgroundColor(ArkUIRuntimeCallInfo
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
     CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::NativePointerRef::New(vm, nullptr));
+        ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::NativePointerRef::New(vm, nullptr));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     if (isJsView && secondArg->IsUndefined()) {
         GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentBackgroundColor(nativeNode, isJsView);
@@ -987,13 +894,33 @@ ArkUINativeModuleValue XComponentBridge::SetOpacity(ArkUIRuntimeCallInfo* runtim
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
-    auto type = GetXComponentTypeFromNode(nativeNode);
-    if (isJsView) {
-        SetJsViewOpacity(vm, nativeNode, type, secondArg);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
+    if (ArkTSUtils::IsJsView(firstArg, vm)) {
+        if (type == XComponentType::SURFACE || type == XComponentType::COMPONENT) {
+            return panda::JSValueRef::Undefined(vm);
+        }
+        RefPtr<ResourceObject> opacityResObj;
+        double opacity;
+        if (!ArkTSUtils::ParseJsDouble(vm, secondArg, opacity, opacityResObj)) {
+            GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentOpacity(nativeNode);
+            return panda::JSValueRef::Undefined(vm);
+        }
+        if (SystemProperties::ConfigChangePerform() && opacityResObj) {
+            GetArkUINodeModifiers()->getXComponentModifier()->createWithOpacityResourceObj(
+                nativeNode, AceType::RawPtr(opacityResObj));
+            return panda::JSValueRef::Undefined(vm);
+        }
+        if (AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_ELEVEN)) {
+            opacity = std::clamp(opacity, 0.0, 1.0);
+        } else {
+            if (opacity > MAX_OPACITY || LessNotEqual(opacity, 0.0)) {
+                opacity = MAX_OPACITY;
+            }
+        }
+        GetArkUINodeModifiers()->getXComponentModifier()->setXComponentOpacity(nativeNode, opacity);
         return panda::JSValueRef::Undefined(vm);
     }
     if (type != XComponentType::NODE) {
@@ -1023,16 +950,16 @@ ArkUINativeModuleValue XComponentBridge::ResetOpacity(ArkUIRuntimeCallInfo* runt
 ArkUINativeModuleValue XComponentBridge::SetGrayscale(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     if (isJsView) {
         ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     }
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1054,15 +981,45 @@ ArkUINativeModuleValue XComponentBridge::SetOnLoad(ArkUIRuntimeCallInfo* runtime
     if (secondArg.IsNull() || secondArg->IsUndefined() || !secondArg->IsFunction(vm)) {
         return panda::JSValueRef::Undefined(vm);
     }
-    bool isJsView = false;
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ArkUINodeHandle nativeNode = nullptr;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
     panda::Local<panda::FunctionRef> func = secondArg->ToObject(vm);
-    auto onLoad = CreateOnLoadEvent(vm, isJsView, func, frameNode);
+    LoadEvent onLoad = [isJsView, func = panda::CopyableGlobal(vm, func), node = AceType::WeakClaim(frameNode)](
+                           const std::string& xcomponentId) {
+        auto vm = func.GetEcmaVM();
+        CHECK_NULL_VOID(ArkTSUtils::CheckJavaScriptScope(vm));
+        ACE_UINODE_TRACE(node);
+        panda::LocalScope pandaScope(vm);
+        panda::TryCatch trycatch(vm);
+        ACE_SCORING_EVENT("XComponent.onLoad");
+        PipelineContext::SetCallBackNode(node);
+        std::vector<Local<JSValueRef>> argv;
+#ifdef XCOMPONENT_SUPPORTED
+        Local<JSValueRef> jsVal;
+        if (Framework::XComponentClient::GetInstance().GetJSVal(const_cast<EcmaVM*>(vm), xcomponentId, jsVal)) {
+            argv.emplace_back(jsVal);
+            auto controller = Framework::XComponentClient::GetInstance()
+                                  .GetControllerFromJSXComponentControllersMap(xcomponentId);
+            auto* bindingController = controller
+                ? static_cast<Framework::JSXComponentControllerBinding*>(AceType::RawPtr(controller))
+                : nullptr;
+            if (bindingController) {
+                bindingController->SetXComponentContext(Framework::JSRef<Framework::JSVal>(Framework::JSVal(jsVal)));
+            }
+        }
+#endif
+        auto result = func->Call(vm, func.ToLocal(), argv.data(), argv.size());
+        if (isJsView) {
+            TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] onLoad triggers", xcomponentId.c_str());
+            ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        } else {
+            TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent[%{public}s] onLoad", xcomponentId.c_str());
+        }
+    };
     GetArkUINodeModifiers()->getXComponentModifier()->setXComponentOnLoad(nativeNode, reinterpret_cast<void*>(&onLoad));
     return panda::JSValueRef::Undefined(vm);
 }
@@ -1082,10 +1039,9 @@ ArkUINativeModuleValue XComponentBridge::SetOnDestroy(ArkUIRuntimeCallInfo* runt
     if (secondArg.IsNull() || secondArg->IsUndefined() || !secondArg->IsFunction(vm)) {
         return panda::JSValueRef::Undefined(vm);
     }
-    bool isJsView = false;
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ArkUINodeHandle nativeNode = nullptr;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
@@ -1127,16 +1083,27 @@ ArkUINativeModuleValue XComponentBridge::SetEnableAnalyzer(ArkUIRuntimeCallInfo*
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
     CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::NativePointerRef::New(vm, nullptr));
+        ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::NativePointerRef::New(vm, nullptr));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
-    // The COMPONENT/NODE type guard is enforced by XComponentModelNG::EnableAnalyzer(FrameNode*, bool),
-    // so the bridge does not need to query the type again.
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
+
+    if (isJsView) {
+        if (type == XComponentType::COMPONENT || type == XComponentType::NODE) {
+            return panda::JSValueRef::Undefined(vm);
+        }
+        if (secondArg->IsBoolean()) {
+            bool boolValue = secondArg->ToBoolean(vm)->Value();
+            GetArkUINodeModifiers()->getXComponentModifier()->setXComponentEnableAnalyzer(nativeNode, boolValue);
+        }
+        return panda::JSValueRef::Undefined(vm);
+    }
     if (secondArg->IsBoolean()) {
         bool boolValue = secondArg->ToBoolean(vm)->Value();
         GetArkUINodeModifiers()->getXComponentModifier()->setXComponentEnableAnalyzer(nativeNode, boolValue);
-    } else if (!isJsView) {
+    } else {
         GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentEnableAnalyzer(nativeNode);
     }
     return panda::JSValueRef::Undefined(vm);
@@ -1163,11 +1130,11 @@ ArkUINativeModuleValue XComponentBridge::SetEnableSecure(ArkUIRuntimeCallInfo* r
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (isJsView) {
         if (type != XComponentType::SURFACE) {
             return panda::JSValueRef::Undefined(vm);
@@ -1210,13 +1177,13 @@ ArkUINativeModuleValue XComponentBridge::SetHdrBrightness(ArkUIRuntimeCallInfo* 
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
 
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     if (isJsView) {
-        auto type = GetXComponentTypeFromNode(nativeNode);
+        auto type = static_cast<XComponentType>(
+            GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
         if (type != XComponentType::SURFACE) {
             return panda::JSValueRef::Undefined(vm);
         }
@@ -1294,11 +1261,11 @@ ArkUINativeModuleValue XComponentBridge::SetEnableTransparentLayer(ArkUIRuntimeC
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::SURFACE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1336,9 +1303,7 @@ ArkUINativeModuleValue XComponentBridge::SetEnableSurfaceVisibilityLifecycle(Ark
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
-    CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     if (secondArg->IsBoolean()) {
         bool isVisibilityLifecycle = secondArg->ToBoolean(vm)->Value();
@@ -1412,12 +1377,13 @@ ArkUINativeModuleValue XComponentBridge::SetRenderFit(ArkUIRuntimeCallInfo* runt
         return panda::JSValueRef::Undefined(vm);
     }
     ArkUINodeHandle nativeNode = nullptr;
-    bool isJsView = false;
     CHECK_NE_RETURN(
-        GetNativeNodeAndIsJsView(nativeNode, isJsView, firstArg, vm), true, panda::NativePointerRef::New(vm, nullptr));
+        ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::NativePointerRef::New(vm, nullptr));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (isJsView) {
-        auto type = GetXComponentTypeFromNode(nativeNode);
         if (type == XComponentType::COMPONENT || type == XComponentType::NODE) {
             return panda::JSValueRef::Undefined(vm);
         }
@@ -1465,7 +1431,8 @@ ArkUINativeModuleValue XComponentBridge::SetBlendMode(ArkUIRuntimeCallInfo* runt
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type == XComponentType::TEXTURE && Container::LessThanAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
         int32_t blendModeValue = static_cast<int32_t>(BlendMode::NONE);
         int32_t blendApplyTypeValue = static_cast<int32_t>(BlendApplyType::FAST);
@@ -1511,7 +1478,8 @@ ArkUINativeModuleValue XComponentBridge::SetBackgroundImage(ArkUIRuntimeCallInfo
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1575,7 +1543,8 @@ ArkUINativeModuleValue XComponentBridge::SetBackgroundImageSize(ArkUIRuntimeCall
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1636,7 +1605,8 @@ ArkUINativeModuleValue XComponentBridge::SetBackgroundImagePosition(ArkUIRuntime
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1719,7 +1689,8 @@ ArkUINativeModuleValue XComponentBridge::SetBlur(ArkUIRuntimeCallInfo* runtimeCa
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1761,7 +1732,8 @@ ArkUINativeModuleValue XComponentBridge::SetBackdropBlur(ArkUIRuntimeCallInfo* r
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1801,7 +1773,8 @@ ArkUINativeModuleValue XComponentBridge::SetBrightness(ArkUIRuntimeCallInfo* run
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1830,7 +1803,8 @@ ArkUINativeModuleValue XComponentBridge::SetSaturate(ArkUIRuntimeCallInfo* runti
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1863,7 +1837,8 @@ ArkUINativeModuleValue XComponentBridge::SetContrast(ArkUIRuntimeCallInfo* runti
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1896,7 +1871,8 @@ ArkUINativeModuleValue XComponentBridge::SetInvert(ArkUIRuntimeCallInfo* runtime
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1945,7 +1921,8 @@ ArkUINativeModuleValue XComponentBridge::SetSepia(ArkUIRuntimeCallInfo* runtimeC
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -1968,7 +1945,8 @@ ArkUINativeModuleValue XComponentBridge::SetHueRotate(ArkUIRuntimeCallInfo* runt
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -2005,7 +1983,8 @@ ArkUINativeModuleValue XComponentBridge::SetColorBlend(ArkUIRuntimeCallInfo* run
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -2034,7 +2013,8 @@ ArkUINativeModuleValue XComponentBridge::SetSphericalEffect(ArkUIRuntimeCallInfo
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -2057,7 +2037,8 @@ ArkUINativeModuleValue XComponentBridge::SetLightUpEffect(ArkUIRuntimeCallInfo* 
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -2080,7 +2061,8 @@ ArkUINativeModuleValue XComponentBridge::SetPixelStretchEffect(ArkUIRuntimeCallI
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
@@ -2182,7 +2164,8 @@ ArkUINativeModuleValue XComponentBridge::SetLinearGradientBlur(ArkUIRuntimeCallI
     auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
     ACE_UINODE_TRACE(frameNode);
-    auto type = GetXComponentTypeFromNode(nativeNode);
+    auto type =
+        static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
     if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }

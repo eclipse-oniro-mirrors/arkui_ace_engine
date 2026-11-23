@@ -86,11 +86,75 @@ public:
     bool Render(int64_t deadline = 0);
     bool RenderCustomChild(int64_t deadline) override;
 
+    // --- Asynchronous loading (enableAsyncLoad); host for nodes WITH measure
+    // callbacks; the deferral hook sits at the layout-algorithm Measure entry
+    // While deferred neither content nor JS callbacks are dispatched.
+    // Convenience query: the full gate (including this host's unbuilt marker
+    // below) lives in the shared base, evaluated inside TryStartAsyncLoad.
+    bool ShouldStartAsyncLoad() const;
+    RefPtr<UINode> GetAsyncLoadHost() override;
+    // "Not built yet" signal. Content children presence is the usual marker,
+    // but a legitimately empty component stays childless after building, so a
+    // completed build also marks the node explicitly — "built" is either
+    // marker (children present, or a finished build). This keeps pre-built
+    // nodes (lazy caches, preRender — including empty ones) mounting with
+    // their content shown directly instead of a deferral that would re-run
+    // the build. The placeholder never pollutes this marker: it exists only
+    // in non-NONE states (mounted after the gate engages, detached at DONE),
+    // and the gate is evaluated solely from NONE.
+    bool HasUnbuiltContent() const override
+    {
+        return GetChildren().empty() && !contentBuilt_;
+    }
+    // Marks a completed content build; the synchronous Measure path and the
+    // asynchronous slice driver both call it at build completion.
+    void MarkContentBuilt()
+    {
+        contentBuilt_ = true;
+    }
+    void FlushAsyncLoadCompletion(bool wasForced) override;
+
+    bool GetJsActive() const
+    {
+        return jsActive_;
+    }
+    void SetJSViewActive(bool active, bool isLazyForEachNode = false,
+        bool isReuse = false, bool suppressActiveLifecycle = false) override;
+
+    void OnAttachToMainTree(bool recursive) override;
+    void OnDetachFromMainTree(bool recursive, PipelineContext* context) override;
+
 private:
     UINode* GetCustomNodeOwner() const override
     {
         return const_cast<CustomMeasureLayoutNode*>(this);
     }
+
+    // Slice-retained asynchronous build state (the prebuild-slicing retention
+    // protocol): a timed-out slice parks its partially built subtree — the
+    // collector below plus anything pushed but not yet popped — on the retained
+    // processor, so the resumed slice continues in place instead of discarding
+    // children built before the interrupt. Released at the terminal settle.
+    std::unique_ptr<ViewStackProcessor> asyncBuildProcessor_;
+    RefPtr<FrameNode> asyncBuildCollector_;
+
+    // True once any build path has completed this node's content (see
+    // HasUnbuiltContent): a legitimately empty component has no children to
+    // show for it. Monotonic — the load state machine never returns to NONE,
+    // so it never needs to clear.
+    bool contentBuilt_ = false;
+
+    // Terminal cleanup: drop the parked build state (no-op after a natural
+    // completion, which clears it via the scoped processor's choreography).
+    void ReleaseAsyncBuildState() override
+    {
+        asyncBuildProcessor_ = nullptr;
+        asyncBuildCollector_ = nullptr;
+    }
+
+    // Drives the render function outside the layout pass; false = budget ran out.
+    bool ExecuteAsyncBuild(int64_t deadline) override;
+    // DONE settle: placeholder swap, dirty + frame request.
 
     void BuildChildren(const RefPtr<FrameNode>& child);
     std::function<void(LayoutWrapper* layoutWrapper)> layoutFunc_;
@@ -98,6 +162,7 @@ private:
     std::function<void(LayoutWrapper* layoutWrapper)> updateParamFunc_;
     std::string viewKey_;
     RefPtr<MeasureLayoutParam> measureLayoutParam_;
+    bool jsActive_ = true;
 };
 } // namespace OHOS::Ace::NG
 

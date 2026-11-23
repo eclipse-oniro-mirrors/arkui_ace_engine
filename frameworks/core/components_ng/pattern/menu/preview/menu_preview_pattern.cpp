@@ -201,7 +201,6 @@ bool MenuPreviewPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& d
     auto menuPattern = GetMenuPattern(menuWrapper);
     DragAnimationHelper::UpdateGatherNodeToTop();
     UpdateShowScale(context, menuTheme, menuPattern);
-
     isFirstShow_ = false;
     return false;
 }
@@ -256,7 +255,7 @@ void MenuPreviewPattern::InitPanEvent(const RefPtr<GestureEventHub>& gestureHub)
     CHECK_NULL_VOID(targetGestureHub);
     auto dragEventActuator = targetGestureHub->GetDragEventActuator();
     auto actionStartTask = [actuator = AceType::WeakClaim(AceType::RawPtr(dragEventActuator))](
-                               const GestureEvent& info) {
+    const GestureEvent& info) {
         auto dragEventActuator = actuator.Upgrade();
         CHECK_NULL_VOID(dragEventActuator);
         dragEventActuator->RestartDragTask(info);

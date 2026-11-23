@@ -15,6 +15,8 @@
 
 #include "bridge/declarative_frontend/jsview/js_view_context.h"
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -106,12 +108,38 @@ std::unordered_map<int32_t, std::string> UICONTEXT_ERROR_MAP = {
     { ERROR_CODE_TARGET_NOT_ON_COMPONENT_TREE, "The node of targetId is not in the component tree. " }
 };
 
+constexpr int64_t ANIM_LOG_MIN_INTERVAL_MS = 10;
+
+bool ShouldPrintAnimationStartLog()
+{
+    static std::atomic<int64_t> lastPrintTime { 0 };
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    int64_t last = lastPrintTime.load(std::memory_order_relaxed);
+    if (now - last < ANIM_LOG_MIN_INTERVAL_MS) {
+        return false;
+    }
+    return lastPrintTime.compare_exchange_strong(last, now, std::memory_order_relaxed);
+}
+
+bool ShouldPrintAnimationFinishLog()
+{
+    static std::atomic<int64_t> lastPrintTime { 0 };
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    int64_t last = lastPrintTime.load(std::memory_order_relaxed);
+    if (now - last < ANIM_LOG_MIN_INTERVAL_MS) {
+        return false;
+    }
+    return lastPrintTime.compare_exchange_strong(last, now, std::memory_order_relaxed);
+}
+
 void PrintAnimationInfo(const AnimationOption& option, AnimationInterface interface, const std::optional<int32_t>& cnt)
 {
     auto animationInterfaceName = GetAnimationInterfaceName(interface);
     CHECK_NULL_VOID(animationInterfaceName);
-    if (cnt) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "%{public}s starts, %{public}s, cnt:%{public}d",
+    if (cnt && ShouldPrintAnimationStartLog()) {
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "%{public}s starts,%{public}s,cnt:%{public}d",
             animationInterfaceName, option.ToSimpleString().c_str(), cnt.value());
     }
     if (option.GetIteration() == ANIMATION_REPEAT_INFINITE) {
@@ -734,8 +762,7 @@ void JSViewContext::AnimateToInner(const JSCallbackInfo& info, bool immediately)
     if (!Container::CheckRunOnThreadByThreadId(currentId, false)) {
         // fix DynamicComponent get wrong container when calling the animateTo function.
         auto localContainerId = ContainerScope::CurrentLocalId();
-        TAG_LOGI(AceLogTag::ACE_ANIMATION,
-            "AnimateToInner not run on running thread, currentId: %{public}d, localId: %{public}d",
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "not on running thread, currentId: %{public}d, localId: %{public}d",
             currentId, localContainerId);
         if (localContainerId > 0 && Container::CheckRunOnThreadByThreadId(localContainerId, false)) {
             currentId = localContainerId;
@@ -748,8 +775,7 @@ void JSViewContext::AnimateToInner(const JSCallbackInfo& info, bool immediately)
     if (!scopedDelegate) {
         // this case usually means there is no foreground container, need to figure out the reason.
         const char* funcName = immediately ? "animateToImmediately" : "animateTo";
-        TAG_LOGW(AceLogTag::ACE_ANIMATION,
-            "can not find current context ,%{public}s faild, please use uiContext.%{public}s to specify the context",
+        TAG_LOGW(AceLogTag::ACE_ANIMATION, "no context, %{public}s failed, use uiContext.%{public}s to specify",
             funcName, funcName);
         return;
     }
@@ -809,7 +835,9 @@ void JSViewContext::AnimateToInner(const JSCallbackInfo& info, bool immediately)
             auto pipelineContext = PipelineContext::GetCurrentContextSafely();
             CHECK_NULL_VOID(pipelineContext);
             pipelineContext->UpdateCurrentActiveNode(node);
-            TAG_LOGI(AceLogTag::ACE_ANIMATION, "animateTo finish, cnt:%{public}d", count.value());
+            if (ShouldPrintAnimationFinishLog()) {
+                TAG_LOGI(AceLogTag::ACE_ANIMATION, "animTo fin,%{public}d", count.value());
+            }
             func->Execute(isDebugAnim);
             if (isDebugAnim) {
                 TAG_LOGI(AceLogTag::ACE_ANIMATION, "animateTo finish after ExecuteJS, cnt:%{public}d", count.value());

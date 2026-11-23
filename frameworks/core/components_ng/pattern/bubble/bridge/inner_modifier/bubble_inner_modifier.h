@@ -92,7 +92,9 @@ struct ArkUIBubbleInnerModifier {
         const std::unordered_map<int32_t, PopupInfo>& popupMap);
     void (*hideAllPopupsWithoutAnimationIteration)(OverlayManager* overlayManager,
         const std::unordered_map<int32_t, PopupInfo>& popupMap);
+
     bool (*popupInteractiveDismiss)(const RefPtr<BubblePattern>& pattern);
+
     RefPtr<FrameNode> (*createBubbleNode)(const std::string& tag, int32_t targetId,
         const RefPtr<PopupParam>& param, const RefPtr<SpanString>& spanString);
     RefPtr<FrameNode> (*createPopupNode)(const std::string& targetTag, int32_t targetId,

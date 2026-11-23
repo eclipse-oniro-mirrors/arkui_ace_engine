@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <optional>
 #include <string>
 
 #include "base/utils/macros.h"
@@ -46,6 +47,11 @@ public:
     virtual bool IsImplicitAnimationOpen() = 0;
     virtual bool IsChildInAnimation(uint32_t fromIndex) = 0;
     virtual std::pair<int32_t, int32_t> GetActiveRange() = 0;
+    // RepeatOptions.allowReuseInAnimation (creation-time option): sets the tri-state
+    // reuse-in-animation permission on the RepeatNode being rendered; explicitly false
+    // switches its direct Grid / WaterFlow parent to the sync-cache-in-layout strategy
+    // while the node is attached, nullopt / true keep the default behavior.
+    virtual void SetAllowReuseInAnimation(std::optional<bool> allowReuseInAnimation) = 0;
 };
 } // namespace OHOS::Ace::NG
 

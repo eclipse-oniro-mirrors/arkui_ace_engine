@@ -33,6 +33,7 @@
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_controller_ng.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_ng.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_model_static.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern_v2.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_surface_holder.h"
@@ -547,5 +548,68 @@ HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTes
 
     EXPECT_EQ(nativeXComponent->EnableSurfaceVisibilityLifecycle(false), OH_NATIVEXCOMPONENT_RESULT_SUCCESS);
     EXPECT_FALSE(pattern->isVisibilityLifecycleRegistered_);
+}
+
+/**
+ * @tc.name: SurfaceVisibilityLifecycleTest013
+ * @tc.desc: Test static paradigm classic path (isBindNative_ false): lifecycle hooks dispatch to
+ * XComponentPattern, readiness follows hasXComponentInit_ instead of V2 hasSurfaceInitialized_
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestSurfaceVisibilityLifecycle, SurfaceVisibilityLifecycleTest013, TestSize.Level1)
+{
+    auto frameNode = XComponentModelStatic::CreateFrameNode(20013, false);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = GetPattern(frameNode);
+    ASSERT_NE(pattern, nullptr);
+    XComponentModelStatic::SetXComponentType(AceType::RawPtr(frameNode), XCOMPONENT_SURFACE_TYPE_VALUE);
+    frameNode->onMainTree_ = true;
+
+    pattern->isNativeXComponent_ = true;
+    auto [nativeXComponentImpl, nativeXComponentWeak] = pattern->GetNativeXComponent();
+    ASSERT_NE(nativeXComponentImpl, nullptr);
+    auto nativeXComponent = nativeXComponentWeak.lock();
+    ASSERT_NE(nativeXComponent, nullptr);
+    OH_NativeXComponent_Callback surfaceCallback = {};
+    surfaceCallback.OnSurfaceCreated = OnSurfaceCreatedCallback;
+    surfaceCallback.OnSurfaceChanged = [](OH_NativeXComponent*, void*) {};
+    surfaceCallback.OnSurfaceDestroyed = OnSurfaceDestroyedCallback;
+    surfaceCallback.DispatchTouchEvent = [](OH_NativeXComponent*, void*) {};
+    EXPECT_EQ(nativeXComponent->RegisterCallback(&surfaceCallback), OH_NATIVEXCOMPONENT_RESULT_SUCCESS);
+
+    pattern->SetSurfaceVisibilityLifecycle(true);
+    // classic path marks readiness with hasXComponentInit_ (base); V2 hasSurfaceInitialized_ stays false
+    pattern->hasXComponentInit_ = true;
+
+    /**
+     * @tc.steps: step1. Check readiness dispatches to the classic path for static pattern
+     * @tc.expected: IsSurfaceLifecycleReady reflects hasXComponentInit_ when isBindNative_ is false
+     */
+    EXPECT_TRUE(pattern->IsSurfaceLifecycleReady());
+
+    auto mockRenderSurface = AceType::MakeRefPtr<MockRenderSurface>();
+    pattern->renderSurface_ = mockRenderSurface;
+
+    g_surfaceCreateCount = 0;
+    g_surfaceDestroyCount = 0;
+
+    /**
+     * @tc.steps: step2. XComponent becomes invisible in static classic mode
+     * @tc.expected: destroy dispatches to base path, native OnSurfaceDestroyed fired once
+     */
+    EXPECT_CALL(*mockRenderSurface, ReleaseSurfaceBuffers()).Times(1);
+    pattern->OnVisibilityLifecycleChange(false);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_EQ(g_surfaceCreateCount, 0);
+    EXPECT_TRUE(pattern->isVisibilityLifecycleDestroyed_);
+
+    /**
+     * @tc.steps: step3. XComponent becomes visible again
+     * @tc.expected: native OnSurfaceCreated fired once through base path, paired with destroy
+     */
+    pattern->OnVisibilityLifecycleChange(true);
+    EXPECT_EQ(g_surfaceCreateCount, 1);
+    EXPECT_EQ(g_surfaceDestroyCount, 1);
+    EXPECT_FALSE(pattern->isVisibilityLifecycleDestroyed_);
 }
 } // namespace OHOS::Ace::NG

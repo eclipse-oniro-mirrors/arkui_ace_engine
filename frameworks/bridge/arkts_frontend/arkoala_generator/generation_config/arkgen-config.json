@@ -1256,6 +1256,7 @@
         "arkui.component.idlize.AnimationExtender.KeyframeAnimationImpl",
         "arkui.component.idlize.AnimationExtender.OpenImplicitAnimationForAnimation",
         "arkui.component.idlize.AnimationExtender.CloseImplicitAnimationForAnimation",
+        "arkui.component.idlize.FrameNodeExtender.dispatchInputEvent",
         "idlize.internal.interop.NativeModuleNode.ApplyModifierFinish",
         "idlize.internal.interop.NativeModuleNode.AddChild",
         "arkui.component.idlize.RouterExtender.back",

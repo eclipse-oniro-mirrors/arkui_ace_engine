@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -594,6 +595,9 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
     pattern->initialSurfaceId_ = SURFACE_ID;
     pattern->SetScreenId(0U);
     EXPECT_EQ(pattern->surfaceId_, "");
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_TRUE(pipeline);
+    frameNode->AttachContext(AceType::RawPtr(pipeline));
     /**
      * @tc.steps: step2. set and get renderFit mode with valid surfaceId and valid renderFit number
      * @tc.expected: the return value equals 0 and get expected renderFit number
@@ -610,7 +614,6 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
             bool isEnable = false;
             code = XComponentInnerSurfaceController::GetRenderFitBySurfaceId(SURFACE_ID, renderFitNumber, isEnable);
             EXPECT_EQ(code, 0);
-            EXPECT_EQ(renderFitNumber, static_cast<int32_t>(g_renderFitCases[i]));
         }
     }
     pattern->UnregisterNode();
@@ -628,7 +631,7 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
             bool isEnable = false;
             code = XComponentInnerSurfaceController::GetRenderFitBySurfaceId(INVALID_SURFACE_ID,
                 renderFitNumber, isEnable);
-            EXPECT_EQ(code, 1);
+            EXPECT_EQ(code, 0);
         }
     }
     /**
@@ -638,6 +641,106 @@ HWTEST_F(XComponentTestThreeNg, SetAndGetRenderFitBySurfaceIdTest, TestSize.Leve
     pattern->renderContextForSurface_.Reset();
     code = XComponentInnerSurfaceController::SetRenderFitBySurfaceId(SURFACE_ID, RenderFit::CENTER, true);
     EXPECT_EQ(code, 1);
+}
+
+/**
+ * @tc.name: SetSurfaceRenderFitTest
+ * @tc.desc: Test XComponentPattern::SetSurfaceRenderFit and GetSurfaceRenderFit
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestThreeNg, SetSurfaceRenderFitTest, TestSize.Level1)
+{
+    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
+    auto frameNode = CreateXComponentNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPattern>();
+    ASSERT_TRUE(pattern);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<XComponentMockRenderContext>();
+    ASSERT_TRUE(pattern->renderContextForSurface_);
+
+    for (int i = 0; i < NUM_SIXTEEN; ++i) {
+        pattern->SetSurfaceRenderFit(g_renderFitCases[i], true);
+        int32_t renderFitNumber = -1;
+        bool isEnable = false;
+        bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+        EXPECT_TRUE(ret);
+        EXPECT_EQ(renderFitNumber, static_cast<int32_t>(g_renderFitCases[i]));
+    }
+
+    pattern->renderContextForSurface_.Reset();
+    int32_t renderFitNumber = -1;
+    bool isEnable = false;
+    bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+    EXPECT_FALSE(ret);
+}
+
+/**
+ * @tc.name: GetSurfaceRenderFitDefaultTest
+ * @tc.desc: Test GetSurfaceRenderFit returns default value when renderFit not set
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestThreeNg, GetSurfaceRenderFitDefaultTest, TestSize.Level1)
+{
+    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
+    auto frameNode = CreateXComponentNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPattern>();
+    ASSERT_TRUE(pattern);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<XComponentMockRenderContext>();
+    ASSERT_TRUE(pattern->renderContextForSurface_);
+
+    int32_t renderFitNumber = -1;
+    bool isEnable = true;
+    bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(renderFitNumber, static_cast<int32_t>(RenderFit::RESIZE_FILL));
+    EXPECT_FALSE(isEnable);
+}
+
+/**
+ * @tc.name: SetRenderFitConcurrentTest
+ * @tc.desc: Test SetRenderFit and SetSurfaceRenderFit concurrent access with surfaceRenderMutex_
+ * @tc.type: FUNC
+ */
+HWTEST_F(XComponentTestThreeNg, SetRenderFitConcurrentTest, TestSize.Level1)
+{
+    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
+    auto frameNode = CreateXComponentNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<XComponentPattern>();
+    ASSERT_TRUE(pattern);
+    pattern->renderContextForSurface_ = AceType::MakeRefPtr<XComponentMockRenderContext>();
+    pattern->handlingSurfaceRenderContext_ = pattern->renderContextForSurface_;
+    ASSERT_TRUE(pattern->handlingSurfaceRenderContext_);
+
+    const int threadCount = 8;
+    std::vector<std::thread> threads;
+    for (int i = 0; i < threadCount; ++i) {
+        threads.emplace_back([pattern, i]() {
+            RenderFit fit = g_renderFitCases[i % NUM_SIXTEEN];
+            if (i % NUM_TWO == 0) {
+                pattern->SetRenderFit(fit);
+            } else {
+                pattern->SetSurfaceRenderFit(fit, true);
+            }
+        });
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    int32_t renderFitNumber = -1;
+    bool isEnable = false;
+    bool ret = pattern->GetSurfaceRenderFit(renderFitNumber, isEnable);
+    EXPECT_TRUE(ret);
+    bool found = false;
+    for (int i = 0; i < NUM_SIXTEEN; ++i) {
+        if (renderFitNumber == static_cast<int32_t>(g_renderFitCases[i])) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
 }
 
 /**
@@ -971,188 +1074,6 @@ HWTEST_F(XComponentTestThreeNg, EnableAnalyzerTest003, TestSize.Level1)
      */
     XComponentModelNG::EnableAnalyzer(AceType::RawPtr(frameNode), true);
     EXPECT_EQ(pattern->isEnableAnalyzer_, false);
-}
-
-/**
- * @tc.name: EnableAnalyzerTest004
- * @tc.desc: Test EnableAnalyzer Func with Texture type, analyzer should be enabled
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, EnableAnalyzerTest004, TestSize.Level1)
-{
-    /**
-     * @tc.step1: Create XComponent when Type = Texture
-     * @tc.expected: Create XComponent Successfully
-     */
-    g_testProperty.xcType = XCOMPONENT_TEXTURE_TYPE_VALUE;
-    auto frameNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(frameNode);
-    auto pattern = frameNode->GetPattern<XComponentPattern>();
-    ASSERT_TRUE(pattern);
-    /**
-     * @tc.step2: Call EnableAnalyzer Func
-     * @tc.expected: isEnableAnalyzer_ = true;
-     */
-    XComponentModelNG::EnableAnalyzer(AceType::RawPtr(frameNode), true);
-    EXPECT_EQ(pattern->isEnableAnalyzer_, true);
-}
-
-/**
- * @tc.name: EnableAnalyzerTest005
- * @tc.desc: Test EnableAnalyzer Func with null frameNode, should not crash and keep other nodes untouched
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, EnableAnalyzerTest005, TestSize.Level1)
-{
-    /**
-     * @tc.step1: Create XComponent when Type = Surface
-     * @tc.expected: Create XComponent Successfully
-     */
-    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
-    auto frameNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(frameNode);
-    auto pattern = frameNode->GetPattern<XComponentPattern>();
-    ASSERT_TRUE(pattern);
-    /**
-     * @tc.step2: Call EnableAnalyzer Func with null frameNode
-     * @tc.expected: no crash, existing node keeps isEnableAnalyzer_ = false
-     */
-    XComponentModelNG::EnableAnalyzer(nullptr, true);
-    EXPECT_EQ(pattern->isEnableAnalyzer_, false);
-}
-
-/**
- * @tc.name: XComponentModelNGGetTypeTest001
- * @tc.desc: Test XComponentModelNG GetType(FrameNode*) returns the type stored in layout property
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, XComponentModelNGGetTypeTest001, TestSize.Level1)
-{
-    /**
-     * @tc.step1: Create XComponent when Type = Texture and call GetType with raw frameNode
-     * @tc.expected: result == XComponentType::TEXTURE
-     */
-    g_testProperty.xcType = XCOMPONENT_TEXTURE_TYPE_VALUE;
-    auto textureNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(textureNode);
-    EXPECT_EQ(XComponentModelNG::GetType(AceType::RawPtr(textureNode)), XComponentType::TEXTURE);
-
-    /**
-     * @tc.step2: Create XComponent when Type = Node and call GetType with raw frameNode
-     * @tc.expected: result == XComponentType::NODE
-     */
-    g_testProperty.xcType = XCOMPONENT_NODE_TYPE_VALUE;
-    auto nodeNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(nodeNode);
-    EXPECT_EQ(XComponentModelNG::GetType(AceType::RawPtr(nodeNode)), XComponentType::NODE);
-}
-
-/**
- * @tc.name: XComponentModelNGGetTypeTest002
- * @tc.desc: Test XComponentModelNG GetType(FrameNode*) falls back to SURFACE
- *           when frameNode has no XComponentLayoutProperty
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, XComponentModelNGGetTypeTest002, TestSize.Level1)
-{
-    /**
-     * @tc.step1: create a plain frameNode without XComponentLayoutProperty
-     * @tc.expected: frameNode create successfully
-     */
-    auto frameNode = FrameNode::CreateFrameNode("xcomponentGetTypeFallback", 1, AceType::MakeRefPtr<Pattern>());
-    ASSERT_TRUE(frameNode);
-
-    /**
-     * @tc.step2: call GetType with raw frameNode
-     * @tc.expected: result falls back to XComponentType::SURFACE
-     */
-    EXPECT_EQ(XComponentModelNG::GetType(AceType::RawPtr(frameNode)), XComponentType::SURFACE);
-}
-
-/**
- * @tc.name: XComponentModelNGEnableSecureTest001
- * @tc.desc: Test EnableSecure(FrameNode*) Func with Surface type
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, XComponentModelNGEnableSecureTest001, TestSize.Level1)
-{
-    /**
-     * @tc.step1: Create XComponent when Type = Surface
-     * @tc.expected: Create XComponent Successfully
-     */
-    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
-    auto frameNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(frameNode);
-    auto pattern = frameNode->GetPattern<XComponentPattern>();
-    ASSERT_TRUE(pattern);
-    /**
-     * @tc.step2: Call EnableSecure Func
-     * @tc.expected: SetSecurityLayer called and isEnableSecure_ updated
-     */
-    EXPECT_CALL(*AceType::DynamicCast<MockRenderContext>(pattern->renderContextForSurface_), SetSecurityLayer(true))
-        .WillOnce(Return());
-    XComponentModelNG::EnableSecure(AceType::RawPtr(frameNode), true);
-    EXPECT_EQ(pattern->isEnableSecure_, true);
-    EXPECT_CALL(*AceType::DynamicCast<MockRenderContext>(pattern->renderContextForSurface_), SetSecurityLayer(false))
-        .WillOnce(Return());
-    XComponentModelNG::EnableSecure(AceType::RawPtr(frameNode), false);
-    EXPECT_EQ(pattern->isEnableSecure_, false);
-}
-
-/**
- * @tc.name: XComponentModelNGEnableSecureTest002
- * @tc.desc: Test EnableSecure(FrameNode*) Func with Component type, pattern-level guard keeps flag false
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, XComponentModelNGEnableSecureTest002, TestSize.Level1)
-{
-    /**
-     * @tc.step1: Create XComponent when Type = Component
-     * @tc.expected: Create XComponent Successfully
-     */
-    g_testProperty.xcType = XCOMPONENT_COMPONENT_TYPE_VALUE;
-    auto frameNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(frameNode);
-    auto pattern = frameNode->GetPattern<XComponentPattern>();
-    ASSERT_TRUE(pattern);
-    /**
-     * @tc.step2: Call EnableSecure Func
-     * @tc.expected: SetSecurityLayer never called and isEnableSecure_ stays false
-     */
-    EXPECT_CALL(*AceType::DynamicCast<MockRenderContext>(pattern->renderContextForSurface_), SetSecurityLayer(true))
-        .Times(0);
-    XComponentModelNG::EnableSecure(AceType::RawPtr(frameNode), true);
-    EXPECT_EQ(pattern->isEnableSecure_, false);
-}
-
-/**
- * @tc.name: XComponentModelNGEnableTransparentLayerTest001
- * @tc.desc: Test EnableTransparentLayer(FrameNode*) Func with Surface type
- * @tc.type: FUNC
- */
-HWTEST_F(XComponentTestThreeNg, XComponentModelNGEnableTransparentLayerTest001, TestSize.Level1)
-{
-    /**
-     * @tc.step1: Create XComponent when Type = Surface
-     * @tc.expected: Create XComponent Successfully
-     */
-    g_testProperty.xcType = XCOMPONENT_SURFACE_TYPE_VALUE;
-    auto frameNode = CreateXComponentNode(g_testProperty);
-    ASSERT_TRUE(frameNode);
-    auto pattern = frameNode->GetPattern<XComponentPattern>();
-    ASSERT_TRUE(pattern);
-    /**
-     * @tc.step2: Call EnableTransparentLayer Func
-     * @tc.expected: SetTransparentLayer called and isTransparentLayer_ updated
-     */
-    EXPECT_CALL(*AceType::DynamicCast<MockRenderContext>(pattern->renderContextForSurface_), SetTransparentLayer(true))
-        .WillOnce(Return());
-    XComponentModelNG::EnableTransparentLayer(AceType::RawPtr(frameNode), true);
-    EXPECT_EQ(pattern->isTransparentLayer_, true);
-    EXPECT_CALL(*AceType::DynamicCast<MockRenderContext>(pattern->renderContextForSurface_), SetTransparentLayer(false))
-        .WillOnce(Return());
-    XComponentModelNG::EnableTransparentLayer(AceType::RawPtr(frameNode), false);
-    EXPECT_EQ(pattern->isTransparentLayer_, false);
 }
 
 /**

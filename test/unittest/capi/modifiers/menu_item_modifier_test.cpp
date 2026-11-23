@@ -63,7 +63,6 @@ const std::vector<ColorTestStep> COLOR_TEST_PLAN_INVALID = {
     { Converter::ArkUnion<Ark_ResourceColor, Ark_String>(""), COLOR_THEME_FONT }
 };
 
-
 const std::vector<ColorTestStep> COLOR_TEST_PLAN1 = {
     { Converter::ArkUnion<Ark_ResourceColor, Ark_Color>(ARK_COLOR_BLUE), "#FF0000FF" },
     { Converter::ArkUnion<Ark_ResourceColor, Ark_Int32>(0x123456), "#FF123456" },
@@ -511,7 +510,6 @@ HWTEST_F(MenuItemModifierTest, setSelectIconTestString, TestSize.Level1)
 
     auto str = Converter::ArkValue<Ark_String>("path_to_select_icon");
     Ark_ResourceStr resStr = Converter::ArkUnion<Ark_ResourceStr, Ark_String>(str);
-
     auto optIcon = Converter::ArkUnion<Opt_Union_Boolean_ResourceStr_SymbolGlyphModifier, Ark_ResourceStr>(resStr);
     modifier_->setSelectIcon(node_, &optIcon);
     selectIcon = GetAttrValue<std::string>(node_, SELECT_ICON_STR);

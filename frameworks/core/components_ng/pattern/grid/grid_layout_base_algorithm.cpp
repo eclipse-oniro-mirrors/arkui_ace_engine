@@ -103,6 +103,16 @@ std::optional<RectF> ResolveContentClipRect(
 }
 } // namespace
 
+bool GridLayoutBaseAlgorithm::IsSyncCacheLayoutEnabled(LayoutWrapper* layoutWrapper) const
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    auto pattern = host->GetPattern<GridPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsSyncCacheLayoutEnabled();
+}
+
 void GridLayoutBaseAlgorithm::UpdateRealGridItemPositionInfo(
     const RefPtr<LayoutWrapper>& itemLayoutWrapper, int32_t mainIndex, int32_t crossIndex)
 {

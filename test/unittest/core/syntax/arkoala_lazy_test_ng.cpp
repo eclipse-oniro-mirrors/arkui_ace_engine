@@ -16,6 +16,8 @@
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "core/components_ng/pattern/linear_layout/column_model_ng.h"
+#include "core/components_ng/pattern/grid/grid_pattern.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "frameworks/core/components_ng/syntax/arkoala_lazy_node.h"
 #include "base/log/dump_log.h"
 
@@ -102,6 +104,8 @@ public:
     };
     ArkoalaLazyNode::UpdateRangeCb updateRangeCb_ = [](
         int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {};
+    ArkoalaLazyNode::ClearCacheCb clearCacheCb_ = []() {};
+    ArkoalaLazyNode::ReleaseItemByIndexCb releaseItemByIndexCb_ = [](int32_t index) {};
 };
 
 const int32_t INDEX_1 = 1;
@@ -182,16 +186,20 @@ TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeTest004)
      */
     auto lazyNode = CreateLazyForEachNode(GetNextId());
     EXPECT_NE(lazyNode, nullptr);
+    DumpLog::GetInstance().description_.clear();
     lazyNode->DumpInfo();
-    EXPECT_NE(DumpLog::GetInstance().description_.back(), "VirtualScroll: true\n");
+    EXPECT_TRUE(DumpLog::GetInstance().description_.empty());
 
     /**
      * @tc.steps: step2. Test Repeat node dump info
      */
     auto repeatNode = CreateRepeatNode(GetNextId());
     EXPECT_NE(repeatNode, nullptr);
+    DumpLog::GetInstance().description_.clear();
     repeatNode->DumpInfo();
-    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "VirtualScroll: true\n");
+    ASSERT_EQ(DumpLog::GetInstance().description_.size(), 2U);
+    EXPECT_EQ(DumpLog::GetInstance().description_.front(), "VirtualScroll: true\n");
+    EXPECT_EQ(DumpLog::GetInstance().description_.back(), "RepeatMemOpt: disabled\n");
 }
 
 /**
@@ -768,6 +776,486 @@ TEST_F(ArkoalaLazyNodeTest, IsInCacheRange004)
         isInRange = lazyNode->IsInCacheRange(i, activeRangeParam);
         EXPECT_TRUE(isInRange);
     }
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeSetAllowReuseInAnimation001
+ * @tc.desc: SetAllowReuseInAnimation stores the tri-state value
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeSetAllowReuseInAnimation001)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    EXPECT_FALSE(lazyNode->isAllowReuseInAnimation_.has_value());
+    lazyNode->SetAllowReuseInAnimation(false);
+    ASSERT_TRUE(lazyNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_FALSE(lazyNode->isAllowReuseInAnimation_.value());
+    lazyNode->SetAllowReuseInAnimation(true);
+    ASSERT_TRUE(lazyNode->isAllowReuseInAnimation_.has_value());
+    EXPECT_TRUE(lazyNode->isAllowReuseInAnimation_.value());
+    lazyNode->SetAllowReuseInAnimation(std::nullopt);
+    EXPECT_FALSE(lazyNode->isAllowReuseInAnimation_.has_value());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeIsAllowAnimationPriority001
+ * @tc.desc: Explicitly set allowReuseInAnimation has priority over the parent tag default
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeIsAllowAnimationPriority001)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    auto columnNode = CreateFrameNode(GetNextId());
+    lazyNode->SetParent(columnNode);
+    // default: parent is not List -> false
+    EXPECT_FALSE(lazyNode->IsAllowAnimation());
+    // explicitly disallow reuse in animation -> animation allowed
+    lazyNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(lazyNode->IsAllowAnimation());
+    // explicitly allow reuse in animation -> animation disallowed
+    lazyNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(lazyNode->IsAllowAnimation());
+    lazyNode->SetAllowReuseInAnimation(std::nullopt);
+
+    auto listNode = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetNextId(), AceType::MakeRefPtr<Pattern>());
+    lazyNode->SetParent(listNode);
+    // default: List parent -> true
+    EXPECT_TRUE(lazyNode->IsAllowAnimation());
+    lazyNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(lazyNode->IsAllowAnimation());
+    lazyNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(lazyNode->IsAllowAnimation());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeIsAllowAnimationNoParent001
+ * @tc.desc: IsAllowAnimation returns false without a parent frame node
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeIsAllowAnimationNoParent001)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    EXPECT_FALSE(lazyNode->IsAllowAnimation());
+    // explicitly set value applies even without a parent
+    lazyNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(lazyNode->IsAllowAnimation());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeOnAttachSyncCache001
+ * @tc.desc: Attach/detach holds and releases the sync-cache reference on Grid/WaterFlow
+ *           parents for a Repeat-mode node
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeOnAttachSyncCache001)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId(), true);
+    repeatNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    auto waterFlowNode =
+        FrameNode::CreateFrameNode(V2::WATERFLOW_ETS_TAG, GetNextId(), AceType::MakeRefPtr<WaterFlowPattern>());
+    auto waterFlowPattern = waterFlowNode->GetPattern<WaterFlowPattern>();
+    ASSERT_NE(waterFlowPattern, nullptr);
+    waterFlowNode->AddChild(repeatNode);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_TRUE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+    EXPECT_FALSE(waterFlowPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeOnAttachSyncCache002
+ * @tc.desc: A LazyForEach-mode node never enables the sync-cache-in-layout strategy
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeOnAttachSyncCache002)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    // isRepeat_ == false (LazyForEach mode): not qualified even with the option set
+    auto lazyForEachNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    lazyForEachNode->SetAllowReuseInAnimation(false);
+    gridNode->AddChild(lazyForEachNode);
+    lazyForEachNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(lazyForEachNode->syncCacheHost_.Invalid());
+    lazyForEachNode->OnDetachFromMainTree(false, nullptr);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeOnAttachSyncCache003
+ * @tc.desc: Attach does not hold the sync-cache reference when the option is unset or true
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeOnAttachSyncCache003)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId(), true);
+    gridNode->AddChild(repeatNode);
+
+    // unset option keeps the container default
+    repeatNode->SetAllowReuseInAnimation(std::nullopt);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+
+    // explicitly true keeps the container default
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->OnAttachToMainTree(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->OnDetachFromMainTree(false, nullptr);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodePrevL1Index001
+ * @tc.desc: The rid bookkeeping records each node's last L1 index during a range update;
+ *           a node dropping to cache-only (in cache range, out of active range) is
+ *           deactivated in place with its pre-rerender index, and the previous active
+ *           range is retained for SetNodeInactive pairing
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodePrevL1Index001)
+{
+    // items with FrameNode roots so the active state is observable on the root itself
+    std::vector<RefPtr<FrameNode>> roots;
+    ArkoalaLazyNode::CreateItemCb frameItemCb = [this, &roots](int32_t idx, bool skipCreate) {
+        auto root = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+        auto syntaxChild = ColumnModelNG::CreateFrameNode(GetNextId());
+        root->AddChild(syntaxChild);
+        roots.push_back(root);
+        return root;
+    };
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetCallbacks(frameItemCb, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    CreateChildren(repeatNode, 4);
+
+    // no range update happened yet: no pre-rerender L1 index is recorded
+    EXPECT_FALSE(repeatNode->GetPrevL1IndexOfNode(repeatNode->node4Index_.Get(0).value()).has_value());
+    // a node without children and a node whose syntax child was never registered
+    // (no rid bookkeeping) resolve nothing
+    auto childlessRoot = FrameNode::CreateFrameNode("childless", GetNextId(), AceType::MakeRefPtr<Pattern>());
+    EXPECT_FALSE(repeatNode->GetPrevL1IndexOfNode(childlessRoot).has_value());
+    auto foreignRoot = FrameNode::CreateFrameNode("foreign", GetNextId(), AceType::MakeRefPtr<Pattern>());
+    foreignRoot->AddChild(ColumnModelNG::CreateFrameNode(GetNextId()));
+    EXPECT_FALSE(repeatNode->GetPrevL1IndexOfNode(foreignRoot).has_value());
+
+    // first range update: all four nodes stay active and each records its L1 index
+    repeatNode->DoSetActiveChildRange(0, 3, 0, 0, false);
+    for (int32_t i = 0; i < 4; ++i) {
+        auto prevIndex = repeatNode->GetPrevL1IndexOfNode(repeatNode->node4Index_.Get(i).value());
+        ASSERT_TRUE(prevIndex.has_value());
+        EXPECT_EQ(prevIndex.value(), i);
+        EXPECT_TRUE(roots[i]->IsActive());
+    }
+
+    // second range update: active range [1, 2], cache range [0, 3]; nodes 0 and 3 drop to
+    // cache-only and are deactivated in place (they keep their render-tree spot)
+    repeatNode->DoSetActiveChildRange(1, 2, 1, 1, false);
+    EXPECT_FALSE(roots[0]->IsActive());
+    EXPECT_FALSE(roots[3]->IsActive());
+    EXPECT_TRUE(roots[1]->IsActive());
+    EXPECT_TRUE(roots[2]->IsActive());
+    // no transition-out deferral without an open implicit animation
+    EXPECT_FALSE(roots[0]->needSetInActiveAfterTransitionOut_);
+    // the rid bookkeeping keeps the L1 index fresh while the node stays in L1
+    EXPECT_EQ(repeatNode->GetPrevL1IndexOfNode(repeatNode->node4Index_.Get(0).value()).value_or(-1), 0);
+    // the previous active range is retained for SetNodeInactive pairing
+    EXPECT_EQ(repeatNode->prevActiveRangeParam_.start, 0);
+    EXPECT_EQ(repeatNode->prevActiveRangeParam_.end, 3);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeRebuildCacheCancelDeferredDeactivation001
+ * @tc.desc: Reactivation through RebuildCache cancels a pending deferred SetActive(false)
+ *           (NeedSetInActiveAfterTransitionOut) armed by an unfinished transition-out
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeRebuildCacheCancelDeferredDeactivation001)
+{
+    // items with FrameNode roots so the active state is observable on the root itself
+    std::vector<RefPtr<FrameNode>> roots;
+    ArkoalaLazyNode::CreateItemCb frameItemCb = [this, &roots](int32_t idx, bool skipCreate) {
+        auto root = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+        auto syntaxChild = ColumnModelNG::CreateFrameNode(GetNextId());
+        root->AddChild(syntaxChild);
+        roots.push_back(root);
+        return root;
+    };
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetCallbacks(frameItemCb, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    CreateChildren(repeatNode, 4);
+    repeatNode->DoSetActiveChildRange(0, 3, 0, 0, false);
+    EXPECT_TRUE(roots[0]->IsActive());
+
+    // node 0 scrolls back into the active range while a deferred deactivation is still
+    // pending (armed by an earlier SetNodeInactive during an implicit animation;
+    // IsImplicitAnimationOpen is a constant false in the test build, so arm the flag
+    // directly the way SetInActiveAfterTransitionOut's producer would)
+    roots[0]->NeedSetInActiveAfterTransitionOut(true);
+    EXPECT_TRUE(roots[0]->needSetInActiveAfterTransitionOut_);
+
+    repeatNode->DoSetActiveChildRange(0, 1, 0, 2, false);
+
+    // reactivation applies SetActive(true) and cancels the pending flag
+    EXPECT_TRUE(roots[0]->IsActive());
+    EXPECT_FALSE(roots[0]->needSetInActiveAfterTransitionOut_);
+    // nodes outside the new active range (still inside the cache range) are deactivated
+    EXPECT_FALSE(roots[2]->IsActive());
+    EXPECT_FALSE(roots[3]->IsActive());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeGetChildCancelDeferredDeactivation001
+ * @tc.desc: GetFrameChildByIndex with addToRenderTree cancels a pending deferred
+ *           SetActive(false) on the fetched item; an isCache fetch keeps it
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeGetChildCancelDeferredDeactivation001)
+{
+    std::vector<RefPtr<FrameNode>> roots;
+    ArkoalaLazyNode::CreateItemCb frameItemCb = [this, &roots](int32_t idx, bool skipCreate) {
+        auto root = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+        auto syntaxChild = ColumnModelNG::CreateFrameNode(GetNextId());
+        root->AddChild(syntaxChild);
+        roots.push_back(root);
+        return root;
+    };
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetCallbacks(frameItemCb, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    CreateChildren(repeatNode, 2);
+    ASSERT_EQ(roots.size(), static_cast<size_t>(2));
+
+    // a deferred deactivation is pending on item 0 when it is fetched back onto the
+    // render tree (scroll back into view or reuse)
+    roots[0]->isActive_ = false;
+    roots[0]->NeedSetInActiveAfterTransitionOut(true);
+    auto child = repeatNode->GetFrameChildByIndex(0, true, false, true);
+    ASSERT_TRUE(child);
+    EXPECT_TRUE(roots[0]->IsActive());
+    EXPECT_FALSE(roots[0]->needSetInActiveAfterTransitionOut_);
+
+    // isCache fetch: the node is not going back on the render tree, the deferred flag
+    // is kept for the still-pending transition out
+    roots[1]->NeedSetInActiveAfterTransitionOut(true);
+    auto cacheChild = repeatNode->GetFrameChildByIndex(1, true, true, true);
+    ASSERT_TRUE(cacheChild);
+    EXPECT_TRUE(roots[1]->needSetInActiveAfterTransitionOut_);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeRemoveDuplicatedItem001
+ * @tc.desc: GetFrameChildByIndex drops stale node4Index_ entries whose item (first child
+ *           of the wrapper) is the same real item returned for the fetched index, so a
+ *           frontend reuse pool returning one item for two indices cannot leave a stale
+ *           mapping that RebuildCache would later deactivate
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeRemoveDuplicatedItem001)
+{
+    // the reuse pool hands out the same real item (first child below the wrapper) for
+    // every index of this test
+    auto sharedItem = FrameNode::CreateFrameNode("shared_item", GetNextId(), AceType::MakeRefPtr<Pattern>());
+    std::vector<RefPtr<FrameNode>> wrappers;
+    ArkoalaLazyNode::CreateItemCb reuseItemCb = [this, &sharedItem, &wrappers](int32_t idx, bool skipCreate) {
+        auto root = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+        root->AddChild(sharedItem);
+        wrappers.push_back(root);
+        return root;
+    };
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetCallbacks(reuseItemCb, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    repeatNode->SetTotalCount(4);
+
+    // index 0 maps wrapper 0 holding the shared item
+    repeatNode->GetFrameChildByIndex(0, true, false, true);
+    ASSERT_EQ(wrappers.size(), static_cast<size_t>(1));
+    ASSERT_TRUE(repeatNode->node4Index_.Get(0).has_value());
+
+    // index 1 gets a different wrapper holding the SAME item: the stale mapping of
+    // index 0 is dropped so the item is only reachable through index 1
+    repeatNode->GetFrameChildByIndex(1, true, false, true);
+    ASSERT_EQ(wrappers.size(), static_cast<size_t>(2));
+    EXPECT_FALSE(repeatNode->node4Index_.Get(0).has_value()) << "stale entry for the duplicated item removed";
+    auto mappedNode = repeatNode->node4Index_.Get(1);
+    ASSERT_TRUE(mappedNode.has_value());
+    EXPECT_EQ(mappedNode.value(), wrappers[1]);
+
+    // an entry holding a different item survives, a null entry is skipped without crashing
+    auto otherWrapper = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+    otherWrapper->AddChild(ColumnModelNG::CreateFrameNode(GetNextId()));
+    repeatNode->node4Index_.Put(2, otherWrapper);
+    repeatNode->node4Index_.Put(3, nullptr);
+    repeatNode->GetFrameChildByIndex(1, true, false, true);
+    EXPECT_TRUE(repeatNode->node4Index_.Get(2).has_value()) << "entry holding a different item survives";
+    EXPECT_TRUE(repeatNode->node4Index_.Get(3).has_value()) << "null entry skipped, not removed";
+
+    // a wrapper without children: early return, existing entries untouched
+    auto childlessWrapper = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+    repeatNode->RemoveDuplicatedItem(childlessWrapper, 1);
+    EXPECT_TRUE(repeatNode->node4Index_.Get(1).has_value());
+    EXPECT_TRUE(repeatNode->node4Index_.Get(2).has_value());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeSetAllowReuseInAnimationAttached001
+ * @tc.desc: SetAllowReuseInAnimation re-runs the parent sync-cache toggle when the option
+ *           arrives while the node is already attached; a LazyForEach-mode node never
+ *           registers the reference
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeSetAllowReuseInAnimationAttached001)
+{
+    auto gridNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, GetNextId(), AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId(), true);
+    gridNode->AddChild(repeatNode);
+
+    // attach with the option still unset: container keeps its default, no reference held
+    repeatNode->AttachToMainTree(false);
+    EXPECT_TRUE(repeatNode->IsOnMainTree());
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+
+    // the option arrives after attach (createLazyNode attaches inside NodeAttach, the
+    // static frontend sets the option in onNodeCreated afterwards): re-toggle registers
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(repeatNode->syncCacheHost_.Invalid());
+
+    // same value again: early return, the single reference is kept
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // switching to true while attached releases the reference, back to false re-registers
+    repeatNode->SetAllowReuseInAnimation(true);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // detach releases the reference; changing the option afterwards does not touch the parent
+    repeatNode->DetachFromMainTree(false, false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(repeatNode->syncCacheHost_.Invalid());
+    repeatNode->SetAllowReuseInAnimation(true);
+    repeatNode->SetAllowReuseInAnimation(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+
+    // LazyForEach mode (isRepeat_ == false): the re-toggle never qualifies
+    auto lazyForEachNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    gridNode->AddChild(lazyForEachNode);
+    lazyForEachNode->AttachToMainTree(false);
+    lazyForEachNode->SetAllowReuseInAnimation(false);
+    EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_TRUE(lazyForEachNode->syncCacheHost_.Invalid());
+    lazyForEachNode->DetachFromMainTree(false, false);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeProcessOldNode001
+ * @tc.desc: When a node leaves L1, ProcessRepeatNodeCleanup deactivates it with its
+ *           recorded prev L1 index and removes it from the render tree; a later re-created
+ *           node registered under the same rid carries over the recorded L1 index
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeProcessOldNode001)
+{
+    std::vector<RefPtr<FrameNode>> roots;
+    // a rebuilt item gets a fresh root but keeps its syntax child node, so it is
+    // re-registered under the same rid
+    std::vector<RefPtr<FrameNode>> syntaxChildren;
+    ArkoalaLazyNode::CreateItemCb frameItemCb = [this, &roots, &syntaxChildren](int32_t idx, bool skipCreate) {
+        auto root = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+        if (static_cast<size_t>(idx) < syntaxChildren.size()) {
+            root->AddChild(syntaxChildren[static_cast<size_t>(idx)]);
+        } else {
+            auto syntaxChild = ColumnModelNG::CreateFrameNode(GetNextId());
+            root->AddChild(syntaxChild);
+            syntaxChildren.push_back(syntaxChild);
+        }
+        roots.push_back(root);
+        return root;
+    };
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetCallbacks(frameItemCb, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    CreateChildren(repeatNode, 4);
+
+    // record the L1 index of every node
+    repeatNode->DoSetActiveChildRange(0, 3, 0, 0, false);
+    EXPECT_EQ(repeatNode->GetPrevL1IndexOfNode(repeatNode->node4Index_.Get(0).value()).value_or(-1), 0);
+
+    // node 0 leaves L1 entirely (as a purge would drop it): the rid stays active-marked
+    // from the previous run, so ProcessRepeatNodeCleanup deactivates it with its prev L1
+    // index and removes it from the render tree
+    repeatNode->node4Index_.Remove(0);
+    repeatNode->DoSetActiveChildRange(1, 3, 0, 0, false);
+    EXPECT_FALSE(roots[0]->IsActive());
+    EXPECT_FALSE(roots[0]->needSetInActiveAfterTransitionOut_);
+    EXPECT_TRUE(roots[1]->IsActive());
+    // a null node is ignored
+    repeatNode->SetNodeInactive(nullptr, true, 0);
+
+    // a re-created item registered under the same rid (same syntax child node) carries
+    // over the L1 index recorded for that rid
+    size_t rootCount = roots.size();
+    repeatNode->GetFrameChildByIndex(0, true, false, true);
+    ASSERT_EQ(roots.size(), rootCount + 1);
+    auto recreatedRoot = roots.back();
+    EXPECT_NE(recreatedRoot, roots[0]);
+    auto carriedIndex = repeatNode->GetPrevL1IndexOfNode(repeatNode->node4Index_.Get(0).value());
+    ASSERT_TRUE(carriedIndex.has_value());
+    EXPECT_EQ(carriedIndex.value(), 0);
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeHasCustomComponent001
+ * @tc.desc: GetFrameChildByIndex scans each built item subtree for a JsView-tagged node
+ *           (custom component root of the static frontend) and latches the result
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeHasCustomComponent001)
+{
+    // plain column items: no custom component
+    auto plainNode = CreateRepeatNode(GetNextId());
+    plainNode->GetFrameChildByIndex(0, true, false, true);
+    plainNode->GetFrameChildByIndex(1, true, false, true);
+    EXPECT_FALSE(plainNode->HasCustomComponent());
+
+    // an item containing a JsView-tagged node in its subtree latches the flag
+    ArkoalaLazyNode::CreateItemCb jsViewItemCb = [this](int32_t idx, bool skipCreate) {
+        auto root = FrameNode::CreateFrameNode("test_root", GetNextId(), AceType::MakeRefPtr<Pattern>());
+        auto jsView = FrameNode::CreateFrameNode(V2::JS_VIEW_ETS_TAG, GetNextId(), AceType::MakeRefPtr<Pattern>());
+        root->AddChild(jsView);
+        return root;
+    };
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->SetCallbacks(jsViewItemCb, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    EXPECT_FALSE(repeatNode->HasCustomComponent());
+    repeatNode->GetFrameChildByIndex(0, true, false, true);
+    EXPECT_TRUE(repeatNode->HasCustomComponent());
+}
+
+/**
+ * @tc.name: ArkoalaLazyNodeClearCacheAfterAnimation001
+ * @tc.desc: test ArkoalaLazyNodeClearCacheAfterAnimation
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, ArkoalaLazyNodeClearCacheAfterAnimation001)
+{
+    auto repeatNode = CreateRepeatNode(GetNextId());
+    repeatNode->ClearCacheAfterAnimation();
+    repeatNode->needClearCacheAfterAnimation_ = true;
+    repeatNode->ClearCacheAfterAnimation();
+    EXPECT_FALSE(repeatNode->needClearCacheAfterAnimation_);
 }
 
 /**

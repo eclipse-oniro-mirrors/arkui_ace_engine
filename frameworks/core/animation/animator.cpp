@@ -106,8 +106,7 @@ bool Animator::AttachSchedulerOnContainer()
     ContainerScope scope(currentId);
     auto pipeline = PipelineBase::GetCurrentContextSafely();
     CHECK_NULL_RETURN(pipeline, false);
-    TAG_LOGI(AceLogTag::ACE_ANIMATION, "animator binds to context %{public}d, id:%{public}d", pipeline->GetInstanceId(),
-        GetId());
+    TAG_LOGI(AceLogTag::ACE_ANIMATION, "animator bind ctx,%{public}d,%{public}d", pipeline->GetInstanceId(), GetId());
     AttachScheduler(pipeline);
     return true;
 }
@@ -525,7 +524,7 @@ void Animator::Stop()
     status_ = Status::STOPPED;
     asyncTrace_ = nullptr;
     if (animatorName_.find("ohos.animator") != std::string::npos) {
-        TAG_LOGI(AceLogTag::ACE_ANIMATION, "animator stop, id:%{public}d", GetId());
+        TAG_LOGI(AceLogTag::ACE_ANIMATION, "animator stop,%{public}d", GetId());
     }
     StatusListenable::NotifyStopListener();
     for (auto& controller : proxyControllers_) {

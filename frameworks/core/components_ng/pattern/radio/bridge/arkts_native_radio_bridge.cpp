@@ -933,8 +933,8 @@ ArkUINativeModuleValue RadioBridge::SetRadioOnChange(ArkUIRuntimeCallInfo* runti
     }
     panda::Local<panda::FunctionRef> func = callbackArg->ToObject(vm);
     std::function<void(const bool)> callback = [vm, node = AceType::WeakClaim(frameNode),
-                                                   func = panda::CopyableGlobal(vm, func),
-                                                   isJsView](const bool isOnchange) {
+                                            func = panda::CopyableGlobal(vm, func),
+                                            isJsView](const bool isOnchange) {
         panda::LocalScope pandaScope(vm);
         panda::TryCatch trycatch(vm);
         PipelineContext::SetCallBackNode(node);

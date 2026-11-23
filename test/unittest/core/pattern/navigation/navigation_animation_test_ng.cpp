@@ -260,6 +260,7 @@ HWTEST_F(NavigationAnimationTest, NavigationCancelAnimation003, TestSize.Level1)
     */
     auto navigationNode = InitNavigation();
     ASSERT_NE(navigationNode, nullptr);
+    navigationNode->AttachToMainTree();
 
     /**
      * @tc.steps: step2. set interactive value true

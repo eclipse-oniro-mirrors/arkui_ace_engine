@@ -203,9 +203,41 @@ public:
      */
     std::optional<IndexType> GetL1Index4Rid(RIDType rid);
 
+    /**
+     * records the current l1Rid4Index_ as the pre-rerender mapping (prevL1Rid4Index_)
+     * before UpdateL1Rid4Index replaces it. Runs ahead of UpdateTotalCount so a
+     * DoSetActiveChildRange triggered within the same rerender (e.g. by
+     * UpdateTotalCount with totalCount 0) still resolves the old L1 index.
+     */
+    void RecordPrevL1Rid4Index();
+
     //  TS call JS to update l1Rid4Index_ following a
     // Repeat.rerender
     void UpdateL1Rid4Index(std::map<int32_t, uint32_t> l1Rd4Index);
+
+    /**
+     * returns the old (pre-rerender) L1 index of given rid
+     * recorded by RecordPrevL1Rid4Index before UpdateL1Rid4Index
+     * replaces l1Rid4Index_
+     */
+    std::optional<IndexType> GetPrevL1Index4RID(RIDType rid) const;
+
+    /**
+     * returns the old (pre-rerender) L1 index of given node
+     * recorded by RecordPrevL1Rid4Index before UpdateL1Rid4Index
+     * replaces l1Rid4Index_
+     */
+    std::optional<IndexType> GetPrevL1Index4Node(const RefPtr<UINode>& node) const;
+
+    /**
+     * clears the recorded pre-rerender mapping. Called from the idle task once the
+     * frame has settled: the old mapping is only meaningful between a Repeat.rerender
+     * (RecordPrevL1Rid4Index / UpdateL1Rid4Index) and the DoSetActiveChildRange of
+     * the same frame. Keeping it
+     * longer only returns stale indices — recycled nodes may be re-registered under
+     * new rids, so the node lookup could match an obsolete entry.
+     */
+    void ClearPrevL1Rid4Index();
 
     void UpdateIsL1(const CacheItem& cacheItem, bool isL1, bool shouldTriggerRecycleOrReuse = true);
 
@@ -311,6 +343,18 @@ private:
 
     // L1 items index -> RID
     std::map<IndexType, RIDType> l1Rid4Index_;
+
+    // L1 items index -> RID before the last Repeat.rerender
+    // (RecordPrevL1Rid4Index), records the old mapping so the pre-rerender
+    // index of a node can still be looked up after a Repeat.rerender;
+    // cleared by the idle task once the frame settles, see ClearPrevL1Rid4Index
+    std::map<IndexType, RIDType> prevL1Rid4Index_;
+
+    // rid -> index reverse of prevL1Rid4Index_, rebuilt in RecordPrevL1Rid4Index and
+    // cleared together with it. Rids are unique in L1 (one node per rid), so the reverse
+    // resolves the same index the forward scan used to find; lets GetPrevL1Index4RID
+    // answer in O(log n) instead of a linear scan per queried rid.
+    std::map<RIDType, IndexType> prevL1Index4Rid_;
 
     // all nodes RID -> CacheItem[UINode, isValid]
     std::map<RIDType, CacheItem> cacheItem4Rid_;

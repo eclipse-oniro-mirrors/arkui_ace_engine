@@ -1838,6 +1838,12 @@ void TabsModelNG::CreateWithResourceObj(
         case TabJsResType::BlurStyle_INACTIVE_COLOR:
             HandleBackgroundBlurStyleInactiveColor(frameNode, resObj);
             break;
+        case TabJsResType::SIDEBAR_TITLE_BAR_ICON:
+            HandleSidebarTitleBarIcon(frameNode, resObj);
+            break;
+        case TabJsResType::SIDEBAR_TITLE_BAR_TEXT:
+            HandleSidebarTitleBarText(frameNode, resObj);
+            break;
         default:
             break;
     }
@@ -2529,6 +2535,50 @@ void TabsModelNG::HandleSidebarDividerEndMargin(FrameNode* frameNode, const RefP
     pattern->AddResObj(key, resObj, std::move(updateFunc));
 }
 
+void TabsModelNG::HandleSidebarTitleBarIcon(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj)
+{
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(SystemProperties::ConfigChangePerform());
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    const std::string key = "tabsSidebarTitleBarIcon";
+    pattern->RemoveResObj(key);
+    CHECK_NULL_VOID(resObj);
+    auto&& updateFunc = [weak = AceType::WeakClaim(frameNode)](const RefPtr<ResourceObject>& resObj) {
+        auto node = weak.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto tabsPattern = node->GetPattern<TabsPattern>();
+        CHECK_NULL_VOID(tabsPattern);
+        std::string result;
+        if (ResourceParseUtils::ParseResMedia(resObj, result)) {
+            tabsPattern->UpdateSidebarTitleBarIcon(result);
+        }
+    };
+    pattern->AddResObj(key, resObj, std::move(updateFunc));
+}
+
+void TabsModelNG::HandleSidebarTitleBarText(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj)
+{
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(SystemProperties::ConfigChangePerform());
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    const std::string key = "tabsSidebarTitleBarText";
+    pattern->RemoveResObj(key);
+    CHECK_NULL_VOID(resObj);
+    auto&& updateFunc = [weak = AceType::WeakClaim(frameNode)](const RefPtr<ResourceObject>& resObj) {
+        auto node = weak.Upgrade();
+        CHECK_NULL_VOID(node);
+        auto tabsPattern = node->GetPattern<TabsPattern>();
+        CHECK_NULL_VOID(tabsPattern);
+        std::string result;
+        if (ResourceParseUtils::ParseResString(resObj, result)) {
+            tabsPattern->UpdateSidebarTitleBarText(result);
+        }
+    };
+    pattern->AddResObj(key, resObj, std::move(updateFunc));
+}
+
 void TabsModelNG::SetBarFloatingStyle(FrameNode* frameNode, const BarFloatingStyleParameters& parameters)
 {
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarFloatingStyle, parameters, frameNode);
@@ -2841,6 +2891,21 @@ void TabsModelNG::SetShowSidebarControlButton(FrameNode* frameNode, bool showCon
     auto pattern = frameNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(pattern);
     pattern->SetShowSidebarControlButton(showControlButton);
+}
+
+void TabsModelNG::SetSidebarTitleBar(const TabsSidebarTitleBarOptions& options)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetSidebarTitleBar(frameNode, options);
+}
+
+void TabsModelNG::SetSidebarTitleBar(FrameNode* frameNode, const TabsSidebarTitleBarOptions& options)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetSidebarTitleBar(options);
 }
 
 void TabsModelNG::SetBarDisplayModeBreakpoint(const TabBarDisplayModeBreakpoint& breakpoint)

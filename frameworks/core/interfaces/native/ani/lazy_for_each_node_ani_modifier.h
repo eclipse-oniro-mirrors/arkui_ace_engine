@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_LAZY_FOR_EACH_NODE_ANI_MODIFIER_H
 
 #include "core/interfaces/ani/ani_api.h"
+#include "core/components_ng/syntax/arkoala_for_each_node.h"
 #include "core/components_ng/syntax/arkoala_lazy_node.h"
 #include "core/components_ng/render/animation_utils.h"
 
@@ -63,6 +64,38 @@ ani_boolean IsImplicitAnimationOpen(ani_long lazyNodePtr)
     return AnimationUtils::IsImplicitAnimationOpen() ? ANI_TRUE : ANI_FALSE;
 }
 
+// Whether any currently built item subtree of the lazy node contains a custom
+// component root (a JsView-tagged node created for each struct component)
+ani_boolean HasCustomComponent(ani_long lazyNodePtr)
+{
+    auto* uiNode = reinterpret_cast<UINode*>(lazyNodePtr);
+    CHECK_NULL_RETURN(uiNode, ANI_FALSE);
+    auto lazyNode = AceType::DynamicCast<ArkoalaLazyNode>(uiNode);
+    CHECK_NULL_RETURN(lazyNode, ANI_FALSE);
+    return lazyNode->HasCustomComponent() ? ANI_TRUE : ANI_FALSE;
+}
+
+// RepeatOptions.allowReuseInAnimation (creation-time option): sets the tri-state
+// reuse-in-animation permission on the Repeat syntax node of the static frontend;
+// explicitly false switches its direct Grid / WaterFlow parent to the
+// sync-cache-in-layout strategy while the node is attached (Repeat mode only),
+// true keeps the default behavior. Accepts both node flavours the static Repeat
+// creates: ArkoalaLazyNode (virtual scroll) and ArkoalaForEachNode (full load,
+// virtualScroll({ disableVirtualScroll: true })).
+void SetAllowReuseInAnimation(ani_long lazyNodePtr, ani_boolean allow)
+{
+    auto* uiNode = reinterpret_cast<UINode*>(lazyNodePtr);
+    CHECK_NULL_VOID(uiNode);
+    auto lazyNode = AceType::DynamicCast<ArkoalaLazyNode>(uiNode);
+    if (lazyNode) {
+        lazyNode->SetAllowReuseInAnimation(std::optional<bool>(allow == ANI_TRUE));
+        return;
+    }
+    auto forEachNode = AceType::DynamicCast<ArkoalaForEachNode>(uiNode);
+    CHECK_NULL_VOID(forEachNode);
+    forEachNode->SetAllowReuseInAnimation(std::optional<bool>(allow == ANI_TRUE));
+}
+
 const ArkUIAniLazyForEachNodeModifier* GetLazyForEachNodeAniModifier()
 {
     static const ArkUIAniLazyForEachNodeModifier impl = {
@@ -70,7 +103,9 @@ const ArkUIAniLazyForEachNodeModifier* GetLazyForEachNodeAniModifier()
         .isChildInAnimation = IsChildInAnimation,
         .isChildOnMainTree = IsChildOnMainTree,
         .isAllowAnimation = IsAllowAnimation,
-        .isImplicitAnimationOpen = IsImplicitAnimationOpen
+        .isImplicitAnimationOpen = IsImplicitAnimationOpen,
+        .setAllowReuseInAnimation = SetAllowReuseInAnimation,
+        .hasCustomComponent = HasCustomComponent
     };
     return &impl;
 }

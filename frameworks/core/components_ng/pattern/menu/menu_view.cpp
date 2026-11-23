@@ -1233,7 +1233,14 @@ bool MenuView::HandleLowEndImmersiveMaterialForMenu(const RefPtr<FrameNode>& men
         auto backgroundColor = Color::TRANSPARENT;
         auto themeScopeId = menuNode->GetThemeScopeId();
         auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
-        if (tokenTheme && tokenTheme->Colors()) {
+        if (options->userColorMode != ThemeColorMode::SYSTEM) {
+            auto userColorMode =
+                options->userColorMode == ThemeColorMode::DARK ? ColorMode::DARK : ColorMode::LIGHT;
+            auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
+            auto userColor = MaterialUtils::GetColorByMode(menuNode, userColorMode, static_cast<uint32_t>(resId));
+            CHECK_NULL_RETURN(userColor, false);
+            backgroundColor = userColor.value();
+        } else if (tokenTheme && tokenTheme->Colors()) {
             backgroundColor = tokenTheme->Colors()->CompBackgroundPrimary();
         } else {
             auto pipelineContext = menuNode->GetContext();

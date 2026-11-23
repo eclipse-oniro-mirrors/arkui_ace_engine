@@ -409,7 +409,7 @@ void SetMultiRange(FrameNode* frameNode, const Opt_Union_I32_Array_I32* value)
         uint32_t maxCount = TextPickerModelStatic::GetMaxCount(frameNode);
         auto indexesSize = static_cast<int32_t>(indexes.size());
         if (LessNotEqual(indexesSize, maxCount)) {
-            auto diff = maxCount - indexesSize;
+            auto diff = maxCount - static_cast<uint32_t>(indexesSize);
             for (uint32_t i = 0; i < diff; i++) {
                 indexes.emplace_back(0);
             }
