@@ -549,11 +549,11 @@ public:
 
     // Runs one spring stage of the two-stage item snap; invoked with finalStage=true by the handoff of
     // the approach stage. Not intended for external use.
-    void RunItemSnapStage(float endPos, float velocity, bool finalStage, std::function<void(float, float)>&& onHandoff);
+    void RunItemSnapStage(float endPos, float velocity, bool finalStage, std::function<void(float)>&& onHandoff);
 
 private:
     void RunItemSnapApproach(
-        float approachDelta, float flingDelta, float velocity, std::function<void(float, float)>&& onHandoff);
+        float approachDelta, float flingDelta, float velocity, std::function<void(float)>&& onHandoff);
     bool ProcessItemSnapApproach(float position);
     bool UpdateSnapVelocity(float position);
     float GetFlingFriction() const;
@@ -568,10 +568,9 @@ private:
     void CancelItemSnapChain();
 
     void OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source,
-        std::function<void(float, float)>&& onHandoff);
+        std::function<void(float)>&& onHandoff);
     void FinalizeItemSnapStage(int32_t source);
-    void PostItemSnapHandoff(uint32_t generation, float providerVelocity, float motionVelocity,
-        std::function<void(float, float)>&& onHandoff);
+    void PostItemSnapHandoff(uint32_t generation, float velocity, std::function<void(float)>&& onHandoff);
 
 public:
 
@@ -952,7 +951,7 @@ private:
         uint32_t generation;
         float endPos;
         bool earlyHandoff;
-        std::function<void(float, float)> onHandoff;
+        std::function<void(float)> onHandoff;
     };
     std::optional<ItemSnapApproach> itemSnapApproach_;
     // Generation token of the two-stage item snap chain: bumped on every stage start and on
