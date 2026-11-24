@@ -103,15 +103,22 @@ void GetDialogButton(napi_env env, napi_value buttonObj, ButtonInfo& buttonInfo)
     napi_value fontColorApi = nullptr;
     napi_get_named_property(env, buttonObj, "fontColor", &fontColorApi);
     Color fontColor;
-    if (ParseNapiColor(env, fontColorApi, fontColor)) {
+    RefPtr<ResourceObject> fontColorResObj;
+    if (ParseNapiColor(env, fontColorApi, fontColor, fontColorResObj)) {
         buttonInfo.fontColor = fontColor;
+        buttonInfo.textColor = fontColor.ColorToString();
+        buttonInfo.textColorResObj = fontColorResObj;
     }
 
     napi_value bgColorApi = nullptr;
     napi_get_named_property(env, buttonObj, "backgroundColor", &bgColorApi);
     Color bgColor;
-    if (ParseNapiColor(env, bgColorApi, bgColor)) {
+    RefPtr<ResourceObject> bgColorResObj;
+    if (ParseNapiColor(env, bgColorApi, bgColor, bgColorResObj)) {
         buttonInfo.backgroundColor = bgColor;
+        buttonInfo.isBgColorSetted = true;
+        buttonInfo.bgColor = bgColor;
+        buttonInfo.bgColorResObj = bgColorResObj;
     }
 
     int32_t buttonStyle = 0;

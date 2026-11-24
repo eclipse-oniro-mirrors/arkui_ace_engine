@@ -3247,6 +3247,7 @@ interfaces/napi/kits/componentutils/ @ArkUI_Event
 interfaces/napi/kits/configuration/ @arkui_framework_resource
 interfaces/napi/kits/container_utils/ @arkui_framework_xnode
 interfaces/napi/kits/device/ @arkui_framework_xnode
+interfaces/napi/kits/dialog/ @arkuipopupwindow_all
 interfaces/napi/kits/display_sync/ @arkui_framework_xnode
 interfaces/napi/kits/drag_controller/ @ArkUI_Event
 interfaces/napi/kits/drawabledescriptor/ @arkui001
