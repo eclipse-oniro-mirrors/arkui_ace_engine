@@ -164,6 +164,9 @@ protected:
 
     void CalcContentOffset(LayoutWrapper* layoutWrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float mainSize);
 
+    void UpdateWaterFlowDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount);
+    void UpdateDecodeCacheWindowInternal(LayoutWrapper* layoutWrapper, int32_t cacheCount);
+
     bool syncLoad_ = false;
     ContentClipMode contentClipMode_ = ContentClipMode::CONTENT_ONLY;
     RefPtr<ShapeRect> clipShapeRect_;

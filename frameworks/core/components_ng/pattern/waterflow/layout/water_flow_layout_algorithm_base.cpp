@@ -564,4 +564,59 @@ void WaterFlowLayoutBase::CalcContentOffset(
         info->contentEndOffset_ = 0.0f;
     }
 }
+
+void WaterFlowLayoutBase::UpdateWaterFlowDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    CHECK_NULL_VOID(ScrollableUtils::IsLowMemoryDeviceRuntime());
+    UpdateDecodeCacheWindowInternal(layoutWrapper, cacheCount);
+}
+
+void WaterFlowLayoutBase::UpdateDecodeCacheWindowInternal(LayoutWrapper* layoutWrapper, int32_t cacheCount)
+{
+    auto info = LayoutInfo();
+    CHECK_NULL_VOID(info);
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto props = host->GetLayoutProperty<WaterFlowLayoutProperty>();
+    CHECK_NULL_VOID(props);
+    if (props->GetShowCachedItemsValue(false)) {
+        return;
+    }
+    if (cacheCount <= 0) {
+        return;
+    }
+    const int32_t startIndex = info->startIndex_;
+    const int32_t endIndex = info->endIndex_;
+    if (startIndex < 0 || endIndex < 0) {
+        return;
+    }
+    const int32_t decodeWindow = ScrollableUtils::CalcDecodeWindowCount(cacheCount);
+    const int32_t totalItemCount = info->GetChildrenCount();
+    const int32_t firstCacheIdx = std::max(0, startIndex - cacheCount);
+    const int32_t lastCacheIdx = std::min(totalItemCount - 1, endIndex + cacheCount);
+    const int32_t decodeStart = std::max(0, startIndex - decodeWindow);
+    const int32_t decodeEnd = std::min(totalItemCount - 1, endIndex + decodeWindow);
+
+    TAG_LOGD(AceLogTag::ACE_WATERFLOW,
+        "decode window: cacheCount=%{public}d, window=%{public}d, visible=[%{public}d,%{public}d], "
+        "decode=[%{public}d,%{public}d], cache=[%{public}d,%{public}d]",
+        cacheCount, decodeWindow, startIndex, endIndex,
+        decodeStart, decodeEnd, firstCacheIdx, lastCacheIdx);
+
+    for (int32_t idx = 0; idx < totalItemCount; ++idx) {
+        bool active = (idx >= startIndex && idx <= endIndex) ||
+                      (idx >= decodeStart && idx <= decodeEnd);
+        // Segmented layout moves the footer to the last child (footerIndex_ = N-1),
+        // making FlowItem index identical to child index. Other modes keep the
+        // footer at child[0] (footerIndex_ = 0) or have no footer (footerIndex_ = -1),
+        // requiring NodeIdx conversion.
+        int32_t childIdx = (info->footerIndex_ > 0) ? idx : info->NodeIdx(idx);
+        auto wrapper = WaterFlowLayoutUtils::GetWaterFlowItemByIndex(layoutWrapper, childIdx, true);
+        CHECK_NULL_CONTINUE(wrapper);
+        auto itemFrameNode = wrapper->GetHostNode();
+        CHECK_NULL_CONTINUE(itemFrameNode);
+        ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+    }
+}
 } // namespace OHOS::Ace::NG

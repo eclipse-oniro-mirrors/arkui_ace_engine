@@ -109,7 +109,7 @@ struct ScrollableUtils {
 
     ACE_FORCE_EXPORT static int32_t CalcDecodeWindowCount(int32_t cacheCount);
 
-    ACE_FORCE_EXPORT static void UpdateCachedItemDecodeState(const RefPtr<FrameNode>& root, bool active);
+    ACE_FORCE_EXPORT static void UpdateCachedItemDecodeState(const RefPtr<UINode>& root, bool active);
 };
 } // namespace OHOS::Ace::NG
 

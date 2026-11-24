@@ -2743,7 +2743,7 @@ HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState001, TestSize.Level1)
         {0, {{0, 0}, {1, 1}}},
     };
     std::set<int32_t> decodeItems = {0};
-    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 0, decodeItems);
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, decodeItems);
     EXPECT_TRUE(pattern0->decodeCacheActive_);   // in decodeItems, stays active
     EXPECT_FALSE(pattern1->decodeCacheActive_);  // not in decodeItems, deactivated
 }
@@ -2775,7 +2775,7 @@ HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState002, TestSize.Level1)
         {0, {{0, 0}, {1, 1}}},
     };
     std::set<int32_t> decodeItems;  // empty: no items in decode window
-    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 0, decodeItems);
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, decodeItems);
     EXPECT_FALSE(imagePattern->decodeCacheActive_);
 }
 
@@ -2807,7 +2807,7 @@ HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState003, TestSize.Level1)
         {1, {{0, 2}, {1, -1}}},
     };
     std::set<int32_t> decodeItems;
-    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 1, decodeItems);
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, decodeItems);
     EXPECT_FALSE(imagePattern->decodeCacheActive_);
 }
 
@@ -2869,7 +2869,7 @@ HWTEST_F(GridCacheLayoutTestNg, GridUpdateCachedItemDecodeState001, TestSize.Lev
 
 /**
  * @tc.name: GridApplyItemDecodeState_ExpandFullMatrix001
- * @tc.desc: Test expanded range (expandToFullMatrix=true) covers items outside cache window.
+ * @tc.desc: Test ApplyItemDecodeState covers all items outside decode window.
  * @tc.type: FUNC
  */
 HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_ExpandFullMatrix001, TestSize.Level1)
@@ -2908,57 +2908,280 @@ HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_ExpandFullMatrix001, Te
     };
     layoutAlgorithm->info_.startMainLineIndex_ = 2;
     layoutAlgorithm->info_.endMainLineIndex_ = 3;
-    // Expanded range [0, 5] covers items at row 0 and row 5 → marked inactive
+    // All items outside decode window → marked inactive
     std::set<int32_t> emptyDecodeItems;
-    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 0, 5, emptyDecodeItems);
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, emptyDecodeItems);
     EXPECT_FALSE(pattern0->decodeCacheActive_);
     EXPECT_FALSE(pattern10->decodeCacheActive_);
 }
 
 /**
- * @tc.name: GridApplyItemDecodeState_ExpandFullMatrix002
- * @tc.desc: Test original range (expandToFullMatrix=false) misses items outside cache window.
+ * @tc.name: GridUpdateGridDecodeCacheWindowInternal_ShowCached001
+ * @tc.desc: Test B5 — showCachedItems=true skips gracefully, no decode state change.
  * @tc.type: FUNC
  */
-HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_ExpandFullMatrix002, TestSize.Level1)
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateGridDecodeCacheWindowInternal_ShowCached001, TestSize.Level1)
 {
     GridModelNG model = CreateGrid();
     model.SetColumnsTemplate("1fr 1fr");
-    model.SetCachedCount(1);
+    model.SetCachedCount(5, true); // 5 : cacheCount, true : showCachedItems
     CreateFixedItems(20);
     CreateDone();
-
     auto item0 = GetItem(0, true);
-    auto item10 = GetItem(10, true);
     ASSERT_NE(item0, nullptr);
-    ASSERT_NE(item10, nullptr);
-    auto image0 = CreateImageFrameNode();
-    auto image10 = CreateImageFrameNode();
-    ASSERT_NE(image0, nullptr);
-    ASSERT_NE(image10, nullptr);
-    item0->AddChild(image0);
-    item10->AddChild(image10);
-    auto pattern0 = image0->GetPattern<ImagePattern>();
-    auto pattern10 = image10->GetPattern<ImagePattern>();
-    ASSERT_NE(pattern0, nullptr);
-    ASSERT_NE(pattern10, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+    // showCachedItems=true → early return, no decode state change
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridUpdateGridDecodeCacheWindowInternal_CacheCountZero001
+ * @tc.desc: Test B6 — cacheCount=0 skips gracefully, no decode state change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateGridDecodeCacheWindowInternal_CacheCountZero001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(0);
+    CreateFixedItems(20);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 0);
+    // cacheCount=0 → early return, no decode state change
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridUpdateGridDecodeCacheWindowInternal_EmptyMatrix001
+ * @tc.desc: Test B7 — empty gridMatrix skips gracefully, no decode state change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateGridDecodeCacheWindowInternal_EmptyMatrix001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(20);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.gridMatrix_.clear();
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->UpdateGridDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+    // gridMatrix empty → early return, no decode state change
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridUpdateGridDecodeCacheWindowInternal_NormalPath001
+ * @tc.desc: Test B9 — normal path via internal method, ApplyItemDecodeState called.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateGridDecodeCacheWindowInternal_NormalPath001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
 
     auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
     ASSERT_TRUE(layoutAlgorithm);
-    layoutAlgorithm->info_.gridMatrix_ = {
-        {0, {{0, 0}, {1, 1}}},
-        {1, {{0, 2}, {1, 3}}},
-        {2, {{0, 4}, {1, 5}}},
-        {3, {{0, 6}, {1, 7}}},
-        {4, {{0, 8}, {1, 9}}},
-        {5, {{0, 10}, {1, 11}}},
-    };
-    layoutAlgorithm->info_.startMainLineIndex_ = 2;
-    layoutAlgorithm->info_.endMainLineIndex_ = 3;
-    // Original range [1, 4] misses items at row 0 and row 5 → stay active
-    std::set<int32_t> emptyDecodeItems;
-    layoutAlgorithm->ApplyItemDecodeState(frameNode_, 1, 4, emptyDecodeItems);
-    EXPECT_TRUE(pattern0->decodeCacheActive_);
-    EXPECT_TRUE(pattern10->decodeCacheActive_);
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->Measure(AceType::RawPtr(wrapper));
+    layoutAlgorithm->Layout(AceType::RawPtr(wrapper));
+    layoutAlgorithm->UpdateGridDecodeCacheWindowInternal(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+    // Item 0 is in viewport (startIndex_=0) → in decodeItems → stays active
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
 }
+
+/**
+ * @tc.name: GridUpdateGridDecodeCacheWindow_NullWrapper001
+ * @tc.desc: Test B1 — UpdateGridDecodeCacheWindow with null layoutWrapper does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateGridDecodeCacheWindow_NullWrapper001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->UpdateGridDecodeCacheWindow(nullptr, 5); // 5 : cacheCount
+    // null layoutWrapper → early return, no decode state change
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState_NullHost001
+ * @tc.desc: Test D1 — ApplyItemDecodeState with null host does not crash, no items processed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_NullHost001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    std::set<int32_t> decodeItems;
+    RefPtr<FrameNode> nullHost = nullptr;
+    layoutAlgorithm->ApplyItemDecodeState(nullHost, decodeItems);
+    // null host → early return, no decode state change
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState_UnbuiltItem001
+ * @tc.desc: Test D2 — unbuilt items return null from GetFrameNodeChildByIndexWithoutBuild, skipped.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_UnbuiltItem001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    // Set childrenCount_ higher than actual built items (10) to simulate unbuilt items
+    layoutAlgorithm->info_.childrenCount_ = 20; // 20 : simulate 20 items, only 10 built
+    std::set<int32_t> emptyDecodeItems;
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, emptyDecodeItems);
+    // Built item 0 (not in decodeItems) → deactivated; unbuilt items 10..19 → skipped
+    EXPECT_FALSE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridApplyItemDecodeState_EmptyCount001
+ * @tc.desc: Test D6 — ApplyItemDecodeState with totalItemCount=0, loop never executes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridApplyItemDecodeState_EmptyCount001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(5);
+    CreateFixedItems(10);
+    CreateDone();
+    auto item0 = GetItem(0, true);
+    ASSERT_NE(item0, nullptr);
+    auto imageNode = CreateImageFrameNode();
+    ASSERT_NE(imageNode, nullptr);
+    item0->AddChild(imageNode);
+    auto imagePattern = imageNode->GetPattern<ImagePattern>();
+    ASSERT_NE(imagePattern, nullptr);
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+    auto layoutAlgorithm = AceType::DynamicCast<GridScrollLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->info_.childrenCount_ = 0;
+    std::set<int32_t> decodeItems = {0};
+    layoutAlgorithm->ApplyItemDecodeState(frameNode_, decodeItems);
+    // totalItemCount=0 → loop never executes, no decode state change
+    EXPECT_TRUE(imagePattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridUpdateCachedItemDecodeState_NullRoot001
+ * @tc.desc: Test U1 — UpdateCachedItemDecodeState with null root does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateCachedItemDecodeState_NullRoot001, TestSize.Level1)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+    RefPtr<UINode> nullNode = nullptr;
+    ScrollableUtils::UpdateCachedItemDecodeState(nullNode, false);
+    // null root → early return, existing node unaffected
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+}
+
+/**
+ * @tc.name: GridUpdateCachedItemDecodeState_NoChildren001
+ * @tc.desc: Test U6 — UpdateCachedItemDecodeState on node with no children, no recursion.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, GridUpdateCachedItemDecodeState_NoChildren001, TestSize.Level1)
+{
+    auto frameNode = CreateImageFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->decodeCacheActive_);
+    ScrollableUtils::UpdateCachedItemDecodeState(frameNode, false);
+    EXPECT_FALSE(pattern->decodeCacheActive_);
+}
+
 } // namespace OHOS::Ace::NG

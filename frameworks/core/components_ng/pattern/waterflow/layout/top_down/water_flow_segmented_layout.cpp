@@ -188,6 +188,7 @@ void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
         cacheCount, props_->GetShowCachedItemsValue(false));
 
     LayoutEdges(wrapper_, info_, info_->GetMaxMainHeight());
+    UpdateWaterFlowDecodeCacheWindow(wrapper_, cacheCount);
     UpdateOverlay(wrapper_);
 
     ClearUnlayoutedItems(wrapper_);
