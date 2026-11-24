@@ -56,9 +56,9 @@ std::string SerializeCommandResult(const NG::RelaxedCommandResult& result)
         // Dedicated special-component failure contract (UIExtension/DynamicComponent hit):
         // offset is the component-local coordinate converted via NGGestureRecognizer::Transform.
         return std::string(
-                   "{\"resultCode\":\"SEC_UEC_FAILED\",\"message\":\"target is special component\",\"extraInfo\":{") +
-               "\"nodeId\":" + std::to_string(result.specialNodeId) + ",\"offset\":{\"x\":" +
-               std::to_string(result.specialOffsetX) + ",\"y\":" + std::to_string(result.specialOffsetY) + "}}}";
+            "{\"resultCode\":\"SEC_UEC_FAILED\",\"message\":\"target is special component\",\"extraInfo\":{") +
+            "\"nodeId\":" + std::to_string(result.specialNodeId) + ",\"offset\":{\"x\":" +
+            std::to_string(result.specialOffsetX) + ",\"y\":" + std::to_string(result.specialOffsetY) + "}}}";
     }
     const char* type = "EXECUTE_FAIL";
     switch (result.errorType) {

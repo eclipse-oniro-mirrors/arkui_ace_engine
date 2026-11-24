@@ -769,6 +769,22 @@ int32_t UIContentServiceProxy::SendCommand(
         SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback, securityAuth);
 }
 
+namespace {
+// The ACE-side effective timeout extends with a declared hold_ms (hold_ms can legitimately
+// reach the 5000 ms default window); keep the callback record past the server-side latest
+// completion so a boundary-hold result is not silently dropped.
+int32_t SendCommandCallbackTimeout(const std::string& command)
+{
+    int32_t callbackTimeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
+    if (auto commandJson = InspectorJsonUtil::ParseJsonString(command)) {
+        if (auto actionInfo = commandJson->GetValue("action_info")) {
+            callbackTimeout += actionInfo->GetInt("hold_ms", 0);
+        }
+    }
+    return callbackTimeout;
+}
+} // namespace
+
 int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
     uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback,
     const SecurityAuthInfo& securityAuth)
@@ -805,16 +821,7 @@ int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
         report_->UnregisterSendCommandFinishCallback(requestId);
         return FAILED;
     }
-    // The ACE-side effective timeout extends with a declared hold_ms (hold_ms can legitimately
-    // reach the 5000 ms default window); keep the callback record past the server-side latest
-    // completion so a boundary-hold result is not silently dropped.
-    int32_t callbackTimeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
-    if (auto commandJson = InspectorJsonUtil::ParseJsonString(command)) {
-        if (auto actionInfo = commandJson->GetValue("action_info")) {
-            callbackTimeout += actionInfo->GetInt("hold_ms", 0);
-        }
-    }
-    if (!report_->PostSendCommandCallbackRemoveTask(requestId, callbackTimeout)) {
+    if (!report_->PostSendCommandCallbackRemoveTask(requestId, SendCommandCallbackTimeout(command))) {
         LOGW("SendCommandWithFinishCallback post timeout task failed");
         report_->UnregisterSendCommandFinishCallback(requestId);
         return FAILED;
