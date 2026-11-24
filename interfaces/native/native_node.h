@@ -9824,14 +9824,11 @@ typedef enum {
      * This parameter is optional. Omitting it or passing another integer uses <b>0</b>.</li>
      * <li>`.value[2].i32`: target alignment of type {@link ArkUI_ScrollAlignment}. This parameter is optional.
      * Omitting it or passing an invalid alignment uses <b>ARKUI_SCROLL_ALIGNMENT_AUTO</b>.</li>
-     * <li>`.value[3].f32`: optional additional length offset, default <b>0</b>.
-     * The offset accepts negative, zero and positive values. It adjusts the final scroll position along the
-     * Grid's scroll axis. For a fast animation, the final position is limited by the start and end scroll boundaries.
-     * When `.value[1]` is <b>1</b> and `.value[4]` selects
-     * <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b> or <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE</b>,
-     * the offset uses the node's length unit: <b>vp</b> by default, or the explicitly configured unit, such as <b>px</b>.
-     * When animation is disabled, or the mode is <b>NONE</b>, omitted or invalid, the offset uses <b>px</b>;
-     * these calls do not convert the offset from the node's configured length unit.</li>
+     * <li>`.value[3].f32`: optional additional length offset after scrolling to the specified index, in <b>px</b>.
+     * The default value is <b>0</b>. The offset accepts negative, zero and positive values. It adjusts the final
+     * scroll position along the Grid's scroll axis. The offset is always in <b>px</b> and is not converted from the
+     * node's length unit, regardless of the animation and fast scroll mode settings.
+     * For a fast animation, the final position is limited by the start and end scroll boundaries.</li>
      * <li>`.value[4].i32`: optional fast scroll mode of type {@link OH_ArkUI_FastScrollMode}, available since
      * API version 26.1.0. <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b> (<b>0</b>) is the default.
      * <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b> (<b>1</b>) and

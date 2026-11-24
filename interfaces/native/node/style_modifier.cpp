@@ -20966,13 +20966,10 @@ int32_t SetGridScrollToIndex(ArkUI_NodeHandle node, const ArkUI_AttributeItem* i
     }
     auto* fullImpl = GetFullImpl();
     if (item->size > NUM_4 && InRegion(NUM_1, NUM_2, item->value[NUM_4].i32)) {
+        // extraOffset stays in px for every mode, as in the legacy slot below; the node unit does not apply.
         ArkUIScrollToIndexOptions options {
             values[NUM_1] != DEFAULT_FALSE, values[NUM_2], extraOffset, item->value[NUM_4].i32
         };
-        const int32_t unit = GetDefaultUnit(node, UNIT_VP);
-        if (options.smooth && unit != UNIT_PX) {
-            options.extraOffset = fullImpl->getBasicAPI()->convertLengthMetricsUnit(extraOffset, unit, UNIT_PX);
-        }
         fullImpl->getNodeModifiers()->getGridModifier()->setScrollToIndexWithOptions(
             node->uiNodeHandle, values[NUM_0], &options);
     } else {

@@ -229,7 +229,7 @@ protected:
 
 /**
  * @tc.name: FastScrollGridPublicOptions
- * @tc.desc: Public Grid setAttribute forwards modes 1/2 and converts the node unit exactly once.
+ * @tc.desc: Public Grid setAttribute forwards modes 1/2 and keeps the extra offset in px for every node unit.
  * @tc.type: FUNC
  */
 HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicOptions, TestSize.Level1)
@@ -250,21 +250,16 @@ HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicOptions, TestSize.Leve
             EXPECT_TRUE(g_gridFastScrollCall.options.smooth);
             EXPECT_EQ(g_gridFastScrollCall.options.align, ARKUI_SCROLL_ALIGNMENT_AUTO);
             EXPECT_EQ(g_gridFastScrollCall.options.fastScrollMode, mode);
-            const bool pixels = unit == ARKUI_LENGTH_METRIC_UNIT_PX;
-            EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, pixels ? -11.0f : -22.0f);
-            EXPECT_EQ(g_gridFastScrollCall.conversionCalls, pixels ? 0 : 1);
-            if (!pixels) {
-                EXPECT_EQ(g_gridFastScrollCall.originUnit, static_cast<int32_t>(
-                    unit == ARKUI_LENGTH_METRIC_UNIT_VP ? DimensionUnit::VP : DimensionUnit::FP));
-                EXPECT_EQ(g_gridFastScrollCall.targetUnit, static_cast<int32_t>(DimensionUnit::PX));
-            }
+            // The offset is px regardless of the node unit: it is forwarded as is and never converted.
+            EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, -11.0f);
+            EXPECT_EQ(g_gridFastScrollCall.conversionCalls, 0);
         }
     }
 }
 
 /**
  * @tc.name: FastScrollGridPublicLegacyIsolation
- * @tc.desc: Omitted/invalid mode preserves the old slot; non-animation preserves the raw offset.
+ * @tc.desc: Omitted/invalid mode preserves the old slot; the extra offset stays in px in every slot.
  * @tc.type: FUNC
  */
 HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicLegacyIsolation, TestSize.Level1)
@@ -275,6 +270,8 @@ HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicLegacyIsolation, TestS
     ArkUI_AttributeItem item { values, 5 };
     ASSERT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
     EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 1);
+    EXPECT_EQ(g_gridFastScrollCall.conversionCalls, 0);
+    EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, -11.0f);
     for (int32_t mode : { 0, -1, 3 }) {
         g_gridFastScrollCall = {};
         values[4].i32 = mode;

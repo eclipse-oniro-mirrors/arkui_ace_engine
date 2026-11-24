@@ -2360,7 +2360,6 @@
       "OHOS::Ace::NG::ScrollablePattern::RemainVelocityToChild(float)";
       "OHOS::Ace::NG::ScrollablePattern::ScrollablePattern()";
       "OHOS::Ace::NG::ScrollablePattern::ScrollablePattern(OHOS::Ace::EdgeEffect, bool)";
-      "OHOS::Ace::NG::ScrollablePattern::StartFastScrollAnimation(float)";
       "OHOS::Ace::NG::ScrollablePattern::StartItemSnapAnimation(OHOS::Ace::SnapAnimationOptions const&)";
       "OHOS::Ace::NG::ScrollablePattern::StartFastScrollAnimation(float)";
       "OHOS::Ace::NG::ScrollablePattern::FindItemLazySyntax(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
