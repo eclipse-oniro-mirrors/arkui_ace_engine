@@ -929,6 +929,94 @@ HWTEST_F(TextClockPatternTestNG, TextClockCheckDateTimeElementLocalized, TestSiz
 }
 
 /**
+ * @tc.name: TextClockCheckDateTimeElementMyanmar001
+ * @tc.desc: Test CheckDateTimeElement skips LocalizeDigits for Burmese (my) locale, same as
+ *           Chinese (zh). Numeric elements are returned unchanged; AM/PM and weekday are untouched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextClockPatternTestNG, TextClockCheckDateTimeElementMyanmar001, TestSize.Level1)
+{
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(CLOCK_FORMAT4);
+    RefPtr<FrameNode> frameNode = CreateTextClockParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextClockPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ParseInputFormat();
+    std::vector<std::string> curDateTime = { "2025", "03", "25", "08", "35", "07", "007", "AM", "Mon" };
+
+    // "my" (Burmese) skips LocalizeDigits: numeric elements are returned as-is.
+    Localization::GetInstance()->SetLocaleImpl("my", "", "", "", "");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'y', 0, false), "2025");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'm', 4, false), "35");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 's', 5, false), "07");
+    // AM/PM and weekday are never passed through LocalizeDigits regardless of locale.
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'a', 7, false), "AM");
+    EXPECT_EQ(pattern->CheckDateTimeElement(curDateTime, 'E', 8, false), "Mon");
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+}
+
+/**
+ * @tc.name: GetCurrentFormatDateTimeMyanmarSkip001
+ * @tc.desc: Test GetCurrentFormatDateTime skips ICU FormatDateTimeMatchHourField for Burmese (my)
+ *           locale when no format is set, falling back to the manual formatting path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextClockPatternTestNG, GetCurrentFormatDateTimeMyanmarSkip001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Set up pipeline with API version >= 11 so the FormatDateTime
+     *           early-return branch is not taken and the FormatDateTimeMatchHourField
+     *           path becomes reachable when no format is set.
+     */
+    MockPipelineContext::SetUp();
+    auto pipelineContext = PipelineBase::GetCurrentContext();
+    ASSERT_NE(pipelineContext, nullptr);
+    auto lastPlatformVersion = pipelineContext->GetMinPlatformVersion();
+    auto mockContainer = MockContainer::Current();
+    ASSERT_NE(mockContainer, nullptr);
+    mockContainer->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_SEVENTEEN));
+    pipelineContext->SetMinPlatformVersion(static_cast<int32_t>(PlatformVersion::VERSION_SEVENTEEN));
+
+    /**
+     * @tc.steps: step2. Create TextClock without a format so the no-format branch is taken.
+     */
+    TextClockModelNG textClockModel;
+    textClockModel.Create();
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextClockPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    /**
+     * @tc.steps: step3. Non-skip locale (en): FormatDateTimeMatchHourField is used, which the
+     *           mock returns as the fixed constant "08:00:00".
+     * @tc.expected: result equals "08:00:00".
+     */
+    Localization::GetInstance()->SetLocaleImpl("en", "", "", "", "");
+    auto resEn = pattern->GetCurrentFormatDateTime();
+    EXPECT_EQ(resEn, "08:00:00");
+
+    /**
+     * @tc.steps: step4. Skip locale (my): FormatDateTimeMatchHourField is skipped and the manual
+     *           formatting path runs with the current time.
+     * @tc.expected: result differs from the ICU mock constant "08:00:00".
+     */
+    Localization::GetInstance()->SetLocaleImpl("my", "", "", "", "");
+    auto resMy = pattern->GetCurrentFormatDateTime();
+    EXPECT_NE(resMy, "08:00:00");
+    EXPECT_NE(resMy, resEn);
+
+    // restore
+    Localization::GetInstance()->SetLocaleImpl("", "", "", "", "");
+    pipelineContext->SetMinPlatformVersion(lastPlatformVersion);
+    mockContainer->SetApiTargetVersion(lastPlatformVersion);
+    MockPipelineContext::TearDown();
+}
+
+/**
  * @tc.name: TextClockUpdateFontSize001
  * @tc.desc: Test UpdateTextClockFontSize of TextClockPattern.
  * @tc.type: FUNC
