@@ -212,6 +212,7 @@ void PatternLockPattern::HandleTextOnAccessibilityFocusCallback(int32_t x, int32
         AddPassPoint(x, y);
         choosePoint_.emplace_back(x, y);
         StartModifierConnectedAnimate(x, y);
+        UpdateDotConnectEvent();
         auto host = GetHost();
         auto accessibilityProperty = host->GetAccessibilityProperty<AccessibilityProperty>();
         accessibilityProperty->SetAccessibilityLevel(AccessibilityProperty::Level::NO_STR);

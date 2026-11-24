@@ -1060,12 +1060,25 @@ HWTEST_F(PatternLockPatternTestNg, PatternLockPatternTest025, TestSize.Level1)
         }
     });
 
+    int32_t dotConnectCount = 0;
+    int32_t lastConnectedDot = -1;
+    eventHub_->SetOnDotConnect(
+        [&dotConnectCount, &lastConnectedDot](int32_t currentIndex) {
+            dotConnectCount++;
+            lastConnectedDot = currentIndex;
+        });
+
     /**
      * @tc.steps: step1. select some points via focus callback.
+     * @tc.expected: onDotConnect is triggered once per selected point with the correct code.
      */
     pattern_->choosePoint_.clear();
     pattern_->HandleTextOnAccessibilityFocusCallback(1, 1);
+    EXPECT_EQ(dotConnectCount, 1);
+    EXPECT_EQ(lastConnectedDot, 0); // code of (1,1) = 3*(1-1)+(1-1) = 0
     pattern_->HandleTextOnAccessibilityFocusCallback(2, 2);
+    EXPECT_EQ(dotConnectCount, 2);
+    EXPECT_EQ(lastConnectedDot, 4); // code of (2,2) = 3*(2-1)+(2-1) = 4
     EXPECT_EQ(pattern_->choosePoint_.size(), 2);
 
     /**
