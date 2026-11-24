@@ -494,6 +494,16 @@ void ButtonModelStatic::SetMaxFontScale(FrameNode* frameNode, const std::optiona
     }
 }
 
+void ButtonModelStatic::SetVibrancyMode(FrameNode* frameNode, const std::optional<VibrancyMode>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (mode) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(ButtonLayoutProperty, VibrancyMode, mode.value(), frameNode);
+    } else {
+        ACE_RESET_NODE_LAYOUT_PROPERTY(ButtonLayoutProperty, VibrancyMode, frameNode);
+    }
+}
+
 float ButtonModelStatic::GetMinFontScale(FrameNode* frameNode)
 {
     CHECK_NULL_RETURN(frameNode, 0.0f);

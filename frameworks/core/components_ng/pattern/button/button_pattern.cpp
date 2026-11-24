@@ -756,6 +756,7 @@ void ButtonPattern::OnModifyDone()
     HandleBorderAndShadow();
     HandleFocusStatusStyle();
     HandleFocusActiveStyle();
+    UpdateTextVibrancy();
 }
 
 void ButtonPattern::ReapplyImmersiveMaterial()
@@ -1660,6 +1661,22 @@ void ButtonPattern::OnColorConfigurationUpdate()
         themeBgColor_ = backgroundColor;
         themeTextColor_ = textColor;
     }
+    UpdateTextVibrancy();
+}
+
+void ButtonPattern::UpdateTextVibrancy()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto layoutProperty = GetLayoutProperty<ButtonLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (!layoutProperty->GetCreateWithLabelValue(true)) {
+        return;
+    }
+    auto textNode = DynamicCast<FrameNode>(host->GetFirstChild());
+    CHECK_NULL_VOID(textNode);
+    VibrancyMode mode = layoutProperty->GetVibrancyModeValue(VibrancyMode::DISABLED);
+    ViewAbstract::SetVibrancyMode(AceType::RawPtr(textNode), mode);
 }
 
 bool ButtonPattern::OnThemeScopeUpdate(int32_t themeScopeId)

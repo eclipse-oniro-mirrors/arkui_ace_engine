@@ -149,6 +149,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, ButtonMaxFontScaleModifier.identity, ButtonMaxFontScaleModifier, value);
         return this;
       }
+      vibrancyMode(value: any): this {
+        modifierWithKey(this._modifiersWithKeys, ButtonVibrancyModeModifier.identity, ButtonVibrancyModeModifier, value);
+        return this;
+      }
     }
 
     class ButtonBackgroundColorModifier extends ModifierWithKey<any> {
@@ -256,6 +260,25 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
     (ButtonMaxFontScaleModifier as any).identity = Symbol('buttonMaxFontScale');
+
+    class ButtonVibrancyModeModifier extends ModifierWithKey<any> {
+      constructor(value: any) {
+        super(value);
+      }
+      applyPeer(node: any, reset: any): void {
+        if (reset) {
+          getUINativeModule().button.resetVibrancyMode(node);
+        } else if (!isNumber(this.value)) {
+          getUINativeModule().button.resetVibrancyMode(node);
+        } else {
+          getUINativeModule().button.setVibrancyMode(node, this.value);
+        }
+      }
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
+    (ButtonVibrancyModeModifier as any).identity = Symbol('buttonVibrancyMode');
 
     class ButtonStateEffectModifier extends ModifierWithKey<any> {
       constructor(value: any) {
@@ -755,6 +778,10 @@ class JSButton extends JSContainerBase {
 
   static maxFontScale(value: any): void {
     getUINativeModule().button.setMaxFontScale(true, value);
+  }
+
+  static vibrancyMode(value: any): void {
+    getUINativeModule().button.setVibrancyMode(true, value);
   }
 
   static onTouch(value: any): void {

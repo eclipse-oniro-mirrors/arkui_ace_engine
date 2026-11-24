@@ -69,6 +69,7 @@ public:
     void SetCreateWithLabel(bool createWithLabel) override;
     void SetMinFontScale(float minFontScale) override;
     void SetMaxFontScale(float maxFontScale) override;
+    void SetVibrancyMode(VibrancyMode mode) override;
     void CreateWithColorResourceObj(const RefPtr<ResourceObject>& resObj,
         const ButtonColorType buttonColorType) override;
     void CreateWithStringResourceObj(const RefPtr<ResourceObject>& resObj,
@@ -134,6 +135,7 @@ public:
     static bool GetAutoDisable(FrameNode* frameNode);
     static void SetMinFontScale(FrameNode* frameNode, float minFontScale);
     static void SetMaxFontScale(FrameNode* frameNode, float maxFontScale);
+    static void SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode);
     static float GetMinFontScale(FrameNode* frameNode);
     static float GetMaxFontScale(FrameNode* frameNode);
     void ResetTextAlign() override;

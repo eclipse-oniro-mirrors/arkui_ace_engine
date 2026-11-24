@@ -202,6 +202,23 @@ void ResetButtonType(ArkUINodeHandle node)
     }
 }
 
+void SetButtonVibrancyMode(ArkUINodeHandle node, int mode)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    if (mode >= static_cast<int>(VibrancyMode::DISABLED) &&
+        mode <= static_cast<int>(VibrancyMode::DARKEN)) {
+        ButtonModelNG::SetVibrancyMode(frameNode, static_cast<VibrancyMode>(mode));
+    }
+}
+
+void ResetButtonVibrancyMode(ArkUINodeHandle node)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    ButtonModelNG::SetVibrancyMode(frameNode, VibrancyMode::DISABLED);
+}
+
 void SetButtonStateEffect(ArkUINodeHandle node, ArkUI_Bool stateEffect)
 {
     auto* frameNode = GetFrameNode(node);
@@ -1881,6 +1898,8 @@ const ArkUIButtonModifier* GetButtonDynamicModifier()
             .resetJsButtonBorderRadius = nullptr,
             .setJsButtonFontSize = SetJsButtonFontSizeImpl,
             .setJsButtonFontColorUseColorPtr = SetJsButtonFontColorUseColorPtrImpl,
+            .setButtonVibrancyMode = nullptr,
+            .resetButtonVibrancyMode = nullptr,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -1965,6 +1984,8 @@ const ArkUIButtonModifier* GetButtonDynamicModifier()
         .resetJsButtonBorderRadius = ResetJsButtonBorderRadius,
         .setJsButtonFontSize = SetJsButtonFontSize,
         .setJsButtonFontColorUseColorPtr = SetJsButtonFontColorUseColorPtr,
+        .setButtonVibrancyMode = SetButtonVibrancyMode,
+        .resetButtonVibrancyMode = ResetButtonVibrancyMode,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

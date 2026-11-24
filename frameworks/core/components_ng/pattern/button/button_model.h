@@ -20,6 +20,7 @@
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/base/view_abstract_model.h"
 #include "core/components_ng/pattern/button/button_request_data.h"
+#include "ui/properties/ui_material_enums.h"
 
 namespace OHOS::Ace {
 enum class ButtonColorType {
@@ -81,6 +82,7 @@ public:
     virtual void SetCreateWithLabel(bool isLabelButton) {}
     virtual void SetMinFontScale(float minFontScale) {}
     virtual void SetMaxFontScale(float maxFontScale) {}
+    virtual void SetVibrancyMode(VibrancyMode mode) {}
     virtual void CreateWithColorResourceObj(const RefPtr<ResourceObject>& resObj,
         const ButtonColorType buttonColorType) = 0;
     virtual void CreateWithStringResourceObj(const RefPtr<ResourceObject>& resObj,

@@ -58,6 +58,7 @@ public:
     static bool GetAutoDisable(FrameNode* frameNode);
     static void SetMinFontScale(FrameNode* frameNode, const std::optional<float>& minFontScale);
     static void SetMaxFontScale(FrameNode* frameNode, const std::optional<float>& maxFontScale);
+    static void SetVibrancyMode(FrameNode* frameNode, const std::optional<VibrancyMode>& mode);
     static float GetMinFontScale(FrameNode* frameNode);
     static float GetMaxFontScale(FrameNode* frameNode);
     static void ResetButtonTextFontSize(FrameNode* frameNode);
