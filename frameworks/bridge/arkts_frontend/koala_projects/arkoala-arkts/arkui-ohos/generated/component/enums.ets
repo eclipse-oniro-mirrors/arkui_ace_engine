@@ -404,17 +404,17 @@ export enum FunctionKey {
     DPAD_LEFT = 16,
     DPAD_RIGHT = 17,
     CAPS_LOCK = 18,
-    SCROLL_LOCK = 20,
-    PAUSE_BREAK = 21,
-    NUM_LOCK = 22,
-    INSERT = 23,
-    DELETE = 24,
-    HOME = 25,
-    END = 26,
-    PAGE_UP = 27,
-    PAGE_DOWN = 28,
-    ENTER = 29,
-    BACKSPACE = 30
+    SCROLL_LOCK = 19,
+    PAUSE_BREAK = 20,
+    NUM_LOCK = 21,
+    INSERT = 22,
+    DELETE = 23,
+    HOME = 24,
+    END = 25,
+    PAGE_UP = 26,
+    PAGE_DOWN = 27,
+    ENTER = 28,
+    BACKSPACE = 29
 }
 export enum ImageSpanAlignment {
     BASELINE = 4,

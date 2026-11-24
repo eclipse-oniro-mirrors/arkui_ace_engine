@@ -944,67 +944,67 @@ typedef enum {
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SCROLL_LOCK = 20,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_SCROLL_LOCK = 19,
     /**
      * @brief Pause/Break key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAUSE_BREAK = 21,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAUSE_BREAK = 20,
     /**
      * @brief NumLock key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_NUM_LOCK = 22,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_NUM_LOCK = 21,
     /**
      * @brief Insert key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_INSERT = 23,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_INSERT = 22,
     /**
      * @brief Delete key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DELETE = 24,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_DELETE = 23,
     /**
      * @brief Home key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_HOME = 25,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_HOME = 24,
     /**
      * @brief End key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_END = 26,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_END = 25,
     /**
      * @brief Page Up key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAGE_UP = 27,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAGE_UP = 26,
     /**
      * @brief Page Down key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAGE_DOWN = 28,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_PAGE_DOWN = 27,
     /**
      * @brief Enter key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ENTER = 29,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_ENTER = 28,
     /**
      * @brief Backspace key.
      *
      * @since 26.1.0
      */
-    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE = 30,
+    OH_ARKUI_KEYBOARD_SHORTCUT_FUNCTION_KEY_BACKSPACE = 29,
 } OH_ArkUI_KeyboardShortcutFunctionKey;
 
 /**
