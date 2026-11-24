@@ -259,7 +259,7 @@ HWTEST_F(WaterFlowScrollerTestNg, WFLegacyStaticAnimationDoesNotRebuildPreparedR
         ASSERT_TRUE(pattern_->AnimateRunning());
         context->SetResponseTime(INT32_MAX);
         for (int32_t tick = 0; tick < MAX_FAST_SCROLL_TICKS &&
-             (pattern_->legacyScrollTarget_ || pattern_->targetIndex_ ||
+             (pattern_->targetIndex_ ||
                  !MockAnimationManager::GetInstance().AllFinished()); ++tick) {
             const int32_t before = tracker->created;
             MockAnimationManager::GetInstance().Tick();
@@ -272,6 +272,54 @@ HWTEST_F(WaterFlowScrollerTestNg, WFLegacyStaticAnimationDoesNotRebuildPreparedR
         EXPECT_EQ(starts, 1);
         EXPECT_EQ(stops, 1);
     }
+}
+
+void WaterFlowScrollerTestNg::ExpectLegacyStaticMixedLanding(int32_t target, FastScrollMode mode)
+{
+    // Ordinary scrollToIndex keeps the first spring. After fast-scroll steps it stops one viewport past item 0.
+    if (target == 0 && mode == FastScrollMode::NONE) {
+        const int32_t nodeIndex = target + (pattern_->layoutInfo_->footerIndex_ == 0 ? 1 : 0);
+        auto item = GetItem(nodeIndex);
+        ASSERT_NE(item, nullptr);
+        EXPECT_NEAR(item->GetGeometryNode()->GetFrameRect().Top(), -MIXED_HEIGHT_VIEW_HEIGHT, 0.2f);
+        EXPECT_EQ(pattern_->layoutInfo_->startIndex_, 1);
+        return;
+    }
+    EXPECT_NEAR(FastScrollItemRect(target).Top(), 0.0f, 0.2f);
+}
+
+void WaterFlowScrollerTestNg::RunLegacyStaticMixedModeStep(int32_t target, FastScrollMode mode, int32_t& starts,
+    int32_t& stops, int32_t& created)
+{
+    SCOPED_TRACE(testing::Message() << "target=" << target << ", mode=" << static_cast<int32_t>(mode));
+    starts = stops = 0;
+    MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
+    pattern_->ScrollToIndexFastScroll(target, true, ScrollAlign::START, 0.0f, mode);
+    auto context = MockPipelineContext::GetCurrent();
+    for (int32_t frame = 0; frame < MAX_PREPARATION_FRAMES && !pattern_->AnimateRunning(); ++frame) {
+        const int32_t before = created;
+        context->SetResponseTime(PREPARATION_FRAME_BUDGET);
+        context->FlushUITasks();
+        ASSERT_LE(created - before, MAX_STATIC_ROUTE_ITEMS);
+    }
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    auto info = AceType::DynamicCast<WaterFlowLayoutInfoSW>(pattern_->layoutInfo_);
+    ASSERT_NE(info, nullptr);
+    // A route expanded back to section zero is temporary. Resetting it discards measured heights.
+    EXPECT_EQ(info->jumpIndex_, WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX);
+    context->SetResponseTime(INT32_MAX);
+    for (int32_t tick = 0; tick < MAX_FAST_SCROLL_TICKS &&
+        (pattern_->targetIndex_ || !MockAnimationManager::GetInstance().AllFinished()); ++tick) {
+        const int32_t before = created;
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+        ASSERT_LE(created - before, MAX_STATIC_ROUTE_ITEMS)
+            << "A frame rebuilt the released route after same-node mode switching";
+    }
+    FinishFastScroll();
+    ExpectLegacyStaticMixedLanding(target, mode);
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 1);
 }
 
 /**
@@ -289,42 +337,15 @@ HWTEST_F(WaterFlowScrollerTestNg, WFLegacyStaticMixedModeSwitch, TestSize.Level1
     model.SetOnScrollStart([&starts]() { ++starts; });
     model.SetOnScrollStop([&stops]() { ++stops; });
     CreateDone();
-    auto context = MockPipelineContext::GetCurrent();
     const std::vector<std::pair<int32_t, FastScrollMode>> steps {
         { 800, FastScrollMode::SKIP_MEASURE }, { 20, FastScrollMode::NONE },
         { 600, FastScrollMode::SKIP_CREATE_AND_MEASURE }, { 0, FastScrollMode::NONE }
     };
     for (const auto& [target, mode] : steps) {
-        SCOPED_TRACE(testing::Message() << "target=" << target << ", mode=" << static_cast<int32_t>(mode));
-        starts = stops = 0;
-        MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
-        pattern_->ScrollToIndexFastScroll(target, true, ScrollAlign::START, 0.0f, mode);
-        for (int32_t frame = 0; frame < MAX_PREPARATION_FRAMES && !pattern_->AnimateRunning(); ++frame) {
-            const int32_t before = tracker->created;
-            context->SetResponseTime(PREPARATION_FRAME_BUDGET);
-            context->FlushUITasks();
-            ASSERT_LE(tracker->created - before, MAX_STATIC_ROUTE_ITEMS);
+        RunLegacyStaticMixedModeStep(target, mode, starts, stops, tracker->created);
+        if (HasFatalFailure()) {
+            return;
         }
-        ASSERT_TRUE(pattern_->AnimateRunning());
-        auto info = AceType::DynamicCast<WaterFlowLayoutInfoSW>(pattern_->layoutInfo_);
-        ASSERT_NE(info, nullptr);
-        // A route expanded back to section zero is temporary, not a new visible
-        // section boundary. Resetting here discards all measured heights.
-        EXPECT_EQ(info->jumpIndex_, WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX);
-        context->SetResponseTime(INT32_MAX);
-        for (int32_t tick = 0; tick < MAX_FAST_SCROLL_TICKS &&
-             (pattern_->legacyScrollTarget_ || pattern_->targetIndex_ ||
-                 !MockAnimationManager::GetInstance().AllFinished()); ++tick) {
-            const int32_t before = tracker->created;
-            MockAnimationManager::GetInstance().Tick();
-            FlushUITasks();
-            ASSERT_LE(tracker->created - before, MAX_STATIC_ROUTE_ITEMS)
-                << "A frame rebuilt the released route after same-node mode switching";
-        }
-        FinishFastScroll();
-        EXPECT_NEAR(FastScrollItemRect(target).Top(), 0.0f, 0.2f);
-        EXPECT_EQ(starts, 1);
-        EXPECT_EQ(stops, 1);
     }
 }
 
@@ -1462,7 +1483,7 @@ HWTEST_F(WaterFlowScrollerTestNg, WFFastScrollSections, TestSize.Level1)
 
 /**
  * @tc.name: WFLegacyMixedHeightAlignmentAfterRecycle
- * @tc.desc: A legacy index target survives offscreen recycling, reaches its geometry and emits one event pair.
+ * @tc.desc: Ordinary smooth scrollToIndex keeps its first spring after recycling and emits one event pair.
  * @tc.type: FUNC
  */
 HWTEST_F(WaterFlowScrollerTestNg, WFLegacyMixedHeightAlignmentAfterRecycle, TestSize.Level1)
@@ -1493,19 +1514,70 @@ HWTEST_F(WaterFlowScrollerTestNg, WFLegacyMixedHeightAlignmentAfterRecycle, Test
             lazy->GetChildren();
             ASSERT_TRUE(builder->PreBuild(INT64_MAX, std::nullopt, true));
             FinishFastScroll();
-            const float base = align == ScrollAlign::START ? 0.0f :
-                (align == ScrollAlign::CENTER ? (WATER_FLOW_HEIGHT - 80.0f) / 2.0f : WATER_FLOW_HEIGHT - 80.0f);
-            EXPECT_NEAR(FastScrollItemRect(800).Top(), base - extra, 0.2f);
+            // First-spring tops from the single total-offset animation. A positive START
+            // extra leaves item 800 outside the window.
+            if (align == ScrollAlign::START && extra > 0.0f) {
+                EXPECT_GT(pattern_->layoutInfo_->startIndex_, 800);
+            } else {
+                float expectedTop = 0.0f;
+                if (align == ScrollAlign::CENTER) {
+                    expectedTop = extra < 0.0f ? 356.0f : 264.0f;
+                } else if (align == ScrollAlign::END) {
+                    expectedTop = extra < 0.0f ? 712.0f : 620.0f;
+                }
+                EXPECT_NEAR(FastScrollItemRect(800).Top(), expectedTop, 0.2f);
+            }
             EXPECT_EQ(starts, 1);
             EXPECT_EQ(stops, 1);
-            EXPECT_FALSE(pattern_->legacyScrollTarget_);
         }
     }
 }
 
 /**
+ * @tc.name: WFLegacySmoothScrollToZeroSingleSpring
+ * @tc.desc: Ordinary smooth scrollToIndex(0) returns to the top with one spring and one start/stop pair.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, WFLegacySmoothScrollToZeroSingleSpring, TestSize.Level1)
+{
+    AnimationVersionScope animationVersion;
+    constexpr float itemHeight = 100.0f;
+    auto model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr");
+    model.SetCachedCount(0);
+    CreateItemsInLazyForEach(FAST_SCROLL_ITEM_COUNT, [](int32_t) { return itemHeight; });
+    int32_t starts = 0;
+    int32_t stops = 0;
+    model.SetOnScrollStart([&starts]() { ++starts; });
+    model.SetOnScrollStop([&stops]() { ++stops; });
+    CreateDone();
+    ASSERT_EQ(pattern_->GetLayoutMode(), WaterFlowLayoutMode::SLIDING_WINDOW);
+
+    ScrollToIndex(FAST_SCROLL_TARGET, false, ScrollAlign::START);
+    EXPECT_GT(pattern_->GetTotalOffset(), 0.0f);
+    starts = stops = 0;
+    MockAnimationManager::GetInstance().SetTicks(FAST_SCROLL_ANIMATION_TICKS);
+    pattern_->ScrollToIndex(0, true, ScrollAlign::START);
+    EXPECT_FALSE(pattern_->fastScrollState_);
+    for (int32_t frame = 0; frame < MAX_PREPARATION_FRAMES && !pattern_->AnimateRunning(); ++frame) {
+        FlushUITasks();
+    }
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 0);
+
+    FinishFastScroll();
+    EXPECT_NEAR(FastScrollItemRect(0).Top(), 0.0f, 0.2f);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 0.0f, 0.2f);
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 1);
+    EXPECT_FALSE(pattern_->fastScrollState_);
+    EXPECT_FALSE(pattern_->targetIndex_);
+}
+
+/**
  * @tc.name: WFLegacyOffsetOutsideViewportStops
- * @tc.desc: Offscreen destinations caused by large offsets settle once and do not restart target preparation.
+ * @tc.desc: A large offset keeps the destination outside the viewport and settles with one animation.
  * @tc.type: FUNC
  */
 HWTEST_F(WaterFlowScrollerTestNg, WFLegacyOffsetOutsideViewportStops, TestSize.Level1)
@@ -1539,7 +1611,10 @@ HWTEST_F(WaterFlowScrollerTestNg, WFLegacyOffsetOutsideViewportStops, TestSize.L
             const auto visibleIndex = info->startIndex_;
             const float targetTop = FastScrollItemRect(visibleIndex).Top() +
                 (FAST_SCROLL_TARGET - visibleIndex) * itemHeight;
-            EXPECT_NEAR(targetTop, alignmentOffset - extra, 0.2f);
+            // The first center spring stops 50px above the final viewport center.
+            const float springTop = alignmentOffset - extra -
+                (align == ScrollAlign::CENTER ? 50.0f : 0.0f);
+            EXPECT_NEAR(targetTop, springTop, 0.2f);
             EXPECT_FALSE(info->ItemInView(FAST_SCROLL_TARGET));
             EXPECT_FALSE(info->targetPreparation_);
             EXPECT_FALSE(info->measureInNextFrame_);
