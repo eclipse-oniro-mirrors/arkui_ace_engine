@@ -1948,7 +1948,7 @@ export struct DatePickerComponent {
 private onYearChange(selectedIndex: int): void {
     const newYear: int = this.hideYear && selectedIndex === this.yearArray.length - 1
       ? DatePickerConstant.HIDE_YEAR_SENTINEL
-      : this.startYear + selectedIndex;
+      : (this.lunar ? this.lunarStartYear : this.startYear) + selectedIndex;
     if (newYear === this.selectedYear) {
       return;
     }
@@ -2413,7 +2413,8 @@ private onYearChange(selectedIndex: int): void {
     if (this.selectedYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
       return this.yearArray.length - 1;
     }
-    return this.selectedYear - this.startYear;
+    const startYear: int = this.lunar ? this.lunarStartYear : this.startYear;
+    return this.selectedYear - startYear;
   }
   
   private getMonthSelectedIndex(): int {

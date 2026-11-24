@@ -2491,7 +2491,7 @@ export class DatePickerComponent extends ViewPU {
     onYearChange(selectedIndex) {
         const newYear = this.hideYear && selectedIndex === this.yearArray.length - 1
             ? DatePickerConstant.HIDE_YEAR_SENTINEL
-            : this.startYear + selectedIndex;
+            : (this.lunar ? this.lunarStartYear : this.startYear) + selectedIndex;
         // Guard: if the year hasn't actually changed, do nothing.
         // This prevents reverse linkage when ArkUI re-fires onChange during re-renders.
         if (newYear === this.selectedYear) {
@@ -2919,7 +2919,8 @@ export class DatePickerComponent extends ViewPU {
         if (this.selectedYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
             return this.yearArray.length - 1;
         }
-        return this.selectedYear - this.startYear;
+        const startYear = this.lunar ? this.lunarStartYear : this.startYear;
+        return this.selectedYear - startYear;
     }
     getMonthSelectedIndex() {
         if (this.lunar) {
