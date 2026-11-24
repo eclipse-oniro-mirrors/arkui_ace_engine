@@ -2010,7 +2010,10 @@ HWTEST_F(AccessibilityFocusMoveTest, ThirdHardeningFailedHoverAndUnroutableSync,
     manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
     FocusStrategyOsalThird strategy(manager, provider, NodeConfig{});
     int64_t target = -1;
-    EXPECT_FALSE(strategy.CanSendHoverWithTargetIdByReadableRules(TEST_MISSING_NODE_ID, target));
+    // Fail-open restored: an origin the provider cannot answer still allows the enter event
+    // with the hovered id; the event send re-queries the provider and drops it if that fails.
+    EXPECT_TRUE(strategy.CanSendHoverWithTargetIdByReadableRules(TEST_MISSING_NODE_ID, target));
+    EXPECT_EQ(target, TEST_MISSING_NODE_ID);
     auto host = NG::FrameNode::CreateFrameNode("XComponent", TEST_HOST_ID, AceType::MakeRefPtr<NG::Pattern>());
     auto operation = std::make_shared<JsThirdProviderInteractionOperation>(provider, manager, host);
     operation->SetBelongTreeId(0);

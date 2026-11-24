@@ -18,6 +18,7 @@
 #include <functional>
 #include <future>
 #include <limits>
+#include <map>
 #include <thread>
 
 #include "core/pipeline/base/element_register.h"
@@ -878,6 +879,108 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, PendingEventsDoNotRetainContext, TestS
     EXPECT_EQ(scenario.executor->eventCount, 2);
     EXPECT_TRUE(scenario.manager->hoverForThirdState_.nodesHovering.empty());
     EXPECT_TRUE(scenario.manager->hoverForThirdState_.thirdOperationIdle.load());
+}
+
+namespace {
+// Provider stub for the third hover hit-test: a node table queried per id, counting
+// every callback so the tests can assert how far the walk reached.
+class HoverTreeProvider : public MockOhAccessibilityProvider {
+    DECLARE_ACE_TYPE(HoverTreeProvider, MockOhAccessibilityProvider);
+public:
+    std::map<int64_t, ArkUI_AccessibilityElementInfo> nodes;
+    std::map<int64_t, size_t> queries;
+    int32_t FindAccessibilityNodeInfosById(const int64_t elementId, const int32_t mode,
+        const int32_t requestId, std::vector<ArkUI_AccessibilityElementInfo>& infos) override
+    {
+        ++queries[elementId];
+        const auto it = nodes.find(elementId == -1 ? 0 : elementId);
+        if (it == nodes.end()) {
+            return -1;
+        }
+        infos.push_back(it->second);
+        return 0;
+    }
+    void Add(int64_t id, int64_t parent, const ArkUI_AccessibleRect& rect)
+    {
+        auto& node = nodes[id];
+        node.SetElementId(id);
+        node.SetParentId(parent);
+        node.SetVisible(true);
+        node.SetRect(rect);
+        node.SetAccessibilityLevel("yes");
+    }
+};
+} // namespace
+
+// The hover hit-test walks the provider's tree without request budgets: a chain
+// deeper than the former depth budget still resolves its deepest node.
+HWTEST_F(JsThirdAccessibilityHoverNgTest, ThirdHoverHitTestWalksDeepChain, TestSize.Level1)
+{
+    constexpr int64_t chainLength = 80;
+    auto provider = AceType::MakeRefPtr<HoverTreeProvider>();
+    ArkUI_AccessibleRect hitRect { 0, 0, 100, 100 };
+    provider->Add(0, -1, hitRect);
+    for (int64_t id = 1; id < chainLength; ++id) {
+        provider->Add(id, id - 1, hitRect);
+        provider->nodes[id - 1].AddChildNodeId(id);
+    }
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    jsAccessibilityManager->Register(true);
+    auto jsInteractionOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        provider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+    constexpr int64_t hostElementId = 0;
+    jsAccessibilityManager->RegisterJsThirdProviderInteractionOperation(
+        hostElementId, jsInteractionOperation);
+    NG::PointF point(50, 50);
+    Framework::AccessibilityHoverForThirdConfig config
+        { hostElementId, point, SourceType::NONE, NG::AccessibilityHoverEventType::ENTER,
+          std::chrono::high_resolution_clock::now(), context };
+    jsAccessibilityManager->HandleAccessibilityHoverForThird(config);
+    const auto& hovering = jsAccessibilityManager->hoverForThirdState_.nodesHovering;
+    ASSERT_EQ(hovering.size(), static_cast<size_t>(chainLength));
+    EXPECT_EQ(hovering.back(), chainLength - 1);
+}
+
+// The root record may list more children than the former edge budget and the walk
+// still queries through the whole list: the root stays the only hover hit.
+HWTEST_F(JsThirdAccessibilityHoverNgTest, ThirdHoverHitTestWalksWideChildList, TestSize.Level1)
+{
+    constexpr int64_t childCount = 40001;
+    auto provider = AceType::MakeRefPtr<HoverTreeProvider>();
+    ArkUI_AccessibleRect hitRect { 0, 0, 100, 100 };
+    ArkUI_AccessibleRect missRect { 200, 200, 300, 300 };
+    provider->Add(0, -1, hitRect);
+    for (int64_t id = 1; id <= childCount; ++id) {
+        provider->Add(id, 0, missRect);
+        provider->nodes[0].AddChildNodeId(id);
+    }
+    auto frameNode = FrameNode::CreateFrameNode("framenode", 1, AceType::MakeRefPtr<Pattern>(), true);
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto context = NG::PipelineContext::GetCurrentContext();
+    jsAccessibilityManager->SetPipelineContext(context);
+    jsAccessibilityManager->Register(true);
+    auto jsInteractionOperation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(
+        provider, jsAccessibilityManager, frameNode);
+    jsInteractionOperation->SetBelongTreeId(0);
+    constexpr int64_t hostElementId = 0;
+    jsAccessibilityManager->RegisterJsThirdProviderInteractionOperation(
+        hostElementId, jsInteractionOperation);
+    NG::PointF point(50, 50);
+    Framework::AccessibilityHoverForThirdConfig config
+        { hostElementId, point, SourceType::NONE, NG::AccessibilityHoverEventType::ENTER,
+          std::chrono::high_resolution_clock::now(), context };
+    jsAccessibilityManager->HandleAccessibilityHoverForThird(config);
+    const auto& hovering = jsAccessibilityManager->hoverForThirdState_.nodesHovering;
+    ASSERT_EQ(hovering.size(), 1);
+    EXPECT_EQ(hovering.front(), 0);
+    // The walk queried through to the last child of the oversized list.
+    EXPECT_EQ(provider->queries.count(childCount), 1);
+    EXPECT_EQ(provider->queries.at(childCount), 1);
+    EXPECT_EQ(provider->queries.at(1), 1);
 }
 
 } // namespace OHOS::Ace::NG
