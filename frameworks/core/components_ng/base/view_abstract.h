@@ -979,6 +979,7 @@ public:
     static void SetBlendApplyType(FrameNode* frameNode, BlendApplyType blendApplyType);
     static void SetBlender(FrameNode* frameNode, const OHOS::Rosen::Blender* blender);
     static void ResetBlender(FrameNode* frameNode);
+    static void SetVibrancyMode(VibrancyMode mode);
     static void SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode);
     static void SetMonopolizeEvents(FrameNode* frameNode, bool monopolizeEvents);
     static void SetDraggable(FrameNode* frameNode, bool draggable);

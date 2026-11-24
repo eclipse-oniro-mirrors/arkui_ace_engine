@@ -27,6 +27,15 @@
 #include "core/interfaces/native/implementation/dismiss_content_cover_action_peer.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+void ParseSheetVibrancyMode(SheetStyle& sheetStyle, const Ark_SheetOptions& sheetOptions)
+{
+    if (SystemProperties::GetUiMaterialLevel() == UiMaterialLevel::SMOOTH) {
+        return;
+    }
+    sheetStyle.titleBarVibrancyMode = Converter::OptConvert<VibrancyMode>(sheetOptions.titleBarVibrancyMode);
+}
+} // namespace
 constexpr int32_t EFFECT_EDGE_ZERO = 0;
 constexpr int32_t EFFECT_EDGE_ONE = 1;
 constexpr int32_t EFFECT_EDGE_TWO = 2;
@@ -226,6 +235,7 @@ void BindSheetUtil::ParseSheetParams(SheetStyle& sheetStyle, const Ark_SheetOpti
         colorFilterOpt.value()->GetColorFilterMatrix().size() == COLOR_FILTER_MATRIX_SIZE) {
         sheetStyle.colorFilterEffect = colorFilterOpt.value()->GetColorFilterMatrix();
     }
+    ParseSheetVibrancyMode(sheetStyle, sheetOptions);
 }
 
 void BindSheetUtil::ModifySheetStyle(

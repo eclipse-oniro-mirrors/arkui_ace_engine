@@ -1390,6 +1390,60 @@ HWTEST_F(ViewAbstractTestNg, SetVibrancyMode002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetVibrancyMode003
+ * @tc.desc: Test SetVibrancyMode without FrameNode overload (via ViewStackProcessor)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetVibrancyMode003, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    stack->ClearVisualState();
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+
+    auto backupLevel = g_uiMaterialLevel;
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    ViewAbstract::SetVibrancyMode(VibrancyMode::BRIGHTEN);
+    g_uiMaterialLevel = backupLevel;
+
+    auto& rc = node->GetRenderContext();
+    ASSERT_NE(rc, nullptr);
+    EXPECT_TRUE(rc->HasVibrancyMode());
+    EXPECT_EQ(rc->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::BRIGHTEN);
+
+    stack->Finish();
+}
+
+/**
+ * @tc.name: SetVibrancyMode004
+ * @tc.desc: Test SetVibrancyMode without FrameNode overload returns early when IsCurrentVisualStateProcess is false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetVibrancyMode004, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    stack->SetVisualState(VisualState::DISABLED);
+
+    auto backupLevel = g_uiMaterialLevel;
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    ViewAbstract::SetVibrancyMode(VibrancyMode::BRIGHTEN);
+    g_uiMaterialLevel = backupLevel;
+
+    auto& rc = node->GetRenderContext();
+    ASSERT_NE(rc, nullptr);
+    EXPECT_FALSE(rc->HasVibrancyMode());
+
+    stack->ClearVisualState();
+    stack->Finish();
+}
+
+/**
  * @tc.name: SetColorFilterEffect001
  * @tc.desc: Test SetColorFilterEffect with valid 20-element matrix
  * @tc.type: FUNC

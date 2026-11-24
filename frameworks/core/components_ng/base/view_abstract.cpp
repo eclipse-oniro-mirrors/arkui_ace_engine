@@ -10201,13 +10201,23 @@ void ViewAbstract::ResetBlender(FrameNode* frameNode)
     renderContext->ResetBlender();
 }
 
+void ViewAbstract::SetVibrancyMode(VibrancyMode mode)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetVibrancyMode(frameNode, mode);
+}
+
 void ViewAbstract::SetVibrancyMode(FrameNode* frameNode, VibrancyMode mode)
 {
     CHECK_NULL_VOID(frameNode);
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    // only EXQUISITE level devices take effect
-    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+    // SMOOTH level devices do not take effect
+    if (SystemProperties::GetUiMaterialLevel() == UiMaterialLevel::SMOOTH) {
         return;
     }
     renderContext->UpdateVibrancyMode(mode);
