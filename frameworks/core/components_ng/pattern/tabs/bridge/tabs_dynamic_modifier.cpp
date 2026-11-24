@@ -984,6 +984,10 @@ void SetShowSidebarControlButtonImpl(ArkUINodeHandle node, ArkUI_Bool showContro
 
 void ResetShowSidebarControlButtonImpl(ArkUINodeHandle node) {}
 
+void SetShowBottomBarOnSidebarCollapseImpl(ArkUINodeHandle node, ArkUI_Bool show) {}
+
+void ResetShowBottomBarOnSidebarCollapseImpl(ArkUINodeHandle node) {}
+
 void SetBarDisplayModeBreakpointImpl(ArkUINodeHandle node, struct ArkUITabBarDisplayModeBreakpoint* breakpoint) {}
 
 void ResetBarDisplayModeBreakpointImpl(ArkUINodeHandle node) {}
@@ -2244,6 +2248,20 @@ void ResetShowSidebarControlButton(ArkUINodeHandle node)
     TabsModelNG::SetShowSidebarControlButton(frameNode, false);
 }
 
+void SetShowBottomBarOnSidebarCollapse(ArkUINodeHandle node, ArkUI_Bool show)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowBottomBarOnSidebarCollapse(frameNode, show);
+}
+
+void ResetShowBottomBarOnSidebarCollapse(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetShowBottomBarOnSidebarCollapse(frameNode, false);
+}
+
 void SetSidebarTitleBar(ArkUINodeHandle node, struct ArkUITabsSidebarTitleBarOptions* options)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2740,6 +2758,8 @@ const ArkUITabsModifier* GetTabsModifier()
             .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOpts,
             .setTabViewCustomization = SetTabViewCustomization,
             .resetTabViewCustomization = ResetTabViewCustomization,
+            .setShowBottomBarOnSidebarCollapse = SetShowBottomBarOnSidebarCollapse,
+            .resetShowBottomBarOnSidebarCollapse = ResetShowBottomBarOnSidebarCollapse,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -2901,6 +2921,8 @@ const ArkUITabsModifier* GetTabsModifier()
         .markUserSetSafeAreaOpts = MarkUserSetSafeAreaOptsImpl,
         .setTabViewCustomization = SetTabViewCustomizationImpl,
         .resetTabViewCustomization = ResetTabViewCustomizationImpl,
+        .setShowBottomBarOnSidebarCollapse = SetShowBottomBarOnSidebarCollapseImpl,
+        .resetShowBottomBarOnSidebarCollapse = ResetShowBottomBarOnSidebarCollapseImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

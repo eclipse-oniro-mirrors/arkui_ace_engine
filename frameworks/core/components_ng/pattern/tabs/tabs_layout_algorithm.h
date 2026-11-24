@@ -157,6 +157,13 @@ private:
     void UpdateBgMaskNodeVisibility(LayoutWrapper* layoutWrapper, bool isVisible);
     void MeasureInSideBarMode(LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty,
         const SizeF& idealSize, bool needMeasureEnterComponents);
+    // Collapse button (direct child of tabsNode, stays visible when the
+    // sidebar is collapsed): measure + position helpers shared by the
+    // sidebar-mode passes and the bottom-tab-bar passes that come from the
+    // sidebar collapse switch (collapsed-with-bottom-bar arrangement), so a
+    // button (re-)created in that state still gets geometry.
+    void MeasureCollapseButton(LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty);
+    void LayoutCollapseButton(LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty);
     float MeasureSideBar(
         LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty, const SizeF& idealSize);
     float MeasureSideBarDivider(

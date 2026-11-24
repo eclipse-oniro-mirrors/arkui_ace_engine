@@ -224,6 +224,7 @@ public:
     static void SetSidebarBottomBar(FrameNode* frameNode, const RefPtr<AceType>& bottomBar);
     static void SetSidebarSearchableOptions(FrameNode* frameNode, const TabsSidebarSearchableOptions& options);
     static void SetShowSidebarControlButton(FrameNode* frameNode, bool showControlButton);
+    static void SetShowBottomBarOnSidebarCollapse(FrameNode* frameNode, bool show);
     static void SetSidebarTitleBar(FrameNode* frameNode, const TabsSidebarTitleBarOptions& options);
     static void SetBarDisplayModeBreakpoint(FrameNode* frameNode, const TabBarDisplayModeBreakpoint& breakpoint);
     static void SetOnBarDisplayModeChange(FrameNode* frameNode,

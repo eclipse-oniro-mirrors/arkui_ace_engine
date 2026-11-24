@@ -31,6 +31,9 @@
 #include "core/components_ng/pattern/tabs/tab_content_model_static.h"
 #include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 #include "core/components_ng/pattern/tabs/tab_content_layout_property.h"
+#include "core/components_ng/pattern/tabs/tabs_model.h"
+#include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
+#include "core/components_ng/pattern/shape/polygon_paint_property.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/common/font_manager.h"
 #include "test/mock/frameworks/core/common/mock_font_manager.h"
@@ -2840,5 +2843,330 @@ HWTEST_F(TabsTestNg, HandleTouchUpNewMaterial002, TestSize.Level1)
     FlushUITasks();
     auto colorAfter = renderContext->GetBackgroundColor().value_or(Color::TRANSPARENT);
     EXPECT_EQ(colorAfter, Color::TRANSPARENT);
+}
+
+namespace {
+/**
+ * @brief Create a Tabs node with the sidebar layout style and an optional control button,
+ *        then flush the layout so that sidebar child nodes are built.
+ */
+RefPtr<TabsSideBarPattern> CreateTabsWithSideBar(TabsTestNg& fixture)
+{
+    TabsModelNG model = fixture.CreateTabs();
+    fixture.CreateTabContents(TABCONTENT_NUMBER);
+    model.SetBarLayoutStyle(TabBarLayoutStyle::SIDEBAR);
+    model.SetShowSidebarControlButton(true);
+    fixture.CreateTabsDone(model);
+
+    auto frameNode = fixture.frameNode_;
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    frameNode->SetActive();
+    frameNode->isLayoutDirtyMarked_ = true;
+    frameNode->CreateLayoutTask();
+    auto paintProperty = frameNode->GetPaintProperty<PaintProperty>();
+    if (paintProperty) {
+        auto wrapper = frameNode->CreatePaintWrapper();
+        if (wrapper != nullptr) {
+            wrapper->FlushRender();
+        }
+        paintProperty->CleanDirty();
+    }
+    frameNode->SetActive(false);
+
+    auto sideBarNode = fixture.pattern_ ? fixture.pattern_->GetSideBarNode() : nullptr;
+    return sideBarNode ? sideBarNode->GetPattern<TabsSideBarPattern>() : nullptr;
+}
+} // namespace
+
+/**
+ * @tc.name: CollapseButtonIconRotation001
+ * @tc.desc: Test that the collapse button icon is a Stack container holding three static
+ *           hamburger bar Rect nodes and a morphable arrow triangle Polygon node, and that
+ *           collapsing morphs only the triangle from the expanded shape to the collapsed shape
+ *           (LTR + START position).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, CollapseButtonIconRotation001, TestSize.Level1)
+{
+    auto sideBarPattern = CreateTabsWithSideBar(*this);
+    ASSERT_NE(sideBarPattern, nullptr);
+
+    /**
+     * @tc.steps: step1. Inspect the collapse button icon structure.
+     * @tc.expected: step1. The icon is a STACK container with three RECT children (static
+     *           hamburger bars, vp-sized with capsule corner radius) and a POLYGON child
+     *           (morphable triangle) mounted last; the triangle node is tracked separately.
+     */
+    auto iconNode = sideBarPattern->collapseButtonIconNode_;
+    ASSERT_NE(iconNode, nullptr);
+    EXPECT_EQ(iconNode->GetTag(), V2::STACK_ETS_TAG);
+    const auto& iconChildren = iconNode->GetChildren();
+    ASSERT_EQ(iconChildren.size(), 4u);
+
+    // Expected COLLAPSE_ICON_BARS geometry (24x24 box, vp): top, middle, bottom.
+    // Values are the double literals of the production float constants; compare
+    // with EXPECT_NEAR (1e-3) because the properties store floats.
+    const double barWidths[] = { 19.969, 12.984, 19.969 };
+    const double barHeights[] = { 1.488, 1.512, 1.512 };
+    auto childIt = iconChildren.begin();
+    for (size_t barIndex = 0; barIndex < 3; ++barIndex) {
+        ASSERT_NE(childIt, iconChildren.end());
+        auto barNode = AceType::DynamicCast<FrameNode>(*childIt);
+        ASSERT_NE(barNode, nullptr);
+        EXPECT_EQ(barNode->GetTag(), "CollapseIconButtonBar");
+        // Bar width/height are set in vp as the user-defined ideal size of the layout property.
+        auto barLayoutProperty = barNode->GetLayoutProperty();
+        ASSERT_NE(barLayoutProperty, nullptr);
+        const auto& calcLayoutConstraint = barLayoutProperty->GetCalcLayoutConstraint();
+        ASSERT_NE(calcLayoutConstraint, nullptr);
+        ASSERT_TRUE(calcLayoutConstraint->selfIdealSize.has_value());
+        const auto& barWidth = calcLayoutConstraint->selfIdealSize->Width();
+        ASSERT_TRUE(barWidth.has_value());
+        EXPECT_EQ(barWidth->GetDimension().Unit(), DimensionUnit::VP);
+        EXPECT_NEAR(barWidth->GetDimension().Value(), barWidths[barIndex], 1e-3);
+        const auto& barHeight = calcLayoutConstraint->selfIdealSize->Height();
+        ASSERT_TRUE(barHeight.has_value());
+        EXPECT_EQ(barHeight->GetDimension().Unit(), DimensionUnit::VP);
+        EXPECT_NEAR(barHeight->GetDimension().Value(), barHeights[barIndex], 1e-3);
+        // Capsule bar: render-context corner radius equals half of the bar height.
+        auto barRenderContext = barNode->GetRenderContext();
+        ASSERT_NE(barRenderContext, nullptr);
+        auto barRadius = barRenderContext->GetBorderRadius();
+        ASSERT_TRUE(barRadius.has_value());
+        ASSERT_TRUE(barRadius->radiusTopLeft.has_value());
+        EXPECT_EQ(barRadius->radiusTopLeft->Unit(), DimensionUnit::VP);
+        EXPECT_NEAR(barRadius->radiusTopLeft->Value(), barHeights[barIndex] / 2.0, 1e-3);
+        ++childIt;
+    }
+
+    ASSERT_NE(childIt, iconChildren.end());
+    auto triangleNode = AceType::DynamicCast<FrameNode>(*childIt);
+    ASSERT_NE(triangleNode, nullptr);
+    EXPECT_EQ(triangleNode->GetTag(), V2::POLYGON_ETS_TAG);
+
+    auto trackedTriangleNode = sideBarPattern->collapseButtonTriangleNode_;
+    ASSERT_NE(trackedTriangleNode, nullptr);
+    EXPECT_EQ(AceType::RawPtr(trackedTriangleNode), AceType::RawPtr(triangleNode));
+
+    auto trianglePaintProperty = triangleNode->GetPaintProperty<PolygonPaintProperty>();
+    ASSERT_NE(trianglePaintProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. Sidebar is expanded initially (LTR + START position).
+     * @tc.expected: step2. isCollapsed_ is false and the triangle points left: the apex sits at
+     *           x=0 while the two right corners sit at x=4.271.
+     */
+    EXPECT_FALSE(sideBarPattern->IsCollapsed());
+    sideBarPattern->UpdateCollapseButtonIcon();
+    ASSERT_TRUE(trianglePaintProperty->HasPoints());
+    auto expandedPoints = trianglePaintProperty->GetPointsValue();
+    // The triangle glyph is a rounded-corner outline sampled as a two-state
+    // 27-point ring: three feature blocks of 9 samples per arc, in ring
+    // traversal order. LTR + START expands to RING_OPEN whose block order is
+    // [apex, bottomCorner, topCorner]; the apex tip sits at index 4 (block
+    // middle) with x=0 (expanded triangle points left).
+    ASSERT_EQ(expandedPoints.size(), 27u);
+    // Apex block start and tip (leftmost point of the outline).
+    EXPECT_NEAR(expandedPoints[0].first.Value(), 0.240, 1e-3);
+    EXPECT_NEAR(expandedPoints[0].second.Value(), 2.424, 1e-3);
+    EXPECT_NEAR(expandedPoints[4].first.Value(), 0.0, 1e-3);
+    EXPECT_NEAR(expandedPoints[4].second.Value(), 2.928, 1e-3);
+    // Bottom-right corner block start (block order guards the rotation pairing).
+    EXPECT_NEAR(expandedPoints[9].first.Value(), 3.287, 1e-3);
+    EXPECT_NEAR(expandedPoints[9].second.Value(), 5.734, 1e-3);
+    EXPECT_NEAR(expandedPoints[17].first.Value(), 4.271, 1e-3);
+    EXPECT_NEAR(expandedPoints[17].second.Value(), 5.230, 1e-3);
+    // Top-right corner block start.
+    EXPECT_NEAR(expandedPoints[18].first.Value(), 4.271, 1e-3);
+    EXPECT_NEAR(expandedPoints[18].second.Value(), 0.625, 1e-3);
+
+    /**
+     * @tc.steps: step3. Click the collapse button to collapse the sidebar.
+     * @tc.expected: step3. Sidebar becomes collapsed and the triangle morphs to point right:
+     *           the apex sits at x=4.295 while the two left corners sit at x=0.
+     */
+    sideBarPattern->OnCollapseButtonClick();
+    EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    sideBarPattern->UpdateCollapseButtonIcon();
+    // Clean up the collapse switch request registered by the click (no layout pass
+    // runs in the test env to consume it).
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
+
+    auto collapsedPoints = trianglePaintProperty->GetPointsValue();
+    // The output keeps the arc order of the begin ring (RING_OPEN) and takes
+    // the RING_CLOSE target points via the rotation-correspondence block
+    // mapping {1, 2, 0}: output block b of 9 samples maps to RING_CLOSE block
+    // {1,2,0}[b]. So output blocks are [topCorner, bottomCorner, apex] and the
+    // ring traversal does not start at the apex: the apex arc lands at index
+    // 18..26 with its tip at index 22 (x=4.295, collapsed triangle points
+    // right); the two left corner arcs sit at x<=1.008 (vertices roll into
+    // their collapsed slots by rotation correspondence, not a mirror flip).
+    ASSERT_EQ(collapsedPoints.size(), 27u);
+    // Top-left corner block start (block order guards the rotation pairing).
+    EXPECT_NEAR(collapsedPoints[0].first.Value(), 1.008, 1e-3);
+    EXPECT_NEAR(collapsedPoints[0].second.Value(), 0.121, 1e-3);
+    EXPECT_NEAR(collapsedPoints[4].first.Value(), 0.357, 1e-3);
+    EXPECT_NEAR(collapsedPoints[4].second.Value(), 0.064, 1e-3);
+    // Bottom-left corner block start.
+    EXPECT_NEAR(collapsedPoints[9].first.Value(), 0.0, 1e-3);
+    EXPECT_NEAR(collapsedPoints[9].second.Value(), 5.230, 1e-3);
+    EXPECT_NEAR(collapsedPoints[17].first.Value(), 1.008, 1e-3);
+    EXPECT_NEAR(collapsedPoints[17].second.Value(), 5.734, 1e-3);
+    // Apex arc (mapped to the last block): block start and tip (rightmost
+    // point of the outline, collapsed triangle points right).
+    EXPECT_NEAR(collapsedPoints[18].first.Value(), 4.031, 1e-3);
+    EXPECT_NEAR(collapsedPoints[18].second.Value(), 3.431, 1e-3);
+    EXPECT_NEAR(collapsedPoints[22].first.Value(), 4.295, 1e-3);
+    EXPECT_NEAR(collapsedPoints[22].second.Value(), 2.928, 1e-3);
+}
+
+/**
+ * @tc.name: CollapseButtonIconRotation002
+ * @tc.desc: Test that the arrow triangle morphs to the collapsed shape when collapsed and back
+ *           to the expanded shape when expanded (LTR + START position).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, CollapseButtonIconRotation002, TestSize.Level1)
+{
+    auto sideBarPattern = CreateTabsWithSideBar(*this);
+    ASSERT_NE(sideBarPattern, nullptr);
+    auto triangleNode = sideBarPattern->collapseButtonTriangleNode_;
+    ASSERT_NE(triangleNode, nullptr);
+    EXPECT_EQ(triangleNode->GetTag(), V2::POLYGON_ETS_TAG);
+    auto trianglePaintProperty = triangleNode->GetPaintProperty<PolygonPaintProperty>();
+    ASSERT_NE(trianglePaintProperty, nullptr);
+
+    /**
+     * @tc.steps: step1. Collapse the sidebar so the triangle morphs to point right.
+     * @tc.expected: step1. isCollapsed_ is true, the apex sits at x=4.295 and the two corners
+     *           sit at x=0.
+     */
+    sideBarPattern->OnCollapseButtonClick();
+    EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    sideBarPattern->UpdateCollapseButtonIcon();
+
+    auto collapsedPoints = trianglePaintProperty->GetPointsValue();
+    // The output keeps the arc order of the begin ring (RING_OPEN) and takes
+    // the RING_CLOSE target points via the rotation-correspondence block
+    // mapping {1, 2, 0}: output blocks are [topCorner, bottomCorner, apex],
+    // and the ring traversal does not start at the apex: the apex tip (x=4.295,
+    // pointing right) lands at index 22, the two left corners sit at x<=1.008.
+    ASSERT_EQ(collapsedPoints.size(), 27u);
+    // Top-left corner block start (block order guards the rotation pairing).
+    EXPECT_NEAR(collapsedPoints[0].first.Value(), 1.008, 1e-3);
+    EXPECT_NEAR(collapsedPoints[0].second.Value(), 0.121, 1e-3);
+    EXPECT_NEAR(collapsedPoints[4].first.Value(), 0.357, 1e-3);
+    EXPECT_NEAR(collapsedPoints[4].second.Value(), 0.064, 1e-3);
+    // Bottom-left corner block start.
+    EXPECT_NEAR(collapsedPoints[9].first.Value(), 0.0, 1e-3);
+    EXPECT_NEAR(collapsedPoints[9].second.Value(), 5.230, 1e-3);
+    EXPECT_NEAR(collapsedPoints[17].first.Value(), 1.008, 1e-3);
+    EXPECT_NEAR(collapsedPoints[17].second.Value(), 5.734, 1e-3);
+    // Apex arc (mapped to the last block): block start and tip (rightmost
+    // point of the outline, collapsed triangle points right).
+    EXPECT_NEAR(collapsedPoints[18].first.Value(), 4.031, 1e-3);
+    EXPECT_NEAR(collapsedPoints[18].second.Value(), 3.431, 1e-3);
+    EXPECT_NEAR(collapsedPoints[22].first.Value(), 4.295, 1e-3);
+    EXPECT_NEAR(collapsedPoints[22].second.Value(), 2.928, 1e-3);
+
+    /**
+     * @tc.steps: step2. Click the expand button to expand the sidebar. The first click left the
+     *           switch state machine in COLLAPSE_REQUESTED (no layout pass runs in the test env
+     *           to finish it); simulate the switch finishing so the expand click is accepted.
+     * @tc.expected: step2. Sidebar becomes expanded and the triangle morphs back to point left:
+     *           the apex sits at x=0 and the two corners sit at x=4.271.
+     */
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
+    sideBarPattern->OnCollapseButtonClick();
+    EXPECT_FALSE(sideBarPattern->IsCollapsed());
+    sideBarPattern->UpdateCollapseButtonIcon();
+    // Clean up the expand switch request registered by the second click.
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
+
+    auto expandedPoints = trianglePaintProperty->GetPointsValue();
+    // Expanded outline is the RING_OPEN half of the two-state 27-point ring
+    // (blocks [apex, bottomCorner, topCorner]): the apex tip sits at index 4
+    // with x=0 (pointing left) and the two right corners sit at x=4.271.
+    ASSERT_EQ(expandedPoints.size(), 27u);
+    EXPECT_NEAR(expandedPoints[0].first.Value(), 0.240, 1e-3);
+    EXPECT_NEAR(expandedPoints[0].second.Value(), 2.424, 1e-3);
+    EXPECT_NEAR(expandedPoints[4].first.Value(), 0.0, 1e-3);
+    EXPECT_NEAR(expandedPoints[4].second.Value(), 2.928, 1e-3);
+    EXPECT_NEAR(expandedPoints[9].first.Value(), 3.287, 1e-3);
+    EXPECT_NEAR(expandedPoints[9].second.Value(), 5.734, 1e-3);
+    EXPECT_NEAR(expandedPoints[17].first.Value(), 4.271, 1e-3);
+    EXPECT_NEAR(expandedPoints[17].second.Value(), 5.230, 1e-3);
+    EXPECT_NEAR(expandedPoints[18].first.Value(), 4.271, 1e-3);
+    EXPECT_NEAR(expandedPoints[18].second.Value(), 0.625, 1e-3);
+}
+
+/**
+ * @tc.name: FloatingBarWhenCollapse001
+ * @tc.desc: Test that floating bar on collapse is disabled by default when the
+ *           showBottomBarOnSidebarCollapse property is not set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, FloatingBarWhenCollapse001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    /**
+     * @tc.expected: showBottomBarOnSidebarCollapse is not set and defaults to false.
+     */
+    EXPECT_FALSE(layoutProperty_->HasShowBottomBarOnSidebarCollapse());
+    EXPECT_FALSE(pattern_->IsShowBottomBarOnSidebarCollapseEnabled());
+}
+
+/**
+ * @tc.name: FloatingBarWhenCollapse002
+ * @tc.desc: Test that showBottomBarOnSidebarCollapse=true enables the feature, and that
+ *           ApplyFloatingTabBarHiddenTargets (expand-direction hidden state of the
+ *           collapse/expand switch) fades the floating tab bar out (opacity 0, scale
+ *           shrunk to FLOATING_BAR_ENTER_SCALE * baseFloatingScale).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, FloatingBarWhenCollapse002, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    ASSERT_NE(tabBarNode_, nullptr);
+
+    /**
+     * @tc.steps: step1. Set showBottomBarOnSidebarCollapse=true.
+     * @tc.expected: step1. IsShowBottomBarOnSidebarCollapseEnabled() returns true.
+     */
+    layoutProperty_->UpdateShowBottomBarOnSidebarCollapse(true);
+    EXPECT_TRUE(layoutProperty_->GetShowBottomBarOnSidebarCollapseValue(false));
+    EXPECT_TRUE(pattern_->IsShowBottomBarOnSidebarCollapseEnabled());
+
+    /**
+     * @tc.steps: step2. Enter floating bar mode and apply the hidden targets.
+     * @tc.expected: step2. TabBar opacity is 0 and transform scale is scaled down
+     * to FLOATING_BAR_ENTER_SCALE (0.4) * baseFloatingScale (1.0).
+     */
+    pattern_->isFloatingBar_ = true;
+    pattern_->ApplyFloatingTabBarHiddenTargets();
+
+    auto renderContext = tabBarNode_->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    EXPECT_EQ(renderContext->GetOpacity().value_or(1.0), 0.0);
+    ASSERT_TRUE(renderContext->HasTransformScale());
+    auto scale = renderContext->GetTransformScaleValue(VectorF(1.0f, 1.0f));
+    EXPECT_FLOAT_EQ(scale.x, 0.4f);
+    EXPECT_FLOAT_EQ(scale.y, 0.4f);
 }
 } // namespace OHOS::Ace::NG

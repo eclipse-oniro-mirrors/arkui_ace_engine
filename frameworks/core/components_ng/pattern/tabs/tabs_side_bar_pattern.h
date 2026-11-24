@@ -164,22 +164,21 @@ public:
     void ClearCollapseButtonState();
 
     void UpdateCollapseButtonIcon();
+    // Re-apply the glyph fill color (hamburger bars + triangle) from the theme;
+    // used on color-configuration updates (dark/light mode switch) — the colors
+    // are baked into the Shape paint properties at creation time.
+    void UpdateCollapseButtonIconColor();
+    // Re-apply the (possibly mirrored) left/top offsets of the hamburger bars
+    // inside the collapse button icon (Stack children tagged CollapseIconButtonBar).
+    void UpdateCollapseButtonBarPositions();
+    void AnimateCollapseButtonIconRotation(bool isCollapse);
+    void UpdateCollapseTrianglePoints(const RefPtr<FrameNode>& triangleNode, float progress);
     void UpdateTitleBarContent();
     Dimension ComputeTitleBarRowHeight() const;
 
     bool IsCollapsed() const
     {
         return isCollapsed_;
-    }
-
-    bool IsCollapseAnimating() const
-    {
-        return isCollapseAnimating_;
-    }
-
-    void SetCollapseAnimating(bool animating)
-    {
-        isCollapseAnimating_ = animating;
     }
 
     bool IsBottomBarScrollEffectEnabled() const
@@ -204,13 +203,19 @@ private:
     void CreateMaskNodeIfNeeded();
     RefPtr<FrameNode> CreateCollapseButtonNode();
     RefPtr<FrameNode> CreateCollapseButtonIcon();
+    RefPtr<FrameNode> CreateCollapseIconButtonBar(
+        const Color& color, float left, float top, float width, float height);
+    bool IsSidebarOnEndSide() const;
+    // Whether the collapse-button icon is mirrored horizontally (RTL layouts only;
+    // independent of sidebarPosition — the triangle side is decided by the reading
+    // direction, its pointing direction by the sidebar's on-screen side).
+    bool IsIconMirroredByRtl() const;
+    void UpdateCollapseTrianglePosition(const RefPtr<FrameNode>& triangleNode) const;
     void CreateTitleBarRowIfNeeded();
     RefPtr<FrameNode> CreateTitleBarIconNode();
     RefPtr<FrameNode> CreateTitleBarTextNode();
     void InitCollapseButtonClickEvent(const RefPtr<GestureEventHub>& gestureHub);
     void OnCollapseButtonClick();
-    void CollapseSideBarContent();
-    void ExpandSideBarContent();
     void CreateBottomBarMaskNodeIfNeeded();
     void OnTabListScroll(float totalOffset, float scrollableDistance);
 
@@ -256,12 +261,12 @@ private:
 
     RefPtr<FrameNode> collapseButtonNode_ = nullptr;
     RefPtr<FrameNode> collapseButtonIconNode_ = nullptr;
+    RefPtr<FrameNode> collapseButtonTriangleNode_ = nullptr;
     RefPtr<FrameNode> titleBarRowNode_ = nullptr;
     RefPtr<FrameNode> titleBarIconNode_ = nullptr;
     RefPtr<FrameNode> titleBarTextNode_ = nullptr;
     TabsSidebarTitleBarOptions titleBarOptions_;
     bool isCollapsed_ = false;
-    bool isCollapseAnimating_ = false;
     bool showControlButton_ = false;
 
     // BottomBar gradual blur effect nodes & state

@@ -290,6 +290,7 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "setBarStyle", "resetBarStyle", "setSidebarPosition",
         "resetSidebarPosition", "setSidebarHeader", "resetSidebarHeader", "setSidebarSearchable",
         "resetSidebarSearchable", "setShowSidebarControlButton", "resetShowSidebarControlButton",
+        "setShowBottomBarOnSidebarCollapse", "resetShowBottomBarOnSidebarCollapse",
         "setSidebarTitleBar", "resetSidebarTitleBar",
         "setBarDisplayModeBreakpoint", "resetBarDisplayModeBreakpoint",
         "setOnBarDisplayModeChange", "resetOnBarDisplayModeChange", "setSidebarDisplayStyle",
@@ -408,6 +409,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarSearchable),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetShowSidebarControlButton),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetShowSidebarControlButton),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetShowBottomBarOnSidebarCollapse),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetShowBottomBarOnSidebarCollapse),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarTitleBar),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarTitleBar),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetBarDisplayModeBreakpoint),
@@ -3634,6 +3637,33 @@ ArkUINativeModuleValue TabsBridge::ResetShowSidebarControlButton(ArkUIRuntimeCal
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getTabsModifier()->resetShowSidebarControlButton(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::SetShowBottomBarOnSidebarCollapse(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    Local<JSValueRef> showArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool show = false;
+    if (!showArg.IsNull() && !showArg->IsUndefined() && showArg->IsBoolean()) {
+        show = showArg->ToBoolean(vm)->Value();
+    }
+    GetArkUINodeModifiers()->getTabsModifier()->setShowBottomBarOnSidebarCollapse(nativeNode, show);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::ResetShowBottomBarOnSidebarCollapse(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    GetArkUINodeModifiers()->getTabsModifier()->resetShowBottomBarOnSidebarCollapse(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

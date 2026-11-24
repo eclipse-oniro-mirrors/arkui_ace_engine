@@ -343,6 +343,10 @@ function loadComponent(): ComponentObj | undefined {
         getUINativeModule().tabs.markUserSetSafeAreaOpts(this.nativePtr);
         return this;
       }
+      showBottomBarOnSidebarCollapse(value: Optional<boolean>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsShowBottomBarOnSidebarCollapseModifier.identity, TabsShowBottomBarOnSidebarCollapseModifier, value);
+        return this;
+      }
     }
 
     class TabBarFloatingStyleModifier extends ModifierWithKey<barFloatingStyleOptions> {
@@ -646,7 +650,7 @@ function loadComponent(): ComponentObj | undefined {
         }
       }
     }
-    
+
     class TabsOptionsIndexModifier extends ModifierWithKey<number> {
       constructor(value: number) {
         super(value);
@@ -1494,6 +1498,23 @@ function loadComponent(): ComponentObj | undefined {
         }
       }
     }
+
+    class TabsShowBottomBarOnSidebarCollapseModifier extends ModifierWithKey<Optional<boolean>> {
+      constructor(value: Optional<boolean>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('showBottomBarOnSidebarCollapse');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetShowBottomBarOnSidebarCollapse(node);
+        }
+        else {
+          getUINativeModule().tabs.setShowBottomBarOnSidebarCollapse(node, this.value);
+        }
+      }
+    }
+
         loadComponent.componentObj = { 'component': ArkTabsComponent };
   }
   return loadComponent.componentObj;
@@ -1768,6 +1789,10 @@ class JSTabs extends JSContainerBase {
   static expandSafeArea(types?: Array<SafeAreaType>, edges?: Array<SafeAreaEdge>): void {
     JSViewAbstract.expandSafeArea(types, edges);
     getUINativeModule().tabs.markUserSetSafeAreaOpts(true);
+  }
+
+  static showBottomBarOnSidebarCollapse(value: Optional<boolean>): void {
+    getUINativeModule().tabs.setShowBottomBarOnSidebarCollapse(true, value);
   }
 
   static attributeModifier(modifier: any): void {

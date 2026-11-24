@@ -249,6 +249,105 @@ public:
         return baseFloatingScale_;
     }
 
+    // Whether the bottom tab bar (floating tab bar or normal bottom tab bar) should
+    // be shown after the sidebar is collapsed.
+    bool IsShowBottomBarOnSidebarCollapseEnabled() const;
+    // Whether the tab bar is a bottom-style bar able to join the sidebar
+    // collapse/expand switch: a floating bar, or a normal bar actually placed
+    // at the bottom (not vertical, barPosition == END). Other placements
+    // (vertical bar / top bar) never animate in the switch.
+    bool IsTabBarBottomStyle() const;
+    // Whether the bottom tab bar actually joins (this phase of) the sidebar
+    // collapse/expand switch — the switch flips the display mode and fires the
+    // developer change event ONLY when it does. See the .cpp for the two
+    // direction-dependent conditions.
+    bool WillBottomBarJoinCollapseSwitch(bool toCollapsed) const;
+    // Whether the tab bar node is currently laid out visible (not GONE). The
+    // expand-direction hide is an invariant keyed on this live state, not on
+    // the shown-after-collapse bookkeeping.
+    bool IsTabBarNodeVisible() const;
+    // Whether the effective divider is explicitly null (hidden via divider-node
+    // opacity 0 by the model layer). Display-mode switch animations must not
+    // restore opacity to 1.0 for a null divider.
+    bool IsTabBarDividerNull() const;
+    // The three frame nodes that move together whenever the tab bar enters or
+    // exits a bar display arrangement: the bar itself, its divider and the
+    // floating background mask (when present). Nodes that do not exist (yet)
+    // are left null — write sites gate on the fields they need.
+    struct TabBarTransitionNodes {
+        RefPtr<FrameNode> tabBar;
+        RefPtr<FrameNode> tabBarDivider;
+        RefPtr<FrameNode> bgMaskNode;
+    };
+    TabBarTransitionNodes GetTabBarTransitionNodes() const;
+    // Whether keepTabBarInSideBar keeps the tab bar visible in the sidebar
+    // arrangement (the bar then never joins mode-switch hides).
+    bool IsKeepTabBarInSideBarMode() const;
+    // Set one opacity on the transition nodes: tab bar, divider, and — only
+    // for the floating bar families, which animate the mask — the background
+    // mask. Restoring visibility (non-zero opacity) must skip a divider
+    // explicitly set to null (the model layer hides it via opacity 0);
+    // hiding (zero opacity) always applies.
+    void UpdateTabBarTransitionOpacity(
+        const TabBarTransitionNodes& nodes, float opacity, bool withBackgroundMask);
+    // Two-pass sidebar collapse/expand switch: the click only registers the
+    // request and marks the tabs dirty. The next layout pass (pass 1) keeps
+    // the "from" arrangement but additionally measures/layouts the entering
+    // components so they have valid geometry; an after-layout task then
+    // applies the initial transforms and starts the animation whose closure
+    // re-enters layout (pass 2) in the "to" arrangement (re-entrant
+    // FlushUITasks) and sets the sidebar translate target — plus the bottom
+    // bar transform/opacity targets only when showBottomBarOnSidebarCollapse
+    // lets the bar join the switch. No-op while another switch is
+    // pending/running.
+    void RequestSidebarCollapseSwitchAnimation(bool toCollapsed);
+    // Phase of the two-pass sidebar collapse/expand switch state machine.
+    enum class SidebarCollapseSwitchState {
+        NONE = 0,
+        COLLAPSE_REQUESTED,
+        COLLAPSE_ANIMATING,
+        EXPAND_REQUESTED,
+        EXPAND_ANIMATING,
+    };
+    bool IsSidebarCollapseSwitchBusy() const
+    {
+        return sidebarCollapseSwitchState_ != SidebarCollapseSwitchState::NONE;
+    }
+    bool IsSidebarCollapseSwitchRequested() const
+    {
+        return sidebarCollapseSwitchState_ == SidebarCollapseSwitchState::COLLAPSE_REQUESTED ||
+               sidebarCollapseSwitchState_ == SidebarCollapseSwitchState::EXPAND_REQUESTED;
+    }
+    bool IsSidebarCollapseSwitchToCollapsed() const
+    {
+        return sidebarCollapseSwitchState_ == SidebarCollapseSwitchState::COLLAPSE_REQUESTED ||
+               sidebarCollapseSwitchState_ == SidebarCollapseSwitchState::COLLAPSE_ANIMATING;
+    }
+    bool IsOnSidebarCollapseSwitchAnimation() const
+    {
+        return sidebarCollapseSwitchState_ == SidebarCollapseSwitchState::COLLAPSE_ANIMATING ||
+               sidebarCollapseSwitchState_ == SidebarCollapseSwitchState::EXPAND_ANIMATING;
+    }
+    // Whether the steady layout is in the "sidebar collapsed with bottom bar
+    // shown" arrangement (content shrinks by the bar height, sidebar GONE).
+    bool IsBottomBarShownAfterCollapse() const
+    {
+        return bottomBarShownAfterCollapse_;
+    }
+    // Whether the in-flight collapse/expand switch actually has the bottom bar
+    // participating. Frozen at switch start (StartSidebarCollapseSwitchAnimation):
+    // a mid-animation flip of showBottomBarOnSidebarCollapse must not change the
+    // running switch — it takes effect on the next switch. The animation-phase
+    // masking in the layout algorithm reads this instead of re-evaluating the
+    // live property, so pass-1/pass-2/finish stay consistent with the started
+    // animation.
+    bool IsSidebarCollapseSwitchWithBottomBar() const
+    {
+        return sidebarCollapseSwitchWithBottomBar_;
+    }
+    // Invoked from the after-layout task of the pass-1 layout.
+    void StartSidebarCollapseSwitchAnimation();
+
     bool IsTabBarFollowingHand() const
     {
         return floatingBarPosition_ != FloatingBarPosition::CENTER || floatTabBarFollowHandAnimationCount_ > 0;
@@ -648,6 +747,42 @@ private:
         bool toSidebar, float outsideX, const std::function<void()>& finishCb);
     void StartFloatingTabBarExitAnim(float baseScale, const std::function<void()>& finishCb);
     void StartFloatingTabBarEnterAnim(float baseScale, const std::function<void()>& finishCb);
+    // Bottom tab bar show/hide on sidebar collapse/expand (two-pass switch):
+    // per-variant transform targets. Floating tab bar scales+fades; normal
+    // bottom tab bar slides (translate = ±tabBarHeight+dividerHeight)+fades.
+    void ApplyFloatingTabBarShownTargets();
+    void ApplyFloatingTabBarHiddenTargets();
+    void ApplyNonFloatingTabBarShownTargets();
+    void ApplyNonFloatingTabBarHiddenTargets(float tabHeight);
+    // Dispatch to the variant targets above; keepMode (keepTabBarInSideBar)
+    // keeps the tab bar managed by the sidebar mode and is skipped.
+    void ApplyBottomBarShownTargets();
+    void ApplyBottomBarHiddenTargets(float tabHeight);
+    // Instantly (non-animated) hide a still-visible tab bar at sidebar-expand
+    // animation start when the bar does not join the switch animation
+    // (non-bottom placements never animate): restores the SIDEBAR
+    // arrangement's hidden invariant. keepMode keeps the bar visible and is
+    // skipped.
+    void HideTabBarForSidebarRestore();
+    // Set translate on sidebar + sidebar divider (shared by both directions).
+    void ApplySideBarTranslate(float translateX);
+    // Animation frames of the two-pass collapse/expand switch, invoked from the
+    // StartAnimation closures (lambdas stay thin).
+    // Main (228/30) frame: pass-2 re-entrant layout in the "to" arrangement +
+    // sidebar translate (+ normal bottom bar translate/opacity targets).
+    // tabHeight: bar height captured from the pass-1 geometry before the
+    // animation starts (expand-direction exit target); withBottomBar: whether
+    // the bottom tab bar actually joined this switch (captured at start).
+    void RunSidebarCollapseSwitchMainFrame(bool toCollapsed, float tabHeight, bool withBottomBar);
+    // Floating bar (228/20) frame: bottom tab bar scale+opacity targets only.
+    void RunSidebarCollapseSwitchFloatingBarFrame(bool toCollapsed, float tabHeight);
+    // Finish bookkeeping of the two-pass collapse/expand switch animation:
+    // flip the shown-after-collapse arrangement flag, set the leaving element
+    // GONE, reset transient transforms and clear the animation flags.
+    // withBottomBar: whether the bottom tab bar actually participated in this
+    // switch (collapse: showBottomBarOnSidebarCollapse read at animation start;
+    // expand: it was shown by the collapse switch).
+    void OnSidebarCollapseSwitchAnimationFinished(bool toCollapsed, bool withBottomBar);
 
     bool isCustomAnimation_ = false;
     bool isDisableSwipe_ = false;
@@ -725,6 +860,16 @@ private:
     bool isOnDisplayModeSwitchAnimation_ = false;
     int32_t displayModeAnimCount_ = 0;
     std::optional<TabBarDisplayMode> displayModeAnimTarget_;
+    // Two-pass collapse/expand switch (showBottomBarOnSidebarCollapse):
+    // sidebarCollapseSwitchState_ = single state machine covering the
+    // requested (waiting for the pass-1 layout) and animating (pass-2
+    // re-entrant) phases, in both collapse and expand directions;
+    // bottomBarShownAfterCollapse_ = steady arrangement flag.
+    SidebarCollapseSwitchState sidebarCollapseSwitchState_ = SidebarCollapseSwitchState::NONE;
+    bool bottomBarShownAfterCollapse_ = false;
+    // Frozen "bar participates" decision of the in-flight switch (see
+    // IsSidebarCollapseSwitchWithBottomBar); reset together with the state.
+    bool sidebarCollapseSwitchWithBottomBar_ = false;
     std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
     std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
     bool tabBarClickIntercept_ = false;

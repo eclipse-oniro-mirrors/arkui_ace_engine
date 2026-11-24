@@ -2893,6 +2893,14 @@ void TabsModelNG::SetShowSidebarControlButton(FrameNode* frameNode, bool showCon
     pattern->SetShowSidebarControlButton(showControlButton);
 }
 
+void TabsModelNG::SetShowBottomBarOnSidebarCollapse(FrameNode* frameNode, bool show)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    layoutProperty->UpdateShowBottomBarOnSidebarCollapse(show);
+}
+
 void TabsModelNG::SetSidebarTitleBar(const TabsSidebarTitleBarOptions& options)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();

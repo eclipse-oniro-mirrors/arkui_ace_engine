@@ -113,6 +113,9 @@ constexpr int32_t DISPLAY_MODE_FLOATING_PHASE2_DELAY = 200; // ms — phase2 sta
 constexpr int32_t DISPLAY_MODE_ANIMATION_DURATION = 500; // ms
 // floatingTabbar enter/exit scale bounds (per spec).
 constexpr float FLOATING_BAR_ENTER_SCALE = 0.4f;
+// Bottom tab bar show/hide duration on sidebar collapse/expand: matches the sidebar
+// slide duration so both animations run over the same window on a collapse click.
+constexpr int32_t SIDEBAR_COLLAPSE_SWITCH_ANIM_DURATION = 300; // ms
 constexpr float FLOATING_BAR_PHASE1_SCALE_X = 0.95f;
 constexpr float FLOATING_BAR_PHASE1_SCALE_Y = 1.05f;
 // Color invert constants for auto-inversion
@@ -1950,7 +1953,11 @@ void TabsPattern::ResetTabBarFollowHandPosition()
     auto renderContext = tabBar->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     floatingBarPosition_ = FloatingBarPosition::CENTER;
-    if (isOnDisplayModeSwitchAnimation_) {
+    // The sidebar collapse/expand switch animation owns the floating bar scale
+    // during the switch (enter transform -> shown target); a direct write here
+    // (e.g. from the pass-2 re-entrant layout via MeasureTabBar) would fight
+    // with it and make the bar pop.
+    if (isOnDisplayModeSwitchAnimation_ || IsSidebarCollapseSwitchBusy()) {
         return;
     }
     renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
@@ -2174,7 +2181,7 @@ void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
     if (!renderContext->HasTransformScale() && !isFloatingScaleEnabled) {
         return;
     }
-    if (isOnDisplayModeSwitchAnimation_) {
+    if (isOnDisplayModeSwitchAnimation_ || IsSidebarCollapseSwitchBusy()) {
         return;
     }
     renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
@@ -2891,7 +2898,14 @@ void TabsPattern::UpdateCollapseButtonForDisplayMode(TabBarDisplayMode mode)
 {
     auto host = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(host);
-    if (mode != TabBarDisplayMode::SIDEBAR) {
+    // The collapsed-with-bottom-bar state also reports a non-SIDEBAR display
+    // mode (the pass-2 switch layout flips currentBarDisplayMode_), but the
+    // collapse button must SURVIVE there — it is the expand entry. Keep it
+    // while the collapse switch is in flight (busy) and in the collapsed
+    // steady state; only a real display-mode switch away from SIDEBAR
+    // (breakpoint-driven) removes the button.
+    if (mode != TabBarDisplayMode::SIDEBAR && !IsSidebarCollapseSwitchBusy() &&
+        !IsBottomBarShownAfterCollapse()) {
         if (collapseButtonNode_) {
             host->RemoveChild(collapseButtonNode_);
             host->MarkNeedSyncRenderTree();
@@ -3915,13 +3929,532 @@ void TabsPattern::StartFloatingTabBarEnterAnim(float baseScale, const std::funct
         CHECK_NULL_VOID(tabBarRC);
         tabBarRC->UpdateTransformScale({ baseScale, baseScale });
         tabBarRC->UpdateOpacity(1.0);
-        if (tabBarDivider) {
+        if (tabBarDivider && !pattern->IsTabBarDividerNull()) {
             tabBarDivider->GetRenderContext()->UpdateOpacity(1.0);
         }
         if (bgMaskNode) {
             bgMaskNode->GetRenderContext()->UpdateOpacity(1.0);
         }
     }, opt.GetOnFinishEvent(), nullptr, context);
+}
+
+bool TabsPattern::IsShowBottomBarOnSidebarCollapseEnabled() const
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    if (!tabsNode) {
+        return false;
+    }
+    auto layoutProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    if (!layoutProperty) {
+        return false;
+    }
+    return layoutProperty->GetShowBottomBarOnSidebarCollapseValue(false);
+}
+
+bool TabsPattern::IsTabBarBottomStyle() const
+{
+    // Floating bars always count as bottom bars (they float at the bottom).
+    if (isFloatingBar_) {
+        return true;
+    }
+    // Normal bars only when actually placed at the bottom: the tabs content is
+    // horizontal (not vertical) and the bar position is END (bottom).
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(property, false);
+    bool isVertical = property->GetAxis().value_or(Axis::HORIZONTAL) == Axis::VERTICAL;
+    bool isBarPositionEnd = property->GetTabBarPosition().value_or(BarPosition::START) == BarPosition::END;
+    bool isTopLayoutStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM) == TabBarLayoutStyle::TOP;
+    bool bottomStyle = !isVertical && isBarPositionEnd && !isTopLayoutStyle;
+    return bottomStyle;
+}
+
+bool TabsPattern::IsTabBarNodeVisible() const
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_RETURN(host, false);
+    auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
+    CHECK_NULL_RETURN(tabBar, false);
+    auto tabBarLayoutProperty = tabBar->GetLayoutProperty();
+    CHECK_NULL_RETURN(tabBarLayoutProperty, false);
+    return tabBarLayoutProperty->GetVisibilityValue(VisibleType::VISIBLE) != VisibleType::GONE;
+}
+
+bool TabsPattern::IsTabBarDividerNull() const
+{
+    // A divider explicitly set to null is hidden by the model layer purely via
+    // divider-node opacity 0 (the layout property keeps strokeWidth 1.0). The
+    // display-mode switch animations must not un-hide it: opacity restores
+    // only apply to a real (non-null) divider. A never-set divider keeps the
+    // default TabsItemDivider (isNull == false), so it is unaffected.
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_RETURN(host, false);
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, false);
+    return layoutProperty->GetDivider().value_or(TabsItemDivider()).isNull;
+}
+
+TabsPattern::TabBarTransitionNodes TabsPattern::GetTabBarTransitionNodes() const
+{
+    TabBarTransitionNodes nodes;
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    if (!host) {
+        return nodes;
+    }
+    nodes.tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
+    nodes.tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
+    nodes.bgMaskNode = host->HasBackgroundMaskNode() ?
+        AceType::DynamicCast<FrameNode>(host->GetBackgroundMask()) : nullptr;
+    return nodes;
+}
+
+bool TabsPattern::IsKeepTabBarInSideBarMode() const
+{
+    auto layoutProperty = GetLayoutProperty<TabsLayoutProperty>();
+    return layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
+}
+
+void TabsPattern::UpdateTabBarTransitionOpacity(
+    const TabBarTransitionNodes& nodes, float opacity, bool withBackgroundMask)
+{
+    if (nodes.tabBar) {
+        auto tabBarRC = nodes.tabBar->GetRenderContext();
+        if (tabBarRC) {
+            tabBarRC->UpdateOpacity(opacity);
+        }
+    }
+    if (nodes.tabBarDivider && (opacity == 0.0f || !IsTabBarDividerNull())) {
+        auto dividerRC = nodes.tabBarDivider->GetRenderContext();
+        if (dividerRC) {
+            dividerRC->UpdateOpacity(opacity);
+        }
+    }
+    if (withBackgroundMask && nodes.bgMaskNode) {
+        auto bgMaskRC = nodes.bgMaskNode->GetRenderContext();
+        if (bgMaskRC) {
+            bgMaskRC->UpdateOpacity(opacity);
+        }
+    }
+}
+
+bool TabsPattern::WillBottomBarJoinCollapseSwitch(bool toCollapsed) const
+{
+    // Whether the bottom tab bar actually participates in (this phase of) the
+    // sidebar collapse/expand switch: it must be a bottom-style bar, and
+    // - collapse: showBottomBarOnSidebarCollapse is enabled (read at use time);
+    // - expand: hiding the bar with the sidebar restore is an invariant — a
+    //   currently visible bar joins the switch so its exit is animated
+    //   (whether the collapse switch is the one that showed it no longer
+    //   matters). A GONE bar has nothing to animate.
+    // keepTabBarInSideBar keeps the tab bar visible in the sidebar
+    // arrangement, so on expand the bar never joins the switch in that mode.
+    if (!IsTabBarBottomStyle()) {
+        return false;
+    }
+    if (toCollapsed) {
+        return IsShowBottomBarOnSidebarCollapseEnabled();
+    }
+    if (IsKeepTabBarInSideBarMode()) {
+        return false;
+    }
+    return IsTabBarNodeVisible();
+}
+
+void TabsPattern::RequestSidebarCollapseSwitchAnimation(bool toCollapsed)
+{
+    // One switch at a time: reject while another request is pending or a
+    // switch animation is still running.
+    if (IsSidebarCollapseSwitchBusy()) {
+        TAG_LOGI(AceLogTag::ACE_TABS,
+            "Sidebar collapse switch request rejected while busy, toCollapsed=%{public}d", toCollapsed);
+        return;
+    }
+    sidebarCollapseSwitchState_ = toCollapsed ? SidebarCollapseSwitchState::COLLAPSE_REQUESTED
+                                              : SidebarCollapseSwitchState::EXPAND_REQUESTED;
+    TAG_LOGI(AceLogTag::ACE_TABS,
+        "Sidebar collapse switch requested, toCollapsed=%{public}d", toCollapsed);
+}
+
+void TabsPattern::StartSidebarCollapseSwitchAnimation()
+{
+    // Invoked from the after-layout task of the pass-1 layout: the entering
+    // components now have valid geometry, apply their initial transforms and
+    // start the single two-phase switch animation.
+    if (sidebarCollapseSwitchState_ != SidebarCollapseSwitchState::COLLAPSE_REQUESTED &&
+        sidebarCollapseSwitchState_ != SidebarCollapseSwitchState::EXPAND_REQUESTED) {
+        return;
+    }
+    bool toCollapsed = IsSidebarCollapseSwitchToCollapsed();
+    sidebarCollapseSwitchState_ = toCollapsed ? SidebarCollapseSwitchState::COLLAPSE_ANIMATING
+                                              : SidebarCollapseSwitchState::EXPAND_ANIMATING;
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
+    auto tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
+    auto context = host->GetContextRefPtr();
+    CHECK_NULL_VOID(context);
+    CHECK_NULL_VOID(tabBar);
+    TAG_LOGI(AceLogTag::ACE_TABS,
+        "Start sidebar collapse switch animation, toCollapsed=%{public}d", toCollapsed);
+
+    // The collapse button icon morph belongs to the concrete animation path: it
+    // starts together with the two-pass switch animation (not at registration
+    // time in TabsSideBarPattern::OnCollapseButtonClick).
+    auto sideBar = GetSideBarNode();
+    auto sideBarPattern = sideBar ? sideBar->GetPattern<TabsSideBarPattern>() : nullptr;
+    if (sideBarPattern) {
+        sideBarPattern->AnimateCollapseButtonIconRotation(toCollapsed);
+    }
+
+    // showBottomBarOnSidebarCollapse only decides whether the bottom tab bar
+    // additionally joins the collapse-direction switch; the two-pass sidebar
+    // slide itself always runs (merged with the former legacy slide path). The
+    // bar joins only when it is a bottom-style bar (floating bar, or a normal
+    // bar actually at the bottom: not vertical + barPosition END) — other
+    // placements never animate; on expand direction they are hidden instantly
+    // at animation start instead (HideTabBarForSidebarRestore below).
+    bool withBottomBar = WillBottomBarJoinCollapseSwitch(toCollapsed);
+    // Freeze the participation decision for the whole switch: the animation-
+    // phase masking in the layout algorithm reads this flag (not the live
+    // property), so flipping showBottomBarOnSidebarCollapse mid-animation
+    // cannot diverge pass-2/finish from the started animation (a mid-flight
+    // property flip then takes effect on the NEXT switch).
+    sidebarCollapseSwitchWithBottomBar_ = withBottomBar;
+
+    // Initial transforms on the entering element (its geometry comes from the
+    // pass-1 animation-start layout).
+    if (toCollapsed) {
+        // Sidebar keeps its current in-place state as the exit start. The
+        // bottom tab bar additionally enters when enabled: from below the
+        // screen edge (non-floating) or scaled down at the bottom center
+        // (floating).
+        // Explicitly establish the exit-start translate (0) BEFORE the
+        // animation starts: the very first collapse may run with an unset
+        // translate render property on the sidebar/divider, and the pass-2
+        // target write inside the animation then jumps straight to the outside
+        // position instead of interpolating (subsequent cycles already have
+        // the property — the expand path's entering transform and the finish
+        // reset both write it). The expand arm below establishes its start
+        // transform the same way.
+        ApplySideBarTranslate(0.0f);
+        if (withBottomBar) {
+            ApplyEnteringBottomTabBarInitialTransform(tabBar, tabBarDivider);
+        }
+    } else {
+        // Sidebar + sidebar divider enter from outside; the bottom tab bar
+        // keeps its shown state as the exit start.
+        ApplyEnteringSidebarInitialTransform(CalcSidebarOutsideTranslateX());
+        if (!withBottomBar) {
+            // Expand without the bar joining the switch animation (non-bottom
+            // placement, or keepMode): hiding the bar with the sidebar restore
+            // is an invariant, and non-bottom placements never animate — hide
+            // any still-visible bar instantly here, BEFORE StartAnimation (i.e.
+            // outside any animation scope), restoring the SIDEBAR arrangement's
+            // hidden invariant. keepMode keeps the bar visible (skipped inside).
+            HideTabBarForSidebarRestore();
+        }
+    }
+
+    // The bottom bar exit target (expand direction) needs the bar height,
+    // captured from the pass-1 geometry before the animation starts.
+    float tabHeight = 0.0f;
+    auto tabBarGeo = tabBar->GetGeometryNode();
+    if (tabBarGeo) {
+        tabHeight += tabBarGeo->GetFrameSize().Height();
+    }
+    if (tabBarDivider) {
+        auto dividerGeo = tabBarDivider->GetGeometryNode();
+        if (dividerGeo) {
+            tabHeight += dividerGeo->GetFrameSize().Height();
+        }
+    }
+
+    // Animation split by bottom bar type (spec):
+    //  - normal bar: tab bar and sidebar both translate on the same 228/30
+    //    spring, so they are folded into ONE animation and move in sync;
+    //  - floating bar: the tab bar does scale+opacity on the floating 228/20
+    //    spring while the sidebar translates on 228/30 — the curves differ,
+    //    so a SECOND animation is started for the bar alongside the first.
+    // The pass-2 re-entrant layout and the sidebar slide always live in the
+    // first (228/30) animation; its finish event drives the state machine.
+    bool floatingBar = isFloatingBar_;
+    AnimationOption option;
+    option.SetDuration(SIDEBAR_COLLAPSE_SWITCH_ANIM_DURATION);
+    option.SetCurve(DISPLAY_MODE_TRANSLATE_CURVE);
+    option.SetOnFinishEvent([weakPattern = WeakClaim(this), toCollapsed, withBottomBar]() {
+        auto pattern = weakPattern.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->OnSidebarCollapseSwitchAnimationFinished(toCollapsed, withBottomBar);
+    });
+    AnimationUtils::StartAnimation(option,
+        [weakPattern = WeakClaim(this), toCollapsed, tabHeight, withBottomBar]() {
+            auto pattern = weakPattern.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->RunSidebarCollapseSwitchMainFrame(toCollapsed, tabHeight, withBottomBar);
+        }, option.GetOnFinishEvent(), nullptr, context);
+
+    if (!withBottomBar || !floatingBar) {
+        return;
+    }
+    // Floating bar: scale+opacity on its own 228/20 spring. Started right
+    // after the first animation (whose closure already ran the pass-2
+    // relayout above), so both animations begin on the same frame with the
+    // final geometry known.
+    AnimationOption barOption;
+    barOption.SetDuration(SIDEBAR_COLLAPSE_SWITCH_ANIM_DURATION);
+    barOption.SetCurve(DISPLAY_MODE_FLOATING_CURVE);
+    AnimationUtils::StartAnimation(barOption,
+        [weakPattern = WeakClaim(this), toCollapsed, tabHeight]() {
+            auto pattern = weakPattern.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->RunSidebarCollapseSwitchFloatingBarFrame(toCollapsed, tabHeight);
+        }, nullptr, nullptr, context);
+}
+
+void TabsPattern::RunSidebarCollapseSwitchMainFrame(bool toCollapsed, float tabHeight, bool withBottomBar)
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    // Pass 2: re-entrant layout in the "to" arrangement. The content
+    // reflows (full width once the sidebar leaves / height minus the
+    // bar once it appears) and the exiting component keeps geometry
+    // via the animation-side extra layout.
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    context->FlushUITasks();
+
+    ApplySideBarTranslate(toCollapsed ? CalcSidebarOutsideTranslateX() : 0.0f);
+    bool floatingBar = isFloatingBar_;
+    if (!floatingBar && withBottomBar) {
+        // Normal bar: same 228/30 translate curve -> same animation.
+        if (toCollapsed) {
+            ApplyBottomBarShownTargets();
+        } else {
+            ApplyBottomBarHiddenTargets(tabHeight);
+        }
+    }
+}
+
+void TabsPattern::RunSidebarCollapseSwitchFloatingBarFrame(bool toCollapsed, float tabHeight)
+{
+    if (toCollapsed) {
+        ApplyBottomBarShownTargets();
+    } else {
+        ApplyBottomBarHiddenTargets(tabHeight);
+    }
+}
+
+void TabsPattern::ApplySideBarTranslate(float translateX)
+{
+    auto sideBar = GetSideBarNode();
+    auto sideBarDivider = GetSideBarDividerNode();
+    if (sideBar) {
+        auto renderContext = sideBar->GetRenderContext();
+        if (renderContext) {
+            renderContext->UpdateTransformTranslate({ translateX, 0.0f, 0.0f });
+        }
+    }
+    if (sideBarDivider) {
+        auto renderContext = sideBarDivider->GetRenderContext();
+        if (renderContext) {
+            renderContext->UpdateTransformTranslate({ translateX, 0.0f, 0.0f });
+        }
+    }
+}
+
+void TabsPattern::ApplyBottomBarShownTargets()
+{
+    if (IsKeepTabBarInSideBarMode()) {
+        return;
+    }
+    if (isFloatingBar_) {
+        ApplyFloatingTabBarShownTargets();
+    } else {
+        ApplyNonFloatingTabBarShownTargets();
+    }
+}
+
+void TabsPattern::ApplyBottomBarHiddenTargets(float tabHeight)
+{
+    if (IsKeepTabBarInSideBarMode()) {
+        return;
+    }
+    if (isFloatingBar_) {
+        ApplyFloatingTabBarHiddenTargets();
+    } else {
+        ApplyNonFloatingTabBarHiddenTargets(tabHeight);
+    }
+}
+
+void TabsPattern::HideTabBarForSidebarRestore()
+{
+    // Instant (non-animated) hide of a still-visible tab bar at sidebar-expand
+    // animation start: invoked from StartSidebarCollapseSwitchAnimation BEFORE
+    // StartAnimation, i.e. outside any animation scope, so the visibility flip
+    // and transform resets take effect on the next layout pass without
+    // interpolation. Only reached when the bar does not join the switch
+    // animation (non-bottom placement — those never animate). keepMode
+    // (keepTabBarInSideBar) keeps the bar visible in the sidebar arrangement
+    // and is skipped; a GONE bar needs nothing.
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    bool keepMode = IsKeepTabBarInSideBarMode();
+    if (keepMode || !IsTabBarNodeVisible()) {
+        return;
+    }
+    // tabBar-family only by design: unlike the end-of-animation cleanup pair
+    // (ResetDisplayModeSwitchTransforms + SetElementVisibilityForMode), this
+    // runs at expand animation START, right after
+    // ApplyEnteringSidebarInitialTransform set the sidebar's offscreen entry
+    // translate — a full Reset would zero that translate and destroy the
+    // slide-in start point. Only the tab bar family (bar / divider / mask) is
+    // hidden and reset here.
+    auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
+    auto tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
+    auto bgMaskNode = host->HasBackgroundMaskNode() ?
+        AceType::DynamicCast<FrameNode>(host->GetBackgroundMask()) : nullptr;
+    if (tabBar) {
+        tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+        auto tabBarRC = tabBar->GetRenderContext();
+        if (tabBarRC) {
+            tabBarRC->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+            if (isFloatingBar_) {
+                tabBarRC->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
+            }
+            tabBarRC->UpdateOpacity(1.0);
+        }
+        tabBar->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+    if (tabBarDivider) {
+        tabBarDivider->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+        auto dividerRC = tabBarDivider->GetRenderContext();
+        if (dividerRC) {
+            dividerRC->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+            if (!IsTabBarDividerNull()) {
+                dividerRC->UpdateOpacity(1.0);
+            }
+        }
+    }
+    if (bgMaskNode) {
+        bgMaskNode->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+        auto bgMaskRC = bgMaskNode->GetRenderContext();
+        if (bgMaskRC) {
+            bgMaskRC->UpdateOpacity(1.0);
+        }
+    }
+}
+
+void TabsPattern::ApplyFloatingTabBarShownTargets()
+{
+    auto nodes = GetTabBarTransitionNodes();
+    CHECK_NULL_VOID(nodes.tabBar);
+    auto tabBarRC = nodes.tabBar->GetRenderContext();
+    CHECK_NULL_VOID(tabBarRC);
+    tabBarRC->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
+    UpdateTabBarTransitionOpacity(nodes, 1.0f, true);
+}
+
+void TabsPattern::ApplyFloatingTabBarHiddenTargets()
+{
+    auto nodes = GetTabBarTransitionNodes();
+    CHECK_NULL_VOID(nodes.tabBar);
+    auto tabBarRC = nodes.tabBar->GetRenderContext();
+    CHECK_NULL_VOID(tabBarRC);
+    float targetScale = FLOATING_BAR_ENTER_SCALE * baseFloatingScale_;
+    tabBarRC->UpdateTransformScale({ targetScale, targetScale });
+    UpdateTabBarTransitionOpacity(nodes, 0.0f, true);
+}
+
+void TabsPattern::ApplyNonFloatingTabBarShownTargets()
+{
+    auto nodes = GetTabBarTransitionNodes();
+    CHECK_NULL_VOID(nodes.tabBar);
+    auto tabBarRC = nodes.tabBar->GetRenderContext();
+    CHECK_NULL_VOID(tabBarRC);
+    tabBarRC->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+    if (nodes.tabBarDivider) {
+        auto dividerRC = nodes.tabBarDivider->GetRenderContext();
+        if (dividerRC) {
+            dividerRC->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+        }
+    }
+    UpdateTabBarTransitionOpacity(nodes, 1.0f, false);
+}
+
+void TabsPattern::ApplyNonFloatingTabBarHiddenTargets(float tabHeight)
+{
+    auto nodes = GetTabBarTransitionNodes();
+    CHECK_NULL_VOID(nodes.tabBar);
+    auto tabBarRC = nodes.tabBar->GetRenderContext();
+    CHECK_NULL_VOID(tabBarRC);
+    tabBarRC->UpdateTransformTranslate({ 0.0f, tabHeight, 0.0f });
+    if (nodes.tabBarDivider) {
+        auto dividerRC = nodes.tabBarDivider->GetRenderContext();
+        if (dividerRC) {
+            dividerRC->UpdateTransformTranslate({ 0.0f, tabHeight, 0.0f });
+        }
+    }
+    UpdateTabBarTransitionOpacity(nodes, 0.0f, false);
+}
+
+void TabsPattern::OnSidebarCollapseSwitchAnimationFinished(bool toCollapsed, bool withBottomBar)
+{
+    TAG_LOGI(AceLogTag::ACE_TABS,
+        "Sidebar collapse switch animation finished, toCollapsed=%{public}d, withBottomBar=%{public}d",
+        toCollapsed, withBottomBar);
+    // Back to the steady state: the switch state machine is complete.
+    sidebarCollapseSwitchState_ = SidebarCollapseSwitchState::NONE;
+    sidebarCollapseSwitchWithBottomBar_ = false;
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    if (toCollapsed) {
+        // Steady collapsed arrangement: the slide-out finished, the sidebar can
+        // leave the render tree. The arrangement becomes
+        // collapsed-with-bottom-bar only when the bar actually participated in
+        // this switch (showBottomBarOnSidebarCollapse). The real display-mode
+        // switch (currentBarDisplayMode_ => BOTTOMTABBAR) and the developer
+        // notification already happened in the pass-2 re-entrant layout via
+        // the standard displayModeChanged machinery — the finish only records
+        // the steady flag used by the breakpoint-change masking in Measure.
+        if (withBottomBar) {
+            bottomBarShownAfterCollapse_ = true;
+        }
+        auto sideBar = GetSideBarNode();
+        auto sideBarDivider = GetSideBarDividerNode();
+        if (sideBar) {
+            sideBar->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+        }
+        if (sideBarDivider) {
+            sideBarDivider->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+        }
+        ApplySideBarTranslate(0.0f);
+        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        return;
+    }
+    // Back to the sidebar arrangement. Hide the bottom tab bar (and its
+    // divider / background mask) and reset the transient animation
+    // transforms so the next show starts from a clean state — only needed
+    // when the bar actually participated (it was shown by the collapse
+    // switch). The display-mode switch back to SIDEBAR and the developer
+    // notification already happened in the pass-2 re-entrant layout via
+    // the standard displayModeChanged machinery; a sidebar-only expand
+    // (collapse ran without the bar) never switched the mode at all.
+    bottomBarShownAfterCollapse_ = false;
+    if (!withBottomBar) {
+        // Final steady-state layout pass in the resolved arrangement.
+        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        return;
+    }
+    // Reuse the standard end-of-animation cleanup pair (same as
+    // OnDisplayModeSwitchAnimationsFinished): transform/opacity resets —
+    // including the null-divider opacity invariant — live in
+    // ResetDisplayModeSwitchTransforms, the tabBar/divider/bgMask visibility
+    // flip back to the sidebar arrangement lives in
+    // SetElementVisibilityForMode(SIDEBAR).
+    ResetDisplayModeSwitchTransforms();
+    SetElementVisibilityForMode(TabBarDisplayMode::SIDEBAR);
+    // Final steady-state layout pass in the resolved arrangement.
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void TabsPattern::OnDisplayModeSwitchAnimationsFinished()

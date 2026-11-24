@@ -2076,6 +2076,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): TabsAttribute;
     sidebarDivider(value: Optional<DividerStyle>): TabsAttribute;
     tabViewCustomization(value: Optional<TabViewCustomization>): TabsAttribute;
+    showBottomBarOnSidebarCollapse(value: Optional<boolean>): TabsAttribute;
 }
 declare class ArkTabContentComponent extends ArkComponent implements TabContentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);
