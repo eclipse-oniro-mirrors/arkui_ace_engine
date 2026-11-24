@@ -56,6 +56,13 @@ bool InputManager::HasControlComponentPermission()
     return permissionGranted;
 }
 
+bool InputManager::HasPendingInputEvent()
+{
+    auto* inputManager = MMI::InputManager::GetInstance();
+    CHECK_NULL_RETURN(inputManager, false);
+    return inputManager->HasPendingInputEvent();
+}
+
 KeyboardType ConvertKeyboardType(int32_t type)
 {
     switch (type) {

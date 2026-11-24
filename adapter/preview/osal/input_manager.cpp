@@ -38,6 +38,11 @@ bool InputManager::HasControlComponentPermission()
     return false;
 }
 
+bool InputManager::HasPendingInputEvent()
+{
+    return false;
+}
+
 void InputManager::ReportAgentInputDecision(const NG::AgentInputResult&)
 {
 }

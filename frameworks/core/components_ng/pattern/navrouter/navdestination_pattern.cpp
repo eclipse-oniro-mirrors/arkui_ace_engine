@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
+#include "core/common/inspector_tree_activity.h"
 
 #include <cinttypes>
 
@@ -633,14 +634,12 @@ void NavDestinationPattern::OnDetachFromMainTree()
 
 void NavDestinationPattern::ContentChangeByDetaching(PipelineContext* pipeline)
 {
-#ifndef CROSS_PLATFORM
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    mgr->OnTransitionRemoved(host->GetId());
-#endif
+    mgr->OnTransitionRemoved(host->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
 }
 
 void NavDestinationPattern::DumpInfo(std::unique_ptr<JsonValue>& json)

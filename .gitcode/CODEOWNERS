@@ -4684,6 +4684,9 @@ frameworks/core/common/reporter/reporter.h @ArkUI_Event
 frameworks/core/common/statistic_event_adapter.h @ArkUI_Event
 frameworks/core/common/thp_extra_manager.h @ArkUI_ability_group
 frameworks/core/common/window_free_container.h @arkui_framework_xnode
+frameworks/core/common/inspector_tree_activity.h @arkui_framework_xnode
+frameworks/core/common/inspector_tree_input_guard.h @arkui_framework_xnode
+frameworks/core/common/inspector_tree_ui_state.h @arkui_framework_xnode
 frameworks/core/components/common/properties/advanced_text_style.h @huawei_g_five
 frameworks/core/components/common/properties/animatable_color.cpp @arkui_navigation
 frameworks/core/components/common/properties/brightness_option.h @ArkUI_Event

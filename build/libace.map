@@ -4207,8 +4207,8 @@
       OHOS::Ace::NG::ContentChangeManager::MarkCapiScrollToEventSource*;
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperScrollEnd(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperScrollStart(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
-      "OHOS::Ace::NG::ContentChangeManager::OnTransitionAdded(int)";
-      "OHOS::Ace::NG::ContentChangeManager::OnTransitionRemoved(int)";
+      "OHOS::Ace::NG::ContentChangeManager::OnTransitionAdded(int, OHOS::Ace::InspectorTreeActivity)";
+      "OHOS::Ace::NG::ContentChangeManager::OnTransitionRemoved(int, OHOS::Ace::InspectorTreeActivity)";
       "OHOS::Ace::NG::ContentChangeManager::ReportTranslateTextNode(OHOS::Ace::WeakPtr<OHOS::Ace::NG::PageTranslateNode> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::ContentChangeManager::ResetTranslateTextNode(int)";
       "OHOS::Ace::IconStyle OHOS::Ace::NG::Converter::Convert<OHOS::Ace::IconStyle, Ark_TabBarIconStyle>(Ark_TabBarIconStyle const&)";

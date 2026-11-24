@@ -27,6 +27,8 @@
 
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
+#include "core/common/inspector_tree_activity.h"
+#include "core/common/inspector_tree_ui_state.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager_impl.h"
 #include "core/components_ng/manager/content_change_manager/page_scene_split_state.h"
 #include "core/pipeline/base/element_register.h"
@@ -1891,7 +1893,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest020, TestSize.Level
      * @tc.expected: transitioningNodes_ is empty.
      */
     EXPECT_FALSE(contentChangeMgr->IsContentChangeDetectEnable());
-    contentChangeMgr->OnTransitionAdded(NORMAL_NODE_ID);
+    contentChangeMgr->OnTransitionAdded(NORMAL_NODE_ID, InspectorTreeActivity::PAGE_TRANSITION);
     EXPECT_TRUE(contentChangeMgr->transitioningNodes_.empty());
 
     /**
@@ -1901,7 +1903,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest020, TestSize.Level
     ContentChangeConfig config;
     contentChangeMgr->currentContentChangeConfig_ = config;
     EXPECT_TRUE(contentChangeMgr->IsContentChangeDetectEnable());
-    contentChangeMgr->OnTransitionAdded(NORMAL_NODE_ID);
+    contentChangeMgr->OnTransitionAdded(NORMAL_NODE_ID, InspectorTreeActivity::PAGE_TRANSITION);
     EXPECT_FALSE(contentChangeMgr->transitioningNodes_.empty());
     EXPECT_EQ(static_cast<int32_t>(contentChangeMgr->transitioningNodes_.count(NORMAL_NODE_ID)), 1);
     auto size = static_cast<int32_t>(contentChangeMgr->transitioningNodes_.size());
@@ -1921,7 +1923,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest020, TestSize.Level
      * @tc.steps: step5. call OnTransitionAdded with existing node id (duplicate test).
      * @tc.expected: transitioningNodes_ size remains unchanged (set deduplication).
      */
-    contentChangeMgr->OnTransitionAdded(NORMAL_NODE_ID);
+    contentChangeMgr->OnTransitionAdded(NORMAL_NODE_ID, InspectorTreeActivity::PAGE_TRANSITION);
     size = static_cast<int32_t>(contentChangeMgr->transitioningNodes_.size());
     EXPECT_EQ(size, 2);
 
@@ -1954,7 +1956,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest021, TestSize.Level
      * @tc.expected: transitioningNodes_ remains empty.
      */
     EXPECT_TRUE(contentChangeMgr->transitioningNodes_.empty());
-    contentChangeMgr->OnTransitionRemoved(TEST_NODE_ID_NOT_EXIST);
+    contentChangeMgr->OnTransitionRemoved(TEST_NODE_ID_NOT_EXIST, InspectorTreeActivity::PAGE_TRANSITION);
     EXPECT_TRUE(contentChangeMgr->transitioningNodes_.empty());
 
     /**
@@ -1965,7 +1967,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest021, TestSize.Level
     contentChangeMgr->transitioningNodes_.emplace(TEST_TRANSITIONING_NODE_ID);
     auto size = static_cast<int32_t>(contentChangeMgr->transitioningNodes_.size());
     EXPECT_EQ(size, 2);
-    contentChangeMgr->OnTransitionRemoved(TEST_NODE_ID_NOT_EXIST);
+    contentChangeMgr->OnTransitionRemoved(TEST_NODE_ID_NOT_EXIST, InspectorTreeActivity::PAGE_TRANSITION);
     size = static_cast<int32_t>(contentChangeMgr->transitioningNodes_.size());
     EXPECT_EQ(size, 2);
 
@@ -1973,7 +1975,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest021, TestSize.Level
      * @tc.steps: step4. remove an existing node.
      * @tc.expected: transitioningNodes_ size decreases by 1.
      */
-    contentChangeMgr->OnTransitionRemoved(NORMAL_NODE_ID);
+    contentChangeMgr->OnTransitionRemoved(NORMAL_NODE_ID, InspectorTreeActivity::PAGE_TRANSITION);
     size = static_cast<int32_t>(contentChangeMgr->transitioningNodes_.size());
     EXPECT_EQ(size, 1);
     EXPECT_EQ(static_cast<int32_t>(contentChangeMgr->transitioningNodes_.count(NORMAL_NODE_ID)), 0);
@@ -1983,7 +1985,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest021, TestSize.Level
      * @tc.steps: step5. remove the last existing node.
      * @tc.expected: transitioningNodes_ is empty.
      */
-    contentChangeMgr->OnTransitionRemoved(TEST_TRANSITIONING_NODE_ID);
+    contentChangeMgr->OnTransitionRemoved(TEST_TRANSITIONING_NODE_ID, InspectorTreeActivity::PAGE_TRANSITION);
     EXPECT_TRUE(contentChangeMgr->transitioningNodes_.empty());
 
     /**
@@ -2180,6 +2182,32 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest025, TestSize.Level
      */
     contentChangeMgr->scrollingSwiperNodes_.clear();
     EXPECT_FALSE(contentChangeMgr->IsSwiperScrolling());
+}
+
+/**
+ * @tc.name: ContentChangeManagerTest025A
+ * @tc.desc: Swiper transition and scroll activities are cleared independently.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest025A, TestSize.Level1)
+{
+    auto contentChangeMgr = GetContentChangeManager();
+    ASSERT_NE(contentChangeMgr, nullptr);
+    contentChangeMgr->StopContentChangeReport();
+
+    auto frameNode = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 102, AceType::MakeRefPtr<SwiperPattern>());
+    ASSERT_NE(frameNode, nullptr);
+
+    contentChangeMgr->OnTransitionAdded(frameNode->GetId(), InspectorTreeActivity::SWIPER_TRANSITION);
+    contentChangeMgr->OnSwiperScrollStartInner(frameNode);
+    EXPECT_STREQ(InspectorTreeUiState::GetActiveError(), "SWIPER_ANIMATING");
+
+    contentChangeMgr->OnTransitionRemoved(frameNode->GetId(), InspectorTreeActivity::SWIPER_TRANSITION);
+    EXPECT_STREQ(InspectorTreeUiState::GetActiveError(), "SWIPER_ANIMATING");
+
+    contentChangeMgr->OnSwiperScrollEnd(frameNode);
+    EXPECT_EQ(InspectorTreeUiState::GetActiveError(), nullptr);
+    contentChangeMgr->StopContentChangeReport();
 }
 
 /**
@@ -2449,7 +2477,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerStartEventTest003, Test
     EXPECT_CALL(*mockUiSessionManager, ReportContentChangeEvent(ChangeType::SCROLL_START, _)).Times(1);
     contentChangeMgr->OnContentChangeStart(node, ChangeType::PAGE);
     contentChangeMgr->OnContentChangeStart(node, ChangeType::SCROLL);
-    contentChangeMgr->OnTransitionAdded(node->GetId());
+    contentChangeMgr->OnTransitionAdded(node->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
     contentChangeMgr->OnScrollChangeStart(node);
     Mock::VerifyAndClearExpectations(mockUiSessionManager);
 
@@ -4170,7 +4198,7 @@ HWTEST_F(ContentChangeManagerTestNg, CapiPageInterruptUsesMetadataLikeIpc, TestS
 
 /**
  * @tc.name: CapiScrollInterruptKeepsIpcStateWithoutBlockingNextNode
- * @tc.desc: CAPI interruption cleanup leaves IPC state unchanged and permits later normal scroll END.
+ * @tc.desc: CAPI interruption cleanup permits a later normal scroll END to complete the IPC cycle.
  * @tc.type: FUNC
  */
 HWTEST_F(ContentChangeManagerTestNg, CapiScrollInterruptKeepsIpcStateWithoutBlockingNextNode, TestSize.Level1)
@@ -4195,16 +4223,18 @@ HWTEST_F(ContentChangeManagerTestNg, CapiScrollInterruptKeepsIpcStateWithoutBloc
     pattern->scrollStop_ = true;
     pattern->scrollAbort_ = true;
     pattern->OnScrollStop(nullptr, nullptr);
-    EXPECT_TRUE(manager->IsScrolling());
+    EXPECT_FALSE(manager->IsScrolling());
     EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
     EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
     EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SCROLL_START));
     EXPECT_EQ(state.types, (std::vector<uint32_t> { SCROLL_START, SCROLL_END }));
+    Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
     auto next = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, node->GetId() + 1, AceType::MakeRefPtr<ScrollPattern>());
     manager->OnScrollChangeStart(next);
     manager->OnContentChangeStart(next, ChangeType::SCROLL);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::SCROLL, _)).Times(1);
     manager->OnScrollChangeEnd(next);
-    EXPECT_TRUE(manager->IsScrolling());
+    EXPECT_FALSE(manager->IsScrolling());
     EXPECT_TRUE(manager->capiImpl_->capiScrollingNodes_.empty());
     EXPECT_TRUE(manager->capiImpl_->capiScrollSources_.empty());
     EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SCROLL_START));
@@ -4240,12 +4270,12 @@ HWTEST_F(ContentChangeManagerTestNg, CapiSwiperInterruptKeepsIpcStateAndAutoPlay
         manager->OnSwiperChangeStart(node, false);
         ASSERT_TRUE(manager->IsTransitioning());
         pattern->ContentChangeOnTransitionEnd(node, true);
-        EXPECT_TRUE(manager->IsTransitioning());
+        EXPECT_FALSE(manager->IsTransitioning());
         EXPECT_EQ(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START), !autoPlay);
         EXPECT_EQ(manager->capiImpl_->capiActiveSwipers_.empty(), autoPlay);
         EXPECT_EQ(manager->capiImpl_->capiPendingSwipers_.empty(), autoPlay);
         manager->OnVsyncEnd(RectF());
-        EXPECT_TRUE(manager->IsTransitioning());
+        EXPECT_FALSE(manager->IsTransitioning());
         EXPECT_TRUE(manager->capiImpl_->capiPendingSwipers_.empty());
         EXPECT_TRUE(manager->capiImpl_->capiActiveSwipers_.empty());
         EXPECT_FALSE(manager->capiImpl_->HasCapiContentChangeStart(node->GetId(), SWIPER_START));
@@ -4904,9 +4934,9 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest001, T
     auto target = FrameNode::CreateFrameNode("NavDestination", 451, AceType::MakeRefPtr<Pattern>(), true);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(2);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, GetSimpleTree(target))).Times(2);
-    manager->OnTransitionAdded(navigation->GetId());
+    manager->OnTransitionAdded(navigation->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
     manager->OnContentChangeStart(navigation, ChangeType::PAGE);
-    manager->OnTransitionAdded(target->GetId());
+    manager->OnTransitionAdded(target->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
     manager->OnContentChangeStart(target, ChangeType::PAGE);
     manager->OnPageTransitionEnd(target, navigation->GetId());
     EXPECT_EQ(manager->transitioningNodes_.count(navigation->GetId()), 0);
@@ -4936,7 +4966,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest002, T
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, HasSubstr("\"$ID\":452"))).Times(2);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, HasSubstr("\"$ID\":452"))).Times(2);
     for (int32_t i = 0; i < 2; ++i) {
-        manager->OnTransitionAdded(navigation->GetId());
+        manager->OnTransitionAdded(navigation->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
         manager->OnContentChangeStart(navigation, ChangeType::PAGE);
         manager->OnContentChangeInterrupted(navigation, ChangeType::PAGE);
         EXPECT_FALSE(manager->IsTransitioning());
@@ -4961,7 +4991,7 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest003, T
     auto navigation = FrameNode::CreateFrameNode("Navigation", 453, AceType::MakeRefPtr<Pattern>(), true);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(1);
     EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, _)).Times(0);
-    manager->OnTransitionAdded(navigation->GetId());
+    manager->OnTransitionAdded(navigation->GetId(), InspectorTreeActivity::PAGE_TRANSITION);
     manager->OnContentChangeStart(navigation, ChangeType::PAGE);
     manager->OnPageTransitionEnd(nullptr, navigation->GetId());
     EXPECT_FALSE(manager->IsTransitioning());

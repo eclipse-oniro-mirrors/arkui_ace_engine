@@ -143,7 +143,7 @@ HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortContinuationTest001, TestSi
 
 /**
  * @tc.name: ContentChangeScrollAbortLegacyTest001
- * @tc.desc: With START reporting disabled, an abort preserves the existing scroll tracking behavior.
+ * @tc.desc: With START reporting disabled, an abort clears the internal scroll tracking state.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortLegacyTest001, TestSize.Level1)
@@ -161,7 +161,7 @@ HWTEST_F(ScrollableTestCore, ContentChangeScrollAbortLegacyTest001, TestSize.Lev
     auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     EXPECT_CALL(*mockUiSessionManager, ReportContentChangeEvent(_, _)).Times(0);
     pattern->OnScrollStop({}, {});
-    EXPECT_TRUE(manager->IsScrolling());
+    EXPECT_FALSE(manager->IsScrolling());
     Mock::VerifyAndClearExpectations(mockUiSessionManager);
     manager->StopContentChangeReport();
 }

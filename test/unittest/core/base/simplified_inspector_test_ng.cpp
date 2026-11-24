@@ -29,6 +29,7 @@
 
 #include "base/utils/utils.h"
 #include "core/common/ace_application_info.h"
+#include "core/common/inspector_tree_input_guard.h"
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/base/simplified_inspector.h"
@@ -1040,4 +1041,40 @@ HWTEST_F(SimplifiedInspectorTestNg, FillInspectorAttrsTest006, TestSize.Level1)
     EXPECT_FALSE(jsonNode->Contains(INSPECTOR_ZINDEX));
     EXPECT_FALSE(jsonNode->Contains(INSPECTOR_VISIBILITY));
 }
+#ifndef CROSS_PLATFORM
+// A pending input arriving after traversal starts must stop siblings and parent attribute collection.
+HWTEST_F(SimplifiedInspectorTestNg, InputInterruptStopsTraversal, TestSize.Level1)
+{
+    auto root = FrameNode::CreateFrameNode("Root", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    for (int i = 0; i < 10; ++i) {
+        root->AddChild(FrameNode::CreateFrameNode("Child", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>()));
+    }
+    int probes = 0;
+    InspectorTreeInputGuard guard(3, [&probes]() { return ++probes == 2; });
+    auto tree = JsonUtil::CreateSharedPtrJson();
+    root->DumpSimplifyTreeWithParamConfig(0, tree, false);
+    EXPECT_TRUE(InspectorTreeInputGuard::IsInterrupted());
+    EXPECT_EQ(probes, 2);
+    EXPECT_FALSE(tree->Contains("$type"));
+}
+
+HWTEST_F(SimplifiedInspectorTestNg, InputInterruptRecovery, TestSize.Level1)
+{
+    auto root = FrameNode::CreateFrameNode("Root", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    {
+        InspectorTreeInputGuard guard(1, []() { return true; });
+        auto tree = JsonUtil::CreateSharedPtrJson();
+        root->DumpSimplifyTreeWithParamConfig(0, tree, false);
+        EXPECT_FALSE(tree->Contains("$type"));
+    }
+    InspectorTreeInputGuard guard(1, []() { return false; });
+    auto tree = JsonUtil::CreateSharedPtrJson();
+    root->DumpSimplifyTreeWithParamConfig(0, tree, false);
+    EXPECT_FALSE(InspectorTreeInputGuard::IsInterrupted());
+    EXPECT_TRUE(tree->Contains("$type"));
+}
+#endif
 } // namespace OHOS::Ace::NG

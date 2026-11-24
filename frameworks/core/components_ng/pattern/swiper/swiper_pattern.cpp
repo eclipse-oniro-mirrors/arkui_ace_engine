@@ -39,6 +39,7 @@
 #include "core/animation/spring_curve.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
+#include "core/common/inspector_tree_activity.h"
 #include "core/common/premake_scope.h"
 #ifndef CROSS_PLATFORM
 #include "base/ressched/ressched_report.h"
@@ -1945,14 +1946,22 @@ void SwiperPattern::FireAnimationStartEvent(
 void SwiperPattern::FireAnimationEndEvent(
     int32_t currentIndex, const AnimationCallbackInfo& info, bool isInterrupt) const
 {
+    auto host = GetHost();
     if (currentIndex == -1) {
+        if (isInterrupt) {
+            ContentChangeOnTransitionEnd(host, true);
+        }
         return;
     }
     auto swiperEventHub = GetEventHub<SwiperEventHub>();
-    CHECK_NULL_VOID(swiperEventHub);
+    if (!swiperEventHub) {
+        if (isInterrupt) {
+            ContentChangeOnTransitionEnd(host, true);
+        }
+        return;
+    }
     isInterrupt ? swiperEventHub->FireAnimationEndOnForceEvent(currentIndex, info)
                 : swiperEventHub->FireAnimationEndEvent(currentIndex, info);
-    auto host = GetHost();
     CHECK_NULL_VOID(host);
     host->OnAccessibilityEvent(AccessibilityEventType::SCROLL_END);
     if (isInterrupt) {
@@ -4043,14 +4052,17 @@ void SwiperPattern::HandleDragEnd(double dragVelocity, float mainDelta)
     if (itemPosition_.empty()) {
         EventReport::ReportScrollableErrorEvent(
             "Swiper", ScrollableErrorType::INTERNAL_ERROR, "Swiper item position is empty.");
+        ContentChangeOnTransitionEnd(GetHost());
         return;
     }
 
     if (IsAutoLinear() && AutoLinearIsOutOfBoundary(0.0f)) {
+        ContentChangeOnTransitionEnd(GetHost());
         return;
     }
 
     if (CheckDragOutOfBoundary(dragVelocity)) {
+        ContentChangeOnTransitionEnd(GetHost());
         return;
     }
 
@@ -8626,7 +8638,7 @@ void SwiperPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyN
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
-    mgr->OnTransitionAdded(keyNode->GetId());
+    mgr->OnTransitionAdded(keyNode->GetId(), InspectorTreeActivity::SWIPER_TRANSITION);
 }
 
 void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode, bool isInterrupt) const
@@ -8636,11 +8648,11 @@ void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNod
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
+    mgr->OnTransitionRemoved(keyNode->GetId(), InspectorTreeActivity::SWIPER_TRANSITION);
     if (isInterrupt) {
         mgr->OnSwiperChangeInterrupted(keyNode, hasTabsAncestor_);
         return;
     }
-    mgr->OnTransitionRemoved(keyNode->GetId());
 }
 
 void SwiperPattern::ContentChangeByDetaching(PipelineContext* pipeline)
@@ -8651,7 +8663,7 @@ void SwiperPattern::ContentChangeByDetaching(PipelineContext* pipeline)
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    mgr->OnTransitionRemoved(host->GetId());
+    mgr->OnTransitionRemoved(host->GetId(), InspectorTreeActivity::SWIPER_TRANSITION);
 }
 
 bool SwiperPattern::StartFakeDrag()

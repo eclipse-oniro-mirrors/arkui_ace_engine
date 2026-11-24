@@ -120,4 +120,66 @@ TEST(InspectorTreeTask06, ExistingRegistrationAndLegacyReportEntryRemainUsable)
     stub->ReportInspectorTreeValue("discarded", 1, true);
     EXPECT_EQ(calls, 1);
 }
+
+TEST(InspectorTreeTask06, PostRemoveTaskSkippedAfterCallbackAlreadyCleared)
+{
+    sptr<UiReportStub> stub = new UiReportStub();
+    auto handler = std::make_shared<AppExecFwk::EventHandler>();
+    stub->SetEventHandler(handler);
+    int calls = 0;
+    auto callback = [&calls](std::string, int32_t, bool) { ++calls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->ReportInspectorTreeValue("last", 1, true);
+    EXPECT_EQ(calls, 1);
+    stub->PostGetInspectorTreeCallbackRemoveTask(1500);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    handler->AdvanceTime(1500);
+    stub->ReportInspectorTreeValue("next", 1, true);
+    EXPECT_EQ(calls, 2);
+}
+
+TEST(InspectorTreeTask06, PostRemoveTaskStillTimesOutPendingCallback)
+{
+    sptr<UiReportStub> stub = new UiReportStub();
+    auto handler = std::make_shared<AppExecFwk::EventHandler>();
+    stub->SetEventHandler(handler);
+    int calls = 0;
+    auto callback = [&calls](std::string, int32_t, bool) { ++calls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->PostGetInspectorTreeCallbackRemoveTask(1500);
+    handler->AdvanceTime(1500);
+    stub->ReportInspectorTreeValue("late", 1, true);
+    EXPECT_EQ(calls, 0);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->ReportInspectorTreeValue("next", 1, true);
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(InspectorTreeTask06, DeliveryAfterPostCancelsTimeoutTask)
+{
+    sptr<UiReportStub> stub = new UiReportStub();
+    auto handler = std::make_shared<AppExecFwk::EventHandler>();
+    stub->SetEventHandler(handler);
+    int calls = 0;
+    auto callback = [&calls](std::string, int32_t, bool) { ++calls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->PostGetInspectorTreeCallbackRemoveTask(1500);
+    stub->ReportInspectorTreeValue("last", 1, true);
+    EXPECT_EQ(calls, 1);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    handler->AdvanceTime(1500);
+    stub->ReportInspectorTreeValue("next", 1, true);
+    EXPECT_EQ(calls, 2);
+}
+
+TEST(InspectorTreeTask06, TimeoutWithNoPendingCallbackIsIgnored)
+{
+    sptr<UiReportStub> stub = new UiReportStub();
+    int calls = 0;
+    auto callback = [&calls](std::string, int32_t, bool) { ++calls; };
+    stub->HandleInspectorTreeCallbackTimeout();
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->ReportInspectorTreeValue("data", 1, true);
+    EXPECT_EQ(calls, 1);
+}
 } // namespace OHOS::Ace

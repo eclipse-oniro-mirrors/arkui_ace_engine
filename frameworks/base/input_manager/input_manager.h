@@ -57,6 +57,7 @@ public:
 
     static bool HasControlComponentPermission();
     static void ReportAgentInputDecision(const NG::AgentInputResult& result);
+    static bool HasPendingInputEvent();
 
     static KeyboardType GetKeyboardType(int32_t deviceId);
 

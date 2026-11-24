@@ -310,6 +310,11 @@ int32_t UiContentStub::GetInspectorTreeInner(MessageParcel& data, MessageParcel&
         LOGW("GetInspectorTreeInner read GetInspectorTreeConfigImpl failed");
         return FAILED;
     }
+    if (configImplPtr->GetConfig().inputCheckInterval == 0) {
+        LOGW("GetInspectorTreeInner inputCheckInterval is invalid");
+        delete configImplPtr;
+        return PARAM_INVALID;
+    }
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", processId);
     GetInspectorTree(nullptr, configImplPtr->GetConfig());
@@ -698,6 +703,11 @@ int32_t UiContentStub::GetVisibleInspectorTreeInner(MessageParcel& data, Message
     if (!configImplPtr) {
         LOGW("GetVisibleInspectorTreeInner read GetInspectorTreeConfigImpl failed");
         return FAILED;
+    }
+    if (configImplPtr->GetConfig().inputCheckInterval == 0) {
+        LOGW("GetVisibleInspectorTreeInner inputCheckInterval is invalid");
+        delete configImplPtr;
+        return PARAM_INVALID;
     }
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", processId);

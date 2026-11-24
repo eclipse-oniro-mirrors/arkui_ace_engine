@@ -31,6 +31,11 @@
 #include <unordered_map>
 #include <vector>
 
+namespace OHOS::Ace {
+class InspectorTreeUiState;
+enum class InspectorTreeActivity : uint32_t;
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::NG {
 class FrameNode;
 class PipelineContext;
@@ -97,8 +102,8 @@ public:
     ACE_FORCE_EXPORT void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow);
     void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow, bool reportCapi);
     void OnScrollRemoved(int32_t nodeId);
-    void OnTransitionAdded(int32_t nodeId);
-    void OnTransitionRemoved(int32_t nodeId);
+    void OnTransitionAdded(int32_t nodeId, InspectorTreeActivity activity);
+    void OnTransitionRemoved(int32_t nodeId, InspectorTreeActivity activity);
     bool IsScrolling() const;
     bool IsTransitioning() const;
     bool IsContentChanging() const;
@@ -185,7 +190,8 @@ private:
     void OnSwiperScrollStartInner(const RefPtr<FrameNode>& node);
     void OnContentChangeNodeDestroyedInner(int32_t nodeId);
     void OnContentChangeStartInner(const RefPtr<FrameNode>& keyNode, ChangeType type);
-    void OnContentChangeInterruptedInner(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeInterruptedInner(
+        const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportEnd = true);
     void OnPageTransitionEndInner(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
     void OnScrollChangeEndInner(const RefPtr<FrameNode>& keyNode, uint32_t type);
     void OnSwiperChangeStartInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
@@ -273,6 +279,7 @@ private:
     std::unordered_map<int32_t, std::unordered_map<ChangeType, ActiveContentChange>> activeContentChanges_;
     std::unordered_map<int32_t, std::unordered_map<ChangeType, PendingSwiperChange>> pendingSwiperChanges_;
     std::set<std::pair<WeakPtr<FrameNode>, bool>> changedSwiperNodes_;
+    std::unique_ptr<InspectorTreeUiState> inspectorTreeUiState_;
     std::set<int32_t> scrollingNodes_;
     std::set<int32_t> scrollingSwiperNodes_;
     std::set<int32_t> transitioningNodes_;

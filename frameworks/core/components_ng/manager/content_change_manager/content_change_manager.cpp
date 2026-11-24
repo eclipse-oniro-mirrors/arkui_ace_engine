@@ -25,6 +25,7 @@
 #include "base/log/ace_trace.h"
 #include "base/utils/time_util.h"
 #include "base/utils/utils.h"
+#include "core/common/inspector_tree_ui_state.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -243,7 +244,8 @@ private:
 #endif
 
 ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor)
-    : capiImpl_(std::make_unique<CapiImpl>()), taskExecutor_(taskExecutor)
+    : capiImpl_(std::make_unique<CapiImpl>()), inspectorTreeUiState_(std::make_unique<InspectorTreeUiState>()),
+      taskExecutor_(taskExecutor)
 {
 #ifndef IS_RELEASE_VERSION
     dumpMgr_ = std::make_shared<ContentChangeDumpManager>();
@@ -305,6 +307,7 @@ void ContentChangeManager::UpdateContentChangeParameters()
 
 void ContentChangeManager::ResetContentChangeState()
 {
+    inspectorTreeUiState_->Reset();
     activeContentChanges_.clear();
     pendingSwiperChanges_.clear();
     changedSwiperNodes_.clear();
@@ -334,6 +337,7 @@ void ContentChangeManager::StopContentChangeReport()
     ACE_SCOPED_TRACE("[ContentChangeManager] StopContentChangeReport");
     LOGI("[ContentChangeManager] StopContentChangeReport");
     currentContentChangeConfig_.reset();
+    inspectorTreeUiState_->Reset();
     activeContentChanges_.clear();
     pendingSwiperChanges_.clear();
     changedSwiperNodes_.clear();
@@ -430,13 +434,16 @@ void ContentChangeManager::ReportContentChangeEnd(const ActiveContentChange& act
     UiSessionManager::GetInstance()->ReportContentChangeEvent(activeChange.endType, endJson->ToString());
 }
 
-void ContentChangeManager::OnContentChangeInterruptedInner(const RefPtr<FrameNode>& keyNode, ChangeType type)
+void ContentChangeManager::OnContentChangeInterruptedInner(
+    const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportEnd)
 {
     CHECK_NULL_VOID(keyNode);
     bool shouldReportEnd = true;
     if (type == ChangeType::PAGE) {
+        inspectorTreeUiState_->Stop(InspectorTreeActivity::PAGE_TRANSITION, keyNode->GetId());
         transitioningNodes_.erase(keyNode->GetId());
     } else if (type == ChangeType::SCROLL) {
+        inspectorTreeUiState_->Stop(InspectorTreeActivity::SCROLL, keyNode->GetId());
         scrollingNodes_.erase(keyNode->GetId());
         // A scroll END is emitted globally when the last scrolling node stops.  Do not emit a
         // second node-level END while another scroll is still active.
@@ -456,13 +463,14 @@ void ContentChangeManager::OnContentChangeInterruptedInner(const RefPtr<FrameNod
     if (nodeIter->second.empty()) {
         activeContentChanges_.erase(nodeIter);
     }
-    if (shouldReportEnd) {
+    if (shouldReportEnd && reportEnd) {
         ReportContentChangeEnd(activeChange);
     }
 }
 
 void ContentChangeManager::OnContentChangeNodeDestroyedInner(int32_t nodeId)
 {
+    inspectorTreeUiState_->RemoveNode(nodeId);
     scrollingNodes_.erase(nodeId);
     transitioningNodes_.erase(nodeId);
     scrollingSwiperNodes_.erase(nodeId);
@@ -868,7 +876,7 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
 void ContentChangeManager::OnPageTransitionEndInner(const RefPtr<FrameNode>& keyNode, int32_t transitionId)
 {
     // The saved transition ID also permits cleanup when the report node has expired.
-    OnTransitionRemoved(transitionId);
+    OnTransitionRemoved(transitionId, InspectorTreeActivity::PAGE_TRANSITION);
     if (!keyNode) {
         CompleteContentChange(transitionId, ChangeType::PAGE);
         return;
@@ -895,6 +903,7 @@ void ContentChangeManager::OnPageTransitionEndInner(const RefPtr<FrameNode>& key
 void ContentChangeManager::OnScrollChangeEndInner(const RefPtr<FrameNode>& keyNode, uint32_t type)
 {
     CHECK_NULL_VOID(keyNode);
+    inspectorTreeUiState_->Stop(InspectorTreeActivity::SCROLL, keyNode->GetId());
     bool ignored = IsIgnoringEventType(type);
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -944,7 +953,7 @@ void ContentChangeManager::OnSwiperChangeStartInner(const RefPtr<FrameNode>& key
 void ContentChangeManager::OnSwiperChangeEndInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
     CHECK_NULL_VOID(keyNode);
-    OnTransitionRemoved(keyNode->GetId());
+    OnTransitionRemoved(keyNode->GetId(), InspectorTreeActivity::SWIPER_TRANSITION);
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
     if (!contentChangeEnabled && !pageSceneEnabled) {
@@ -1239,6 +1248,7 @@ void ContentChangeManager::FlushPageSceneNodeChanged()
 void ContentChangeManager::OnSwiperScrollStartInner(const RefPtr<FrameNode>& keyNode)
 {
     CHECK_NULL_VOID(keyNode);
+    inspectorTreeUiState_->Start(InspectorTreeActivity::SWIPER_SCROLL, keyNode->GetId());
     ACE_SCOPED_TRACE("[ContentChangeManager] OnSwiperScrollStart");
     scrollingSwiperNodes_.emplace(keyNode->GetId());
 }
@@ -1250,9 +1260,11 @@ bool ContentChangeManager::IsSwiperScrolling() const
 
 void ContentChangeManager::OnScrollChangeStartInner(const RefPtr<FrameNode>& keyNode)
 {
+    CHECK_NULL_VOID(keyNode);
+    inspectorTreeUiState_->Start(InspectorTreeActivity::SCROLL, keyNode->GetId());
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
-    if ((!contentChangeEnabled && !pageSceneEnabled) || !keyNode) {
+    if (!contentChangeEnabled && !pageSceneEnabled) {
         return;
     }
     scrollingNodes_.emplace(keyNode->GetId());
@@ -1265,6 +1277,7 @@ void ContentChangeManager::OnScrollChangeStartInner(const RefPtr<FrameNode>& key
 
 void ContentChangeManager::OnScrollRemovedInner(int32_t nodeId)
 {
+    inspectorTreeUiState_->Stop(InspectorTreeActivity::SCROLL, nodeId);
     if (scrollingNodes_.count(nodeId)) {
         scrollingNodes_.erase(nodeId);
     }

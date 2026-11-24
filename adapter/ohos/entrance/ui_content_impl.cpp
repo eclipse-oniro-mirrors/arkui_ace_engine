@@ -70,6 +70,7 @@
 #include "bridge/common/utils/module_buffer_reader.h"
 #include "core/common/statistic_event_reporter.h"
 #include "core/common/force_split/force_split_utils.h"
+#include "core/common/inspector_tree_ui_state.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
@@ -7069,21 +7070,57 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
 {
     InitInspectorWindowSnapshotCallback();
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
+    auto reportCollectionError = [](const char* reason, const char* phase) {
+        std::string result = R"({"result":1,"error":"COLLECTION_FAILED","reason":")";
+        result += reason;
+        result += ',';
+        result += R"("phase":")";
+        result += phase;
+        result += R"(","visitedNodes":0})";
+        UiSessionManager::GetInstance()->ReportInspectorTreeValue(result);
+    };
     // set get inspector tree function for ui session manager
-    auto callback = [weakTaskExecutor = taskExecutor](bool onlyNeedVisible, ParamConfig config) {
-        auto taskExecutor = weakTaskExecutor.Upgrade();
-        CHECK_NULL_VOID(taskExecutor);
-        taskExecutor->PostSyncTaskTimeout(
-            [onlyNeedVisible, config]() {
-                auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
-                CHECK_NULL_VOID(pipeline);
-                if (onlyNeedVisible) {
-                    pipeline->GetInspectorTree(true, config);
-                } else {
-                    pipeline->GetInspectorTree(false, config);
+    auto callback = [weakTaskExecutor = taskExecutor, reportCollectionError](
+                         bool onlyNeedVisible, ParamConfig config) {
+        InspectorTreeUiState::DispatchCollection(
+            [&]() {
+                auto taskExecutor = weakTaskExecutor.Upgrade();
+                if (!taskExecutor) {
+                    reportCollectionError("TASK_EXECUTOR_UNAVAILABLE", "BEFORE_UI_POST");
+                    return;
+                }
+                auto collectTask = [onlyNeedVisible, config, reportCollectionError]() {
+                    auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                    if (!pipeline) {
+                        reportCollectionError("PIPELINE_UNAVAILABLE", "BEFORE_UI_COLLECTION");
+                        return;
+                    }
+                    if (!pipeline->GetTaskExecutor()) {
+                        reportCollectionError("PIPELINE_TASK_EXECUTOR_UNAVAILABLE", "BEFORE_UI_COLLECTION");
+                        return;
+                    }
+                    const char* activityError = InspectorTreeUiState::GetActiveError();
+                    if (activityError != nullptr) {
+                        reportCollectionError(activityError, "BEFORE_UI_COLLECTION");
+                        return;
+                    }
+                    if (onlyNeedVisible) {
+                        pipeline->GetInspectorTree(true, config);
+                    } else {
+                        pipeline->GetInspectorTree(false, config);
+                    }
+                };
+                if (!taskExecutor->PostSyncTaskTimeout(
+                    collectTask, TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME,
+                    "UiSessionGetInspectorTree")) {
+                    reportCollectionError("POST_UI_TASK_FAILED", "BEFORE_UI_POST");
                 }
             },
-            TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME, "UiSessionGetInspectorTree");
+            [reportCollectionError](const char* activityError) {
+                TAG_LOGI(AceLogTag::ACE_UIEVENT,
+                    "UISessionCollectTree rejected BEFORE_UI_POST reason=%{public}s", activityError);
+                reportCollectionError(activityError, "BEFORE_UI_POST");
+            });
     };
     UiSessionManager::GetInstance()->SaveInspectorTreeFunction(callback);
     auto webCallback = [weakTaskExecutor = taskExecutor](bool isRegister) {

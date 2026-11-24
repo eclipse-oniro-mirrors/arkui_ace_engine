@@ -18,7 +18,7 @@
 namespace OHOS::Ace {
 GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(bool interactionInfo, bool accessibilityInfo, bool cacheNodes,
     bool withWeb, bool withUIExtension, bool rectCulling, float minOpacity,
-    bool withResponseRegion, bool withCustomContent)
+    bool withResponseRegion, bool withCustomContent, uint32_t inputCheckInterval)
 {
     config_.interactionInfo = interactionInfo;
     config_.accessibilityInfo = accessibilityInfo;
@@ -29,6 +29,7 @@ GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(bool interactionInfo, boo
     config_.minOpacity = minOpacity;
     config_.withResponseRegion = withResponseRegion;
     config_.withCustomContent = withCustomContent;
+    config_.inputCheckInterval = inputCheckInterval;
 }
 GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(const ParamConfig& config)
 {
@@ -41,6 +42,7 @@ GetInspectorTreeConfigImpl::GetInspectorTreeConfigImpl(const ParamConfig& config
     config_.minOpacity = config.minOpacity;
     config_.withResponseRegion = config.withResponseRegion;
     config_.withCustomContent = config.withCustomContent;
+    config_.inputCheckInterval = config.inputCheckInterval;
 }
 bool GetInspectorTreeConfigImpl::Marshalling(Parcel& parcel) const
 {
@@ -65,7 +67,10 @@ bool GetInspectorTreeConfigImpl::Marshalling(Parcel& parcel) const
     if (!parcel.WriteFloat(config_.minOpacity)) {
         return false;
     }
-    return parcel.WriteBool(config_.withResponseRegion) && parcel.WriteBool(config_.withCustomContent);
+    if (!parcel.WriteBool(config_.withResponseRegion) || !parcel.WriteBool(config_.withCustomContent)) {
+        return false;
+    }
+    return parcel.WriteUint32(config_.inputCheckInterval);
 }
 GetInspectorTreeConfigImpl* GetInspectorTreeConfigImpl::Unmarshalling(Parcel& parcel)
 {
@@ -102,10 +107,16 @@ GetInspectorTreeConfigImpl* GetInspectorTreeConfigImpl::Unmarshalling(Parcel& pa
     if (!parcel.ReadBool(withResponseRegion) || !parcel.ReadBool(withCustomContent)) {
         return nullptr;
     }
+    uint32_t inputCheckInterval = UINT32_MAX;
+    if (parcel.GetReadableBytes() > 0) {
+        if (parcel.GetReadableBytes() < sizeof(uint32_t) || !parcel.ReadUint32(inputCheckInterval)) {
+            return nullptr;
+        }
+    }
     GetInspectorTreeConfigImpl* configImpl =
         new GetInspectorTreeConfigImpl(
             interactionInfo, accessibilityInfo, cacheNodes, withWeb, withUIExtension, rectCulling, minOpacity,
-            withResponseRegion, withCustomContent);
+            withResponseRegion, withCustomContent, inputCheckInterval);
     return configImpl;
 }
 ParamConfig GetInspectorTreeConfigImpl::GetConfig() const

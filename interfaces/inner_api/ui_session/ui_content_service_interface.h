@@ -118,6 +118,9 @@ public:
      * @description: define get the current page inspector tree info interface
      * @return: result number
      */
+    // Input interruption completes the callback once with isLastPart=true and JSON
+    // {"result":1,"error":"INPUT_INTERRUPTED","visitedNodes":N}; no partial tree is returned.
+    // The immediate return code still describes request submission, not collection completion.
     virtual int32_t GetInspectorTree(const std::function<void(std::string, int32_t, bool)>& eventCallback,
         ParamConfig config = ParamConfig(), int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
     virtual int32_t GetVisibleInspectorTree(const std::function<void(std::string, int32_t, bool)>& eventCallback,
