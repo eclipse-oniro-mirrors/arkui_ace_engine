@@ -1974,7 +1974,7 @@ public:
     virtual ~FillRequestCallback() = default;
     void OnFillRequestSuccess(const AbilityBase::ViewData& viewData) override
     {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "called OnFillRequestSuccess, pageUrl=[%{private}zu]",
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "OnFillReqSucc, pageUrl=[%{private}zu]",
             viewData.pageUrl.size());
         ProcessOnFinish();
         auto pipelineContext = pipelineContext_.Upgrade();
@@ -2223,7 +2223,7 @@ private:
 
 bool AceContainer::UpdatePopupUIExtension(const RefPtr<NG::FrameNode>& node, uint32_t autoFillSessionId, bool isNative)
 {
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "UpdatePopupUIExtension called");
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "UpdPopupUE");
     CHECK_NULL_RETURN(node, false);
     CHECK_NULL_RETURN(uiWindow_, false);
     auto uiContent = uiWindow_->GetUIContent();
@@ -2389,7 +2389,7 @@ int32_t AceContainer::RequestAutoFill(const RefPtr<NG::FrameNode>& node, AceAuto
     const std::function<void()>& onFinish, const std::function<void()>& onUIExtNodeBindingCompleted,
     AceAutoFillTriggerType triggerType)
 {
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "called, autoFillType: %{public}d", static_cast<int32_t>(autoFillType));
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "called, type: %{public}d", static_cast<int32_t>(autoFillType));
     auto pipelineContext = AceType::DynamicCast<NG::PipelineContext>(pipelineContext_);
     CHECK_NULL_RETURN(node, AceAutoFillError::ACE_AUTO_FILL_DEFAULT);
     CHECK_NULL_RETURN(pipelineContext, AceAutoFillError::ACE_AUTO_FILL_DEFAULT);
@@ -2408,7 +2408,7 @@ int32_t AceContainer::RequestAutoFill(const RefPtr<NG::FrameNode>& node, AceAuto
     auto viewDataWrapOhos = AceType::DynamicCast<ViewDataWrapOhos>(viewDataWrap);
     CHECK_NULL_RETURN(viewDataWrapOhos, AceAutoFillError::ACE_AUTO_FILL_DEFAULT);
     auto viewData = viewDataWrapOhos->GetViewData();
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "isNewPassWord is: %{public}d", isNewPassWord);
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "isNewPassWord:%{public}d", isNewPassWord);
     if (isNewPassWord) {
         callback->OnFillRequestSuccess(viewData);
         return AceAutoFillError::ACE_AUTO_FILL_SUCCESS;
@@ -2453,13 +2453,13 @@ public:
     virtual ~SaveRequestCallback() = default;
     void OnSaveRequestSuccess() override
     {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "OnSaveRequestSuccess called");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "OnSaveRequestSuccess");
         ProcessOnFinish();
     }
 
     void OnSaveRequestFailed() override
     {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "OnSaveRequestFailed called");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "OnSaveRequestFailed");
         ProcessOnFinish();
     }
 
@@ -2490,7 +2490,7 @@ private:
 bool AceContainer::RequestAutoSave(const RefPtr<NG::FrameNode>& node, const std::function<void()>& onFinish,
     const std::function<void()>& onUIExtNodeBindingCompleted, bool isNative, int32_t instanceId)
 {
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "RequestAutoSave called");
+    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "ReqAutoSave");
     CHECK_NULL_RETURN(uiWindow_, false);
     auto uiContent = uiWindow_->GetUIContent();
     auto uiContentImpl = reinterpret_cast<UIContentImpl*>(uiContent);

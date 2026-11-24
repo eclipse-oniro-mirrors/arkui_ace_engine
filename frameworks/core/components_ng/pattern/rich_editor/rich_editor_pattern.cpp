@@ -11259,11 +11259,11 @@ std::pair<bool, bool> RichEditorPattern::ProcessAutoFill(bool isNewPassWord, boo
     CHECK_NULL_RETURN(host, std::make_pair(false, false));
     auto container = Container::Current();
     if (container == nullptr) {
-        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Get current container is nullptr.");
+        TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Container is null");
         return std::make_pair(false, false);
     }
     auto onUIExtNodeDestroy = [weak = WeakPtr<FrameNode>(host)]() {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeDestroy called.");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeDestroy");
         auto node = weak.Upgrade();
         CHECK_NULL_VOID(node);
         auto pageNode = node->GetPageNode();
@@ -11273,7 +11273,7 @@ std::pair<bool, bool> RichEditorPattern::ProcessAutoFill(bool isNewPassWord, boo
         pagePattern->SetIsModalCovered(false);
     };
     auto onUIExtNodeBindingCompleted = [weak = WeakPtr<FrameNode>(host)]() {
-        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeBindingCompleted called.");
+        TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "onUIExtNodeBindingCompleted");
         auto node = weak.Upgrade();
         CHECK_NULL_VOID(node);
         auto pageNode = node->GetPageNode();
@@ -11316,7 +11316,7 @@ void RichEditorPattern::SendAccountRecommendCommand(const RefPtr<TextFieldManage
     CHECK_NULL_VOID(host);
     auto fillContentMap = textFieldManager->GetFillContentMap(host->GetId());
     if (fillContentMap.empty() || !IsTriggerAutoFillPassword()) {
-        TAG_LOGD(AceLogTag::ACE_AUTO_FILL, "SendAccountRecommendCommand: fillContentMap empty or not needed");
+        TAG_LOGD(AceLogTag::ACE_AUTO_FILL, "map empty or not needed");
         return;
     }
     // RichEditor has no firstAutoFillContainerNode_ / sibling userName node, so

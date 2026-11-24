@@ -4451,7 +4451,7 @@ void PipelineContext::NotifyFillRequestSuccess(AceAutoFillType autoFillType, Ref
         }
         auto frameNode = DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(item->GetId()));
         if (frameNode == nullptr) {
-            TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "frameNode is not found, id=%{public}d", item->GetId());
+            TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "Node %{public}d is null", item->GetId());
             continue;
         }
         if ((triggerType == AceAutoFillTriggerType::PASTE_REQUEST ||

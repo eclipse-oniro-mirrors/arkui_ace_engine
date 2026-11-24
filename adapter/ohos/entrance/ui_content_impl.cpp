@@ -5734,7 +5734,7 @@ bool UIContentImpl::DumpViewData(const RefPtr<NG::FrameNode>& node, RefPtr<ViewD
     viewDataWrap->SetAbilityName(info->name);
     viewDataWrap->SetModuleName(info->moduleName);
     viewDataWrap->SetBundleName(info->bundleName);
-    TAG_LOGI(AceLogTag::ACE_AUTO_FILL, "bundleName=[%{private}s], moduleName=[%{private}s], abilityName=[%{private}s]",
+    TAG_LOGD(AceLogTag::ACE_AUTO_FILL, "bundleName=[%{private}s], moduleName=[%{private}s], abilityName=[%{private}s]",
         info->bundleName.c_str(), info->moduleName.c_str(), info->name.c_str());
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_RETURN(container, false);
