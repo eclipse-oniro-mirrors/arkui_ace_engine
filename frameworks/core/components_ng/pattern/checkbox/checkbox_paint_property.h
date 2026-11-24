@@ -41,6 +41,9 @@ public:
         paintProperty->propCheckBoxSelectedColor_ = CloneCheckBoxSelectedColor();
         paintProperty->propCheckBoxUnSelectedColor_ = CloneCheckBoxUnSelectedColor();
         paintProperty->propCheckBoxCheckMarkColor_ = CloneCheckBoxCheckMarkColor();
+        paintProperty->propCheckBoxSelectedColorFlagByUser_ = CloneCheckBoxSelectedColorFlagByUser();
+        paintProperty->propCheckBoxUnSelectedColorFlagByUser_ = CloneCheckBoxUnSelectedColorFlagByUser();
+        paintProperty->propCheckBoxCheckMarkColorFlagByUser_ = CloneCheckBoxCheckMarkColorFlagByUser();
         paintProperty->propCheckBoxCheckMarkSize_ = CloneCheckBoxCheckMarkSize();
         paintProperty->propCheckBoxCheckMarkWidth_ = CloneCheckBoxCheckMarkWidth();
         paintProperty->propCheckBoxSelectedStyle_ = CloneCheckBoxSelectedStyle();
