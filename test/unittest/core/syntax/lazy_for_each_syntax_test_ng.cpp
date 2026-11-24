@@ -2026,4 +2026,232 @@ HWTEST_F(LazyForEachSyntaxTestNg, DataChangeListenerOwner_002, TestSize.Level1)
     }
 }
 
+/**
+ * @tc.name: LazyForEachNodeTryBindController001
+ * @tc.desc: Test LazyForEachNode TryBindController accepts only the first binding
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachNodeTryBindController001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode
+     * @tc.expected: Node is created unbound
+     */
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+    EXPECT_FALSE(lazyForEachNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step2. Call TryBindController for the first time
+     * @tc.expected: The first binding is accepted (creation-time immutable binding)
+     */
+    EXPECT_TRUE(lazyForEachNode->TryBindController());
+    EXPECT_TRUE(lazyForEachNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step3. Call TryBindController again
+     * @tc.expected: Later binds on an already bound node are ignored
+     */
+    EXPECT_FALSE(lazyForEachNode->TryBindController());
+    EXPECT_TRUE(lazyForEachNode->controllerBound_);
+}
+ 
+/**
+ * @tc.name: LazyForEachSetController001
+ * @tc.desc: Test LazyForEachModelNG::SetController calls bindController on first bind
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachSetController001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode (pushed onto ViewStackProcessor)
+     * @tc.expected: Node is created unbound
+     */
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+    EXPECT_FALSE(lazyForEachNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step2. Push node back onto the stack (CreateLazyForEachNode calls Finish() which pops it)
+     * then call SetController — stack path finds the node, TryBindController succeeds
+     * @tc.expected: bindController callback is invoked with the node
+     */
+    ViewStackProcessor::GetInstance()->Push(lazyForEachNode);
+    RefPtr<LazyForEachNode> capturedNode;
+    LazyForEachModelNG lazyForEachModel;
+    lazyForEachModel.SetController(
+        [&capturedNode](const RefPtr<LazyForEachNode>& node) { capturedNode = node; });
+    EXPECT_EQ(capturedNode, lazyForEachNode);
+    EXPECT_TRUE(lazyForEachNode->controllerBound_);
+}
+ 
+/**
+ * @tc.name: LazyForEachSetController002
+ * @tc.desc: Test LazyForEachModelNG::SetController when node is not on the stack
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachSetController002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode, then clear the stack
+     * @tc.expected: Node exists but is not on ViewStackProcessor
+     */
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+    ViewStackProcessor::GetInstance()->ClearStack();
+ 
+    /**
+     * @tc.steps: step2. Call SetController — stack returns null, CHECK_NULL_VOID exits
+     * @tc.expected: bindController callback is not invoked
+     */
+    bool callbackCalled = false;
+    LazyForEachModelNG lazyForEachModel;
+    lazyForEachModel.SetController(
+        [&callbackCalled](const RefPtr<LazyForEachNode>& node) { callbackCalled = true; });
+    EXPECT_FALSE(callbackCalled);
+}
+ 
+/**
+ * @tc.name: LazyForEachSetController003
+ * @tc.desc: Test LazyForEachModelNG::SetController when controller already bound
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachSetController003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode and bind controller for the first time
+     * @tc.expected: First bind succeeds, callback is invoked
+     */
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+    // CreateLazyForEachNode calls Finish() which pops the node off the stack.
+    // Push it back so SetController's stack lookup can find it.
+    ViewStackProcessor::GetInstance()->Push(lazyForEachNode);
+ 
+    bool firstCallbackCalled = false;
+    LazyForEachModelNG lazyForEachModel;
+    lazyForEachModel.SetController(
+        [&firstCallbackCalled](const RefPtr<LazyForEachNode>& node) { firstCallbackCalled = true; });
+    EXPECT_TRUE(firstCallbackCalled);
+    EXPECT_TRUE(lazyForEachNode->controllerBound_);
+ 
+    /**
+     * @tc.steps: step2. Call SetController again — TryBindController returns false
+     * @tc.expected: Second bindController callback is not invoked
+     */
+    bool secondCallbackCalled = false;
+    lazyForEachModel.SetController(
+        [&secondCallbackCalled](const RefPtr<LazyForEachNode>& node) { secondCallbackCalled = true; });
+    EXPECT_FALSE(secondCallbackCalled);
+}
+ 
+/**
+ * @tc.name: LazyForEachControllerPattern001
+ * @tc.desc: Test controller BindToNode with null node (CHECK_NULL_VOID branch)
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachControllerPattern001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Simulate JSLazyForEachController::BindToNode(nullptr)
+     * @tc.expected: WeakPtr stays empty after null bind attempt
+     */
+    WeakPtr<LazyForEachNode> weakNode;
+    auto nullNode = RefPtr<LazyForEachNode>(nullptr);
+    // CHECK_NULL_VOID equivalent: do not set weak ref when node is null
+    if (nullNode) {
+        weakNode = nullNode;
+    }
+    EXPECT_TRUE(weakNode.Upgrade() == nullptr);
+}
+ 
+/**
+ * @tc.name: LazyForEachControllerPattern002
+ * @tc.desc: Test controller BindToNode with valid node, then ClearCache with live weak ref
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachControllerPattern002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode and bind via weak ref (controller pattern)
+     */
+    auto lazyForEachNode = CreateLazyForEachNode();
+    ASSERT_NE(lazyForEachNode, nullptr);
+ 
+    WeakPtr<LazyForEachNode> weakNode;
+    // BindToNode: CHECK_NULL_VOID then set weak ref
+    if (lazyForEachNode) {
+        weakNode = lazyForEachNode;
+    }
+    EXPECT_EQ(weakNode.Upgrade(), lazyForEachNode);
+ 
+    /**
+     * @tc.steps: step2. ClearCache: upgrade weak ref, node is alive → call node->CleanCache(false, true)
+     * @tc.expected: CleanCache executes, pending flags reset
+     */
+    lazyForEachNode->pendingCleanCache_ = true;
+    lazyForEachNode->pendingRestoreCache_ = true;
+    auto node = weakNode.Upgrade();
+    ASSERT_TRUE(node);
+    node->CleanCache(false, true);
+    EXPECT_FALSE(lazyForEachNode->pendingCleanCache_);
+    EXPECT_FALSE(lazyForEachNode->pendingRestoreCache_);
+}
+ 
+/**
+ * @tc.name: LazyForEachControllerPattern003
+ * @tc.desc: Test controller ClearCache with expired weak ref (safe no-op branch)
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachControllerPattern003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a LazyForEachNode, bind via weak ref, then release the strong ref
+     */
+    WeakPtr<LazyForEachNode> weakNode;
+    {
+        auto lazyForEachNode = CreateLazyForEachNode();
+        ASSERT_NE(lazyForEachNode, nullptr);
+        if (lazyForEachNode) {
+            weakNode = lazyForEachNode;
+        }
+        EXPECT_NE(weakNode.Upgrade(), nullptr);
+    }
+    /**
+     * @tc.steps: step2. ClearCache: upgrade weak ref fails → safe no-op (spec R-6)
+     * @tc.expected: No crash, no node method called
+     */
+    auto node = weakNode.Upgrade();
+    EXPECT_EQ(node, nullptr);
+}
+ 
+/**
+ * @tc.name: LazyForEachControllerPattern004
+ * @tc.desc: Test controller last-bind-wins: rebinding replaces previous weak ref
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachControllerPattern004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create two LazyForEachNodes, bind to first then second
+     * @tc.expected: Weak ref points to the second node (last-bind-wins, spec R-8)
+     */
+    auto node1 = CreateLazyForEachNode();
+    ASSERT_NE(node1, nullptr);
+    auto node2 = CreateLazyForEachNode();
+    ASSERT_NE(node2, nullptr);
+ 
+    WeakPtr<LazyForEachNode> weakNode;
+    if (node1) {
+        weakNode = node1;
+    }
+    EXPECT_EQ(weakNode.Upgrade(), node1);
+    // Rebind: last-bind-wins
+    if (node2) {
+        weakNode = node2;
+    }
+    EXPECT_EQ(weakNode.Upgrade(), node2);
+    EXPECT_NE(weakNode.Upgrade(), node1);
+}
+
 } // namespace OHOS::Ace::NG

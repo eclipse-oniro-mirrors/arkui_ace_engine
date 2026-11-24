@@ -1296,6 +1296,490 @@ TEST_F(ArkoalaLazyNodeTest, NeedBuildAll001)
 }
 
 /**
+ * @tc.name: CleanCache002
+ * @tc.desc: Test ArkoalaLazyNode CleanCache skips cache release for a non-scroll parent (needBuildAll_).
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache002)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t releaseCount = 0;
+    int32_t updateStart = -100; // sentinel: updateRange_ must not be invoked
+    lazyNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [&updateStart](int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {
+            updateStart = start;
+        },
+        []() {},
+        [&releaseCount](int32_t index) { ++releaseCount; });
+ 
+    // Non-scroll parent (e.g. Column): needBuildAll_ keeps every child on screen, nothing to release.
+    lazyNode->SetNeedBuildAll(true);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 2, 2 };
+    for (int32_t i = 0; i < 6; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+    lazyNode->pendingCleanCache_ = true;
+    lazyNode->pendingRestoreCache_ = true;
+ 
+    lazyNode->CleanCache(true);
+ 
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 6);
+    EXPECT_FALSE(lazyNode->pendingCleanCache_);
+    EXPECT_FALSE(lazyNode->pendingRestoreCache_);
+}
+ 
+/**
+ * @tc.name: CleanCache003
+ * @tc.desc: Test ArkoalaLazyNode CleanCache retains a reduced cache band capped at 2 (memory optimization).
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache003)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t releaseCount = 0;
+    std::vector<int32_t> releasedIndexes;
+    int32_t updateCacheStart = -1;
+    int32_t updateCacheEnd = -1;
+    lazyNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [&updateCacheStart, &updateCacheEnd](
+            int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {
+            updateCacheStart = cacheStart;
+            updateCacheEnd = cacheEnd;
+        },
+        []() {},
+        [&releaseCount, &releasedIndexes](int32_t index) {
+            ++releaseCount;
+            releasedIndexes.emplace_back(index);
+        });
+ 
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    // cacheStart/cacheEnd 4 is clamped to the max retained idle cache count (2): band is [0, 4].
+    lazyNode->activeRangeParam_ = { 2, 2, 4, 4 };
+    for (int32_t i = 0; i < 6; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->CleanCache(true);
+ 
+    // Active index 2 and cached band [0, 4] are kept, only index 5 is released.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 5);
+    EXPECT_FALSE(lazyNode->node4Index_.ContainsKey(5));
+    EXPECT_EQ(releaseCount, 1);
+    ASSERT_EQ(releasedIndexes.size(), 1);
+    EXPECT_EQ(releasedIndexes[0], 5);
+    // TS side is notified with the reduced (clamped) cache band.
+    EXPECT_EQ(updateCacheStart, 2);
+    EXPECT_EQ(updateCacheEnd, 2);
+}
+ 
+/**
+ * @tc.name: CleanCache004
+ * @tc.desc: Test ArkoalaLazyNode CleanCache with clearAll releases all idle nodes even without memOpt strategy.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache004)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t releaseCount = 0;
+    int32_t updateCacheStart = -1;
+    int32_t updateCacheEnd = -1;
+    lazyNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [&updateCacheStart, &updateCacheEnd](
+            int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {
+            updateCacheStart = cacheStart;
+            updateCacheEnd = cacheEnd;
+        },
+        []() {},
+        [&releaseCount](int32_t index) { ++releaseCount; });
+ 
+    lazyNode->SetNeedBuildAll(false);
+    // clearAll bypasses the memory optimization strategy check.
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::DEFAULT;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 4, 4 };
+    for (int32_t i = 0; i < 6; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->CleanCache(true, true);
+ 
+    // Only the active range [2, 2] survives; the retained cache band shrinks to 0.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 1);
+    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(2));
+    EXPECT_EQ(releaseCount, 5);
+    EXPECT_EQ(updateCacheStart, 0);
+    EXPECT_EQ(updateCacheEnd, 0);
+}
+ 
+/**
+ * @tc.name: CleanCache005
+ * @tc.desc: Test ArkoalaLazyNode CleanCache before layout (never-set range) retains nothing.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache005)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t releaseCount = 0;
+    int32_t updateStart = -100;
+    int32_t updateEnd = -100;
+    int32_t updateCacheStart = -1;
+    int32_t updateCacheEnd = -1;
+    lazyNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [&updateStart, &updateEnd, &updateCacheStart, &updateCacheEnd](
+            int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {
+            updateStart = start;
+            updateEnd = end;
+            updateCacheStart = cacheStart;
+            updateCacheEnd = cacheEnd;
+        },
+        []() {},
+        [&releaseCount](int32_t index) { ++releaseCount; });
+ 
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    // Never laid out: active range stays {-1, -1, -1, -1}.
+    lazyNode->activeRangeParam_ = { -1, -1, -1, -1 };
+    for (int32_t i = 0; i < 3; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->CleanCache(true);
+ 
+    // Parity with the dynamic side: startIndex_/endIndex_ == -1 retains nothing.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 0);
+    EXPECT_EQ(releaseCount, 3);
+    EXPECT_EQ(updateStart, -1);
+    EXPECT_EQ(updateEnd, -1);
+    EXPECT_EQ(updateCacheStart, 0);
+    EXPECT_EQ(updateCacheEnd, 0);
+}
+ 
+/**
+ * @tc.name: PurgeNode001
+ * @tc.desc: Test ArkoalaLazyNode PurgeNode keeps the whole node4Index_ map for a non-scroll parent.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, PurgeNode001)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    lazyNode->SetNeedBuildAll(true);
+    lazyNode->options_.releaseStrategy = LazyForEachReleaseStrategy::BATCH;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    for (int32_t i = 0; i < 5; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->PurgeNode();
+ 
+    // The idle-task backstop must not drop on-screen children of a non-scroll parent.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 5);
+}
+ 
+/**
+ * @tc.name: PurgeNode002
+ * @tc.desc: Test ArkoalaLazyNode PurgeNode removes indexes outside the cache range for a scroll parent.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, PurgeNode002)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.releaseStrategy = LazyForEachReleaseStrategy::BATCH;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    for (int32_t i = 0; i < 5; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->PurgeNode();
+ 
+    // Cache band is [1, 3]: indexes 0 and 4 are purged, 1..3 are kept.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 3);
+    EXPECT_FALSE(lazyNode->node4Index_.ContainsKey(0));
+    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(1));
+    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(2));
+    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(3));
+    EXPECT_FALSE(lazyNode->node4Index_.ContainsKey(4));
+}
+ 
+/**
+ * @tc.name: RestoreCache001
+ * @tc.desc: Test ArkoalaLazyNode RestoreCache skips rebuild for a non-scroll parent.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, RestoreCache001)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t createCount = 0;
+    lazyNode->SetCallbacks(
+        [this, &createCount](int32_t index, bool skipCreate) {
+            ++createCount;
+            return CreateFrameNode(GetNextId());
+        },
+        [](int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {},
+        []() {},
+        [](int32_t index) {});
+ 
+    lazyNode->SetNeedBuildAll(true);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    lazyNode->pendingCleanCache_ = true;
+    lazyNode->pendingRestoreCache_ = true;
+ 
+    lazyNode->RestoreCache();
+ 
+    // Nothing was released on hide for a non-scroll parent, so nothing is rebuilt.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 0);
+    EXPECT_FALSE(lazyNode->pendingCleanCache_);
+    EXPECT_FALSE(lazyNode->pendingRestoreCache_);
+}
+ 
+/**
+ * @tc.name: RestoreCache002
+ * @tc.desc: Test ArkoalaLazyNode RestoreCache rebuilds only the cache band for a scroll parent.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, RestoreCache002)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t createCount = 0;
+    std::vector<int32_t> createdIndexes;
+    lazyNode->SetCallbacks(
+        [this, &createCount, &createdIndexes](int32_t index, bool skipCreate) {
+            ++createCount;
+            createdIndexes.emplace_back(index);
+            return CreateFrameNode(GetNextId());
+        },
+        [](int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool isLoop) {},
+        []() {},
+        [](int32_t index) {});
+ 
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+ 
+    lazyNode->RestoreCache();
+ 
+    // Cache band is [1, 3] with active [2, 2]: only idle caches 1 and 3 are rebuilt.
+    EXPECT_EQ(createCount, 2);
+    ASSERT_EQ(createdIndexes.size(), 2);
+    EXPECT_EQ(createdIndexes[0], 1);
+    EXPECT_EQ(createdIndexes[1], 3);
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 2);
+    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(1));
+    EXPECT_TRUE(lazyNode->node4Index_.ContainsKey(3));
+}
+ 
+/**
+ * @tc.name: GetReducedCacheRangeParam001
+ * @tc.desc: Test GetReducedCacheRangeParam when start >= 0 but end < 0 (short-circuit branch: start ok, end < 0).
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, GetReducedCacheRangeParam001)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    lazyNode->SetCallbacks(createItemCb_, updateRangeCb_, clearCacheCb_, releaseItemByIndexCb_);
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    // start >= 0, end < 0: should take the "end < 0" branch and retain nothing.
+    lazyNode->activeRangeParam_ = { 2, -1, 1, 1 };
+    for (int32_t i = 0; i < 3; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->CleanCache(true);
+ 
+    // end < 0 means retainNothing = true, all nodes released.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 0);
+}
+ 
+/**
+ * @tc.name: CleanCache006
+ * @tc.desc: Test CleanCache with isRepeat_ true but no repeat memOpt strategy and clearAll false —
+ *           should skip both the repeat early-return and the lazyForEach release block.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache006)
+{
+    auto repeatNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId(), true);
+    int32_t releaseCount = 0;
+    repeatNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [](int32_t, int32_t, int32_t, int32_t, bool) {},
+        []() {},
+        [&releaseCount](int32_t index) { ++releaseCount; });
+ 
+    // isRepeat_ == true, but repeat strategy is DEFAULT and clearAll is false,
+    // so the repeat early-return is skipped and the !isRepeat_ block is also skipped.
+    repeatNode->SetNeedBuildAll(false);
+    repeatNode->repeatMemoryOptimizationStrategy_ = RepeatMemoryOptimizationStrategy::DEFAULT;
+    repeatNode->options_.memOptStrategy = LazyForEachMemOptStrategy::DEFAULT;
+    repeatNode->totalCount_ = TOTAL_COUNT;
+    repeatNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    for (int32_t i = 0; i < 5; ++i) {
+        repeatNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+    repeatNode->pendingCleanCache_ = true;
+    repeatNode->pendingRestoreCache_ = true;
+ 
+    repeatNode->CleanCache(true);
+ 
+    // Neither the repeat path nor the lazyForEach path executes: node4Index_ is untouched.
+    EXPECT_EQ(repeatNode->node4Index_.Size(), 5);
+    EXPECT_EQ(releaseCount, 0);
+    EXPECT_FALSE(repeatNode->pendingCleanCache_);
+    EXPECT_FALSE(repeatNode->pendingRestoreCache_);
+}
+ 
+/**
+ * @tc.name: CleanCache007
+ * @tc.desc: Test CleanCache with !isRepeat_ && !needBuildAll_ but memOptStrategy != ENABLE and clearAll false —
+ *           should skip the release block (covers the false branch of the || in line 1016).
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache007)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t releaseCount = 0;
+    lazyNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [](int32_t, int32_t, int32_t, int32_t, bool) {},
+        []() {},
+        [&releaseCount](int32_t index) { ++releaseCount; });
+ 
+    // !isRepeat_ && !needBuildAll_ but memOptStrategy is DEFAULT and clearAll is false.
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::DEFAULT;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    for (int32_t i = 0; i < 5; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    lazyNode->CleanCache(true);
+ 
+    // The release block is skipped: no nodes released.
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 5);
+    EXPECT_EQ(releaseCount, 0);
+}
+ 
+/**
+ * @tc.name: CleanCache008
+ * @tc.desc: Test CleanCache when willRelease is true but releaseItemByIndex_ is not set —
+ *           nodes are still removed from node4Index_ but release callback is not invoked.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, CleanCache008)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    // Set releaseItemByIndex_ to nullptr by not providing it.
+    lazyNode->SetCallbacks(
+        [this](int32_t, bool) { return CreateFrameNode(GetNextId()); },
+        [](int32_t, int32_t, int32_t, int32_t, bool) {},
+        []() {},
+        nullptr);
+ 
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    for (int32_t i = 0; i < 5; ++i) {
+        lazyNode->node4Index_.Put(i, CreateFrameNode(GetNextId()));
+    }
+ 
+    // Should not crash even though releaseItemByIndex_ is null.
+    lazyNode->CleanCache(true);
+ 
+    // Nodes outside the active+cache range are still removed from node4Index_.
+    // Active [2,2] + cache [1,3] -> indexes 0 and 4 are released (removed from map).
+    EXPECT_EQ(lazyNode->node4Index_.Size(), 3);
+    EXPECT_FALSE(lazyNode->node4Index_.ContainsKey(0));
+    EXPECT_FALSE(lazyNode->node4Index_.ContainsKey(4));
+}
+ 
+/**
+ * @tc.name: RestoreCache003
+ * @tc.desc: Test RestoreCache with isRepeat_ true — should enter the repeat branch path.
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, RestoreCache003)
+{
+    auto repeatNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId(), true);
+    int32_t createCount = 0;
+    repeatNode->SetCallbacks(
+        [this, &createCount](int32_t index, bool skipCreate) {
+            ++createCount;
+            return CreateFrameNode(GetNextId());
+        },
+        [](int32_t, int32_t, int32_t, int32_t, bool) {},
+        []() {},
+        [](int32_t) {});
+ 
+    // isRepeat_ == true with repeat strategy ENABLE_AUTO_CACHE_OPTIMIZATION.
+    repeatNode->SetNeedBuildAll(false);
+    repeatNode->repeatMemoryOptimizationStrategy_ =
+        RepeatMemoryOptimizationStrategy::ENABLE_AUTO_CACHE_OPTIMIZATION;
+    repeatNode->totalCount_ = TOTAL_COUNT;
+    repeatNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    repeatNode->pendingCleanCache_ = true;
+    repeatNode->pendingRestoreCache_ = true;
+ 
+    repeatNode->RestoreCache();
+ 
+    // Should have attempted to rebuild cache items outside the cache range.
+    EXPECT_FALSE(repeatNode->pendingCleanCache_);
+    EXPECT_FALSE(repeatNode->pendingRestoreCache_);
+}
+ 
+/**
+ * @tc.name: RestoreCache004
+ * @tc.desc: Test RestoreCache with !isRepeat_ && !needBuildAll_ but memOptStrategy != ENABLE —
+ *           should skip the lazyForEach restore block (covers false branch on line 1058).
+ * @tc.type: FUNC
+ */
+TEST_F(ArkoalaLazyNodeTest, RestoreCache004)
+{
+    auto lazyNode = AceType::MakeRefPtr<ArkoalaLazyNode>(GetNextId());
+    int32_t createCount = 0;
+    lazyNode->SetCallbacks(
+        [this, &createCount](int32_t index, bool skipCreate) {
+            ++createCount;
+            return CreateFrameNode(GetNextId());
+        },
+        [](int32_t, int32_t, int32_t, int32_t, bool) {},
+        []() {},
+        [](int32_t) {});
+ 
+    // !isRepeat_ && !needBuildAll_ but memOptStrategy is DEFAULT.
+    lazyNode->SetNeedBuildAll(false);
+    lazyNode->options_.memOptStrategy = LazyForEachMemOptStrategy::DEFAULT;
+    lazyNode->totalCount_ = TOTAL_COUNT;
+    lazyNode->activeRangeParam_ = { 2, 2, 1, 1 };
+    lazyNode->pendingCleanCache_ = true;
+    lazyNode->pendingRestoreCache_ = true;
+ 
+    lazyNode->RestoreCache();
+ 
+    // The lazyForEach restore block is skipped: no items rebuilt.
+    EXPECT_EQ(createCount, 0);
+    EXPECT_FALSE(lazyNode->pendingCleanCache_);
+    EXPECT_FALSE(lazyNode->pendingRestoreCache_);
+}
+
+/**
  * @tc.name: ArkoalaLazyNodeRepeatMemOptDump001
  * @tc.desc: Test ArkoalaLazyNode(Repeat) DumpInfo shows RepeatMemOpt enablement.
  *           Covers the mem-opt (auto cache clear) dump display on Repeat nodes.
