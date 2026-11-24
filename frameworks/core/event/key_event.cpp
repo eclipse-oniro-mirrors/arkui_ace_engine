@@ -73,6 +73,22 @@ bool KeyEvent::IsFunctionKey() const
     return functionKeys.find(code) != functionKeys.end();
 }
 
+bool KeyEvent::IsFunctionKeyName(const std::string& name)
+{
+    static const std::set<std::string> functionKeyNames = {
+        "TAB", "ESC", "F1", "F2", "F3", "F4", "F5", "F6",
+        "F7", "F8", "F9", "F10", "F11", "F12",
+        "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+        "CAPS_LOCK", "PRINT_SCREEN", "SCROLL_LOCK", "PAUSE_BREAK",
+        "NUM_LOCK", "INSERT", "DELETE", "HOME", "END",
+        "PAGE_UP", "PAGE_DOWN", "ENTER", "BACKSPACE"
+    };
+    std::string upperName = name;
+    std::transform(upperName.begin(), upperName.end(), upperName.begin(),
+        [](unsigned char c) { return std::toupper(c); });
+    return functionKeyNames.find(upperName) != functionKeyNames.end();
+}
+
 std::string KeyEvent::ToString() const
 {
     std::stringstream ss;

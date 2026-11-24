@@ -50,13 +50,25 @@ int32_t ApplicationShortcutManager::RegisterApplicationShortcut(const std::strin
     if (IsUnsupportedShortcutContainer(Container::CurrentSafely(), "registration")) {
         return 0;
     }
+    if (!IsValidShortcutValue(value)) {
+        LOGE("Application shortcut value '%{public}s' is not a valid keyboard shortcut key", value.c_str());
+        return 0;
+    }
+    if (value.length() == 1 && keys == 0) {
+        LOGE("A character key requires at least one modifier key.");
+        return 0;
+    }
     if (applicationShortcutId_ == std::numeric_limits<int32_t>::max()) {
         LOGE("Application shortcut registration IDs exhausted");
         return 0;
     }
+    // Normalize to uppercase for consistent storage and case-sensitive matching.
+    std::string normalizedValue = value;
+    std::transform(normalizedValue.begin(), normalizedValue.end(), normalizedValue.begin(),
+        [](unsigned char c) { return std::toupper(c); });
     const auto registrationId = ++applicationShortcutId_;
     applicationKeyboardShortcuts_.emplace(registrationId,
-        ApplicationKeyboardShortcut { value, keys, std::move(onKeyboardShortcutAction) });
+        ApplicationKeyboardShortcut { normalizedValue, keys, std::move(onKeyboardShortcutAction) });
     return registrationId;
 }
 
@@ -99,14 +111,33 @@ static uint8_t GetEventModifierKeys(const KeyEvent& event)
     return modifiers;
 }
 
+static int32_t CountNonModifierKeys(const KeyEvent& event)
+{
+    int32_t count = 0;
+    for (auto code : event.pressedCodes) {
+        switch (code) {
+            case KeyCode::KEY_CTRL_LEFT:
+            case KeyCode::KEY_CTRL_RIGHT:
+            case KeyCode::KEY_SHIFT_LEFT:
+            case KeyCode::KEY_SHIFT_RIGHT:
+            case KeyCode::KEY_ALT_LEFT:
+            case KeyCode::KEY_ALT_RIGHT:
+                break;
+            default:
+                ++count;
+                break;
+        }
+    }
+    return count;
+}
+
 static bool MatchShortcutValue(const KeyEvent& event, const std::string& value)
 {
     auto keyStr = event.ConvertInputCodeToString();
-    std::string lowerKey = keyStr;
-    std::string lowerValue = value;
-    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
-    std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
-    return lowerKey.find(lowerValue) != std::string::npos;
+    if (event.IsFunctionKey() || event.IsEscapeKey()) {
+        return keyStr == value;
+    }
+    return keyStr.find(value) != std::string::npos;
 }
 
 bool ApplicationShortcutManager::TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId)
@@ -116,9 +147,10 @@ bool ApplicationShortcutManager::TryTriggerApplicationShortcut(const KeyEvent& e
     }
     std::vector<ApplicationKeyboardShortcut> matched;
     const uint8_t eventModifiers = GetEventModifierKeys(event);
+    const int32_t nonModifierKeyCount = CountNonModifierKeys(event);
     for (const auto& [registrationId, shortcut] : applicationKeyboardShortcuts_) {
         if (MatchShortcutValue(event, shortcut.value) && eventModifiers == shortcut.keys &&
-            shortcut.onKeyboardShortcutAction) {
+            nonModifierKeyCount == 1 && shortcut.onKeyboardShortcutAction) {
             matched.push_back(shortcut);
         }
     }
@@ -132,6 +164,17 @@ bool ApplicationShortcutManager::TryTriggerApplicationShortcut(const KeyEvent& e
         }
     }
     return !matched.empty();
+}
+
+bool ApplicationShortcutManager::IsValidShortcutValue(const std::string& value)
+{
+    if (value.empty()) {
+        return false;
+    }
+    if (value.length() == 1) {
+        return static_cast<unsigned char>(value[0]) < 0x80;
+    }
+    return KeyEvent::IsFunctionKeyName(value);
 }
 
 } // namespace OHOS::Ace

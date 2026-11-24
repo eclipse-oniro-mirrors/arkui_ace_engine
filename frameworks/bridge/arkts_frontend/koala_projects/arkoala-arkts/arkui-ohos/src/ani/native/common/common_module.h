@@ -146,7 +146,7 @@ ani_boolean GetKeyEventModifierKeyState(
 void SetClickEventPreventDefault(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
 void SetTouchEventPreventDefault(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
 ani_int RegisterApplicationShortcut(ani_env* env, ani_object obj, ani_string value,
-    ani_int modifiers, ani_fn_object callback);
+    ani_int functionKey, ani_int modifiers, ani_fn_object callback);
 void UnregisterApplicationShortcut(ani_env* env, ani_object obj, ani_int registrationId);
 ani_int GetCallingScopeUIContext(ani_env* env, [[maybe_unused]]ani_object obj);
 ani_int GetLastFocusedUIContext(ani_env* env, [[maybe_unused]]ani_object obj);

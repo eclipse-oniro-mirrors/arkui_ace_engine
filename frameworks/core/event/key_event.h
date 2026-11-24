@@ -113,6 +113,7 @@ struct KeyEvent final : public NonPointerEvent {
 
     std::string ConvertInputCodeToString() const;
     ACE_FORCE_EXPORT std::string ConvertCodeToString() const;
+    static bool IsFunctionKeyName(const std::string& name);
 
     KeyCode code { KeyCode::KEY_UNKNOWN };
     std::string key;
