@@ -2462,6 +2462,86 @@ HWTEST_F(TabsTestNg, HandleTouchUpAndClickTo005, TestSize.Level1)
 }
 
 /**
+ * @tc.name: HandleTouchUpAndClickTo006
+ * @tc.desc: test HandleTouchUpAndClickTo marks the click as handled for the new
+ *           material (floating) TabBar so the follow-up click callback can skip
+ *           duplicate handling. The tabBarClickHandled_ flag must be set only
+ *           after a successful UP touch on the new material TabBar and must be
+ *           clearable via ResetTabBarClickHandled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsTestNg, HandleTouchUpAndClickTo006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with tab contents and obtain TabBarPattern
+     * @tc.expected: step1. TabBarPattern is valid and the handled flag starts cleared
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(tabBarPattern_, nullptr);
+    EXPECT_FALSE(tabBarPattern_->IsTabBarClickHandled());
+
+    /**
+     * @tc.steps: step2. Call HandleTouchUpAndClickTo with useNewMaterial_ false
+     * @tc.expected: step2. Early return, the handled flag stays false
+     */
+    tabBarPattern_->SetUseNewMaterial(false);
+    TouchLocationInfo nonMaterialInfo(0);
+    nonMaterialInfo.SetTouchType(TouchType::UP);
+    nonMaterialInfo.SetLocalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    nonMaterialInfo.SetGlobalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    tabBarPattern_->HandleTouchUpAndClickTo(nonMaterialInfo);
+    EXPECT_FALSE(tabBarPattern_->IsTabBarClickHandled());
+
+    /**
+     * @tc.steps: step3. Call HandleTouchUpAndClickTo with useNewMaterial_ true and
+     *           a non-UP touch type
+     * @tc.expected: step3. Early return, the handled flag stays false
+     */
+    tabBarPattern_->SetUseNewMaterial(true);
+    TouchLocationInfo downInfo(0);
+    downInfo.SetTouchType(TouchType::DOWN);
+    downInfo.SetLocalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    downInfo.SetGlobalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    tabBarPattern_->HandleTouchUpAndClickTo(downInfo);
+    EXPECT_FALSE(tabBarPattern_->IsTabBarClickHandled());
+
+    /**
+     * @tc.steps: step4. Call HandleTouchUpAndClickTo with useNewMaterial_ true and
+     *           TouchType::UP so the click is handled
+     * @tc.expected: step4. The handled flag is set to true
+     */
+    TouchLocationInfo upInfo(0);
+    upInfo.SetTouchType(TouchType::UP);
+    upInfo.SetLocalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    upInfo.SetGlobalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    tabBarPattern_->HandleTouchUpAndClickTo(upInfo);
+    EXPECT_TRUE(tabBarPattern_->IsTabBarClickHandled());
+
+    /**
+     * @tc.steps: step5. Call ResetTabBarClickHandled to clear the flag
+     * @tc.expected: step5. The handled flag returns to false for the next touch cycle
+     */
+    tabBarPattern_->ResetTabBarClickHandled();
+    EXPECT_FALSE(tabBarPattern_->IsTabBarClickHandled());
+
+    /**
+     * @tc.steps: step6. A fresh TouchType::UP after reset must re-arm the flag so the
+     *           next click cycle is handled independently of the previous one. This
+     *           verifies the flag state machine does not get stuck cleared after a
+     *           reset, which is the basis of the duplicate-click guard the PR adds.
+     * @tc.expected: step6. The handled flag is set to true again
+     */
+    TouchLocationInfo repeatUpInfo(0);
+    repeatUpInfo.SetTouchType(TouchType::UP);
+    repeatUpInfo.SetLocalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    repeatUpInfo.SetGlobalLocation(Offset(TABS_WIDTH / 4.0f, 0.0f));
+    tabBarPattern_->HandleTouchUpAndClickTo(repeatUpInfo);
+    EXPECT_TRUE(tabBarPattern_->IsTabBarClickHandled());
+}
+
+/**
  * @tc.name: GetSelectChildIndex001
  * @tc.desc: test GetSelectChildIndex with offset within first child
  * @tc.type: FUNC

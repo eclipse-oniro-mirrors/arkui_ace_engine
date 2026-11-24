@@ -630,6 +630,10 @@ void TabBarPattern::AddTabBarItemClickAndTouchEvent(const RefPtr<FrameNode>& tab
     auto clickCallback = [weak = WeakClaim(this), tabBarItemId](GestureEvent& info) {
         auto tabBar = weak.Upgrade();
         CHECK_NULL_VOID(tabBar);
+        if (tabBar->IsNewMaterial() && tabBar->IsTabBarClickHandled()) {
+            tabBar->ResetTabBarClickHandled();
+            return;
+        }
         auto host = tabBar->GetHost();
         CHECK_NULL_VOID(host);
         auto index = host->GetChildFlatIndex(tabBarItemId).second;
@@ -649,6 +653,9 @@ void TabBarPattern::AddTabBarItemClickAndTouchEvent(const RefPtr<FrameNode>& tab
         CHECK_NULL_VOID(host);
         auto index = host->GetChildFlatIndex(tabBarItemId).second;
         for (auto touchInfo : info.GetTouches()) {
+            if (touchInfo.GetTouchType() == TouchType::DOWN) {
+                tabBar->ResetTabBarClickHandled();
+            }
             tabBar->HandleTouchEvent(touchInfo.GetTouchType(), index);
             tabBar->HandleTouchUpAndClickTo(touchInfo);
         }
@@ -4236,6 +4243,7 @@ void TabBarPattern::HandleTouchUpAndClickTo(const TouchLocationInfo& info)
     Offset tabBarLocal(global.GetX() - hostGlobal.GetX() - translateX,
                        global.GetY() - hostGlobal.GetY() - translateY);
     auto index = GetSelectChildIndex(tabBarLocal);
+    tabBarClickHandled_ = true;
     HandleClick(SourceType::NONE, index);
 }
 
