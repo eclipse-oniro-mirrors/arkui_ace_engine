@@ -138,6 +138,8 @@ export struct DatePickerComponent {
   @State lunarEndMonth: int = DatePickerConstant.MAX_MONTH;
   @State lunarStartDay: int = DatePickerConstant.MIN_DAY;
   @State lunarEndDay: int = 30;
+  @State lunarStartYear: int = 0;
+  @State lunarEndYear: int = 0;
   @State startHour: int = DatePickerConstant.MIN_HOUR;
   @State endHour: int = DatePickerConstant.MAX_HOUR;
   @State startMinute: int = DatePickerConstant.MIN_MINUTE;
@@ -351,8 +353,10 @@ export struct DatePickerComponent {
   }
   
   private initLunarArrays(): void {
+    const startYear: int = this.lunar ? this.lunarStartYear : this.startYear;
+    const endYear: int = this.lunar ? this.lunarEndYear : this.endYear;
     this.yearArray = [];
-    for (let i: int = this.startYear; i <= this.endYear; i++) {
+    for (let i: int = startYear; i <= endYear; i++) {
       this.yearArray.push(this.formatLunarYear(i));
     }
     if (this.hideYear) {
@@ -362,10 +366,10 @@ export struct DatePickerComponent {
     let startLunarMonthIndex: int = DatePickerConstant.MIN_MONTH;
     let endLunarMonthIndex: int = DatePickerConstant.MAX_MONTH;
     
-    if (this.selectedYear === this.startYear) {
+    if (this.selectedYear === startYear) {
       startLunarMonthIndex = this.lunarStartMonth;
     }
-    if (this.selectedYear === this.endYear) {
+    if (this.selectedYear === endYear) {
       endLunarMonthIndex = this.lunarEndMonth;
     }
     
@@ -389,11 +393,11 @@ export struct DatePickerComponent {
     let startLunarDayIndex: int = DatePickerConstant.MIN_DAY;
     let endLunarDayIndex: int = lunarDays;
     
-    if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+    if (this.selectedYear === this.lunarStartYear && this.selectedMonth === this.lunarStartMonth &&
         !this.selectedIsLeapMonth) {
       startLunarDayIndex = this.lunarStartDay;
     }
-    if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+    if (this.selectedYear === this.lunarEndYear && this.selectedMonth === this.lunarEndMonth &&
         !this.selectedIsLeapMonth) {
       endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays).toInt();
     }
@@ -1586,16 +1590,22 @@ export struct DatePickerComponent {
       this.lunarCalendar!.setTime(startGregorian);
       this.lunarStartMonth = this.lunarCalendar!.get('month').toInt();
       this.lunarStartDay = this.lunarCalendar!.get('date').toInt();
+      this.lunarStartYear = this.startYear;
+      if (this.lunarStartMonth >= 11 && startGregorian.getMonth().toInt() <= 1) { this.lunarStartYear -= 1; }
       
       const endGregorian: Date = this.createDateFromParams(this.endYear, this.endMonth, this.endDay);
       this.lunarCalendar!.setTime(endGregorian);
       this.lunarEndMonth = this.lunarCalendar!.get('month').toInt();
       this.lunarEndDay = this.lunarCalendar!.get('date').toInt();
+      this.lunarEndYear = this.endYear;
+      if (this.lunarEndMonth >= 11 && endGregorian.getMonth().toInt() <= 1) { this.lunarEndYear -= 1; }
     } else {
       this.lunarStartMonth = DatePickerConstant.MIN_MONTH;
       this.lunarEndMonth = DatePickerConstant.MAX_MONTH;
       this.lunarStartDay = DatePickerConstant.MIN_DAY;
       this.lunarEndDay = 30;
+      this.lunarStartYear = this.startYear;
+      this.lunarEndYear = this.endYear;
     }
   
     const now = new Date();
@@ -1634,7 +1644,9 @@ export struct DatePickerComponent {
           if (m >= DatePickerConstant.MIN_MONTH && m <= DatePickerConstant.MAX_MONTH &&
               d >= DatePickerConstant.MIN_DAY && d <= maxDay) {
             selectedIsResult = true;
-            this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
+            if (this.selectedYear < this.startYear || this.selectedYear > this.endYear) {
+              this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
+            }
             this.selectedMonth = m;
             this.selectedDay = d;
             this.selectedIsLeapMonth = false;
@@ -1694,7 +1706,7 @@ export struct DatePickerComponent {
         this.selectedIsLeapMonth = this.isDateInLeapMonth(targetDate, this.selectedYear, this.selectedMonth);
 
         // Ensure selected date is within lunar range based on gregorian year
-        if (this.selectedYear === this.startYear) {
+        if (this.selectedYear === this.lunarStartYear) {
           if (this.selectedMonth < this.lunarStartMonth) {
             this.selectedMonth = this.lunarStartMonth;
             this.selectedIsLeapMonth = false;
@@ -1704,7 +1716,7 @@ export struct DatePickerComponent {
             this.selectedDay = this.lunarStartDay;
           }
         }
-        if (this.selectedYear === this.endYear) {
+        if (this.selectedYear === this.lunarEndYear) {
           if (this.selectedMonth > this.lunarEndMonth) {
             this.selectedMonth = this.lunarEndMonth;
             this.selectedIsLeapMonth = false;
@@ -1917,7 +1929,6 @@ export struct DatePickerComponent {
         result.month = gregorianDate.getMonth().toInt();
         result.day = gregorianDate.getDate().toInt();
       } else {
-        result.year = this.selectedYear;
         result.month = this.selectedMonth;
         result.day = this.selectedDay;
       }
@@ -1948,10 +1959,10 @@ private onYearChange(selectedIndex: int): void {
       let startLunarMonthIndex: int = DatePickerConstant.MIN_MONTH;
       let endLunarMonthIndex: int = DatePickerConstant.MAX_MONTH;
       
-      if (this.selectedYear === this.startYear) {
+      if (this.selectedYear === this.lunarStartYear) {
         startLunarMonthIndex = this.lunarStartMonth;
       }
-      if (this.selectedYear === this.endYear) {
+      if (this.selectedYear === this.lunarEndYear) {
         endLunarMonthIndex = this.lunarEndMonth;
       }
       
@@ -1985,11 +1996,11 @@ private onYearChange(selectedIndex: int): void {
       let startLunarDayIndex: int = DatePickerConstant.MIN_DAY;
       let endLunarDayIndex: int = lunarDays;
       
-      if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+      if (this.selectedYear === this.lunarStartYear && this.selectedMonth === this.lunarStartMonth &&
           !this.selectedIsLeapMonth) {
         startLunarDayIndex = this.lunarStartDay;
       }
-      if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+      if (this.selectedYear === this.lunarEndYear && this.selectedMonth === this.lunarEndMonth &&
           !this.selectedIsLeapMonth) {
         endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays).toInt();
       }
@@ -2063,7 +2074,7 @@ private onYearChange(selectedIndex: int): void {
   private onMonthChange(selectedIndex: int): void {
     if (this.lunar) {
       let startLunarMonthIndex: int = DatePickerConstant.MIN_MONTH;
-      if (this.selectedYear === this.startYear) {
+      if (this.selectedYear === this.lunarStartYear) {
         startLunarMonthIndex = this.lunarStartMonth;
       }
       // Save old values to detect if anything actually changed
@@ -2081,11 +2092,11 @@ private onYearChange(selectedIndex: int): void {
       let startLunarDayIndex: int = DatePickerConstant.MIN_DAY;
       let endLunarDayIndex: int = lunarDays;
       
-      if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+      if (this.selectedYear === this.lunarStartYear && this.selectedMonth === this.lunarStartMonth &&
           !this.selectedIsLeapMonth) {
         startLunarDayIndex = this.lunarStartDay;
       }
-      if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+      if (this.selectedYear === this.lunarEndYear && this.selectedMonth === this.lunarEndMonth &&
           !this.selectedIsLeapMonth) {
         endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays).toInt();
       }
@@ -2121,7 +2132,7 @@ private onYearChange(selectedIndex: int): void {
    private onDayChange(selectedIndex: int): void {
     if (this.lunar) {
       let startLunarDayIndex: int = DatePickerConstant.MIN_DAY;
-      if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+      if (this.selectedYear === this.lunarStartYear && this.selectedMonth === this.lunarStartMonth &&
           !this.selectedIsLeapMonth) {
         startLunarDayIndex = this.lunarStartDay;
       }
@@ -2355,11 +2366,11 @@ private onYearChange(selectedIndex: int): void {
       let startLunarDayIndex: int = DatePickerConstant.MIN_DAY;
       let endLunarDayIndex: int = lunarDays;
       
-      if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+      if (this.selectedYear === this.lunarStartYear && this.selectedMonth === this.lunarStartMonth &&
           !this.selectedIsLeapMonth) {
         startLunarDayIndex = this.lunarStartDay;
       }
-      if (this.selectedYear === this.endYear && this.selectedMonth === this.lunarEndMonth &&
+      if (this.selectedYear === this.lunarEndYear && this.selectedMonth === this.lunarEndMonth &&
           !this.selectedIsLeapMonth) {
         endLunarDayIndex = Math.min(this.lunarEndDay, lunarDays).toInt();
       }
@@ -2408,7 +2419,7 @@ private onYearChange(selectedIndex: int): void {
   private getMonthSelectedIndex(): int {
     if (this.lunar) {
       let startLunarMonthIndex: int = DatePickerConstant.MIN_MONTH;
-      if (this.selectedYear === this.startYear) {
+      if (this.selectedYear === this.lunarStartYear) {
         startLunarMonthIndex = this.lunarStartMonth;
       }
       // Encode (month, isLeap) to array index, accounting for leap month insertion
@@ -2436,7 +2447,7 @@ private onYearChange(selectedIndex: int): void {
   private getDaySelectedIndex(): int {
     if (this.lunar) {
       let startLunarDayIndex: int = DatePickerConstant.MIN_DAY;
-      if (this.selectedYear === this.startYear && this.selectedMonth === this.lunarStartMonth &&
+      if (this.selectedYear === this.lunarStartYear && this.selectedMonth === this.lunarStartMonth &&
           !this.selectedIsLeapMonth) {
         startLunarDayIndex = this.lunarStartDay;
       }
@@ -2560,8 +2571,8 @@ private onYearChange(selectedIndex: int): void {
     }
 
     this.yearColumnCanLoop = false;
-    const atStartYear: boolean = this.selectedYear === this.startYear;
-    const atEndYear: boolean = this.selectedYear === this.endYear;
+    const atStartYear: boolean = this.lunar ? (this.selectedYear === this.lunarStartYear) : (this.selectedYear === this.startYear);
+    const atEndYear: boolean = this.lunar ? (this.selectedYear === this.lunarEndYear) : (this.selectedYear === this.endYear);
     this.monthColumnCanLoop = !atStartYear && !atEndYear;
     if (this.lunar) {
       const atStartMonth: boolean = atStartYear && this.selectedMonth === this.lunarStartMonth &&
