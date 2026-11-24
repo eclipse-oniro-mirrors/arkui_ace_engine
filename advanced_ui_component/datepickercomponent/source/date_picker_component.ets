@@ -2579,8 +2579,10 @@ private formatHour(hour24: number): string {
     }
 
     this.yearColumnCanLoop = false;
-    const atStartYear = this.lunar ? (this.selectedYear === this.lunarStartYear) : (this.selectedYear === this.startYear);
-    const atEndYear = this.lunar ? (this.selectedYear === this.lunarEndYear) : (this.selectedYear === this.endYear);
+    const atStartYear = this.lunar ?
+        (this.selectedYear === this.lunarStartYear) : (this.selectedYear === this.startYear);
+    const atEndYear = this.lunar ?
+        (this.selectedYear === this.lunarEndYear) : (this.selectedYear === this.endYear);
     this.monthColumnCanLoop = !atStartYear && !atEndYear;
     if (this.lunar) {
       const atStartMonth = atStartYear && this.selectedMonth === this.lunarStartMonth && !this.selectedIsLeapMonth;

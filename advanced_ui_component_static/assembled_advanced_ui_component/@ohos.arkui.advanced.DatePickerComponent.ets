@@ -2571,8 +2571,10 @@ private onYearChange(selectedIndex: int): void {
     }
 
     this.yearColumnCanLoop = false;
-    const atStartYear: boolean = this.lunar ? (this.selectedYear === this.lunarStartYear) : (this.selectedYear === this.startYear);
-    const atEndYear: boolean = this.lunar ? (this.selectedYear === this.lunarEndYear) : (this.selectedYear === this.endYear);
+    const atStartYear: boolean = this.lunar ?
+        (this.selectedYear === this.lunarStartYear) : (this.selectedYear === this.startYear);
+    const atEndYear: boolean = this.lunar ?
+        (this.selectedYear === this.lunarEndYear) : (this.selectedYear === this.endYear);
     this.monthColumnCanLoop = !atStartYear && !atEndYear;
     if (this.lunar) {
       const atStartMonth: boolean = atStartYear && this.selectedMonth === this.lunarStartMonth &&
