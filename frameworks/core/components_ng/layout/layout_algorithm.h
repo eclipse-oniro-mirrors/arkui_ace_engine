@@ -125,8 +125,8 @@ public:
     bool IsContentOverflow(LayoutWrapper* layoutWrapper, OverflowCollector& collector);
 
 private:
-    bool IsContentOverflowForSmartLayout(LayoutWrapper* layoutWrapper, const RectF& childRect);
-    bool IsContentUnderutilizedForSmartLayout(LayoutWrapper* layoutWrapper, const RectF& childRect);
+    bool IsContentOverflowForSmartLayout(LayoutWrapper* layoutWrapper, const RectF& childRect, bool isRootNode);
+    bool IsContentUnderutilizedForSmartLayout(LayoutWrapper* layoutWrapper, const RectF& childRect, bool isRootNode);
     void TryRestoreSmartLayoutForHost(LayoutWrapper* layoutWrapper);
     uint64_t NodePath2Hash(const std::string& path);
     std::string ComputeCurrentPathHash(FrameNode* hostNode);

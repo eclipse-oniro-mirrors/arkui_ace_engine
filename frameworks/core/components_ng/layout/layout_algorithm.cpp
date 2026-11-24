@@ -59,6 +59,28 @@ bool IsComponentSupportSmartLayout(const RefPtr<FrameNode>& hostNode)
     }
     return true;
 }
+
+bool IsSmartLayoutRootNode(const RefPtr<FrameNode>& hostNode, const SizeF& frameSize)
+{
+    CHECK_NULL_RETURN(hostNode, false);
+    auto* context = hostNode->GetContext();
+    CHECK_NULL_RETURN(context, false);
+    constexpr float rootSizeEpsilon = 1.0f;
+    auto isRootSizeMatched = [&frameSize](float width, float height) {
+        return NearEqual(width, frameSize.Width(), rootSizeEpsilon) &&
+            NearEqual(height, frameSize.Height(), rootSizeEpsilon);
+    };
+    if (context->IsFormRender()) {
+        auto rootRect = context->GetRootRect();
+        return isRootSizeMatched(rootRect.Width(), rootRect.Height());
+    }
+    auto formNode = SmartLayoutAlgorithm::FindGenUIRenderComp(hostNode);
+    CHECK_NULL_RETURN(formNode, false);
+    auto formGeo = formNode->GetGeometryNode();
+    CHECK_NULL_RETURN(formGeo, false);
+    auto formSize = formGeo->GetFrameSize();
+    return isRootSizeMatched(formSize.Width(), formSize.Height());
+}
 }
 
 static inline void UnionRect(std::optional<RectF>& unionRect, const RectF& rect)
@@ -271,18 +293,22 @@ bool LayoutAlgorithm::HandleContentOverflowWithSmartLayout(LayoutWrapper* layout
     TryRestoreSmartLayoutForHost(layoutWrapper);
 
     RectF childRect;
+    bool isRootNode = false;
     if (hostNode->GetTag() != V2::TEXT_ETS_TAG) {
         auto collectResult = CollectOverflowFromFrameNode(AceType::RawPtr(hostNode), true, true);
         if (collectResult.overflowDisabled || !collectResult.totalChildFrameRect.has_value()) {
             return false;
         }
         childRect = collectResult.totalChildFrameRect.value();
+        auto geometry = hostNode->GetGeometryNode();
+        CHECK_NULL_RETURN(geometry, false);
+        isRootNode = IsSmartLayoutRootNode(hostNode, geometry->GetFrameSize());
     }
 
-    if (IsContentOverflowForSmartLayout(layoutWrapper, childRect)) {
+    if (IsContentOverflowForSmartLayout(layoutWrapper, childRect, isRootNode)) {
         SmartLayoutAlgorithm smartLayoutAlgorithm;
         return smartLayoutAlgorithm.PerformSmartLayout(layoutWrapper);
-    } else if (IsContentUnderutilizedForSmartLayout(layoutWrapper, childRect)) {
+    } else if (IsContentUnderutilizedForSmartLayout(layoutWrapper, childRect, isRootNode)) {
         SmartLayoutAlgorithm smartLayoutAlgorithm;
         return smartLayoutAlgorithm.PerformSmartLayoutScaleUp(layoutWrapper);
     }
@@ -290,7 +316,8 @@ bool LayoutAlgorithm::HandleContentOverflowWithSmartLayout(LayoutWrapper* layout
     return false;
 }
 
-bool LayoutAlgorithm::IsContentOverflowForSmartLayout(LayoutWrapper* layoutWrapper, const RectF& childRect)
+bool LayoutAlgorithm::IsContentOverflowForSmartLayout(
+    LayoutWrapper* layoutWrapper, const RectF& childRect, bool isRootNode)
 {
     CHECK_NULL_RETURN(layoutWrapper, false);
     auto hostNode = layoutWrapper->GetHostNode();
@@ -299,9 +326,7 @@ bool LayoutAlgorithm::IsContentOverflowForSmartLayout(LayoutWrapper* layoutWrapp
     if (hostNode->GetTag() == V2::TEXT_ETS_TAG) {
         auto textPattern = hostNode->GetPattern<TextPattern>();
         CHECK_NULL_RETURN(textPattern, false);
-        auto geometryNode = layoutWrapper->GetGeometryNode();
-        CHECK_NULL_RETURN(geometryNode, false);
-        return textPattern->IsContentOverflowForSmartLayout(geometryNode->GetContentSize());
+        return textPattern->IsContentOverflowForSmartLayout(layoutWrapper);
     }
 
     // 父容器在本地坐标系下的区域
@@ -310,14 +335,20 @@ bool LayoutAlgorithm::IsContentOverflowForSmartLayout(LayoutWrapper* layoutWrapp
     auto frameSize = geometry->GetFrameSize();
     RectF parentRect(0.0f, 0.0f, frameSize.Width(), frameSize.Height());
 
-    // 子节点包围盒是否超出父容器
-    return LessOrEqual(childRect.Top(), parentRect.Top()) ||
-        GreatOrEqual(childRect.Bottom(), parentRect.Bottom()) ||
-        LessOrEqual(childRect.Left(), parentRect.Left()) ||
-        GreatOrEqual(childRect.Right(), parentRect.Right());
+    if (isRootNode) {
+        return LessOrEqual(childRect.Top(), parentRect.Top()) ||
+            GreatOrEqual(childRect.Bottom(), parentRect.Bottom()) ||
+            LessOrEqual(childRect.Left(), parentRect.Left()) ||
+            GreatOrEqual(childRect.Right(), parentRect.Right());
+    }
+    return LessNotEqual(childRect.Top(), parentRect.Top()) ||
+        GreatNotEqual(childRect.Bottom(), parentRect.Bottom()) ||
+        LessNotEqual(childRect.Left(), parentRect.Left()) ||
+        GreatNotEqual(childRect.Right(), parentRect.Right());
 }
 
-bool LayoutAlgorithm::IsContentUnderutilizedForSmartLayout(LayoutWrapper* layoutWrapper, const RectF& childRect)
+bool LayoutAlgorithm::IsContentUnderutilizedForSmartLayout(
+    LayoutWrapper* layoutWrapper, const RectF& childRect, bool isRootNode)
 {
     CHECK_NULL_RETURN(layoutWrapper, false);
     auto hostNode = layoutWrapper->GetHostNode();
@@ -326,29 +357,8 @@ bool LayoutAlgorithm::IsContentUnderutilizedForSmartLayout(LayoutWrapper* layout
     CHECK_NULL_RETURN(geometry, false);
     auto frameSize = geometry->GetFrameSize();
 
-    auto* context = hostNode->GetContext();
-    CHECK_NULL_RETURN(context, false);
-
-    // 1px tolerance for matching host frame size against smart layout root size
-    constexpr float ROOT_SIZE_EPSILON = 1.0f;
-    auto isRootSizeMatched = [&frameSize](float width, float height) {
-        return NearEqual(width, frameSize.Width(), ROOT_SIZE_EPSILON) &&
-            NearEqual(height, frameSize.Height(), ROOT_SIZE_EPSILON);
-    };
-    if (context->IsFormRender()) {
-        auto rootRect = context->GetRootRect();
-        if (!isRootSizeMatched(rootRect.Width(), rootRect.Height())) {
-            return false;
-        }
-    } else {
-        auto formNode = SmartLayoutAlgorithm::FindGenUIRenderComp(hostNode);
-        CHECK_NULL_RETURN(formNode, false);
-        auto formGeo = formNode->GetGeometryNode();
-        CHECK_NULL_RETURN(formGeo, false);
-        auto formSize = formGeo->GetFrameSize();
-        if (!isRootSizeMatched(formSize.Width(), formSize.Height())) {
-            return false;
-        }
+    if (!isRootNode) {
+        return false;
     }
 
     auto layoutProperty = hostNode->GetLayoutProperty();

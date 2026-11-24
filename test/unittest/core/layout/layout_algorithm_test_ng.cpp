@@ -260,18 +260,43 @@ HWTEST_F(LayoutAlgorithmTestNg, IsContentOverflowForSmartLayoutTest001, TestSize
     auto wrapper = AceType::MakeRefPtr<LayoutWrapperNode>(host, host->GetGeometryNode(),
         host->GetLayoutProperty());
 
-    // 80x80 包围盒位于 (10,10)，超出 50x50 父容器 -> 溢出
+    // 80x80 包围盒位于 (10,10)，超出 50x50 父容器 -> 溢出（非根）
     RectF overflowRect(10.0f, 10.0f, 80.0f, 80.0f);
-    EXPECT_TRUE(algo->IsContentOverflowForSmartLayout(AceType::RawPtr(wrapper), overflowRect));
+    EXPECT_TRUE(algo->IsContentOverflowForSmartLayout(AceType::RawPtr(wrapper), overflowRect, false));
 
     // 包围盒完全位于父容器内 -> 不溢出
     RectF insideRect(5.0f, 5.0f, 40.0f, 40.0f);
-    EXPECT_FALSE(algo->IsContentOverflowForSmartLayout(AceType::RawPtr(wrapper), insideRect));
+    EXPECT_FALSE(algo->IsContentOverflowForSmartLayout(AceType::RawPtr(wrapper), insideRect, false));
 
     // 父容器扩大到 100x100 后，原溢出包围盒不再超出边界 -> 不溢出
     host->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 100.0f));
-    EXPECT_FALSE(algo->IsContentOverflowForSmartLayout(AceType::RawPtr(wrapper), overflowRect));
+    EXPECT_FALSE(algo->IsContentOverflowForSmartLayout(AceType::RawPtr(wrapper), overflowRect, false));
     EXPECT_FALSE(algo->HandleContentOverflowWithSmartLayout(AceType::RawPtr(wrapper)));
+}
+
+/**
+ * @tc.name: IsContentOverflowForSmartLayoutNonRootExactFillTest001
+ * @tc.desc: non-root container: exact-fill content is not overflow; only strict overrun is
+ * @tc.type: FUNC
+ */
+HWTEST_F(LayoutAlgorithmTestNg, IsContentOverflowForSmartLayoutNonRootExactFillTest001, TestSize.Level0)
+{
+    auto algo = AceType::MakeRefPtr<LayoutAlgorithm>();
+    auto host = FrameNode::CreateFrameNode("Column", 500, AceType::MakeRefPtr<Pattern>());
+    host->GetGeometryNode()->SetFrameSize(SizeF(50.0f, 50.0f));
+    auto wrapper = AceType::MakeRefPtr<LayoutWrapperNode>(host, host->GetGeometryNode(), host->GetLayoutProperty());
+    // 非根容器（isRootNode=false）：恰好铺满 50x50 触边不越界，旧实现 LessOrEqual/GreatOrEqual 会误判溢出
+    EXPECT_FALSE(algo->IsContentOverflowForSmartLayout(
+        AceType::RawPtr(wrapper), RectF(0.0f, 0.0f, 50.0f, 50.0f), false));
+    // 非根容器：严格越界（left=-1）仍判溢出
+    EXPECT_TRUE(algo->IsContentOverflowForSmartLayout(
+        AceType::RawPtr(wrapper), RectF(-1.0f, 0.0f, 51.0f, 50.0f), false));
+    // 根容器（isRootNode=true）保留历史语义：恰好铺满触边即判溢出
+    EXPECT_TRUE(algo->IsContentOverflowForSmartLayout(
+        AceType::RawPtr(wrapper), RectF(0.0f, 0.0f, 50.0f, 50.0f), true));
+    // 根容器：严格位于内部（不触边）不判溢出
+    EXPECT_FALSE(algo->IsContentOverflowForSmartLayout(
+        AceType::RawPtr(wrapper), RectF(1.0f, 1.0f, 48.0f, 48.0f), true));
 }
 
 /**
