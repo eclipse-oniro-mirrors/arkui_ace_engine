@@ -167,6 +167,7 @@ class EventHub;
 class OverlayManager;
 class PipelineContext;
 class DragDropManager;
+class DragSnapshotRequest;
 struct DragStartContext;
 
 // The gesture event hub is mainly used to handle common gesture events.
@@ -455,7 +456,11 @@ public:
     bool TriggerTouchEvent(const TouchEvent& point);
     void SetRecognizerDelayStatus(const RecognizerDelayStatus& recognizerDelayStatus = RecognizerDelayStatus::NONE);
     void DragNodeDetachFromParent();
+    void CancelDragSnapshot();
 private:
+    std::weak_ptr<DragSnapshotRequest> pendingDragSnapshot_;
+    WeakPtr<DragDropManager> pendingDragSnapshotManager_;
+
     void RegisterBasicRecognizers(
         const std::list<RefPtr<NGGestureRecognizer>>& recognizers,
         int32_t touchId);

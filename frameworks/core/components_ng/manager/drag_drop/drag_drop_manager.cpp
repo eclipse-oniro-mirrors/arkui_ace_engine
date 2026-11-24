@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
+#include "core/components_ng/manager/drag_drop/drag_snapshot_request.h"
 #include "core/components_ng/base/modifier.h"
 
 #include "core/gestures/drag_event.h"
@@ -96,6 +97,22 @@ const RefPtr<InterpolatingSpring> DRAG_TRANSITION_ANIMATION_CURVE =
     AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 380.0f, 34.0f);
 constexpr char STOP_DRAG_ANIMATION_END_TASK[] = "ArkUIDragStopAnimationEnd";
 
+RefPtr<UnifiedData> RequestDragData(const std::string& udKey)
+{
+    if (udKey.empty()) {
+        TAG_LOGI(AceLogTag::ACE_DRAG, "udKey is empty");
+        return nullptr;
+    }
+    ACE_SCOPED_TRACE("drag: get drag data from udmf");
+    RefPtr<UnifiedData> udData = UdmfClient::GetInstance()->CreateUnifiedData();
+    auto ret = UdmfClient::GetInstance()->GetData(udData, udKey);
+    if (ret != 0) {
+        TAG_LOGI(AceLogTag::ACE_DRAG, "Get udmfData failed");
+        return nullptr;
+    }
+    return udData;
+}
+
 DragAnimationType ParseDragAnimationType(int32_t dragAnimationTypeValue)
 {
     return dragAnimationTypeValue == static_cast<int32_t>(DragAnimationType::FOLLOW_HAND_MORPH)
@@ -141,6 +158,7 @@ DragDropManager::DragDropManager() {}
 
 DragDropManager::~DragDropManager()
 {
+    CancelPendingDragSnapshots();
     if (isDragFwkShow_ == false || isDragWindowHiddenByDeveloper_) {
         ACE_SCOPED_TRACE("drag: set drag window visible when destroy");
         TAG_LOGI(AceLogTag::ACE_DRAG, "destroy, transDragWindowToDragFwk is %{public}d", isDragFwkShow_);
@@ -1513,20 +1531,43 @@ void DragDropManager::DoDropAction(const RefPtr<FrameNode>& dragFrameNode, const
     OnDragDrop(event, dragFrameNode, pointerEvent);
 }
 
+std::shared_ptr<DragSnapshotRequest> DragDropManager::CreateDragSnapshotRequest(
+    std::function<void(const RefPtr<PixelMap>&)> callback)
+{
+    auto request = std::make_shared<DragSnapshotRequest>(std::move(callback));
+    pendingDragSnapshots_.insert(request);
+    return request;
+}
+
+void DragDropManager::CompleteDragSnapshotRequest(
+    const std::shared_ptr<DragSnapshotRequest>& request, const RefPtr<PixelMap>& pixelMap)
+{
+    if (pendingDragSnapshots_.erase(request) == 0) {
+        return;
+    }
+    request->Complete(pixelMap);
+}
+
+void DragDropManager::CancelDragSnapshotRequest(const std::shared_ptr<DragSnapshotRequest>& request)
+{
+    if (pendingDragSnapshots_.erase(request) == 0) {
+        return;
+    }
+    request->Cancel();
+}
+
+void DragDropManager::CancelPendingDragSnapshots()
+{
+    auto requests = std::move(pendingDragSnapshots_);
+    pendingDragSnapshots_.clear();
+    for (const auto& request : requests) {
+        request->Cancel();
+    }
+}
+
 RefPtr<UnifiedData> DragDropManager::RequestUDMFDataWithUDKey(const std::string& udKey)
 {
-    if (udKey.empty()) {
-        TAG_LOGI(AceLogTag::ACE_DRAG, "udKey is empty");
-        return nullptr;
-    }
-    ACE_SCOPED_TRACE("drag: get drag data from udmf");
-    RefPtr<UnifiedData> udData = UdmfClient::GetInstance()->CreateUnifiedData();
-    auto ret = UdmfClient::GetInstance()->GetData(udData, udKey);
-    if (ret != 0) {
-        TAG_LOGI(AceLogTag::ACE_DRAG, "Get udmfData failed");
-        return nullptr;
-    }
-    return udData;
+    return RequestDragData(udKey);
 }
 
 void DragDropManager::TryGetDataBackGround(const RefPtr<FrameNode>& dragFrameNode, const DragPointerEvent& pointerEvent,
@@ -1542,13 +1583,12 @@ void DragDropManager::TryGetDataBackGround(const RefPtr<FrameNode>& dragFrameNod
         [id = Container::CurrentId(), weakPipeline, weakDragFrameNode, pointerEvent, udKey, count,
         weakManager = WeakClaim(this)]() {
             ContainerScope scope(id);
-            auto dragDropManager = weakManager.Upgrade();
-            CHECK_NULL_VOID(dragDropManager);
+            CHECK_NULL_VOID(!weakManager.Invalid());
             auto pipeline = weakPipeline.Upgrade();
             CHECK_NULL_VOID(pipeline);
             auto taskScheduler = pipeline->GetTaskExecutor();
             CHECK_NULL_VOID(taskScheduler);
-            auto result = dragDropManager->RequestUDMFDataWithUDKey(udKey);
+            auto result = RequestDragData(udKey);
             if (result != nullptr || count >= MAX_RETRY_TIMES) {
                 taskScheduler->PostTask(
                     [weakDragFrameNode, pointerEvent, weakManager, result, udKey]() {
@@ -1745,8 +1785,12 @@ void DragDropManager::ExecuteFollowHandMorphStopDrag(const RefPtr<OHOS::Ace::Dra
     };
     DragDropGlobalController::GetInstance().SavePendingFollowHandMorphDropAnimation(std::move(pendingCallback));
     TAG_LOGI(AceLogTag::ACE_DRAG, "Stop drag follow-hand morph branch enters pending state.");
-    auto stopDragCallback = [id = Container::CurrentId(), taskExecutor]() {
+    auto stopDragCallback = [id = pipeline->GetInstanceId()]() {
         ContainerScope scope(id);
+        auto container = Container::GetContainer(id);
+        CHECK_NULL_VOID(container);
+        auto taskExecutor = container->GetTaskExecutor();
+        CHECK_NULL_VOID(taskExecutor);
         TAG_LOGI(AceLogTag::ACE_DRAG, "Receive stop-drag callback from drag framework for follow-hand morph.");
         taskExecutor->PostTask(
             []() {

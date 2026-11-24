@@ -1039,8 +1039,12 @@ RefPtr<GestureSpan> JSGestureSpan::ParseJSGestureSpan(const JSCallbackInfo& args
         auto onTouch = [execCtx = args.GetExecutionContext(), func = jsOnTouchWeakFunc](TouchEventInfo& info) {
             JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
             ACE_SCORING_EVENT("SpanString.onTouch");
-            JSRef<JSVal> param = JsTouchFunction::CreateJSEventInfo(info);
+            auto eventObj = JsTouchFunction::CreateJSEventInfo(info);
+            JSRef<JSVal> param = eventObj;
             func->ExecuteJS(1, &param);
+            auto* eventInfo = eventObj->Unwrap<TouchEventInfo>();
+            info.SetStopPropagation(eventInfo->IsStopPropagation());
+            info.SetPreventDefault(eventInfo->IsPreventDefault());
         };
         gestureInfo.onTouch = std::move(onTouch);
     }

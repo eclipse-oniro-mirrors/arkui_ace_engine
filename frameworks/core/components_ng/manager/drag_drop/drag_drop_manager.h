@@ -17,8 +17,10 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_DRAG_DROP_DRAG_DROP_MANAGER_H
 
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 
 #include "base/memory/ace_type.h"
 #include "base/utils/noncopyable.h"
@@ -44,6 +46,7 @@ class RSSyncTransactionHandler;
 class RSTransaction;
 } // namespace OHOS::Rosen
 namespace OHOS::Ace::NG {
+class DragSnapshotRequest;
 class AnimatablePropertyFloat;
 template<typename T, typename S>
 class NodeAnimatableProperty;
@@ -157,6 +160,14 @@ public:
     void DoDropAction(const RefPtr<FrameNode>& dragFrameNode, const DragPointerEvent& pointerEvent,
         const RefPtr<UnifiedData>& unifiedData, const std::string& udKey);
     void RequestDragSummaryInfoAndPrivilege();
+    // Snapshot ownership and cleanup are confined to the UI thread.
+    std::shared_ptr<DragSnapshotRequest> CreateDragSnapshotRequest(
+        std::function<void(const RefPtr<PixelMap>&)> callback);
+    void CompleteDragSnapshotRequest(
+        const std::shared_ptr<DragSnapshotRequest>& request, const RefPtr<PixelMap>& pixelMap);
+    void CancelDragSnapshotRequest(const std::shared_ptr<DragSnapshotRequest>& request);
+    void CancelPendingDragSnapshots();
+
     RefPtr<UnifiedData> RequestUDMFDataWithUDKey(const std::string& udKey);
     void TryGetDataBackGround(
         const RefPtr<FrameNode>& dragFrameNode, const DragPointerEvent& pointerEvent,
@@ -777,6 +788,7 @@ public:
 #endif
 
 private:
+    std::unordered_set<std::shared_ptr<DragSnapshotRequest>> pendingDragSnapshots_;
     double CalcDragPreviewDistanceWithPoint(
         const OHOS::Ace::Dimension& preserverHeight, int32_t x, int32_t y, const DragPreviewInfo& info);
     Offset CalcDragMoveOffset(

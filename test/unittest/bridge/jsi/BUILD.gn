@@ -16,6 +16,7 @@ import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 jsi_class_base_sources = [
   "$ace_root/frameworks/bridge/declarative_frontend/engine/jsi/jsi_class_base.cpp",
   "jsi_class_base_test.cpp",
+  "jsi_native_event_test.cpp",
 ]
 
 if (is_host_product) {

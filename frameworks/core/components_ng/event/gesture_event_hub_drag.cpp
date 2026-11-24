@@ -30,6 +30,7 @@
 #include "core/components/container_modal/container_modal_constants.h"
 #include "core/components_ng/event/drag_drop_event.h"
 #include "core/components_ng/event/gesture_event_hub.h"
+#include "core/components_ng/manager/drag_drop/drag_snapshot_request.h"
 #include "core/components_ng/gestures/gesture_referee.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_behavior_reporter/drag_drop_behavior_reporter.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_func_wrapper.h"
@@ -770,6 +771,7 @@ void GestureEventHub::DispatchDragStartByRequestState(const DragStartContext& ct
 
 void GestureEventHub::HandleOnDragStart(const GestureEvent& info)
 {
+    CancelDragSnapshot();
     ACE_BENCH_MARK_TRACE("OnDragStart_start");
     TAG_LOGD(AceLogTag::ACE_DRAG, "Start handle onDragStart.");
     if (dragEventActuator_ && dragEventActuator_->IsDragStartedAcrossScreenLock(info)) {
@@ -1626,8 +1628,20 @@ void GestureEventHub::HandleDragEndAction(const DragframeNodeInfo& info)
     dragDropManager->SetGrayedState(false);
 }
 
+void GestureEventHub::CancelDragSnapshot()
+{
+    auto request = pendingDragSnapshot_.lock();
+    auto manager = pendingDragSnapshotManager_.Upgrade();
+    pendingDragSnapshot_.reset();
+    pendingDragSnapshotManager_.Reset();
+    if (manager && request) {
+        manager->CancelDragSnapshotRequest(request);
+    }
+}
+
 void GestureEventHub::HandleOnDragEnd(const GestureEvent& info)
 {
+    CancelDragSnapshot();
     auto pipeline = NG::PipelineContext::GetCurrentContextSafelyWithCheck();
     const static int32_t PLATFORM_VERSION_TEN = 10;
     if (pipeline && (pipeline->GetMinPlatformVersion() < PLATFORM_VERSION_TEN)) {
@@ -1666,6 +1680,7 @@ void GestureEventHub::HandleOnDragEnd(const GestureEvent& info)
 
 void GestureEventHub::HandleOnDragCancel()
 {
+    CancelDragSnapshot();
     ResetAutoHideDragInfo();
     CHECK_NULL_VOID(dragDropProxy_);
     dragDropProxy_->DestroyDragWindow();
@@ -2025,52 +2040,72 @@ bool GestureEventHub::StartDragForCustomBuilderSync(const GestureEvent& info, co
 void GestureEventHub::StartDragForCustomBuilder(const GestureEvent& info, const RefPtr<PipelineBase>& pipeline,
     const RefPtr<FrameNode> frameNode, DragDropInfo dragDropInfo, const RefPtr<OHOS::Ace::DragEvent>& event)
 {
+    CancelDragSnapshot();
     if (StartDragForCustomBuilderSync(info, pipeline, frameNode, dragDropInfo, event)) {
         return;
     }
 
     TAG_LOGI(AceLogTag::ACE_DRAG, "Snapshot createSync failed, get thumbnail by async.");
+    auto context = AceType::DynamicCast<PipelineContext>(pipeline);
+    CHECK_NULL_VOID(context);
+    auto manager = context->GetDragDropManager();
+    CHECK_NULL_VOID(manager);
     auto weakPipeline = AceType::WeakClaim(AceType::RawPtr(pipeline));
     auto weakFrameNode = AceType::WeakClaim(AceType::RawPtr(frameNode));
-    auto callback = [id = Container::CurrentId(), weakPipeline, info, weakGestureHub = AceType::WeakClaim(this),
-        weakFrameNode, dragDropInfo, event](std::shared_ptr<Media::PixelMap> pixelMap, int32_t arg,
-        std::function<void()> finishCallback) mutable {
-        ContainerScope scope(id);
-        ACE_SCOPED_TRACE("drag: get snapshot async done, post task to UI for next handling");
-        TAG_LOGI(AceLogTag::ACE_DRAG, "Get thumbnail callback executed.");
-        if (pixelMap != nullptr) {
-            dragDropInfo.pixelMap = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&pixelMap));
-        } else {
+    // The manager owns UI objects until completion or cancellation. The service callback only holds weak references.
+    auto request = manager->CreateDragSnapshotRequest(
+        [weakPipeline, info, weakGestureHub = AceType::WeakClaim(this), weakFrameNode, dragDropInfo, event](
+            const RefPtr<PixelMap>& pixelMap) mutable {
+            if (pixelMap) {
+                dragDropInfo.pixelMap = pixelMap;
+            } else {
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
-            DragDropBehaviorReporter::GetInstance().UpdateDragStartResult(DragStartResult::SNAPSHOT_FAIL);
+                DragDropBehaviorReporter::GetInstance().UpdateDragStartResult(DragStartResult::SNAPSHOT_FAIL);
 #endif
-        }
-        auto pipelineCtx = weakPipeline.Upgrade();
-        CHECK_NULL_VOID(pipelineCtx);
-        auto taskScheduler = pipelineCtx->GetTaskExecutor();
-        CHECK_NULL_VOID(taskScheduler);
-        taskScheduler->PostTask(
-            [weakPipeline, info, weakGestureHub, weakFrameNode, dragDropInfo, event, finishCallback]() {
-                TAG_LOGI(AceLogTag::ACE_DRAG, "Get thumbnail finished, start drag.");
-                if (finishCallback) {
-                    finishCallback();
+            }
+            auto gestureEventHub = weakGestureHub.Upgrade();
+            CHECK_NULL_VOID(gestureEventHub);
+            auto frameNode = weakFrameNode.Upgrade();
+            CHECK_NULL_VOID(frameNode);
+            auto pipeline = weakPipeline.Upgrade();
+            CHECK_NULL_VOID(pipeline);
+            gestureEventHub->OnDragStart(info, pipeline, frameNode, dragDropInfo, event);
+        });
+    pendingDragSnapshot_ = request;
+    pendingDragSnapshotManager_ = manager;
+    auto callback = [id = pipeline->GetInstanceId(), weakPipeline,
+        weakManager = AceType::WeakClaim(AceType::RawPtr(manager)),
+        weakRequest = std::weak_ptr<DragSnapshotRequest>(request)](std::shared_ptr<Media::PixelMap> pixelMap,
+        int32_t /* errorCode */, std::function<void()> /* finishCallback */) {
+        ContainerScope scope(id);
+        auto pipeline = weakPipeline.Upgrade();
+        CHECK_NULL_VOID(pipeline);
+        auto executor = pipeline->GetTaskExecutor();
+        CHECK_NULL_VOID(executor);
+        if (!executor->PostTask(
+            [id, weakManager, weakRequest, pixelMap]() mutable {
+                ContainerScope scope(id);
+                auto manager = weakManager.Upgrade();
+                CHECK_NULL_VOID(manager);
+                auto request = weakRequest.lock();
+                CHECK_NULL_VOID(request);
+                RefPtr<PixelMap> result;
+                if (pixelMap) {
+                    result = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&pixelMap));
                 }
-                auto gestureEventHubPtr = weakGestureHub.Upgrade();
-                CHECK_NULL_VOID(gestureEventHubPtr);
-                auto frameNode = weakFrameNode.Upgrade();
-                CHECK_NULL_VOID(frameNode);
-                auto pipeline = weakPipeline.Upgrade();
-                CHECK_NULL_VOID(pipeline);
-                gestureEventHubPtr->OnDragStart(info, pipeline, frameNode, dragDropInfo, event);
-            },
-            TaskExecutor::TaskType::UI, "ArkUIGestureDragStart");
+                manager->CompleteDragSnapshotRequest(request, result);
+            }, TaskExecutor::TaskType::UI, "ArkUIGestureDragStart")) {
+            // UI-owned state is released by gesture cancellation or pipeline teardown if posting fails.
+            TAG_LOGW(AceLogTag::ACE_DRAG, "Failed to post drag snapshot completion to UI.");
+        }
     };
     SnapshotParam param;
     param.delay = CREATE_PIXELMAP_TIME;
     param.checkImageStatus = true;
     param.options.waitUntilRenderFinished = true;
     ACE_SCOPED_TRACE("drag: try sync failed, to get snapshot async");
-    NG::ComponentSnapshot::Create(dragDropInfo.customNode, std::move(callback), true, param);
+    NG::ComponentSnapshot::CreateWithCleanup(dragDropInfo.customNode, std::move(callback), true, param,
+        [request](std::function<void()> cleanup) { request->SetCleanup(std::move(cleanup)); });
     PrintBuilderNode(dragDropInfo.customNode);
 }
 #endif

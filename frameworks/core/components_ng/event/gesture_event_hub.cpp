@@ -191,7 +191,10 @@ HitTestResult ApplyGestureCollectIntervention(
 
 GestureEventHub::GestureEventHub(const WeakPtr<EventHub>& eventHub) : eventHub_(eventHub) {}
 
-GestureEventHub::~GestureEventHub() = default;
+GestureEventHub::~GestureEventHub()
+{
+    CancelDragSnapshot();
+}
 
 
 GestureCollectIntervention GestureEventHub::TriggerOnGestureCollectIntercept(

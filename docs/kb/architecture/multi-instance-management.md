@@ -169,7 +169,10 @@
 | 隔离线程模式下实例隔离失效 | `container_scope.h` MarkIsolatedThread + localContainerSet_ |
 | 跨实例 UI 任务投递死锁 | `multi_thread_build_manager.h/cpp` — PostUITaskAndWait 需避免同线程递归 |
 | PipelineContext 初始化顺序错误 | `ace_container.cpp` Initialize → InitializeFrontend → InitializeTask → AttachView |
+| Pipeline 最后一个强引用在非 UI 线程释放 | 先查 `pipeline_base.cpp` 的 `PipelineBase::MaybeRelease`，不能仅根据 `RefPtr` 释放线程判定析构线程 |
 | 系统栏或窗口模式异常 | `WindowManager` 回调、系统栏样式设置、窗口模式查询 |
+
+跨线程析构审查提示（2026-11-18 核验）：`interfaces/inner_api/ace_kit/include/ui/base/referenced.h` 的 `Referenced::DecRefCount` 在计数归零时先调用虚函数 `MaybeRelease`，仅返回 true 才就地删除。`frameworks/core/pipeline/pipeline_base.cpp` 的 `PipelineBase::MaybeRelease` 在非 UI 线程向自身执行器投递 `ArkUIDestroyPipeline`，投递成功返回 false，由 UI 任务执行 `delete this`；NG 和 legacy PipelineContext 均继承此机制。执行器为空或投递返回 false 时仍允许就地删除，但是否构成实际缺陷需要另行证明该分支可达及其影响。曾有审查仅依据后台 `Upgrade()` 产生临时强引用推断 pipeline 在后台析构，遗漏了此释放钩子；后续应先核对完整释放链，再判断风险，且不能把 Pipeline 的保护推及其他捕获对象。
 
 ## 调试入口
 

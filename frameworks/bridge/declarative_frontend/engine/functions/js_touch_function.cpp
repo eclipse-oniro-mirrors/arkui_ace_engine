@@ -19,6 +19,7 @@
 #include "base/log/log.h"
 #include "bridge/declarative_frontend/engine/functions/js_common_utils.h"
 #include "bridge/declarative_frontend/engine/functions/js_function.h"
+#include "bridge/declarative_frontend/engine/jsi/jsi_native_event.h"
 #include "frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_frame_node_bridge.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_register.h"
 
@@ -112,7 +113,8 @@ JSRef<JSObject> JsTouchFunction::CreateJSEventInfo(TouchEventInfo& info)
         "getModifierKeyState",
         JSRef<JSFunc>::New<FunctionCallback>(NG::ArkTSUtils::JsGetModifierKeyState));
     eventObj->SetPropertyObject("preventDefault", JSRef<JSFunc>::New<FunctionCallback>(JsPreventDefault));
-    eventObj->Wrap<TouchEventInfo>(&info);
+    JsiNativeEvent::Bind(
+        eventObj->GetEcmaVM(), eventObj->GetLocalHandle(), std::make_shared<TouchEventInfo>(info));
     return eventObj;
 }
 

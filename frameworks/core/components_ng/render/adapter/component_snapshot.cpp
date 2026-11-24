@@ -509,6 +509,13 @@ void ComponentSnapshot::Create(
     const RefPtr<AceType>& customNode, JsCallback&& callback, bool enableInspector, const SnapshotParam& param,
     bool flag)
 {
+    CreateWithCleanup(customNode, std::move(callback), enableInspector, param, nullptr, flag);
+}
+
+void ComponentSnapshot::CreateWithCleanup(
+    const RefPtr<AceType>& customNode, JsCallback&& callback, bool enableInspector,
+    const SnapshotParam& param, const std::function<void(std::function<void()>)>& onReady, bool flag)
+{
     if (!customNode) {
         callback(nullptr, ERROR_CODE_INTERNAL_ERROR, nullptr);
         TAG_LOGW(AceLogTag::ACE_COMPONENT_SNAPSHOT, "Internal error! customNode is nullptr");
@@ -543,6 +550,15 @@ void ComponentSnapshot::Create(
 
     if (enableInspector) {
         Inspector::AddOffscreenNode(node);
+    }
+    if (onReady) {
+        onReady([weakNode = AceType::WeakClaim(AceType::RawPtr(node)), enableInspector]() {
+            if (enableInspector) {
+                auto node = weakNode.Upgrade();
+                CHECK_NULL_VOID(node);
+                Inspector::RemoveOffscreenNode(node);
+            }
+        });
     }
 
     if (flag) {

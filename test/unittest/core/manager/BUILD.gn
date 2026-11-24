@@ -77,6 +77,7 @@ ace_unittest("drag_drop_manager_test_ng") {
       "manager_test_min.cpp",
     ]
   }
+  sources += [ "drag_drop_lifetime_test_ng.cpp" ]
 }
 
 ace_unittest("drag_drop_initiating_state_test_ng") {

@@ -6249,6 +6249,9 @@ void PipelineContext::FlushReload(const ConfigurationChange& configurationChange
 void PipelineContext::Destroy()
 {
     CHECK_RUN_ON(UI);
+    if (dragDropManager_) {
+        dragDropManager_->CancelPendingDragSnapshots();
+    }
     CloseUITreeRequests(*this);
     SetDestroyed();
     if (eventManager_) {
