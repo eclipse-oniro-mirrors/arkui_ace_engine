@@ -988,7 +988,7 @@ export class DatePickerComponent extends ViewPU {
                 // if lunar month is 腊月(11) and Gregorian month is Jan/Feb,
                 // the lunar year is the previous Gregorian year.
                 this.selectedYear = gregorianDate.getFullYear();
-                if (this.selectedMonth >= 11 && gregorianDate.getMonth() <= 1) {
+                if (this.selectedMonth >= 10 && gregorianDate.getMonth() <= 1) {
                     this.selectedYear -= 1;
                 }
                 const clampStart = this.lunar && this.lunarStartYear > 0 ? this.lunarStartYear : this.startYear;
@@ -2153,13 +2153,13 @@ export class DatePickerComponent extends ViewPU {
             this.lunarStartMonth = this.lunarCalendar.get('month');
             this.lunarStartDay = this.lunarCalendar.get('date');
             this.lunarStartYear = this.startYear;
-            if (this.lunarStartMonth >= 11 && startGregorian.getMonth() <= 1) { this.lunarStartYear -= 1; }
+            if (this.lunarStartMonth >= 10 && startGregorian.getMonth() <= 1) { this.lunarStartYear -= 1; }
             const endGregorian = this.createDateFromParams(this.endYear, this.endMonth, this.endDay);
             this.lunarCalendar.setTime(endGregorian);
             this.lunarEndMonth = this.lunarCalendar.get('month');
             this.lunarEndDay = this.lunarCalendar.get('date');
             this.lunarEndYear = this.endYear;
-            if (this.lunarEndMonth >= 11 && endGregorian.getMonth() <= 1) { this.lunarEndYear -= 1; }
+            if (this.lunarEndMonth >= 10 && endGregorian.getMonth() <= 1) { this.lunarEndYear -= 1; }
         }
         else {
             this.lunarStartMonth = DatePickerConstant.MIN_MONTH;
@@ -2254,7 +2254,7 @@ export class DatePickerComponent extends ViewPU {
                 // if lunar month is 腊月(11) and Gregorian month is Jan/Feb,
                 // the lunar year is the previous Gregorian year.
                 this.selectedYear = targetDate.getFullYear();
-                if (this.selectedMonth >= 11 && targetDate.getMonth() <= 1) {
+                if (this.selectedMonth >= 10 && targetDate.getMonth() <= 1) {
                     this.selectedYear -= 1;
                 }
                 if (this.selectedYear < this.lunarStartYear) {
