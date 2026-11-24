@@ -19,12 +19,14 @@
 
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/tab_bar/tab_theme.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_algorithm.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
+#include "core/components_ng/pattern/shape/polygon_paint_property.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 
 namespace OHOS::Ace::NG {
@@ -492,7 +494,9 @@ HWTEST_F(TabsSidebarControlButtonTestNg, UpdateCollapseButtonIconTest002, TestSi
 
 /**
  * @tc.name: OnCollapseButtonClickReentrancyTest001
- * @tc.desc: Test OnCollapseButtonClick is blocked during animation (isCollapseAnimating_=true)
+ * @tc.desc: Test OnCollapseButtonClick is blocked while the TabsPattern collapse-switch
+ *   state machine is busy (COLLAPSE_ANIMATING). The shadowed isCollapseAnimating_ flag
+ *   was removed; the debounce now reads the single SidebarCollapseSwitchState machine.
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarControlButtonTestNg, OnCollapseButtonClickReentrancyTest001, TestSize.Level1)
@@ -500,25 +504,30 @@ HWTEST_F(TabsSidebarControlButtonTestNg, OnCollapseButtonClickReentrancyTest001,
     CreateTabsWithSidebar(true);
     auto sideBarPattern = GetSideBarPattern();
     ASSERT_NE(sideBarPattern, nullptr);
+    ASSERT_NE(pattern_, nullptr);
 
     /**
-     * @tc.steps: Set isCollapseAnimating_ = true, then call OnCollapseButtonClick
-     * @tc.expected: isCollapsed_ does not change (click is blocked)
+     * @tc.steps: Make the switch state machine busy (animating), then call OnCollapseButtonClick
+     * @tc.expected: isCollapsed_ does not change (click is blocked), state stays busy
      */
     bool beforeCollapsed = sideBarPattern->IsCollapsed();
-    sideBarPattern->SetCollapseAnimating(true);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::COLLAPSE_ANIMATING;
     sideBarPattern->OnCollapseButtonClick();
 
     EXPECT_EQ(sideBarPattern->IsCollapsed(), beforeCollapsed);
-    EXPECT_TRUE(sideBarPattern->IsCollapseAnimating());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchBusy());
+    EXPECT_TRUE(pattern_->IsOnSidebarCollapseSwitchAnimation());
+
+    /**
+     * @tc.steps: Restore the state machine to idle (cleanup)
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 }
 
 /**
  * @tc.name: OnCollapseButtonClickReentrancyTest002
- * @tc.desc: Test OnCollapseButtonClick toggles isCollapsed_ when not animating.
- *   Note: In test env, AnimationUtils::StartAnimation executes the finish callback
- *   synchronously, so isCollapseAnimating_ is reset to false immediately.
- *   We only verify isCollapsed_ toggles correctly.
+ * @tc.desc: Test OnCollapseButtonClick toggles isCollapsed_ and registers a collapse
+ *   switch request on the TabsPattern state machine when it is idle.
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarControlButtonTestNg, OnCollapseButtonClickReentrancyTest002, TestSize.Level1)
@@ -526,16 +535,27 @@ HWTEST_F(TabsSidebarControlButtonTestNg, OnCollapseButtonClickReentrancyTest002,
     CreateTabsWithSidebar(true);
     auto sideBarPattern = GetSideBarPattern();
     ASSERT_NE(sideBarPattern, nullptr);
+    ASSERT_NE(pattern_, nullptr);
 
     /**
-     * @tc.steps: Not animating, call OnCollapseButtonClick
-     * @tc.expected: isCollapsed_ toggles to true (collapse)
+     * @tc.steps: Not busy, call OnCollapseButtonClick
+     * @tc.expected: isCollapsed_ toggles to true (collapse) and the switch request
+     * is registered (COLLAPSE_REQUESTED)
      */
     EXPECT_FALSE(sideBarPattern->IsCollapsed());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchBusy());
 
     sideBarPattern->OnCollapseButtonClick();
 
     EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchRequested());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchToCollapsed());
+    EXPECT_FALSE(pattern_->IsOnSidebarCollapseSwitchAnimation());
+
+    /**
+     * @tc.steps: Restore the state machine to idle (cleanup)
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 }
 
 /**
@@ -566,140 +586,6 @@ HWTEST_F(TabsSidebarControlButtonTestNg, IsCollapsedTest001, TestSize.Level1)
      */
     sideBarPattern->isCollapsed_ = false;
     EXPECT_FALSE(sideBarPattern->IsCollapsed());
-}
-
-/**
- * @tc.name: IsCollapseAnimatingTest001
- * @tc.desc: Test IsCollapseAnimating and SetCollapseAnimating
- * @tc.type: FUNC
- */
-HWTEST_F(TabsSidebarControlButtonTestNg, IsCollapseAnimatingTest001, TestSize.Level1)
-{
-    RefPtr<FrameNode> sideBarNode;
-    RefPtr<TabsSideBarPattern> sideBarPattern;
-    SetupSideBarPatternCB(sideBarNode, sideBarPattern);
-    ASSERT_NE(sideBarPattern, nullptr);
-
-    /**
-     * @tc.expected: Initial isCollapseAnimating_ is false
-     */
-    EXPECT_FALSE(sideBarPattern->IsCollapseAnimating());
-
-    /**
-     * @tc.steps: Set to true
-     */
-    sideBarPattern->SetCollapseAnimating(true);
-    EXPECT_TRUE(sideBarPattern->IsCollapseAnimating());
-
-    /**
-     * @tc.steps: Set to false
-     */
-    sideBarPattern->SetCollapseAnimating(false);
-    EXPECT_FALSE(sideBarPattern->IsCollapseAnimating());
-}
-
-/**
- * @tc.name: CollapseSideBarContentTest001
- * @tc.desc: Test CollapseSideBarContent sets isCollapsed_ and isCollapseAnimating_
- * @tc.type: FUNC
- */
-HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentTest001, TestSize.Level1)
-{
-    CreateTabsWithSidebar(true);
-    auto sideBarPattern = GetSideBarPattern();
-    ASSERT_NE(sideBarPattern, nullptr);
-
-    /**
-     * @tc.steps: Call CollapseSideBarContent
-     */
-    EXPECT_FALSE(sideBarPattern->IsCollapsed());
-    sideBarPattern->CollapseSideBarContent();
-
-    /**
-     * @tc.expected: isCollapsed_ = true.
-     * Note: isCollapseAnimating_ is reset synchronously by the finish callback
-     * in test env, so we don't assert it here.
-     */
-    EXPECT_TRUE(sideBarPattern->IsCollapsed());
-}
-
-/**
- * @tc.name: CollapseSideBarContentTest002
- * @tc.desc: Test CollapseSideBarContent saves preSideBarWidthPx_ synchronously
- * @tc.type: FUNC
- */
-HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentTest002, TestSize.Level1)
-{
-    CreateTabsWithSidebar(true);
-    auto sideBarPattern = GetSideBarPattern();
-    ASSERT_NE(sideBarPattern, nullptr);
-
-    /**
-     * @tc.steps: Call CollapseSideBarContent
-     */
-    sideBarPattern->CollapseSideBarContent();
-
-    /**
-     * @tc.expected: preSideBarWidthPx_ is saved synchronously (non-negative).
-     * realSideBarWidthPx_ is set inside the animation closure and cleared by
-     * the finish callback; in test env both run synchronously so the value
-     * is already cleared — we only check preSideBarWidthPx_.
-     */
-    float savedWidth = pattern_->GetPreSideBarWidthPx();
-    EXPECT_GE(savedWidth, 0.0f);
-}
-
-/**
- * @tc.name: ExpandSideBarContentTest001
- * @tc.desc: Test ExpandSideBarContent clears isCollapsed_ and sets isCollapseAnimating_
- * @tc.type: FUNC
- */
-HWTEST_F(TabsSidebarControlButtonTestNg, ExpandSideBarContentTest001, TestSize.Level1)
-{
-    CreateTabsWithSidebar(true);
-    auto sideBarPattern = GetSideBarPattern();
-    ASSERT_NE(sideBarPattern, nullptr);
-
-    /**
-     * @tc.steps: First collapse, then expand
-     */
-    sideBarPattern->isCollapsed_ = true;
-    sideBarPattern->ExpandSideBarContent();
-
-    /**
-     * @tc.expected: isCollapsed_ = false.
-     * Note: isCollapseAnimating_ is reset synchronously by the finish callback
-     * in test env, so we don't assert it here.
-     */
-    EXPECT_FALSE(sideBarPattern->IsCollapsed());
-}
-
-/**
- * @tc.name: ExpandSideBarContentTest002
- * @tc.desc: Test ExpandSideBarContent sets realSideBarWidthPx_ to 0 synchronously before animation
- * @tc.type: FUNC
- */
-HWTEST_F(TabsSidebarControlButtonTestNg, ExpandSideBarContentTest002, TestSize.Level1)
-{
-    CreateTabsWithSidebar(true);
-    auto sideBarPattern = GetSideBarPattern();
-    ASSERT_NE(sideBarPattern, nullptr);
-
-    /**
-     * @tc.steps: Set a known preSideBarWidthPx_, then expand
-     */
-    constexpr float TEST_WIDTH = 300.0f;
-    pattern_->SetPreSideBarWidthPx(TEST_WIDTH);
-    sideBarPattern->isCollapsed_ = true;
-    sideBarPattern->ExpandSideBarContent();
-
-    /**
-     * @tc.expected: preSideBarWidthPx_ is still saved. realSideBarWidthPx_ is set
-     * to 0 synchronously, then restored inside the animation closure, then cleared
-     * by the finish callback. In test env all run synchronously, so it's already
-     * cleared — we only verify preSideBarWidthPx_ survives.
-     */
-    EXPECT_EQ(pattern_->GetPreSideBarWidthPx(), TEST_WIDTH);
 }
 
 /**
@@ -759,11 +645,12 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SideBarVisibilityDuringAnimationTest001
     ASSERT_NE(sideBarPattern, nullptr);
 
     /**
-     * @tc.steps: Simulate animation state: isCollapsed=true but isCollapseAnimating=true
-     * Call layout visibility update with isVisible=true
+     * @tc.steps: Simulate animation state: isCollapsed=true but the switch state machine
+     * is busy (COLLAPSE_ANIMATING). Call layout visibility update with isVisible=true
      */
     sideBarPattern->isCollapsed_ = true;
-    sideBarPattern->SetCollapseAnimating(true);
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::COLLAPSE_ANIMATING;
 
     auto layoutWrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(layoutWrapper, nullptr);
@@ -771,11 +658,16 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SideBarVisibilityDuringAnimationTest001
     layoutAlgorithm->UpdateSideBarAndSideBarDividerVisibility(AceType::RawPtr(layoutWrapper), true);
 
     /**
-     * @tc.expected: Sidebar is VISIBLE (because isCollapseAnimating overrides isCollapsed)
+     * @tc.expected: Sidebar is VISIBLE (busy switch overrides isCollapsed)
      */
     auto sideBarProp = sideBarNode->GetLayoutProperty();
     ASSERT_NE(sideBarProp, nullptr);
     EXPECT_EQ(sideBarProp->GetVisibilityValue(VisibleType::GONE), VisibleType::VISIBLE);
+
+    /**
+     * @tc.steps: Restore the state machine to idle (cleanup)
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 }
 
 /**
@@ -792,10 +684,11 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SideBarVisibilityDuringAnimationTest002
     ASSERT_NE(sideBarPattern, nullptr);
 
     /**
-     * @tc.steps: isCollapsed=true, not animating, isVisible=true
+     * @tc.steps: isCollapsed=true, switch state machine idle, isVisible=true
      */
     sideBarPattern->isCollapsed_ = true;
-    sideBarPattern->SetCollapseAnimating(false);
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 
     auto layoutWrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(layoutWrapper, nullptr);
@@ -824,10 +717,11 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SideBarVisibilityDuringAnimationTest003
     ASSERT_NE(sideBarPattern, nullptr);
 
     /**
-     * @tc.steps: isCollapsed=false, not animating, isVisible=true
+     * @tc.steps: isCollapsed=false, switch state machine idle, isVisible=true
      */
     sideBarPattern->isCollapsed_ = false;
-    sideBarPattern->SetCollapseAnimating(false);
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 
     auto layoutWrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(layoutWrapper, nullptr);
@@ -856,10 +750,12 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SideBarVisibilityDuringAnimationTest004
     ASSERT_NE(sideBarPattern, nullptr);
 
     /**
-     * @tc.steps: isCollapsed=false, not animating, but isVisible=false (e.g. bottom tab bar mode)
+     * @tc.steps: isCollapsed=false, switch state machine idle, but isVisible=false
+     * (e.g. bottom tab bar mode)
      */
     sideBarPattern->isCollapsed_ = false;
-    sideBarPattern->SetCollapseAnimating(false);
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 
     auto layoutWrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(layoutWrapper, nullptr);
@@ -892,7 +788,8 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SideBarCollapsedStatePersistTest001, Te
      * from bottom tab bar mode to sidebar mode when sidebar was previously collapsed.
      */
     sideBarPattern->isCollapsed_ = true;
-    sideBarPattern->SetCollapseAnimating(false);
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 
     auto layoutWrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(layoutWrapper, nullptr);
@@ -921,10 +818,11 @@ HWTEST_F(TabsSidebarControlButtonTestNg, DividerVisibilityDuringAnimationTest001
     ASSERT_NE(dividerNode, nullptr);
 
     /**
-     * @tc.steps: isCollapsed=true, isCollapseAnimating=true → divider should be VISIBLE
+     * @tc.steps: isCollapsed=true, switch state machine busy (animating) → divider should be VISIBLE
      */
     sideBarPattern->isCollapsed_ = true;
-    sideBarPattern->SetCollapseAnimating(true);
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::COLLAPSE_ANIMATING;
 
     auto layoutWrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(layoutWrapper, nullptr);
@@ -936,9 +834,9 @@ HWTEST_F(TabsSidebarControlButtonTestNg, DividerVisibilityDuringAnimationTest001
     EXPECT_EQ(dividerProp->GetVisibilityValue(VisibleType::GONE), VisibleType::VISIBLE);
 
     /**
-     * @tc.steps: isCollapsed=true, isCollapseAnimating=false → divider should be GONE
+     * @tc.steps: isCollapsed=true, switch state machine idle → divider should be GONE
      */
-    sideBarPattern->SetCollapseAnimating(false);
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
     layoutAlgorithm->UpdateSideBarAndSideBarDividerVisibility(AceType::RawPtr(layoutWrapper), true);
 
     EXPECT_EQ(dividerProp->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
@@ -968,8 +866,10 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseButtonBackShadowTest001, TestSi
 /**
  * @tc.name: CollapseButtonIconInitTest001
  * @tc.desc: Test collapse button icon node is created after CreateCollapseButton.
- *   Note: Symbol properties are not set in test env due to null ResourceAdapter,
- *   so we only verify the icon node exists.
+ *   The icon is a STACK container (CreateCollapseButtonIcon in
+ *   tabs_side_bar_pattern.cpp): three static hamburger bar FrameNodes plus one
+ *   morphable arrow triangle Polygon node, so the icon node carries a stack
+ *   layout property instead of the legacy text/symbol one.
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarControlButtonTestNg, CollapseButtonIconInitTest001, TestSize.Level1)
@@ -979,12 +879,14 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseButtonIconInitTest001, TestSize
     ASSERT_NE(sideBarPattern, nullptr);
 
     /**
-     * @tc.expected: Icon node exists
+     * @tc.expected: Icon node exists and is a STACK with 3 bars + 1 triangle
      */
     auto iconNode = sideBarPattern->collapseButtonIconNode_;
     ASSERT_NE(iconNode, nullptr);
-    auto iconProp = iconNode->GetLayoutProperty<TextLayoutProperty>();
+    EXPECT_EQ(iconNode->GetTag(), V2::STACK_ETS_TAG);
+    auto iconProp = iconNode->GetLayoutProperty();
     ASSERT_NE(iconProp, nullptr);
+    EXPECT_EQ(iconNode->GetChildren().size(), 4u);
 }
 
 /**
@@ -1016,9 +918,9 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseButtonIconInitTest002, TestSize
 /**
  * @tc.name: ToggleCollapseExpandCycleTest001
  * @tc.desc: Test full collapse→expand cycle toggles isCollapsed_ correctly.
- *   Note: In test env, animation finish callback runs synchronously inside
- *   AnimationUtils::StartAnimation, so isCollapseAnimating_ is already false
- *   after each call. We verify isCollapsed_ toggles correctly across the cycle.
+ *   Note: In test env no layout pass runs between clicks, so the switch state
+ *   machine stays in the REQUESTED phase; we simulate the animation finishing
+ *   (state back to NONE) between clicks, matching the on-device lifecycle.
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarControlButtonTestNg, ToggleCollapseExpandCycleTest001, TestSize.Level1)
@@ -1026,6 +928,7 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ToggleCollapseExpandCycleTest001, TestS
     CreateTabsWithSidebar(true);
     auto sideBarPattern = GetSideBarPattern();
     ASSERT_NE(sideBarPattern, nullptr);
+    ASSERT_NE(pattern_, nullptr);
 
     /**
      * @tc.steps: step1. Collapse — isCollapsed_ should become true
@@ -1033,21 +936,26 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ToggleCollapseExpandCycleTest001, TestS
     EXPECT_FALSE(sideBarPattern->IsCollapsed());
     sideBarPattern->OnCollapseButtonClick();
     EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchRequested());
 
     /**
-     * @tc.steps: step2. Expand — isCollapsed_ should become false
+     * @tc.steps: step2. Simulate switch finished, then expand — isCollapsed_
+     * should become false
      */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
     sideBarPattern->OnCollapseButtonClick();
     EXPECT_FALSE(sideBarPattern->IsCollapsed());
+
+    /**
+     * @tc.steps: Restore the state machine to idle (cleanup)
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 }
 
 /**
  * @tc.name: ToggleCollapseExpandCycleTest002
- * @tc.desc: Test rapid double-click does not crash and ends in a consistent state.
- *   Note: In test env, the animation finish callback runs synchronously, so
- *   isCollapseAnimating_ is false by the time the second click arrives — the
- *   reentrancy guard cannot be tested here. We verify no crash and consistent
- *   final state.
+ * @tc.desc: Test a click landing while the previous switch request is still pending
+ *   is debounced by the state machine: isCollapsed_ keeps the first click's value.
  * @tc.type: FUNC
  */
 HWTEST_F(TabsSidebarControlButtonTestNg, ToggleCollapseExpandCycleTest002, TestSize.Level1)
@@ -1055,14 +963,25 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ToggleCollapseExpandCycleTest002, TestS
     CreateTabsWithSidebar(true);
     auto sideBarPattern = GetSideBarPattern();
     ASSERT_NE(sideBarPattern, nullptr);
+    ASSERT_NE(pattern_, nullptr);
 
     /**
-     * @tc.steps: Two rapid clicks — in test env both execute (no animation guard)
-     * @tc.expected: No crash, isCollapsed_ is false (collapse then expand)
+     * @tc.steps: Two rapid clicks without a layout pass in between
+     * @tc.expected: The second click is rejected by the busy state machine;
+     * isCollapsed_ stays true (collapsed by the first click)
      */
     sideBarPattern->OnCollapseButtonClick();
+    EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    EXPECT_EQ(pattern_->sidebarCollapseSwitchState_, TabsPattern::SidebarCollapseSwitchState::COLLAPSE_REQUESTED);
+
     sideBarPattern->OnCollapseButtonClick();
-    EXPECT_FALSE(sideBarPattern->IsCollapsed());
+    EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    EXPECT_EQ(pattern_->sidebarCollapseSwitchState_, TabsPattern::SidebarCollapseSwitchState::COLLAPSE_REQUESTED);
+
+    /**
+     * @tc.steps: Restore the state machine to idle (cleanup)
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
 }
 
 /**
@@ -1126,12 +1045,14 @@ HWTEST_F(TabsSidebarControlButtonTestNg, ShowSidebarControlButtonDynamicToggleTe
 }
 
 /**
- * @tc.name: CollapseSideBarContentSideBarOnLeft001
- * @tc.desc: CollapseSideBarContent with sideBarOnLeft (START + LTR) → outsideX negative.
- *   Verifies the pre-animation translate reset path runs for the negative-X branch.
+ * @tc.name: SidebarCollapseSwitchSideBarOnLeft001
+ * @tc.desc: Unified two-pass collapse switch with sideBarOnLeft (START + LTR) → outsideX
+ *   negative. OnCollapseButtonClick registers the request, StartSidebarCollapseSwitchAnimation
+ *   drives the slide-out, and the finish bookkeeping sets the leaving sidebar GONE.
+ *   (Replace of the removed CollapseSideBarContent path.)
  * @tc.type: FUNC
  */
-HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnLeft001, TestSize.Level1)
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarCollapseSwitchSideBarOnLeft001, TestSize.Level1)
 {
     CreateTabsWithSidebar(true);
     auto sideBarPattern = GetSideBarPattern();
@@ -1149,15 +1070,26 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnLeft001,
     layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
     FlushLayoutTask(frameNode_);
 
+    /**
+     * @tc.steps: Click (request) then run the two-pass switch animation
+     */
     EXPECT_FALSE(sideBarPattern->IsCollapsed());
-    sideBarPattern->CollapseSideBarContent();
+    sideBarPattern->OnCollapseButtonClick();
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchRequested());
+    pattern_->StartSidebarCollapseSwitchAnimation();
+    // In test env the animation closure/finish may not run synchronously;
+    // drive the finish bookkeeping deterministically when still busy.
+    if (pattern_->IsSidebarCollapseSwitchBusy()) {
+        pattern_->OnSidebarCollapseSwitchAnimationFinished(true, false);
+    }
 
     /**
-     * @tc.expected: isCollapsed_=true; sidebar and divider set GONE by finish callback;
-     * translate pipeline ran (HasTransformTranslate true on both nodes after the
-     * pre-animation reset + animation closure).
+     * @tc.expected: isCollapsed_=true; switch finished (state back to NONE);
+     * sidebar and divider set GONE by the finish bookkeeping; the translate
+     * render property was written (exit-start reset + finish reset).
      */
     EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchBusy());
     auto sideBarRender = sideBarNode->GetRenderContext();
     ASSERT_NE(sideBarRender, nullptr);
     EXPECT_TRUE(sideBarRender->HasTransformTranslate());
@@ -1169,12 +1101,14 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnLeft001,
 }
 
 /**
- * @tc.name: CollapseSideBarContentSideBarOnRight001
- * @tc.desc: CollapseSideBarContent with sideBarOnRight (END + LTR) → outsideX positive.
- *   Verifies the pre-animation translate reset path runs for the positive-X branch.
+ * @tc.name: SidebarCollapseSwitchSideBarOnRight001
+ * @tc.desc: Unified two-pass collapse switch with sideBarOnRight (END + LTR) → outsideX
+ *   positive. Same switch pipeline as the left case; verifies the positive-X slide-out
+ *   branch lands on the same steady state.
+ *   (Replace of the removed CollapseSideBarContent path.)
  * @tc.type: FUNC
  */
-HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnRight001, TestSize.Level1)
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarCollapseSwitchSideBarOnRight001, TestSize.Level1)
 {
     CreateTabsWithSidebar(true);
     auto sideBarPattern = GetSideBarPattern();
@@ -1192,14 +1126,25 @@ HWTEST_F(TabsSidebarControlButtonTestNg, CollapseSideBarContentSideBarOnRight001
     layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
     FlushLayoutTask(frameNode_);
 
+    /**
+     * @tc.steps: Click (request) then run the two-pass switch animation
+     */
     EXPECT_FALSE(sideBarPattern->IsCollapsed());
-    sideBarPattern->CollapseSideBarContent();
+    sideBarPattern->OnCollapseButtonClick();
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchRequested());
+    pattern_->StartSidebarCollapseSwitchAnimation();
+    // In test env the animation closure/finish may not run synchronously;
+    // drive the finish bookkeeping deterministically when still busy.
+    if (pattern_->IsSidebarCollapseSwitchBusy()) {
+        pattern_->OnSidebarCollapseSwitchAnimationFinished(true, false);
+    }
 
     /**
-     * @tc.expected: isCollapsed_=true; translate pipeline ran on both nodes;
-     * visibility GONE after finish callback.
+     * @tc.expected: isCollapsed_=true; switch finished (state back to NONE);
+     * translate pipeline ran on both nodes; visibility GONE after finish.
      */
     EXPECT_TRUE(sideBarPattern->IsCollapsed());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchBusy());
     auto sideBarRender = sideBarNode->GetRenderContext();
     ASSERT_NE(sideBarRender, nullptr);
     EXPECT_TRUE(sideBarRender->HasTransformTranslate());
@@ -1404,4 +1349,455 @@ HWTEST_F(TabsSidebarControlButtonTestNg, SidebarTitleBarTest08, TestSize.Level1)
     EXPECT_FLOAT_EQ(buttonY, (CONTAINER_MODAL_TITLE_HEIGHT_PX - buttonSize) / 2.0f);
 }
 
+// =========================================================================
+// Part 6: Tests for the two-pass sidebar collapse/expand switch state machine
+// =========================================================================
+
+/**
+ * @tc.name: IsTabBarBottomStyleTest001
+ * @tc.desc: Test TabsPattern::IsTabBarBottomStyle — a floating bar always counts as
+ *   bottom-style; a normal bar only when horizontal + barPosition END + non-TOP style.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, IsTabBarBottomStyleTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    /**
+     * @tc.steps: step1. Default sidebar tabs: barPosition START → not bottom style.
+     */
+    EXPECT_FALSE(pattern_->IsTabBarBottomStyle());
+
+    /**
+     * @tc.steps: step2. Normal bar placed at the bottom: horizontal + END → bottom style.
+     */
+    layoutProperty_->UpdateTabBarPosition(BarPosition::END);
+    EXPECT_TRUE(pattern_->IsTabBarBottomStyle());
+
+    /**
+     * @tc.steps: step3. Vertical tabs never join the switch even with END position.
+     */
+    layoutProperty_->UpdateAxis(Axis::VERTICAL);
+    EXPECT_FALSE(pattern_->IsTabBarBottomStyle());
+
+    /**
+     * @tc.steps: step4. Floating bar overrides placement and always qualifies.
+     */
+    layoutProperty_->UpdateAxis(Axis::HORIZONTAL);
+    pattern_->isFloatingBar_ = true;
+    EXPECT_TRUE(pattern_->IsTabBarBottomStyle());
+    pattern_->isFloatingBar_ = false;
+}
+
+/**
+ * @tc.name: WillBottomBarJoinCollapseSwitchTest001
+ * @tc.desc: Test TabsPattern::WillBottomBarJoinCollapseSwitch — collapse direction reads
+ *   showBottomBarOnSidebarCollapse at use time; expand direction is gated by
+ *   keepTabBarInSideBar (never joins) and then by the tabBar node visibility
+ *   (a visible bar joins so its exit is animated; a GONE bar does not).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, WillBottomBarJoinCollapseSwitchTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    auto tabBar = AceType::DynamicCast<FrameNode>(frameNode_->GetTabBar());
+    ASSERT_NE(tabBar, nullptr);
+
+    /**
+     * @tc.steps: step1. Not a bottom-style bar (START) → never joins either direction.
+     */
+    EXPECT_FALSE(pattern_->WillBottomBarJoinCollapseSwitch(true));
+    EXPECT_FALSE(pattern_->WillBottomBarJoinCollapseSwitch(false));
+
+    /**
+     * @tc.steps: step2. Bottom-style bar + property unset → collapse does not join.
+     */
+    layoutProperty_->UpdateTabBarPosition(BarPosition::END);
+    EXPECT_FALSE(pattern_->WillBottomBarJoinCollapseSwitch(true));
+
+    /**
+     * @tc.steps: step3. Property enabled → collapse direction joins; expand direction
+     * joins too when the tabBar node is visible. The sidebar-arrangement fixture
+     * leaves the tabBar GONE by default (SetElementVisibilityForMode hides it in
+     * the sidebar mode), so make it visible first: keepMode is off and the
+     * visible bar joins the expand switch.
+     */
+    layoutProperty_->UpdateShowBottomBarOnSidebarCollapse(true);
+    EXPECT_TRUE(pattern_->WillBottomBarJoinCollapseSwitch(true));
+    tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    EXPECT_TRUE(pattern_->WillBottomBarJoinCollapseSwitch(false));
+
+    /**
+     * @tc.steps: step4. keepTabBarInSideBar keeps the bar in the sidebar → expand
+     * never joins, regardless of bar visibility.
+     */
+    layoutProperty_->UpdateKeepTabBarInSideBar(true);
+    EXPECT_FALSE(pattern_->WillBottomBarJoinCollapseSwitch(false));
+    layoutProperty_->UpdateKeepTabBarInSideBar(false);
+
+    /**
+     * @tc.steps: step5. keepMode off + tabBar GONE → expand direction does not join.
+     */
+    tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+    EXPECT_FALSE(pattern_->WillBottomBarJoinCollapseSwitch(false));
+    tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+}
+
+/**
+ * @tc.name: IsTabBarNodeVisibleTest001
+ * @tc.desc: Test TabsPattern::IsTabBarNodeVisible — false in the sidebar
+ *   arrangement by default (SetElementVisibilityForMode hides the tabBar),
+ *   true when the tabBar layout property visibility is explicitly not GONE,
+ *   false when GONE, false without a host node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, IsTabBarNodeVisibleTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Pattern without host → false (no crash).
+     */
+    auto orphanPattern = AceType::MakeRefPtr<TabsPattern>();
+    EXPECT_FALSE(orphanPattern->IsTabBarNodeVisible());
+
+    /**
+     * @tc.steps: step2. Sidebar-arrangement fixture default: the tabBar was set
+     * GONE by SetElementVisibilityForMode (sidebar mode hides the bottom tab
+     * bar) → false.
+     */
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+    auto tabBar = AceType::DynamicCast<FrameNode>(frameNode_->GetTabBar());
+    ASSERT_NE(tabBar, nullptr);
+    EXPECT_FALSE(pattern_->IsTabBarNodeVisible());
+
+    /**
+     * @tc.steps: step3. tabBar explicitly VISIBLE → true; GONE again → false.
+     */
+    tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    EXPECT_TRUE(pattern_->IsTabBarNodeVisible());
+    tabBar->GetLayoutProperty()->UpdateVisibility(VisibleType::GONE);
+    EXPECT_FALSE(pattern_->IsTabBarNodeVisible());
+}
+
+/**
+ * @tc.name: IsTabBarDividerNullTest001
+ * @tc.desc: Test TabsPattern::IsTabBarDividerNull — false for an unset divider
+ *   (default TabsItemDivider), false for a real divider, true only for a divider
+ *   explicitly set to null; false without a host node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, IsTabBarDividerNullTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Pattern without host → false (no crash).
+     */
+    auto orphanPattern = AceType::MakeRefPtr<TabsPattern>();
+    EXPECT_FALSE(orphanPattern->IsTabBarDividerNull());
+
+    /**
+     * @tc.steps: step2. Divider never set → default TabsItemDivider, isNull == false.
+     */
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    EXPECT_FALSE(pattern_->IsTabBarDividerNull());
+
+    /**
+     * @tc.steps: step3. Real divider set → not null.
+     */
+    TabsItemDivider realDivider;
+    realDivider.isNull = false;
+    realDivider.strokeWidth = 1.0_vp;
+    layoutProperty_->UpdateDivider(realDivider);
+    EXPECT_FALSE(pattern_->IsTabBarDividerNull());
+
+    /**
+     * @tc.steps: step4. Divider explicitly set to null → true.
+     */
+    TabsItemDivider nullDivider;
+    nullDivider.isNull = true;
+    layoutProperty_->UpdateDivider(nullDivider);
+    EXPECT_TRUE(pattern_->IsTabBarDividerNull());
+
+    layoutProperty_->ResetDivider();
+}
+
+/**
+ * @tc.name: HideTabBarForSidebarRestoreTest001
+ * @tc.desc: Test TabsPattern::HideTabBarForSidebarRestore — keepMode and an
+ *   already-GONE tabBar return early without touching render state; otherwise
+ *   the tabBar/divider/background-mask are instantly hidden (visibility GONE)
+ *   with translate/opacity reset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, HideTabBarForSidebarRestoreTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    auto tabBar = AceType::DynamicCast<FrameNode>(frameNode_->GetTabBar());
+    ASSERT_NE(tabBar, nullptr);
+    auto tabBarLayoutProperty = tabBar->GetLayoutProperty();
+    ASSERT_NE(tabBarLayoutProperty, nullptr);
+    auto divider = AceType::DynamicCast<FrameNode>(frameNode_->GetDivider());
+    ASSERT_NE(divider, nullptr);
+
+    /**
+     * @tc.steps: step1. keepMode on → early return: tabBar stays VISIBLE and its
+     * render state is untouched. The sidebar-arrangement fixture leaves the
+     * tabBar GONE by default (SetElementVisibilityForMode hides it in the
+     * sidebar mode); make it explicitly VISIBLE so the early return below is
+     * really triggered by keepMode, not by the already-GONE check.
+     */
+    auto tabBarRC = tabBar->GetRenderContext();
+    ASSERT_NE(tabBarRC, nullptr);
+    tabBarLayoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    tabBarRC->UpdateOpacity(0.3f);
+    layoutProperty_->UpdateKeepTabBarInSideBar(true);
+    pattern_->HideTabBarForSidebarRestore();
+    EXPECT_EQ(tabBarLayoutProperty->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::VISIBLE);
+    ASSERT_TRUE(tabBarRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(tabBarRC->GetOpacity().value(), 0.3f);
+    layoutProperty_->UpdateKeepTabBarInSideBar(false);
+
+    /**
+     * @tc.steps: step2. keepMode off + tabBar already GONE → early return, nothing
+     * to hide.
+     */
+    tabBarLayoutProperty->UpdateVisibility(VisibleType::GONE);
+    pattern_->HideTabBarForSidebarRestore();
+    EXPECT_EQ(tabBarLayoutProperty->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+
+    /**
+     * @tc.steps: step3. Visible bar → instant hide: tabBar GONE, translate reset,
+     * opacity reset to 1.0; divider GONE; background mask GONE when present.
+     */
+    tabBarLayoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    tabBarRC->UpdateTransformTranslate({ 10.0f, 20.0f, 0.0f });
+    pattern_->HideTabBarForSidebarRestore();
+    EXPECT_EQ(tabBarLayoutProperty->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+    ASSERT_TRUE(tabBarRC->GetTransformTranslate().has_value());
+    EXPECT_FLOAT_EQ(tabBarRC->GetTransformTranslate()->x.ConvertToPx(), 0.0f);
+    EXPECT_FLOAT_EQ(tabBarRC->GetTransformTranslate()->y.ConvertToPx(), 0.0f);
+    ASSERT_TRUE(tabBarRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(tabBarRC->GetOpacity().value(), 1.0f);
+    EXPECT_EQ(divider->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+    auto dividerRC = divider->GetRenderContext();
+    ASSERT_NE(dividerRC, nullptr);
+    ASSERT_TRUE(dividerRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(dividerRC->GetOpacity().value(), 1.0f);
+    if (frameNode_->HasBackgroundMaskNode()) {
+        auto bgMaskNode = AceType::DynamicCast<FrameNode>(frameNode_->GetBackgroundMask());
+        ASSERT_NE(bgMaskNode, nullptr);
+        EXPECT_EQ(bgMaskNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::GONE);
+    }
+
+    /**
+     * @tc.steps: cleanup: restore visibility for subsequent cases on the same node.
+     */
+    tabBarLayoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    divider->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+}
+
+/**
+ * @tc.name: ApplyFloatingTabBarShownTargetsDividerGuardTest001
+ * @tc.desc: Test the !IsTabBarDividerNull() guard in
+ *   TabsPattern::ApplyFloatingTabBarShownTargets — with a default (unset) divider
+ *   the divider opacity is restored to 1.0; with a divider explicitly set to null
+ *   the opacity restore is skipped, while the tabBar itself is still restored.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, ApplyFloatingTabBarShownTargetsDividerGuardTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+    auto tabBar = AceType::DynamicCast<FrameNode>(frameNode_->GetTabBar());
+    ASSERT_NE(tabBar, nullptr);
+    auto tabBarRC = tabBar->GetRenderContext();
+    ASSERT_NE(tabBarRC, nullptr);
+    auto divider = AceType::DynamicCast<FrameNode>(frameNode_->GetDivider());
+    ASSERT_NE(divider, nullptr);
+    auto dividerRC = divider->GetRenderContext();
+    ASSERT_NE(dividerRC, nullptr);
+
+    /**
+     * @tc.steps: step1. Divider never set (default TabsItemDivider, isNull == false):
+     * shown targets restore both tabBar and divider opacity.
+     */
+    tabBarRC->UpdateOpacity(0.2f);
+    dividerRC->UpdateOpacity(0.3f);
+    pattern_->ApplyFloatingTabBarShownTargets();
+    ASSERT_TRUE(tabBarRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(tabBarRC->GetOpacity().value(), 1.0f);
+    ASSERT_TRUE(dividerRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(dividerRC->GetOpacity().value(), 1.0f);
+
+    /**
+     * @tc.steps: step2. Divider explicitly set to null: the tabBar opacity is still
+     * restored, but the divider opacity restore is skipped (stays as set).
+     */
+    TabsItemDivider nullDivider;
+    nullDivider.isNull = true;
+    layoutProperty_->UpdateDivider(nullDivider);
+    tabBarRC->UpdateOpacity(0.2f);
+    dividerRC->UpdateOpacity(0.3f);
+    pattern_->ApplyFloatingTabBarShownTargets();
+    ASSERT_TRUE(tabBarRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(tabBarRC->GetOpacity().value(), 1.0f);
+    ASSERT_TRUE(dividerRC->GetOpacity().has_value());
+    EXPECT_FLOAT_EQ(dividerRC->GetOpacity().value(), 0.3f);
+
+    layoutProperty_->ResetDivider();
+}
+
+/**
+ * @tc.name: RequestSidebarCollapseSwitchAnimationTest001
+ * @tc.desc: Test TabsPattern::RequestSidebarCollapseSwitchAnimation — registers the
+ *   requested phase of the state machine and rejects requests while busy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, RequestSidebarCollapseSwitchAnimationTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+
+    /**
+     * @tc.steps: step1. Idle machine: request a collapse switch.
+     * @tc.expected: COLLAPSE_REQUESTED phase, busy/requested/toCollapsed all correct.
+     */
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchBusy());
+    pattern_->RequestSidebarCollapseSwitchAnimation(true);
+    EXPECT_EQ(pattern_->sidebarCollapseSwitchState_, TabsPattern::SidebarCollapseSwitchState::COLLAPSE_REQUESTED);
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchBusy());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchRequested());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchToCollapsed());
+    EXPECT_FALSE(pattern_->IsOnSidebarCollapseSwitchAnimation());
+
+    /**
+     * @tc.steps: step2. Request again while busy → rejected, state unchanged.
+     */
+    pattern_->RequestSidebarCollapseSwitchAnimation(false);
+    EXPECT_EQ(pattern_->sidebarCollapseSwitchState_, TabsPattern::SidebarCollapseSwitchState::COLLAPSE_REQUESTED);
+
+    /**
+     * @tc.steps: step3. Back to idle: request an expand switch.
+     * @tc.expected: EXPAND_REQUESTED phase, toCollapsed=false.
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
+    pattern_->RequestSidebarCollapseSwitchAnimation(false);
+    EXPECT_EQ(pattern_->sidebarCollapseSwitchState_, TabsPattern::SidebarCollapseSwitchState::EXPAND_REQUESTED);
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchRequested());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchToCollapsed());
+
+    /**
+     * @tc.steps: Restore the state machine to idle (cleanup)
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
+}
+
+/**
+ * @tc.name: SidebarCollapseSwitchStateHelpersTest001
+ * @tc.desc: Test the SidebarCollapseSwitchState helper predicates across the animating
+ *   phases: COLLAPSE_ANIMATING / EXPAND_ANIMATING are "on animation" but not
+ *   "requested"; every non-NONE state is busy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, SidebarCollapseSwitchStateHelpersTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(false);
+    ASSERT_NE(pattern_, nullptr);
+
+    /**
+     * @tc.steps: step1. COLLAPSE_ANIMATING phase.
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::COLLAPSE_ANIMATING;
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchBusy());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchRequested());
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchToCollapsed());
+    EXPECT_TRUE(pattern_->IsOnSidebarCollapseSwitchAnimation());
+
+    /**
+     * @tc.steps: step2. EXPAND_ANIMATING phase.
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::EXPAND_ANIMATING;
+    EXPECT_TRUE(pattern_->IsSidebarCollapseSwitchBusy());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchRequested());
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchToCollapsed());
+    EXPECT_TRUE(pattern_->IsOnSidebarCollapseSwitchAnimation());
+
+    /**
+     * @tc.steps: step3. Back to NONE: idle again.
+     */
+    pattern_->sidebarCollapseSwitchState_ = TabsPattern::SidebarCollapseSwitchState::NONE;
+    EXPECT_FALSE(pattern_->IsSidebarCollapseSwitchBusy());
+    EXPECT_FALSE(pattern_->IsOnSidebarCollapseSwitchAnimation());
+}
+
+/**
+ * @tc.name: UpdateCollapseButtonIconColorTest001
+ * @tc.desc: Test TabsSideBarPattern::UpdateCollapseButtonIconColor re-applies the theme
+ *   icon color to all hamburger bars and the morphable triangle (used on dark/light
+ *   mode switches where the Shape fill colors are baked at creation time).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSidebarControlButtonTestNg, UpdateCollapseButtonIconColorTest001, TestSize.Level1)
+{
+    CreateTabsWithSidebar(true);
+    auto sideBarPattern = GetSideBarPattern();
+    ASSERT_NE(sideBarPattern, nullptr);
+    auto sideBarNode = pattern_->GetSideBarNode();
+    ASSERT_NE(sideBarNode, nullptr);
+    auto iconNode = sideBarPattern->collapseButtonIconNode_;
+    ASSERT_NE(iconNode, nullptr);
+    auto triangleNode = sideBarPattern->collapseButtonTriangleNode_;
+    ASSERT_NE(triangleNode, nullptr);
+
+    // Expected color: the theme icon color the function must re-apply.
+    auto tabTheme = sideBarNode->GetTheme<TabTheme>();
+    ASSERT_NE(tabTheme, nullptr);
+    Color expectedColor = tabTheme->GetIconPrimary();
+
+    /**
+     * @tc.steps: step1. Simulate a stale color configuration: overwrite the
+     * background color of every bar and the fill of the triangle with a wrong color.
+     */
+    const auto& iconChildren = iconNode->GetChildren();
+    ASSERT_EQ(iconChildren.size(), 4u);
+    for (const auto& child : iconChildren) {
+        if (child == triangleNode) {
+            continue;
+        }
+        auto barNode = AceType::DynamicCast<FrameNode>(child);
+        ASSERT_NE(barNode, nullptr);
+        auto barRenderContext = barNode->GetRenderContext();
+        ASSERT_NE(barRenderContext, nullptr);
+        barRenderContext->UpdateBackgroundColor(Color::RED);
+        EXPECT_EQ(barRenderContext->GetBackgroundColor().value_or(Color::TRANSPARENT), Color::RED);
+    }
+    auto trianglePaintProperty = triangleNode->GetPaintProperty<PolygonPaintProperty>();
+    ASSERT_NE(trianglePaintProperty, nullptr);
+    trianglePaintProperty->UpdateFill(Color::RED);
+
+    /**
+     * @tc.steps: step2. Re-apply the theme color.
+     * @tc.expected: Every bar background and the triangle fill carry the theme icon color again.
+     */
+    sideBarPattern->UpdateCollapseButtonIconColor();
+    for (const auto& child : iconChildren) {
+        if (child == triangleNode) {
+            continue;
+        }
+        auto barNode = AceType::DynamicCast<FrameNode>(child);
+        ASSERT_NE(barNode, nullptr);
+        auto barRenderContext = barNode->GetRenderContext();
+        ASSERT_NE(barRenderContext, nullptr);
+        EXPECT_EQ(barRenderContext->GetBackgroundColor().value_or(Color::TRANSPARENT), expectedColor);
+    }
+    EXPECT_EQ(trianglePaintProperty->GetFillValue(Color::TRANSPARENT), expectedColor);
+}
 } // namespace OHOS::Ace::NG

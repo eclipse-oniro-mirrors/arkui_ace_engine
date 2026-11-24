@@ -1374,6 +1374,21 @@ void SetTabViewCustomizationImpl(Ark_NativePointer node,
     ParseOrderMap(arkCust, customization);
     TabsModelNG::SetTabViewCustomization(frameNode, customization);
 }
+void SetShowBottomBarOnSidebarCollapseImpl(Ark_NativePointer node,
+                                           const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    // Undefined falls back to false, matching the dynamic-paradigm modifier
+    // where ResetShowBottomBarOnSidebarCollapse passes false.
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    if (!convValue) {
+        TabsModelNG::SetShowBottomBarOnSidebarCollapse(frameNode, false);
+        return;
+    }
+    TabsModelNG::SetShowBottomBarOnSidebarCollapse(frameNode, *convValue);
+}
+
 void SetSidebarTitleBarImpl(Ark_NativePointer node,
                             const Opt_TabsSidebarTitleBarOptions* value)
 {
@@ -1455,6 +1470,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarBottomBarImpl,
         TabsAttributeModifier::SetShowSideBarControlButtonImpl,
         TabsAttributeModifier::SetTabViewCustomizationImpl,
+        TabsAttributeModifier::SetShowBottomBarOnSidebarCollapseImpl,
         TabsAttributeModifier::SetSidebarTitleBarImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,

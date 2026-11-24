@@ -79,6 +79,7 @@ public:
         value->propDividerColorSetByUser_ = CloneDividerColorSetByUser();
         value->propBarBackgroundColorSetByUser_ = CloneBarBackgroundColorSetByUser();
         value->propKeepTabBarInSideBar_ = CloneKeepTabBarInSideBar();
+        value->propShowBottomBarOnSidebarCollapse_ = CloneShowBottomBarOnSidebarCollapse();
         return value;
     }
 
@@ -123,6 +124,7 @@ public:
         ResetBarBackgroundColorSetByUser();
         ResetKeepTabBarInSideBar();
         ResetBarTopFloatingStyle();
+        ResetShowBottomBarOnSidebarCollapse();
     }
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override
@@ -173,6 +175,8 @@ public:
         }
         json->PutExtAttr("barOverlapMode", modeStr.c_str(), filter);
         json->PutExtAttr("keepTabBarInSideBar", propKeepTabBarInSideBar_.value_or(false) ? "true" : "false", filter);
+        json->PutExtAttr("showBottomBarOnSidebarCollapse",
+            propShowBottomBarOnSidebarCollapse_.value_or(false) ? "true" : "false", filter);
         if (propCachedMaxCount_.has_value()) {
             auto cacheInfo = JsonUtil::Create(true);
             cacheInfo->Put("count", propCachedMaxCount_.value());
@@ -329,6 +333,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDivider, TabsItemDivider, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDividerColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(KeepTabBarInSideBar, bool, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(ShowBottomBarOnSidebarCollapse, bool, PROPERTY_UPDATE_MEASURE);
 };
 
 } // namespace OHOS::Ace::NG

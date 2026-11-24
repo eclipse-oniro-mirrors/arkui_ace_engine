@@ -1068,6 +1068,18 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setTabViewCustomization(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setShowBottomBarOnSidebarCollapseAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setShowBottomBarOnSidebarCollapse(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setSidebarTitleBarAttribute(value: TabsSidebarTitleBarOptions | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -1457,6 +1469,9 @@ export interface TabsAttribute extends CommonMethod {
     tabViewCustomization(value: TabViewCustomization | undefined): this {
         throw new Error('Unimplemented method tabViewCustomization')
     }
+    showBottomBarOnSidebarCollapse(value: boolean | undefined): this {
+        throw new Error('Unimplemented method showBottomBarOnSidebarCollapse')
+    }
     sidebarTitleBar(value: TabsSidebarTitleBarOptions | undefined): this {
         throw new Error('Unimplemented method sidebarTitleBar')
     }
@@ -1759,6 +1774,11 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     public tabViewCustomization(value: TabViewCustomization | undefined): this {
         const value_casted = value as (TabViewCustomization | undefined)
         this.getPeer()?.setTabViewCustomizationAttribute(value_casted)
+        return this
+    }
+    public showBottomBarOnSidebarCollapse(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setShowBottomBarOnSidebarCollapseAttribute(value_casted)
         return this
     }
     public sidebarTitleBar(value: TabsSidebarTitleBarOptions | undefined): this {

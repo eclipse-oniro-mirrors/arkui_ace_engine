@@ -303,6 +303,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  showBottomBarOnSidebarCollapse(value: Optional<boolean>): this {
+    this.lazyComponent.showBottomBarOnSidebarCollapse(value);
+    return this;
+  }
+
   sidebarBackgroundColor(value: Optional<ResourceColor>): this {
     this.lazyComponent.sidebarBackgroundColor(value);
     return this;

@@ -5923,6 +5923,8 @@ struct ArkUITabsModifier {
     void (*markUserSetSafeAreaOpts)(ArkUINodeHandle node);
     void (*setTabViewCustomization)(ArkUINodeHandle node, const ArkUITabViewCustomization* customization);
     void (*resetTabViewCustomization)(ArkUINodeHandle node);
+    void (*setShowBottomBarOnSidebarCollapse)(ArkUINodeHandle node, ArkUI_Bool show);
+    void (*resetShowBottomBarOnSidebarCollapse)(ArkUINodeHandle node);
 };
 
 struct ArkUIStepperItemModifier {

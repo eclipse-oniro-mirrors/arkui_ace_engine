@@ -101,12 +101,11 @@ void TabsLayoutAlgorithm::UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper
     // However, during the collapse/expand animation, keep sidebar VISIBLE so RSNode can
     // animate the transform translate. The animation handler manages visibility separately.
     bool isCollapsed = false;
-    bool isCollapseAnimating = false;
     auto sideBarPattern = sideBar->GetPattern<TabsSideBarPattern>();
     if (sideBarPattern) {
         isCollapsed = sideBarPattern->IsCollapsed();
-        isCollapseAnimating = sideBarPattern->IsCollapseAnimating();
     }
+    bool isCollapseAnimating = tabsPattern->IsSidebarCollapseSwitchBusy();
     bool effectiveVisible = isCollapseAnimating || (isVisible && !isCollapsed);
     auto sideBarDivider = tabsPattern->GetSideBarDividerNode();
     if (sideBarDivider) {
@@ -337,6 +336,119 @@ SizeF TabsLayoutAlgorithm::MeasureSwiperInSideBarMode(
     return swiperWrapper->GetGeometryNode()->GetMarginFrameSize();
 }
 
+void TabsLayoutAlgorithm::MeasureCollapseButton(
+    LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    CHECK_NULL_VOID(layoutProperty);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(layoutWrapper->GetHostNode());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    // Measure collapse button (direct child of tabsNode, stays visible when sidebar collapsed)
+    auto buttonNode = tabsPattern->GetCollapseButtonNode();
+    CHECK_NULL_VOID(buttonNode);
+    auto buttonIndex = tabsNode->GetChildIndexById(buttonNode->GetId());
+    if (buttonIndex < 0) {
+        return;
+    }
+    auto buttonWrapper = layoutWrapper->GetOrCreateChildByIndex(buttonIndex);
+    CHECK_NULL_VOID(buttonWrapper);
+    auto buttonLayoutConstraint = layoutProperty->CreateChildConstraint();
+    buttonLayoutConstraint.selfIdealSize.SetWidth(COLLAPSE_BUTTON_SIZE.ConvertToPx());
+    buttonLayoutConstraint.selfIdealSize.SetHeight(COLLAPSE_BUTTON_SIZE.ConvertToPx());
+    buttonWrapper->Measure(buttonLayoutConstraint);
+}
+
+void TabsLayoutAlgorithm::LayoutCollapseButton(
+    LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty)
+{
+    CHECK_NULL_VOID(layoutWrapper);
+    CHECK_NULL_VOID(layoutProperty);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(layoutWrapper->GetHostNode());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    auto layoutWrapperGeo = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_VOID(layoutWrapperGeo);
+    auto sideBar = tabsPattern->GetSideBarNode();
+    CHECK_NULL_VOID(sideBar);
+    // Layout collapse button (top corner of tabsNode, independent of sidebar)
+    auto buttonNode = tabsPattern->GetCollapseButtonNode();
+    CHECK_NULL_VOID(buttonNode);
+    auto buttonIndex = tabsNode->GetChildIndexById(buttonNode->GetId());
+    if (buttonIndex < 0) {
+        return;
+    }
+    auto buttonWrapper = layoutWrapper->GetOrCreateChildByIndex(buttonIndex);
+    CHECK_NULL_VOID(buttonWrapper);
+    auto buttonGeo = buttonWrapper->GetGeometryNode();
+    CHECK_NULL_VOID(buttonGeo);
+    auto frameSize = layoutWrapperGeo->GetFrameSize();
+    if (frameSize.IsPositive()) {
+        MinusPaddingToSize(layoutProperty->CreatePaddingAndBorder(), frameSize);
+    }
+    float buttonSize = COLLAPSE_BUTTON_SIZE.ConvertToPx();
+    float verticalPadding = COLLAPSE_BUTTON_VERTICAL_PADDING.ConvertToPx();
+    auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
+    bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    auto sideBarPattern = sideBar->GetPattern<TabsSideBarPattern>();
+    bool isCollapsed = sideBarPattern ? sideBarPattern->IsCollapsed() : false;
+    float buttonY = verticalPadding + paddingOffset.GetY();
+    if (sideBarPattern && sideBarPattern->ShouldAlignWithControlButtons()) {
+        auto pipeline = tabsNode->GetContext();
+        int32_t titleHeight = pipeline ? pipeline->GetContainerModalTitleHeight() : 0;
+        if (titleHeight > 0) {
+            buttonY = (static_cast<float>(titleHeight) - buttonSize) / 2.0f + paddingOffset.GetY();
+        }
+    }
+    bool hasTitleBarRow = tabsPattern->HasSidebarTitleBar();
+    auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
+    bool isLeadingEdge = (!isRTL && sideBarPosition == BarPosition::START) ||
+        (isRTL && sideBarPosition == BarPosition::END);
+    // Take the sidebar geometry from the layout wrapper (unlike the original
+    // inline block in LayoutInSideBarMode, it is not available from an outer
+    // scope here — this helper also runs in the bottom-tab-bar arrangement).
+    auto sideBarIndex = tabsNode->GetChildIndexById(sideBar->GetId());
+    auto sideBarWrapper = sideBarIndex >= 0 ? layoutWrapper->GetOrCreateChildByIndex(sideBarIndex) : nullptr;
+    auto sideBarGeo = sideBarWrapper ? sideBarWrapper->GetGeometryNode() : nullptr;
+    OffsetF buttonOffset;
+    if (isCollapsed) {
+        float tabsWidth = frameSize.Width();
+        float breakpoint600 = BREAKPOINT_600.ConvertToPx();
+        float breakpoint840 = BREAKPOINT_840.ConvertToPx();
+        float padding = FLOATING_BAR_MARGIN_16.ConvertToPx();
+        if (GreatOrEqual(tabsWidth, breakpoint840)) {
+            padding = FLOATING_BAR_MARGIN_32.ConvertToPx();
+        } else if (GreatOrEqual(tabsWidth, breakpoint600)) {
+            padding = FLOATING_BAR_MARGIN_24.ConvertToPx();
+        }
+        if (isLeadingEdge) {
+            buttonOffset = OffsetF(padding + paddingOffset.GetX(), buttonY);
+        } else {
+            buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(), buttonY);
+        }
+    } else if (hasTitleBarRow && sideBarGeo) {
+        float padding = COLLAPSE_BUTTON_PADDING.ConvertToPx();
+        float sideBarX = sideBarGeo->GetMarginFrameOffset().GetX();
+        float sideBarWidth = sideBarGeo->GetMarginFrameSize().Width();
+        if (isRTL) {
+            buttonOffset = OffsetF(sideBarX + padding, buttonY);
+        } else {
+            buttonOffset = OffsetF(sideBarX + sideBarWidth - buttonSize - padding, buttonY);
+        }
+    } else {
+        float padding = FLOATING_BAR_MARGIN_16.ConvertToPx();
+        if (isLeadingEdge) {
+            buttonOffset = OffsetF(padding + paddingOffset.GetX(), buttonY);
+        } else {
+            buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(), buttonY);
+        }
+    }
+    buttonGeo->SetMarginFrameOffset(buttonOffset);
+    buttonWrapper->Layout();
+}
+
 void TabsLayoutAlgorithm::MeasureInSideBarMode(LayoutWrapper* layoutWrapper,
     const RefPtr<TabsLayoutProperty>& layoutProperty, const SizeF& idealSize, bool needMeasureEnterComponents)
 {
@@ -349,6 +461,28 @@ void TabsLayoutAlgorithm::MeasureInSideBarMode(LayoutWrapper* layoutWrapper,
 
     float sideBarWidth = MeasureSideBar(layoutWrapper, layoutProperty, idealSize);
     float dividerStrokeWidth = MeasureSideBarDivider(layoutWrapper, layoutProperty, idealSize);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    // The sidebar's layout slot is not (yet / anymore) part of the visual
+    // layout here — measure the swiper with the full container width while the
+    // sidebar itself keeps its geometry for the slide:
+    // - collapse, animation running (pass-2 re-entrant layout and any layout
+    //   during the animation): the sidebar is on its way out, so its slot is
+    //   already released in the "to" state;
+    // - expand, request pending (pass-1 "from" state): the sidebar was just
+    //   revealed, but the "from" state still has the content spanning the full
+    //   width. Releasing the slot here keeps the pass-1 content at its
+    //   collapsed-steady size; pass 2 (inside the animation closure, where
+    //   this flag is off) squeezes it to the "to" state, giving the implicit
+    //   animation a from->to delta to interpolate while the sidebar slides in.
+    bool sidebarSlotReleased = tabsPattern &&
+        ((tabsPattern->IsOnSidebarCollapseSwitchAnimation() &&
+             tabsPattern->IsSidebarCollapseSwitchToCollapsed()) ||
+            (tabsPattern->IsSidebarCollapseSwitchRequested() &&
+                !tabsPattern->IsSidebarCollapseSwitchToCollapsed()));
+    if (sidebarSlotReleased) {
+        sideBarWidth = 0.0f;
+        dividerStrokeWidth = 0.0f;
+    }
 
     auto swiperWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.swiperIndex);
     if (swiperWrapper) {
@@ -361,21 +495,7 @@ void TabsLayoutAlgorithm::MeasureInSideBarMode(LayoutWrapper* layoutWrapper,
         swiperWrapper->GetGeometryNode()->SetFrameSize(SizeF());
     }
     // Measure collapse button (direct child of tabsNode, stays visible when sidebar collapsed)
-    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-    CHECK_NULL_VOID(tabsPattern);
-    auto buttonNode = tabsPattern->GetCollapseButtonNode();
-    if (buttonNode) {
-        auto buttonIndex = tabsNode->GetChildIndexById(buttonNode->GetId());
-        if (buttonIndex >= 0) {
-            auto buttonWrapper = layoutWrapper->GetOrCreateChildByIndex(buttonIndex);
-            if (buttonWrapper) {
-                auto buttonLayoutConstraint = layoutProperty->CreateChildConstraint();
-                buttonLayoutConstraint.selfIdealSize.SetWidth(COLLAPSE_BUTTON_SIZE.ConvertToPx());
-                buttonLayoutConstraint.selfIdealSize.SetHeight(COLLAPSE_BUTTON_SIZE.ConvertToPx());
-                buttonWrapper->Measure(buttonLayoutConstraint);
-            }
-        }
-    }
+    MeasureCollapseButton(layoutWrapper, layoutProperty);
     if (tabsNode->HasEffectNode()) {
         auto effectWrapper = layoutWrapper->GetChildByIndex(tabsNode->GetEffectNodeIndex());
         if (effectWrapper) {
@@ -451,22 +571,68 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(tabsPattern);
     auto preDisplayMode = tabsPattern->GetCurrentBarDisplayMode();
     auto curDisplayMode = tabsPattern->CalculateTabBarDisplayMode(idealSize.Width());
+    // Absorb the sidebar collapse/expand switch into the display-mode
+    // determination (single point):
+    // - expanding (switch animation in flight): the "to" mode is SIDEBAR —
+    //   break through the collapsed-state masking on purpose so
+    //   displayModeChanged fires and the standard machinery below switches the
+    //   mode and notifies the developer at animation start;
+    // - currently SIDEBAR and the bottom bar actually shows/showed: the pure
+    //   breakpoint calculation keeps returning SIDEBAR, but the tabs actually
+    //   displays the bottom-tab-bar arrangement — both at the collapse pass-2
+    //   switch moment (switch animation in flight + the bar actually
+    //   participates, frozen at switch start: a mid-animation flip of
+    //   showBottomBarOnSidebarCollapse must not change the running switch) and
+    //   in the collapsed steady state (mode already switched). Masking keeps
+    //   the steady mode from being misread as a breakpoint-driven change.
+    if (tabsPattern->IsOnSidebarCollapseSwitchAnimation() &&
+        !tabsPattern->IsSidebarCollapseSwitchToCollapsed()) {
+        curDisplayMode = TabBarDisplayMode::SIDEBAR;
+    } else if (curDisplayMode == TabBarDisplayMode::SIDEBAR &&
+        (tabsPattern->IsBottomBarShownAfterCollapse() ||
+            (tabsPattern->IsOnSidebarCollapseSwitchAnimation() &&
+                tabsPattern->IsSidebarCollapseSwitchWithBottomBar()))) {
+        curDisplayMode = TabBarDisplayMode::BOTTOMTABBAR;
+    }
     // When first layout, if sideBar exists (using new displayMode feature), need to initialize visibility.
     // Also fire the callback on first layout if the developer registered one, so they receive
     // the initial displayMode (e.g. BOTTOMTABBAR when barStyle defaults to bottom).
     // Otherwise, keep original behavior to avoid affecting developers who don't use new features.
     bool firstLayout = !preDisplayMode.has_value();
     bool displayModeChanged = preDisplayMode.has_value() && preDisplayMode.value() != curDisplayMode;
-    bool shouldAnimate = CheckIfNeedModeChangeAnimation(layoutProperty, tabsPattern, displayModeChanged, firstLayout);
-    if (shouldAnimate && preDisplayMode.has_value() &&
+    // Both kinds of display-mode animation — the breakpoint-driven switch and the
+    // sidebar collapse/expand switch — share the same animate branch below; they
+    // only differ inside it (which components are revealed and which after-layout
+    // task starts the animation). The re-entrant layout inside each animation's
+    // closure (FlushUITasks) always takes the non-animate else branch.
+    bool breakpointAnimPending = CheckIfNeedModeChangeAnimation(
+        layoutProperty, tabsPattern, displayModeChanged, firstLayout);
+    // While a collapse/expand switch is requested or running, the breakpoint-driven
+    // switch must not schedule its own animation — the switch owns this transition.
+    breakpointAnimPending = breakpointAnimPending && !tabsPattern->IsSidebarCollapseSwitchBusy();
+    if (breakpointAnimPending && preDisplayMode.has_value() &&
         (preDisplayMode.value() == TabBarDisplayMode::TOP_TABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR)) {
-        shouldAnimate = false;
+        breakpointAnimPending = false;
     }
+    // The collapse/expand switch's pass 1 (request registered) is an animate pass
+    // too: keep the "from" arrangement and hand over to the switch animation.
+    bool shouldAnimate = breakpointAnimPending || tabsPattern->IsSidebarCollapseSwitchRequested();
     // During the animation closure's FlushUITasks re-entrant layout, the pattern flag is set,
     // so we take the non-animate path but must NOT touch visibility (the animation owns it).
-    bool isReentrantDuringAnim = tabsPattern->IsOnDisplayModeSwitchAnimation();
-    // The animation-start pass additionally measures+layouts the entering component. The
-    // re-entrant layout inside the animation closure is NOT the start pass.
+    // The sidebar collapse/expand switch's pass 2 is the same kind of re-entrant
+    // layout: the mode switch it observes there must not churn visibility —
+    // the pass-1 request block and the finish callback own it.
+    bool isReentrantDuringAnim = tabsPattern->IsOnDisplayModeSwitchAnimation() ||
+        tabsPattern->IsOnSidebarCollapseSwitchAnimation();
+    // Two-pass collapse/expand switch (showBottomBarOnSidebarCollapse): the click
+    // registers a request; the pass-1 layout additionally measures+layouts the
+    // entering component, and the pass-2 re-entrant layout (inside the animation
+    // closure's FlushUITasks) runs in the "to" arrangement.
+    bool collapseAnimRequested = tabsPattern->IsSidebarCollapseSwitchRequested();
+    bool onCollapseBottomBarAnim = tabsPattern->IsOnSidebarCollapseSwitchAnimation();
+    // The animation-start pass (either animation kind, see shouldAnimate above)
+    // additionally measures+layouts the entering component. The re-entrant layout
+    // inside the animation closure is NOT the start pass.
     measuringForAnimStart_ = shouldAnimate;
     bool needUpdateVisibility = (displayModeChanged || (firstLayout && tabsPattern->GetSideBarNode() != nullptr)) &&
         !isReentrantDuringAnim;
@@ -476,41 +642,81 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     bool keepMode = layoutProperty->GetKeepTabBarInSideBarValue(false);
 
     if (shouldAnimate) {
-        // Animate path: keep layout in the old mode for this pass so the "from" state is
-        // captured. The animation closure (AddAfterLayoutTask) switches the mode and calls
-        // FlushUITasks, causing a re-entrant layout in the new mode whose offset diffs are
-        // captured by the implicit animation.
-        effectiveMode = preDisplayMode.value();
-        auto fromMode = preDisplayMode.value();
-        auto toMode = curDisplayMode;
-        // Ensure ALL components (both from-mode and to-mode) are visible so the entering
-        // element can render during the animation. The entering components were previously
-        // GONE because they belonged to the non-active mode.
-        UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, true);
-        if (!keepMode) {
-            UpdateTabBarAndDividerVisibility(layoutWrapper, true);
+        // Animate path: keep layout in the old mode ("from") for this pass so the
+        // "from" state is captured. The after-layout task starts the animation
+        // whose closure calls FlushUITasks, causing a re-entrant layout in the
+        // "to" arrangement whose offset diffs are captured by the animation.
+        effectiveMode = preDisplayMode.value_or(curDisplayMode);
+        if (collapseAnimRequested) {
+            // Internal subdivision — sidebar collapse/expand switch, pass 1: make
+            // the entering components visible so they are measured+laid out with
+            // valid geometry in the "from" arrangement, then start the switch
+            // animation (initial transforms + animation whose closure re-enters
+            // layout in the "to" arrangement via FlushUITasks).
+            bool toCollapsed = tabsPattern->IsSidebarCollapseSwitchToCollapsed();
+            if (toCollapsed) {
+                // showBottomBarOnSidebarCollapse only decides whether the bottom
+                // tab bar additionally joins the collapse switch, and only a
+                // bottom-style bar (floating, or normal bar actually at the
+                // bottom) joins; otherwise the sidebar-only slide runs and
+                // there is nothing extra to reveal.
+                if (tabsPattern->IsShowBottomBarOnSidebarCollapseEnabled() &&
+                    tabsPattern->IsTabBarBottomStyle()) {
+                    if (!keepMode) {
+                        UpdateTabBarAndDividerVisibility(layoutWrapper, true);
+                    }
+                    UpdateBgMaskNodeVisibility(layoutWrapper, true);
+                }
+            } else {
+                UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, true);
+            }
+            auto context = tabsNode->GetContext();
+            CHECK_NULL_VOID(context);
+            context->AddAfterLayoutTask(
+                [weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern)]() {
+                    auto tabsPattern = weakTabsPattern.Upgrade();
+                    CHECK_NULL_VOID(tabsPattern);
+                    tabsPattern->StartSidebarCollapseSwitchAnimation();
+                });
+        } else {
+            // Internal subdivision — breakpoint-driven display-mode switch: ensure
+            // ALL components (both from-mode and to-mode) are visible so the
+            // entering element can render during the animation. The entering
+            // components were previously GONE because they belonged to the
+            // non-active mode.
+            auto fromMode = preDisplayMode.value();
+            auto toMode = curDisplayMode;
+            UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, true);
+            if (!keepMode) {
+                UpdateTabBarAndDividerVisibility(layoutWrapper, true);
+            }
+            UpdateBgMaskNodeVisibility(layoutWrapper, true);
+            auto context = tabsNode->GetContext();
+            CHECK_NULL_VOID(context);
+            // Mark that the next layout pass should additionally measure/layout the entering
+            // component (the one belonging to toMode) so it has geometry for the animation.
+            // The pattern resets this flag after the animation-start layout pass.
+            context->AddAfterLayoutTask(
+                [weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), fromMode, toMode]() {
+                    auto tabsPattern = weakTabsPattern.Upgrade();
+                    CHECK_NULL_VOID(tabsPattern);
+                    TAG_LOGI(AceLogTag::ACE_TABS, "Start Tabs displayMode change animation"
+                        ", fromMode=%{public}d, toMode=%{public}d",
+                        static_cast<int32_t>(fromMode), static_cast<int32_t>(toMode));
+                    tabsPattern->StartDisplayModeSwitchAnimation(fromMode, toMode);
+                });
         }
-        UpdateBgMaskNodeVisibility(layoutWrapper, true);
-        auto context = tabsNode->GetContext();
-        CHECK_NULL_VOID(context);
-        // Mark that the next layout pass should additionally measure/layout the entering
-        // component (the one belonging to toMode) so it has geometry for the animation.
-        // The pattern resets this flag after the animation-start layout pass.
-        context->AddAfterLayoutTask(
-            [weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), fromMode, toMode]() {
-                auto tabsPattern = weakTabsPattern.Upgrade();
-                CHECK_NULL_VOID(tabsPattern);
-                TAG_LOGI(AceLogTag::ACE_TABS, "Start Tabs displayMode change animation"
-                    ", fromMode=%{public}d, toMode=%{public}d",
-                    static_cast<int32_t>(fromMode), static_cast<int32_t>(toMode));
-                tabsPattern->StartDisplayModeSwitchAnimation(fromMode, toMode);
-            });
     } else {
-        // Non-animate path: first layout, external animation active, or re-entrant layout
-        // (isOnDisplayModeSwitchAnimation_ == true during FlushUITasks inside animation closure).
-        // In the re-entrant case, SetCurrentBarDisplayMode and FireBarDisplayModeChangeEvent
-        // are still executed so the mode is updated and the developer callback fires at
-        // animation start (matching Navigation's behavior), not at animation finish.
+        // Non-animate path: first layout, external animation active, or the re-entrant
+        // layout inside either animation's closure (FlushUITasks; the corresponding
+        // pattern flag is set so the animate path above is skipped). In the re-entrant
+        // case, SetCurrentBarDisplayMode and FireBarDisplayModeChangeEvent are still
+        // executed so the mode is updated and the developer callback fires at animation
+        // start (matching Navigation's behavior), not at animation finish. This serves
+        // both animation kinds uniformly — no internal subdivision is needed here:
+        // visibility churn is suppressed for both by isReentrantDuringAnim, and
+        // the "sidebar sliding out" transient is handled inside
+        // MeasureInSideBarMode/LayoutOffsetListInSideBarMode.
         tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
         if (needUpdateVisibility) {
             UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
@@ -545,14 +751,22 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         });
     }
     if (effectiveMode == TabBarDisplayMode::SIDEBAR) {
-        MeasureInSideBarMode(
-            layoutWrapper, layoutProperty, idealSize, shouldAnimate || isReentrantDuringAnim || keepMode);
+        MeasureInSideBarMode(layoutWrapper, layoutProperty, idealSize,
+            shouldAnimate || isReentrantDuringAnim || keepMode || collapseAnimRequested || onCollapseBottomBarAnim);
         return;
     }
 
     auto childLayoutConstraint = layoutProperty->CreateChildConstraint();
     childLayoutConstraint.parentIdealSize = OptionalSizeF(idealSize);
     float dividerStrokeWidth = 0.0f;
+
+    // The collapse button is a direct child of tabsNode and can be on screen
+    // even in the bottom-tab-bar arrangement: in the collapsed-with-bottom-bar
+    // state it is the expand entry. The helper no-ops when no button exists
+    // (genuine bottom tab bar display), so call it unconditionally — e.g.
+    // showSidebarControlButton flipping false->true re-creates the button in
+    // the collapsed state and only this pass would give it geometry.
+    MeasureCollapseButton(layoutWrapper, layoutProperty);
 
     // Measure tab bar.
     SizeF tabBarSize = MeasureTabBar(layoutWrapper, childLayoutConstraint);
@@ -620,7 +834,9 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     // for the enter animation.
     // Re-entrant layout during animation (now in toMode=BOTTOM): also measure the exiting
     // sidebar + sidebarDivider so they keep proper geometry while animating out.
-    if (shouldAnimate || isReentrantDuringAnim) {
+    // Keep the exiting sidebar's geometry valid while it animates out in the
+    // bottom-bar-arrangement layout.
+    if (shouldAnimate || isReentrantDuringAnim || collapseAnimRequested || onCollapseBottomBarAnim) {
         MeasureSideBar(layoutWrapper, layoutProperty, idealSize);
         MeasureSideBarDivider(layoutWrapper, layoutProperty, idealSize);
     }
@@ -679,75 +895,9 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
     }
 
     // Layout collapse button (top corner of tabsNode, independent of sidebar)
-    auto buttonNode = tabsPattern->GetCollapseButtonNode();
-    if (buttonNode) {
-        auto buttonIndex = tabsNode->GetChildIndexById(buttonNode->GetId());
-        if (buttonIndex >= 0) {
-            auto buttonWrapper = layoutWrapper->GetOrCreateChildByIndex(buttonIndex);
-            if (buttonWrapper) {
-                auto buttonGeo = buttonWrapper->GetGeometryNode();
-                if (buttonGeo) {
-                    float buttonSize = COLLAPSE_BUTTON_SIZE.ConvertToPx();
-                    float verticalPadding = COLLAPSE_BUTTON_VERTICAL_PADDING.ConvertToPx();
-                    auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
-                    bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
-                    auto sideBarPattern = sideBar->GetPattern<TabsSideBarPattern>();
-                    bool isCollapsed = sideBarPattern ? sideBarPattern->IsCollapsed() : false;
-                    float buttonY = verticalPadding + paddingOffset.GetY();
-                    if (sideBarPattern && sideBarPattern->ShouldAlignWithControlButtons()) {
-                        auto pipeline = tabsNode->GetContext();
-                        int32_t titleHeight = pipeline ? pipeline->GetContainerModalTitleHeight() : 0;
-                        if (titleHeight > 0) {
-                            buttonY = (static_cast<float>(titleHeight) - buttonSize) / 2.0f + paddingOffset.GetY();
-                        }
-                    }
-                    bool hasTitleBarRow = tabsPattern->HasSidebarTitleBar();
-                    auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
-                    bool isLeadingEdge =
-                        (!isRTL && sideBarPosition == BarPosition::START) ||
-                        (isRTL && sideBarPosition == BarPosition::END);
-                    OffsetF buttonOffset;
-                    if (isCollapsed) {
-                        float tabsWidth = frameSize.Width();
-                        float breakpoint600 = BREAKPOINT_600.ConvertToPx();
-                        float breakpoint840 = BREAKPOINT_840.ConvertToPx();
-                        float padding = FLOATING_BAR_MARGIN_16.ConvertToPx();
-                        if (GreatOrEqual(tabsWidth, breakpoint840)) {
-                            padding = FLOATING_BAR_MARGIN_32.ConvertToPx();
-                        } else if (GreatOrEqual(tabsWidth, breakpoint600)) {
-                            padding = FLOATING_BAR_MARGIN_24.ConvertToPx();
-                        }
-                        if (isLeadingEdge) {
-                            buttonOffset = OffsetF(padding + paddingOffset.GetX(), buttonY);
-                        } else {
-                        buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(),
-                                buttonY);
-                        }
-                    } else if (hasTitleBarRow && sideBarGeo) {
-                        float padding = COLLAPSE_BUTTON_PADDING.ConvertToPx();
-                        float sideBarX = sideBarGeo->GetMarginFrameOffset().GetX();
-                        float sideBarWidth = sideBarGeo->GetMarginFrameSize().Width();
-                        if (isRTL) {
-                            buttonOffset = OffsetF(sideBarX + padding, buttonY);
-                        } else {
-                            buttonOffset = OffsetF(sideBarX + sideBarWidth - buttonSize - padding, buttonY);
-                        }
-                    } else {
-                        float padding = FLOATING_BAR_MARGIN_16.ConvertToPx();
-                        if (isLeadingEdge) {
-                            buttonOffset = OffsetF(padding + paddingOffset.GetX(), buttonY);
-                    } else {
-                            buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(),
-                                buttonY);
-                        }
-                    }
-                    buttonGeo->SetMarginFrameOffset(buttonOffset);
-                    buttonWrapper->Layout();
-                }
-            }
-        }
-    }
-    if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation()) {
+    LayoutCollapseButton(layoutWrapper, layoutProperty);
+    if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation() ||
+        tabsPattern->IsOnSidebarCollapseSwitchAnimation()) {
         // Animation-start or re-entrant layout: also layout the bottom-mode components
         // (tabbar + divider + effectNode + bgMaskNode) at their correct bottom-mode positions.
         LayoutBottomComponentsForAnimation(layoutWrapper, layoutProperty, tabsNode, geometryNode);
@@ -834,6 +984,10 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 
     auto layoutProperty = AceType::DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(layoutProperty);
+    // Same as Measure: keep laying out the collapse button in the bottom-tab-bar
+    // arrangement — in the collapsed-with-bottom-bar state it is the expand
+    // entry, and a button (re-)created there must still be positioned.
+    LayoutCollapseButton(layoutWrapper, layoutProperty);
     auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
     auto dividerWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.dividerIndex);
     auto effectWrapper = tabsNode->HasEffectNode()
@@ -881,7 +1035,9 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 
     LayoutBackgroundMask(layoutWrapper);
 
-    if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation()) {
+    if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation() ||
+        tabsPattern->IsSidebarCollapseSwitchRequested() ||
+        tabsPattern->IsOnSidebarCollapseSwitchAnimation()) {
         LayoutSidebarForAnimation(layoutWrapper, layoutProperty, geometryNode);
         measuringForAnimStart_ = false;
     }
@@ -900,6 +1056,7 @@ void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrappe
     auto tabsPattern = host->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
     if (tabsPattern->IsOnDisplayModeSwitchAnimation() ||
+        tabsPattern->IsSidebarCollapseSwitchBusy() ||
         (isFloatingBar_ && tabsPattern->IsTabBarFollowingHand())) {
         return;
     }
@@ -1326,6 +1483,15 @@ std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetListInSideBarMode(LayoutWr
         CHECK_NULL_BREAK(geo);
         dividerStrokeWidth = geo->GetMarginFrameSize().Width();
     } while (false);
+    // The sidebar's layout slot is not (yet / anymore) part of the visual
+    // layout: collapse-animating (on its way out) or expand-requested (pass-1
+    // keeps the "from" full-width content; pass 2 squeezes it to the "to"
+    // state) — the swiper is laid out at the padding origin with full width
+    // (see the matching patch in MeasureInSideBarMode).
+    bool sidebarSlotReleased = (tabsPattern->IsOnSidebarCollapseSwitchAnimation() &&
+        tabsPattern->IsSidebarCollapseSwitchToCollapsed()) ||
+        (tabsPattern->IsSidebarCollapseSwitchRequested() &&
+            !tabsPattern->IsSidebarCollapseSwitchToCollapsed());
     auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
     auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
     // Apply the divider startMargin (top margin) to the vertical sidebar divider's Y offset.
@@ -1359,6 +1525,9 @@ std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetListInSideBarMode(LayoutWr
             paddingOffset.GetY());
         offsetList[SIDEBAR_DIVIDER_INDEX] = OffsetF(frameSize.Width() - sideBarFrameSize.Width() - dividerStrokeWidth +
             paddingOffset.GetX(), paddingOffset.GetY() + dividerStartMarginPx);
+    }
+    if (sidebarSlotReleased) {
+        offsetList[SWIPER_INDEX] = paddingOffset;
     }
     CalcEffectNodeOffsetInSideBarMode(layoutWrapper, effectNodeWrapper, frameSize, paddingOffset, offsetList);
     return offsetList;

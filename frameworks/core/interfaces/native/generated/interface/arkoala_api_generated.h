@@ -28282,6 +28282,8 @@ typedef struct GENERATED_ArkUITabsModifier {
                                         const Opt_Boolean* value);
     void (*setTabViewCustomization)(Ark_NativePointer node,
                                     const Opt_TabViewCustomization* value);
+    void (*setShowBottomBarOnSidebarCollapse)(Ark_NativePointer node,
+                                              const Opt_Boolean* value);
     void (*setSidebarTitleBar)(Ark_NativePointer node,
                                const Opt_TabsSidebarTitleBarOptions* value);
     void (*setBarMode)(Ark_NativePointer node,
