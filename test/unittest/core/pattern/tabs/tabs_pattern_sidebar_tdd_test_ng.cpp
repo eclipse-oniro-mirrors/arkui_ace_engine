@@ -1217,4 +1217,40 @@ HWTEST_F(TabsPatternSidebarTddTestNg, SetAnimateMode001, TestSize.Level1)
     pattern_->SetAnimateMode(TabAnimateMode::ACTION_FIRST);
     EXPECT_EQ(pattern_->GetAnimateMode(), TabAnimateMode::ACTION_FIRST);
 }
+
+// ===================== InterceptStatus =====================
+
+/**
+ * @tc.name: GetInterceptStatusDefault001
+ * @tc.desc: GetInterceptStatus returns false by default after creation
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsPatternSidebarTddTestNg, GetInterceptStatusDefault001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    EXPECT_FALSE(pattern_->GetInterceptStatus());
+}
+
+/**
+ * @tc.name: SetInterceptStatusToggle001
+ * @tc.desc: SetInterceptStatus toggles the value reported by GetInterceptStatus
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsPatternSidebarTddTestNg, SetInterceptStatusToggle001, TestSize.Level1)
+{
+    TabsModelNG model = CreateTabs();
+    CreateTabContents(TABCONTENT_NUMBER);
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    pattern_->SetInterceptStatus(true);
+    EXPECT_TRUE(pattern_->GetInterceptStatus());
+
+    pattern_->SetInterceptStatus(false);
+    EXPECT_FALSE(pattern_->GetInterceptStatus());
+}
 } // namespace OHOS::Ace::NG

@@ -3302,6 +3302,8 @@ typedef struct Ark_TabsOptions Ark_TabsOptions;
 typedef struct Opt_TabsOptions Opt_TabsOptions;
 typedef struct Ark_TabsSidebarSearchableOptions Ark_TabsSidebarSearchableOptions;
 typedef struct Opt_TabsSidebarSearchableOptions Opt_TabsSidebarSearchableOptions;
+typedef struct Ark_TabsSidebarTitleBarOptions Ark_TabsSidebarTitleBarOptions;
+typedef struct Opt_TabsSidebarTitleBarOptions Opt_TabsSidebarTitleBarOptions;
 typedef struct Ark_text_Decoration Ark_text_Decoration;
 typedef struct Opt_text_Decoration Opt_text_Decoration;
 typedef struct Ark_text_TextShadow Ark_text_TextShadow;
@@ -21411,6 +21413,15 @@ typedef struct Opt_TabsSidebarSearchableOptions {
     Ark_Tag tag;
     Ark_TabsSidebarSearchableOptions value;
 } Opt_TabsSidebarSearchableOptions;
+typedef struct Ark_TabsSidebarTitleBarOptions {
+    /* kind: Interface */
+    Opt_ResourceStr icon;
+    Opt_ResourceStr text;
+} Ark_TabsSidebarTitleBarOptions;
+typedef struct Opt_TabsSidebarTitleBarOptions {
+    Ark_Tag tag;
+    Ark_TabsSidebarTitleBarOptions value;
+} Opt_TabsSidebarTitleBarOptions;
 typedef struct Ark_text_Decoration {
     /* kind: Interface */
     Opt_text_TextDecorationType textDecoration;
@@ -28271,6 +28282,8 @@ typedef struct GENERATED_ArkUITabsModifier {
                                         const Opt_Boolean* value);
     void (*setTabViewCustomization)(Ark_NativePointer node,
                                     const Opt_TabViewCustomization* value);
+    void (*setSidebarTitleBar)(Ark_NativePointer node,
+                               const Opt_TabsSidebarTitleBarOptions* value);
     void (*setBarMode)(Ark_NativePointer node,
                        const Opt_BarMode* value,
                        const Opt_ScrollableBarModeOptions* options);
