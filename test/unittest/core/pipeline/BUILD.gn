@@ -131,7 +131,6 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/frameworks/core/event/mock_point_event.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_statusbar_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_touch_event.cpp",
-    "$ace_root/test/mock/frameworks/core/event/package/mock_package_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_cache.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_file_cache.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_source_info.cpp",

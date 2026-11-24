@@ -40,7 +40,6 @@ template("ace_capability_ohos_source_set") {
       "feature_config/features/ui_node_gc_params_parser.cpp",
       "html/html_to_span.cpp",
       "html/span_to_html.cpp",
-      "package/package_event_proxy_ohos.cpp",
       "preference/storage_impl.cpp",
       "statusbar/statusbar_event_proxy_ohos.cpp",
       "time/time_event_proxy_ohos.cpp",

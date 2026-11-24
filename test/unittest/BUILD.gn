@@ -988,7 +988,6 @@ ohos_static_library("ace_components_mock") {
     "$ace_root/test/mock/frameworks/core/event/mock_statusbar_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_time_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_touch_event.cpp",
-    "$ace_root/test/mock/frameworks/core/event/package/mock_package_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_cache.cpp",
     "$ace_root/test/mock/frameworks/core/image/mock_image_source_info.cpp",
     "$ace_root/test/mock/frameworks/core/pipeline/mock_element_register.cpp",
