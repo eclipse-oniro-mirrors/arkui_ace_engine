@@ -177,6 +177,195 @@ HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest010, TestSize.Level1)
     object = OH_ArkUI_QueryModuleInterfaceByName(ARKUI_MULTI_THREAD_NATIVE_NODE, "ArkUI_NativeNodeAPI_1");
     EXPECT_NE(object, nullptr);
 }
+/**
+ * @tc.name: NativeNodeNapiTest011
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest011, TestSize.Level1)
+{
+    napi_env__* env = nullptr;
+    napi_value__* value = nullptr;
+    ArkUI_NodeHandle* context = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, context);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+}
+/**
+ * @tc.name: NativeNodeNapiTest012
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a null external pointer in builderNode_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest012, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value builderNode = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
+    ASSERT_EQ(napi_create_external(env, nullptr, nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, builderNode, "nodePtr_", nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+/**
+ * @tc.name: NativeNodeNapiTest013
+ * @tc.desc: Test OH_ArkUI_EnableEventPassthrough function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest013, TestSize.Level1)
+{
+    ArkUI_ContextHandle uiContext = new ArkUI_Context({ .id = 10000 });
+    bool enable = true;
+    ArkUI_RawInputEventType eventType = ArkUI_RawInputEventType::ARKUI_RAW_INPUT_EVENT_TYPE_MOUSE;
+    auto code = OH_ArkUI_EnableEventPassthrough(uiContext, enable, eventType);
+    EXPECT_EQ(code, ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+/**
+ * @tc.name: NativeNodeNapiTest014
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a value without nodePtr_/builderNode_ property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest014, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+/**
+ * @tc.name: NativeNodeNapiTest015
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a nodePtr_ property of the wrong type.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest015, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_string_utf8(env, "invalid", NAPI_AUTO_LENGTH, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+/**
+ * @tc.name: NativeNodeNapiTest016
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a null external pointer in nodePtr_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest016, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_external(env, nullptr, nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+/**
+ * @tc.name: NativeNodeNapiTest017
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a builderNode_ that has no nodePtr_ property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest017, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value builderNode = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+/**
+ * @tc.name: NativeNodeNapiTest018
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue success path with a valid nodePtr_ external.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest018, TestSize.Level1)
+{
+    if (OHOS::Ace::NodeModel::GetFullImpl() != nullptr) {
+        GTEST_SKIP() << "FullImpl is initialized, success path is not exercised in the mock environment";
+    }
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    auto pattern = OHOS::Ace::AceType::MakeRefPtr<OHOS::Ace::NG::Pattern>();
+    auto frameNode = OHOS::Ace::NG::FrameNode::CreateFrameNode("text", 100001, pattern, true);
+    ASSERT_NE(frameNode, nullptr);
+    napi_value value = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_external(env, OHOS::Ace::AceType::RawPtr(frameNode), nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_NO_ERROR);
+    ASSERT_NE(handle, nullptr);
+    EXPECT_EQ(handle->type, -1);
+    EXPECT_TRUE(handle->buildNode);
+    EXPECT_FALSE(handle->cNode);
+    delete handle;
+}
+/**
+ * @tc.name: NativeNodeNapiTest019
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue success path with a valid builderNode_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest019, TestSize.Level1)
+{
+    if (OHOS::Ace::NodeModel::GetFullImpl() != nullptr) {
+        GTEST_SKIP() << "FullImpl is initialized, success path is not exercised in the mock environment";
+    }
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    auto pattern = OHOS::Ace::AceType::MakeRefPtr<OHOS::Ace::NG::Pattern>();
+    auto frameNode = OHOS::Ace::NG::FrameNode::CreateFrameNode("text", 100002, pattern, true);
+    ASSERT_NE(frameNode, nullptr);
+    napi_value value = nullptr;
+    napi_value builderNode = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
+    ASSERT_EQ(napi_create_external(env, OHOS::Ace::AceType::RawPtr(frameNode), nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, builderNode, "nodePtr_", nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_NO_ERROR);
+    ASSERT_NE(handle, nullptr);
+    EXPECT_EQ(handle->type, -1);
+    EXPECT_TRUE(handle->buildNode);
+    EXPECT_FALSE(handle->cNode);
+    delete handle;
+}
 
 /**
  * @tc.name: NavigationAPITest001
@@ -882,204 +1071,6 @@ HWTEST_F(NativeNodeNapiTest, NativeBackgroundImagePositionTest004, TestSize.Leve
     ArkUI_AttributeItem backgroundImagePosition3 = { .value = value, .size = 4 };
     auto ret3 = nodeAPI->setAttribute(row, NODE_BACKGROUND_IMAGE_POSITION, &backgroundImagePosition3);
     EXPECT_EQ(ret3, ARKUI_ERROR_CODE_PARAM_INVALID);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest011
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest011, TestSize.Level1)
-{
-    napi_env__* env = nullptr;
-    napi_value__* value = nullptr;
-    ArkUI_NodeHandle* context = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, context);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest012
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a null external pointer in builderNode_.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest012, TestSize.Level1)
-{
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    napi_value value = nullptr;
-    napi_value builderNode = nullptr;
-    napi_value nodePtr = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
-    ASSERT_EQ(napi_create_external(env, nullptr, nullptr, nullptr, &nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, builderNode, "nodePtr_", nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(handle, nullptr);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest014
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a value without nodePtr_/builderNode_ property.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest014, TestSize.Level1)
-{
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    napi_value value = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(handle, nullptr);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest015
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a nodePtr_ property of the wrong type.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest015, TestSize.Level1)
-{
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    napi_value value = nullptr;
-    napi_value nodePtr = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-    ASSERT_EQ(napi_create_string_utf8(env, "invalid", NAPI_AUTO_LENGTH, &nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(handle, nullptr);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest016
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a null external pointer in nodePtr_.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest016, TestSize.Level1)
-{
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    napi_value value = nullptr;
-    napi_value nodePtr = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-    ASSERT_EQ(napi_create_external(env, nullptr, nullptr, nullptr, &nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(handle, nullptr);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest017
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a builderNode_ that has no nodePtr_ property.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest017, TestSize.Level1)
-{
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    napi_value value = nullptr;
-    napi_value builderNode = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(handle, nullptr);
-}
-
-/**
- * @tc.name: NativeNodeNapiTest018
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue success path with a valid nodePtr_ external.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest018, TestSize.Level1)
-{
-    if (OHOS::Ace::NodeModel::GetFullImpl() != nullptr) {
-        GTEST_SKIP() << "FullImpl is initialized, success path is not exercised in the mock environment";
-    }
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    auto pattern = OHOS::Ace::AceType::MakeRefPtr<OHOS::Ace::NG::Pattern>();
-    auto frameNode = OHOS::Ace::NG::FrameNode::CreateFrameNode("text", 100001, pattern, true);
-    ASSERT_NE(frameNode, nullptr);
-    napi_value value = nullptr;
-    napi_value nodePtr = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-    ASSERT_EQ(napi_create_external(env, OHOS::Ace::AceType::RawPtr(frameNode), nullptr, nullptr, &nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_NO_ERROR);
-    ASSERT_NE(handle, nullptr);
-    EXPECT_EQ(handle->type, -1);
-    EXPECT_TRUE(handle->buildNode);
-    EXPECT_FALSE(handle->cNode);
-    delete handle;
-}
-
-/**
- * @tc.name: NativeNodeNapiTest019
- * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue success path with a valid builderNode_.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest019, TestSize.Level1)
-{
-    if (OHOS::Ace::NodeModel::GetFullImpl() != nullptr) {
-        GTEST_SKIP() << "FullImpl is initialized, success path is not exercised in the mock environment";
-    }
-    NativeEngineMock engine;
-    napi_env env = napi_env(engine);
-    auto pattern = OHOS::Ace::AceType::MakeRefPtr<OHOS::Ace::NG::Pattern>();
-    auto frameNode = OHOS::Ace::NG::FrameNode::CreateFrameNode("text", 100002, pattern, true);
-    ASSERT_NE(frameNode, nullptr);
-    napi_value value = nullptr;
-    napi_value builderNode = nullptr;
-    napi_value nodePtr = nullptr;
-    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
-    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
-    ASSERT_EQ(napi_create_external(env, OHOS::Ace::AceType::RawPtr(frameNode), nullptr, nullptr, &nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, builderNode, "nodePtr_", nodePtr), napi_ok);
-    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
-
-    ArkUI_NodeHandle handle = nullptr;
-    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
-    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_NO_ERROR);
-    ASSERT_NE(handle, nullptr);
-    EXPECT_EQ(handle->type, -1);
-    EXPECT_TRUE(handle->buildNode);
-    EXPECT_FALSE(handle->cNode);
-    delete handle;
-}
-
-/**
- * @tc.name: NativeNodeNapiTest013
- * @tc.desc: Test OH_ArkUI_EnableEventPassthrough function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest013, TestSize.Level1)
-{
-    ArkUI_ContextHandle uiContext = new ArkUI_Context({ .id = 10000 });
-    bool enable = true;
-    ArkUI_RawInputEventType eventType = ArkUI_RawInputEventType::ARKUI_RAW_INPUT_EVENT_TYPE_MOUSE;
-    auto code = OH_ArkUI_EnableEventPassthrough(uiContext, enable, eventType);
-    EXPECT_EQ(code, ARKUI_ERROR_CODE_PARAM_INVALID);
 }
 
 namespace OHOS::Ace {

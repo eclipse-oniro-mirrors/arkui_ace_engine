@@ -2112,7 +2112,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest005, TestSize.Level1)
     EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SHADOW, &item), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SHADOW), nullptr);
     
-
     ArkUI_NumberValue customShadowVal[] = {{.f32 = val10}, {.i32 = false}, {.f32 = val0}, {.f32 = val0},
         {.i32 = ARKUI_SHADOW_TYPE_COLOR}, {.u32 = color}, {.u32 = 1}};
     ArkUI_AttributeItem customShadowItem = {customShadowVal, sizeof(customShadowVal) / sizeof(ArkUI_NumberValue)};
@@ -2138,7 +2137,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest005, TestSize.Level1)
     EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_CUSTOM_SHADOW, &customShadowItem), ARKUI_ERROR_CODE_PARAM_INVALID);
     customShadowVal[5].i32 = 0;
     nodeAPI->setAttribute(rootNode, NODE_CUSTOM_SHADOW, &customShadowItem);
-
 
     value2[0].f32 = size;
     value2[1].f32 = size;
@@ -2173,7 +2171,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest005, TestSize.Level1)
     nodeAPI->setAttribute(rootNode, NODE_BACKGROUND_BLUR_STYLE, &backgroundBlurItem);
     nodeAPI->setAttribute(rootNode, NODE_FOREGROUND_BLUR_STYLE, &backgroundBlurItem);
     
-
     ArkUI_NumberValue transformCenter[] = {{.f32 = val0}, {.i32 = val0}, {.f32 = val0}, {.f32 = val05},
         {.f32 = val05}, {.f32 = val0}};
     ArkUI_AttributeItem transformCenterItem = {transformCenter, sizeof(transformCenter) / sizeof(ArkUI_NumberValue)};
@@ -2546,7 +2543,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest005, TestSize.Level1)
     auto accessibilityActionVal = nodeAPI->getAttribute(rootNode, NODE_ACCESSIBILITY_ACTIONS);
     EXPECT_NE(accessibilityActionVal, nullptr);
     
-
     value[0].u32 = ARKUI_NODE_STACK;
     nodeAPI->setAttribute(rootNode, NODE_ACCESSIBILITY_ROLE, &item);
     auto accessibilityRoleVal = nodeAPI->getAttribute(rootNode, NODE_ACCESSIBILITY_ROLE);
@@ -2832,7 +2828,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest006, TestSize.Level1)
     EXPECT_EQ(ret, static_cast<int32_t>(ON_TEXT_AREA_DID_DELETE));
     ret = OHOS::Ace::NodeModel::ConvertOriginEventType(NODE_TEXT_AREA_ON_CHANGE_WITH_PREVIEW_TEXT, nodeType);
     EXPECT_EQ(ret, static_cast<int32_t>(ON_TEXT_AREA_CHANGE_WITH_PREVIEW_TEXT));
-
 
     nodeType = static_cast<int32_t>(ARKUI_NODE_REFRESH);
     ret = OHOS::Ace::NodeModel::ConvertOriginEventType(NODE_REFRESH_STATE_CHANGE, nodeType);
@@ -3443,7 +3438,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest009, TestSize.Level1)
     nodeAPI->setAttribute(rootNode, NODE_SPAN_TEXT_BACKGROUND_STYLE, &backgroundStyleItem);
     backgroundStyle[1].f32 = -1.0f;
     nodeAPI->setAttribute(rootNode, NODE_SPAN_TEXT_BACKGROUND_STYLE, &backgroundStyleItem);
-
 
     EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SPAN_CONTENT), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SPAN_TEXT_BACKGROUND_STYLE), ARKUI_ERROR_CODE_NO_ERROR);
@@ -5229,7 +5223,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest035, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_AlignmentRuleOption_GetBiasHorizontal(nullptr), -1.0f);
     EXPECT_EQ(OH_ArkUI_AlignmentRuleOption_GetBiasVertical(nullptr), -1.0f);
     
-
     ArkUI_NumberValue chainModeVal[] = {{.i32 = ARKUI_AXIS_HORIZONTAL},
         {.i32 = ARKUI_RELATIVE_LAYOUT_CHAIN_STYLE_PACKED}};
     ArkUI_AttributeItem chainModeItem = {chainModeVal, sizeof(chainModeVal) / sizeof(ArkUI_NumberValue)};
@@ -7339,6 +7332,32 @@ HWTEST_F(NativeNodeTest, NativeNodeTest082, TestSize.Level1)
     event.origin = &origin;
     EXPECT_NE(OH_ArkUI_NodeEvent_GetTextChangeEvent(&event), nullptr);
 }
+/**
+ * @tc.name: NativeNodeTest084
+ * @tc.desc: Test swiperNode function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, NativeNodeTest084, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto rootNode = nodeAPI->createNode(ARKUI_NODE_SWIPER);
+    ArkUI_NumberValue value[] = { { .i32 = 1 }, { .i32 = 1 } };
+    ArkUI_AttributeItem item = { value, sizeof(value) / sizeof(ArkUI_NumberValue), nullptr, nullptr };
+
+    value[0].i32 = true;
+    value[1].i32 = false;
+    auto ret = nodeAPI->setAttribute(rootNode, NODE_SWIPER_AUTO_PLAY, &item);
+    EXPECT_EQ(ret, ARKUI_ERROR_CODE_NO_ERROR);
+    auto resultTtem = nodeAPI->getAttribute(rootNode, NODE_SWIPER_AUTO_PLAY);
+    EXPECT_TRUE(resultTtem->value[0].i32);
+    EXPECT_FALSE(resultTtem->value[1].i32);
+    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SWIPER_AUTO_PLAY), ARKUI_ERROR_CODE_NO_ERROR);
+    resultTtem = nodeAPI->getAttribute(rootNode, NODE_SWIPER_AUTO_PLAY);
+    EXPECT_FALSE(resultTtem->value[0].i32);
+    EXPECT_TRUE(resultTtem->value[1].i32);
+    nodeAPI->disposeNode(rootNode);
+}
 
 /**
  * @tc.name: BackdropBlurTest
@@ -7544,33 +7563,6 @@ HWTEST_F(NativeNodeTest, NativeNodeIssueTest001, TestSize.Level1)
     ArkUI_NodeEvent event = { 0, 0 };
     event.node = node;
     OHOS::Ace::NodeModel::HandleNodeEvent(&event);
-}
-
-/**
- * @tc.name: NativeNodeTest084
- * @tc.desc: Test swiperNode function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, NativeNodeTest084, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto rootNode = nodeAPI->createNode(ARKUI_NODE_SWIPER);
-    ArkUI_NumberValue value[] = { { .i32 = 1 }, { .i32 = 1 } };
-    ArkUI_AttributeItem item = { value, sizeof(value) / sizeof(ArkUI_NumberValue), nullptr, nullptr };
-
-    value[0].i32 = true;
-    value[1].i32 = false;
-    auto ret = nodeAPI->setAttribute(rootNode, NODE_SWIPER_AUTO_PLAY, &item);
-    EXPECT_EQ(ret, ARKUI_ERROR_CODE_NO_ERROR);
-    auto resultTtem = nodeAPI->getAttribute(rootNode, NODE_SWIPER_AUTO_PLAY);
-    EXPECT_TRUE(resultTtem->value[0].i32);
-    EXPECT_FALSE(resultTtem->value[1].i32);
-    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SWIPER_AUTO_PLAY), ARKUI_ERROR_CODE_NO_ERROR);
-    resultTtem = nodeAPI->getAttribute(rootNode, NODE_SWIPER_AUTO_PLAY);
-    EXPECT_FALSE(resultTtem->value[0].i32);
-    EXPECT_TRUE(resultTtem->value[1].i32);
-    nodeAPI->disposeNode(rootNode);
 }
 
 void LayoutCallback(void* userData)
@@ -7949,31 +7941,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest099, TestSize.Level1)
     EXPECT_EQ(ret, ARKUI_ERROR_CODE_PARAM_INVALID);
     EXPECT_EQ(nodeAPI->resetAttribute(listItemGroup, NODE_LIST_ITEM_GROUP_NODE_ADAPTER), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_NE(nodeAPI->getAttribute(listItemGroup, NODE_LIST_ITEM_GROUP_NODE_ADAPTER), nullptr);
-    nodeAPI->disposeNode(listItemGroup);
-}
-
-/**
- * @tc.name: ListItemGroupTest001
- * @tc.desc: Test ListItemGroup set header and adapter.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, ListItemGroupTest001, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto listItemGroup = nodeAPI->createNode(ARKUI_NODE_LIST_ITEM_GROUP);
-    auto header = nodeAPI->createNode(ARKUI_NODE_STACK);
-    ASSERT_NE(listItemGroup, nullptr);
-    ArkUI_AttributeItem item0 = { nullptr, 0, nullptr, header };
-    auto ret = nodeAPI->setAttribute(listItemGroup, NODE_LIST_ITEM_GROUP_SET_HEADER, &item0);
-    auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
-    auto* nodeAdapter = fullImpl->getNodeAdapterAPI()->create();
-    auto adapter = reinterpret_cast<ArkUI_NodeAdapterHandle>(nodeAdapter);
-    item0.object = adapter;
-    ret = nodeAPI->setAttribute(listItemGroup, NODE_LIST_ITEM_GROUP_NODE_ADAPTER, &item0);
-    EXPECT_EQ(ret, ARKUI_ERROR_CODE_NO_ERROR);
-
-    fullImpl->getNodeAdapterAPI()->dispose(nodeAdapter);
     nodeAPI->disposeNode(listItemGroup);
 }
 
@@ -9086,48 +9053,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTest141, TestSize.Level1)
 }
 
 /**
- * @tc.name: NativeNodeTest_BackgroundImageResizable_001
- * @tc.desc: Test NODE_BACKGROUND_IMAGE_RESIZABLE_WITH_SLICE function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, NativeNodeTest_BackgroundImageResizable_001, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto rootNode = nodeAPI->createNode(ARKUI_NODE_STACK);
-    auto childNode = nodeAPI->createNode(ARKUI_NODE_STACK);
-    ASSERT_NE(rootNode, nullptr);
-    int32_t ret1 = nodeAPI->addChild(rootNode, childNode);
-    EXPECT_EQ(ret1, ARKUI_ERROR_CODE_NO_ERROR);
-    float size = 100.0f;
-    float left = -1.0f;
-    float top = 0.0f;
-    float right  = 8.0f;
-    float bottom = 9.0f;
-    ArkUI_NumberValue value[] = {{.f32 = size}};
-    ArkUI_AttributeItem item = {value, sizeof(value) / sizeof(ArkUI_NumberValue)};
-
-    ArkUI_NumberValue value2[] = {{.f32 = left}, {.f32 = top}, {.f32 = right}, {.f32 = bottom}};
-    ArkUI_AttributeItem item2 = {value2, sizeof(value2) / sizeof(ArkUI_NumberValue)};
-
-    nodeAPI->setAttribute(rootNode, NODE_WIDTH, &item);
-    auto widthVal = nodeAPI->getAttribute(rootNode, NODE_WIDTH);
-    EXPECT_EQ(widthVal->value[0].f32, size);
-
-    nodeAPI->setAttribute(rootNode, NODE_HEIGHT, &item);
-    auto heightVal = nodeAPI->getAttribute(rootNode, NODE_HEIGHT);
-    EXPECT_EQ(heightVal->value[0].f32, size);
-
-    nodeAPI->setAttribute(rootNode, NODE_BACKGROUND_IMAGE_RESIZABLE_WITH_SLICE, &item2);
-    auto sliceVal = nodeAPI->getAttribute(rootNode, NODE_BACKGROUND_IMAGE_RESIZABLE_WITH_SLICE);
-    EXPECT_EQ(sliceVal->value[0].f32, 0.0f);
-    EXPECT_EQ(sliceVal->value[1].f32, top);
-    EXPECT_EQ(sliceVal->value[2].f32, right);
-    EXPECT_EQ(sliceVal->value[3].f32, bottom);
-    EXPECT_EQ(sliceVal->size, 4);
-}
-
-/**
  * @tc.name: NativeNodeTest142
  * @tc.desc: Test ArkUI_SupportedUIStates.
  * @tc.type: FUNC
@@ -9304,6 +9229,153 @@ HWTEST_F(NativeNodeTest, NativeNodeTest146, TestSize.Level1)
     EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_IMAGE_DYNAMIC_RANGE_MODE, &item2), ERROR_CODE_PARAM_INVALID);
     EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_IMAGE_ORIENTATION, &item2), ERROR_CODE_PARAM_INVALID);
     nodeAPI->disposeNode(rootNode);
+}
+/**
+ * @tc.name: NativeNodeTest147
+ * @tc.desc: Test OH_ArkUI_NodeUtils_GetLayoutPositionInGlobalDisplay function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, NativeNodeTest147, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto node = nodeAPI->createNode(ARKUI_NODE_STACK);
+    ArkUI_IntOffset offset = {0, 0};
+    auto ret = OH_ArkUI_NodeUtils_GetLayoutPositionInGlobalDisplay(node, &offset);
+    EXPECT_EQ(ret, ERROR_CODE_NO_ERROR);
+    ret = OH_ArkUI_NodeUtils_GetLayoutPositionInGlobalDisplay(nullptr, &offset);
+    EXPECT_EQ(ret, ERROR_CODE_PARAM_INVALID);
+}
+/**
+ * @tc.name: NativeNodeTest148
+ * @tc.desc: Test imageNode function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, NativeNodeTest148, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto rootNode = nodeAPI->createNode(ARKUI_NODE_SLIDER);
+    uint32_t colors[] = {0xFFFEBB62, 0xffFFA0A4, 0xffFF0000};
+    float stops[] = {0.0, 0.5, 1};
+    ArkUI_ColorStop linerGrand[] = {{colors, stops, 3}};
+    ArkUI_AttributeItem item = {nullptr, 0, nullptr, linerGrand};
+    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SLIDER_BLOCK_LINEAR_GRADIENT_COLOR, &item),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SLIDER_BLOCK_LINEAR_GRADIENT_COLOR), nullptr);
+    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SLIDER_BLOCK_LINEAR_GRADIENT_COLOR),
+        ARKUI_ERROR_CODE_NO_ERROR);
+
+    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SLIDER_TRACK_LINEAR_GRADIENT_COLOR, &item),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SLIDER_TRACK_LINEAR_GRADIENT_COLOR), nullptr);
+    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SLIDER_TRACK_LINEAR_GRADIENT_COLOR),
+        ARKUI_ERROR_CODE_NO_ERROR);
+
+    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SLIDER_SELECTED_LINEAR_GRADIENT_COLOR, &item),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SLIDER_SELECTED_LINEAR_GRADIENT_COLOR), nullptr);
+    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SLIDER_SELECTED_LINEAR_GRADIENT_COLOR),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    nodeAPI->disposeNode(rootNode);
+}
+/**
+ * @tc.name: NativeNodeTest149
+ * @tc.desc: Test imageNode function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, NativeNodeTest149, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto rootNode = new ArkUI_Node({ .type = ARKUI_NODE_IMAGE,
+        .uiNodeHandle = nullptr, .cNode = true, .magic = ARKUI_NODE_MAGIC_VALID });
+
+    ArkUI_NumberValue value[] = { { .i32 = true } };
+    ArkUI_AttributeItem item = { value, sizeof(value) / sizeof(ArkUI_NumberValue) };
+    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_IMAGE_SUPPORT_SVG2, &item), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_IMAGE_SUPPORT_SVG2), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_IMAGE_SUPPORT_SVG2), nullptr);
+
+    nodeAPI->disposeNode(rootNode);
+}
+/**
+ * @tc.name: NativeNodeTest150
+ * @tc.desc: Test Undefined function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, NativeNodeTest150, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto node = nodeAPI->createNode(ARKUI_NODE_UNDEFINED);
+    ASSERT_EQ(node, nullptr);
+    nodeAPI->disposeNode(node);
+}
+/**
+ * @tc.name: ListItemGroupTest001
+ * @tc.desc: Test ListItemGroup set header and adapter.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, ListItemGroupTest001, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto listItemGroup = nodeAPI->createNode(ARKUI_NODE_LIST_ITEM_GROUP);
+    auto header = nodeAPI->createNode(ARKUI_NODE_STACK);
+    ASSERT_NE(listItemGroup, nullptr);
+    ArkUI_AttributeItem item0 = { nullptr, 0, nullptr, header };
+    auto ret = nodeAPI->setAttribute(listItemGroup, NODE_LIST_ITEM_GROUP_SET_HEADER, &item0);
+    auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
+    auto* nodeAdapter = fullImpl->getNodeAdapterAPI()->create();
+    auto adapter = reinterpret_cast<ArkUI_NodeAdapterHandle>(nodeAdapter);
+    item0.object = adapter;
+    ret = nodeAPI->setAttribute(listItemGroup, NODE_LIST_ITEM_GROUP_NODE_ADAPTER, &item0);
+    EXPECT_EQ(ret, ARKUI_ERROR_CODE_NO_ERROR);
+
+    fullImpl->getNodeAdapterAPI()->dispose(nodeAdapter);
+    nodeAPI->disposeNode(listItemGroup);
+}
+/**
+ * @tc.name: NativeNodeTest_BackgroundImageResizable_001
+ * @tc.desc: Test NODE_BACKGROUND_IMAGE_RESIZABLE_WITH_SLICE function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, NativeNodeTest_BackgroundImageResizable_001, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto rootNode = nodeAPI->createNode(ARKUI_NODE_STACK);
+    auto childNode = nodeAPI->createNode(ARKUI_NODE_STACK);
+    ASSERT_NE(rootNode, nullptr);
+    int32_t ret1 = nodeAPI->addChild(rootNode, childNode);
+    EXPECT_EQ(ret1, ARKUI_ERROR_CODE_NO_ERROR);
+    float size = 100.0f;
+    float left = -1.0f;
+    float top = 0.0f;
+    float right  = 8.0f;
+    float bottom = 9.0f;
+    ArkUI_NumberValue value[] = {{.f32 = size}};
+    ArkUI_AttributeItem item = {value, sizeof(value) / sizeof(ArkUI_NumberValue)};
+
+    ArkUI_NumberValue value2[] = {{.f32 = left}, {.f32 = top}, {.f32 = right}, {.f32 = bottom}};
+    ArkUI_AttributeItem item2 = {value2, sizeof(value2) / sizeof(ArkUI_NumberValue)};
+
+    nodeAPI->setAttribute(rootNode, NODE_WIDTH, &item);
+    auto widthVal = nodeAPI->getAttribute(rootNode, NODE_WIDTH);
+    EXPECT_EQ(widthVal->value[0].f32, size);
+
+    nodeAPI->setAttribute(rootNode, NODE_HEIGHT, &item);
+    auto heightVal = nodeAPI->getAttribute(rootNode, NODE_HEIGHT);
+    EXPECT_EQ(heightVal->value[0].f32, size);
+
+    nodeAPI->setAttribute(rootNode, NODE_BACKGROUND_IMAGE_RESIZABLE_WITH_SLICE, &item2);
+    auto sliceVal = nodeAPI->getAttribute(rootNode, NODE_BACKGROUND_IMAGE_RESIZABLE_WITH_SLICE);
+    EXPECT_EQ(sliceVal->value[0].f32, 0.0f);
+    EXPECT_EQ(sliceVal->value[1].f32, top);
+    EXPECT_EQ(sliceVal->value[2].f32, right);
+    EXPECT_EQ(sliceVal->value[3].f32, bottom);
+    EXPECT_EQ(sliceVal->size, 4);
 }
 
 /**
@@ -9580,78 +9652,6 @@ HWTEST_F(NativeNodeTest, NativeThreadSafeNodeTest004, TestSize.Level1)
 }
 
 /**
- * @tc.name: NativeNodeTest147
- * @tc.desc: Test OH_ArkUI_NodeUtils_GetLayoutPositionInGlobalDisplay function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, NativeNodeTest147, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto node = nodeAPI->createNode(ARKUI_NODE_STACK);
-    ArkUI_IntOffset offset = {0, 0};
-    auto ret = OH_ArkUI_NodeUtils_GetLayoutPositionInGlobalDisplay(node, &offset);
-    EXPECT_EQ(ret, ERROR_CODE_NO_ERROR);
-    ret = OH_ArkUI_NodeUtils_GetLayoutPositionInGlobalDisplay(nullptr, &offset);
-    EXPECT_EQ(ret, ERROR_CODE_PARAM_INVALID);
-}
-
-/**
- * @tc.name: NativeNodeTest148
- * @tc.desc: Test imageNode function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, NativeNodeTest148, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto rootNode = nodeAPI->createNode(ARKUI_NODE_SLIDER);
-    uint32_t colors[] = {0xFFFEBB62, 0xffFFA0A4, 0xffFF0000};
-    float stops[] = {0.0, 0.5, 1};
-    ArkUI_ColorStop linerGrand[] = {{colors, stops, 3}};
-    ArkUI_AttributeItem item = {nullptr, 0, nullptr, linerGrand};
-    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SLIDER_BLOCK_LINEAR_GRADIENT_COLOR, &item),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SLIDER_BLOCK_LINEAR_GRADIENT_COLOR), nullptr);
-    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SLIDER_BLOCK_LINEAR_GRADIENT_COLOR),
-        ARKUI_ERROR_CODE_NO_ERROR);
-
-    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SLIDER_TRACK_LINEAR_GRADIENT_COLOR, &item),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SLIDER_TRACK_LINEAR_GRADIENT_COLOR), nullptr);
-    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SLIDER_TRACK_LINEAR_GRADIENT_COLOR),
-        ARKUI_ERROR_CODE_NO_ERROR);
-
-    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_SLIDER_SELECTED_LINEAR_GRADIENT_COLOR, &item),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_SLIDER_SELECTED_LINEAR_GRADIENT_COLOR), nullptr);
-    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_SLIDER_SELECTED_LINEAR_GRADIENT_COLOR),
-        ARKUI_ERROR_CODE_NO_ERROR);
-    nodeAPI->disposeNode(rootNode);
-}
-
-/**
- * @tc.name: NativeNodeTest149
- * @tc.desc: Test imageNode function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, NativeNodeTest149, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto rootNode = new ArkUI_Node({ .type = ARKUI_NODE_IMAGE,
-        .uiNodeHandle = nullptr, .cNode = true, .magic = ARKUI_NODE_MAGIC_VALID });
-
-    ArkUI_NumberValue value[] = { { .i32 = true } };
-    ArkUI_AttributeItem item = { value, sizeof(value) / sizeof(ArkUI_NumberValue) };
-    EXPECT_EQ(nodeAPI->setAttribute(rootNode, NODE_IMAGE_SUPPORT_SVG2, &item), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_EQ(nodeAPI->resetAttribute(rootNode, NODE_IMAGE_SUPPORT_SVG2), ARKUI_ERROR_CODE_NO_ERROR);
-    EXPECT_NE(nodeAPI->getAttribute(rootNode, NODE_IMAGE_SUPPORT_SVG2), nullptr);
-
-    nodeAPI->disposeNode(rootNode);
-}
-
-/**
  * @tc.name: NativeNodeTestTextEditor1
  * @tc.desc: Test TextEditor function.
  * @tc.type: FUNC
@@ -9893,20 +9893,6 @@ HWTEST_F(NativeNodeTest, NativeNodeTestTextEditorPunctuationOverflow, TestSize.L
     attrValue = nodeAPI->getAttribute(nonTextEditorNode2, NODE_TEXT_EDITOR_PUNCTUATION_OVERFLOW);
     EXPECT_EQ(attrValue, nullptr);
     nodeAPI->disposeNode(nonTextEditorNode2);
-}
-
-/**
- * @tc.name: NativeNodeTest150
- * @tc.desc: Test Undefined function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, NativeNodeTest150, TestSize.Level1)
-{
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto node = nodeAPI->createNode(ARKUI_NODE_UNDEFINED);
-    ASSERT_EQ(node, nullptr);
-    nodeAPI->disposeNode(node);
 }
 
 /**
@@ -12912,6 +12898,37 @@ HWTEST_F(NativeNodeTest, ShowCounterConfigTest001, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_ShowCounterConfig_GetCounterTextOverflowColor(config), 0xFFFFFF00);
     OH_ArkUI_ShowCounterConfig_Dispose(config);
 } 
+/**
+ * @tc.name: ShowCounterConfigTest002
+ * @tc.desc: Test ShowCounterConfig function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, ShowCounterConfigTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. initialize.
+     */
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    auto textinput = new ArkUI_Node({ .type = ARKUI_NODE_TEXT_INPUT,
+        .uiNodeHandle = nullptr, .cNode = true, .magic = ARKUI_NODE_MAGIC_VALID });
+    auto textarea = new ArkUI_Node({ .type = ARKUI_NODE_TEXT_AREA,
+        .uiNodeHandle = nullptr, .cNode = true, .magic = ARKUI_NODE_MAGIC_VALID });
+    auto config = OH_ArkUI_ShowCounterConfig_Create();
+    OH_ArkUI_ShowCounterConfig_SetCounterTextColor(config, 0xFF0000FF);
+    OH_ArkUI_ShowCounterConfig_SetCounterTextOverflowColor(config, 0xFFFFFF00);
+    ArkUI_NumberValue showCounterArray[] = {{.i32 = true},  // 显示计数器
+                                               {.f32 = 50.0f}, // 计数器阈值（百分比）
+                                               {.i32 = true}};
+    ArkUI_AttributeItem item = {.value = showCounterArray, .size = 3, .object = config};
+    nodeAPI->setAttribute(textinput, NODE_TEXT_INPUT_SHOW_COUNTER, &item);
+    nodeAPI->setAttribute(textarea, NODE_TEXT_AREA_SHOW_COUNTER, &item);
+    EXPECT_EQ(OH_ArkUI_ShowCounterConfig_GetCounterTextColor(config), 0xFF0000FF);
+    EXPECT_EQ(OH_ArkUI_ShowCounterConfig_GetCounterTextOverflowColor(config), 0xFFFFFF00);
+    OH_ArkUI_ShowCounterConfig_Dispose(config);
+    nodeAPI->disposeNode(textinput);
+    nodeAPI->disposeNode(textarea);
+}
 
 /**
  * @tc.name: NativeNodeConvertToWindowTest001
@@ -13018,38 +13035,6 @@ HWTEST_F(NativeNodeTest, NativeNodeConvertFromWindowTest001, TestSize.Level1)
     EXPECT_EQ(ret, ARKUI_ERROR_CODE_NODE_NOT_ON_MAIN_TREE);
     ret = OH_ArkUI_NativeModule_ConvertPositionFromWindow(nullptr, position, &pos1);
     EXPECT_EQ(ret, ARKUI_ERROR_CODE_PARAM_INVALID);
-}
-
-/**
- * @tc.name: ShowCounterConfigTest002
- * @tc.desc: Test ShowCounterConfig function.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, ShowCounterConfigTest002, TestSize.Level1)
-{
-    /**
-     * @tc.steps: step1. initialize.
-     */
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    auto textinput = new ArkUI_Node({ .type = ARKUI_NODE_TEXT_INPUT,
-        .uiNodeHandle = nullptr, .cNode = true, .magic = ARKUI_NODE_MAGIC_VALID });
-    auto textarea = new ArkUI_Node({ .type = ARKUI_NODE_TEXT_AREA,
-        .uiNodeHandle = nullptr, .cNode = true, .magic = ARKUI_NODE_MAGIC_VALID });
-    auto config = OH_ArkUI_ShowCounterConfig_Create();
-    OH_ArkUI_ShowCounterConfig_SetCounterTextColor(config, 0xFF0000FF);
-    OH_ArkUI_ShowCounterConfig_SetCounterTextOverflowColor(config, 0xFFFFFF00);
-    ArkUI_NumberValue showCounterArray[] = {{.i32 = true},  // 显示计数器
-                                               {.f32 = 50.0f}, // 计数器阈值（百分比）
-                                               {.i32 = true}};
-    ArkUI_AttributeItem item = {.value = showCounterArray, .size = 3, .object = config};
-    nodeAPI->setAttribute(textinput, NODE_TEXT_INPUT_SHOW_COUNTER, &item);
-    nodeAPI->setAttribute(textarea, NODE_TEXT_AREA_SHOW_COUNTER, &item);
-    EXPECT_EQ(OH_ArkUI_ShowCounterConfig_GetCounterTextColor(config), 0xFF0000FF);
-    EXPECT_EQ(OH_ArkUI_ShowCounterConfig_GetCounterTextOverflowColor(config), 0xFFFFFF00);
-    OH_ArkUI_ShowCounterConfig_Dispose(config);
-    nodeAPI->disposeNode(textinput);
-    nodeAPI->disposeNode(textarea);
 }
 
 /**
@@ -14937,6 +14922,36 @@ HWTEST_F(NativeNodeTest, OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore00
     nodeAPI->disposeNode(child1);
     nodeAPI->disposeNode(child2);
 }
+/**
+ * @tc.name: OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore002
+ * @tc.desc: Non-CNode parent(UNDEFINED) + CNode child, InsertChildBefore rejected.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeTest, OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore002, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+
+    auto parentFrameNode =
+        NG::FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 200018, AceType::MakeRefPtr<NG::Pattern>(), true);
+    ASSERT_NE(parentFrameNode, nullptr);
+    auto parentNode =
+        OHOS::Ace::NodeModel::GetArkUINode(reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(parentFrameNode)));
+    ASSERT_NE(parentNode, nullptr);
+
+    auto child1 = nodeAPI->createNode(ARKUI_NODE_STACK);
+    auto child2 = nodeAPI->createNode(ARKUI_NODE_STACK);
+    ASSERT_NE(child1, nullptr);
+    ASSERT_NE(child2, nullptr);
+
+    EXPECT_EQ(
+        nodeAPI->insertChildBefore(parentNode, child2, child1), OHOS::Ace::ERROR_CODE_NATIVE_IMPL_BUILDER_NODE_ERROR);
+
+    nodeAPI->disposeNode(child1);
+    nodeAPI->disposeNode(child2);
+}
 
 /**
  * @tc.name: OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore_ReorderArkoalaForEach
@@ -15013,37 +15028,6 @@ HWTEST_F(NativeNodeTest, OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore_R
 
     nodeAPI->removeChild(parentHandle, child1);
     nodeAPI->removeChild(parentHandle, child2);
-    nodeAPI->disposeNode(child1);
-    nodeAPI->disposeNode(child2);
-}
-
-/**
- * @tc.name: OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore002
- * @tc.desc: Non-CNode parent(UNDEFINED) + CNode child, InsertChildBefore rejected.
- * @tc.type: FUNC
- */
-HWTEST_F(NativeNodeTest, OH_ArkUI_CrossLanguageTreeOperating_InsertChildBefore002, TestSize.Level1)
-{
-    ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
-    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
-        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
-    ASSERT_NE(nodeAPI, nullptr);
-
-    auto parentFrameNode =
-        NG::FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 200018, AceType::MakeRefPtr<NG::Pattern>(), true);
-    ASSERT_NE(parentFrameNode, nullptr);
-    auto parentNode =
-        OHOS::Ace::NodeModel::GetArkUINode(reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(parentFrameNode)));
-    ASSERT_NE(parentNode, nullptr);
-
-    auto child1 = nodeAPI->createNode(ARKUI_NODE_STACK);
-    auto child2 = nodeAPI->createNode(ARKUI_NODE_STACK);
-    ASSERT_NE(child1, nullptr);
-    ASSERT_NE(child2, nullptr);
-
-    EXPECT_EQ(
-        nodeAPI->insertChildBefore(parentNode, child2, child1), OHOS::Ace::ERROR_CODE_NATIVE_IMPL_BUILDER_NODE_ERROR);
-
     nodeAPI->disposeNode(child1);
     nodeAPI->disposeNode(child2);
 }

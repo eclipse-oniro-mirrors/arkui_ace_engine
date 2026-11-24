@@ -1426,31 +1426,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg156, TestSize.Level1)
 }
 
 /**
- * @tc.name: PipelineContextWindowInfoTest001
- * @tc.desc: Test window information initialization state.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextWindowInfoTest001, TestSize.Level1)
-{
-    ASSERT_NE(context_, nullptr);
-    auto originalWindow = context_->window_;
-    context_->window_ = std::make_shared<Window>();
-
-    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
-
-    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 0.0, 100.0));
-    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
-
-    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 100.0, 0.0));
-    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
-
-    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 100.0, 100.0));
-    EXPECT_TRUE(context_->window_->IsWindowInfoInitialized());
-
-    context_->window_ = originalWindow;
-}
-
-/**
  * @tc.name: PipelineContextTestNg157
  * @tc.desc: Test ScopedLayout.
  * @tc.type: FUNC
@@ -1535,32 +1510,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg160, TestSize.Level1)
      */
     context_->thpExtraMgr_.Reset();
     context_->NotifyResponseRegionChanged(rootNode);
-    EXPECT_FALSE(context_->thpExtraMgr_);
-}
-
-/**
- * @tc.name: PipelineContextTestNgDisableNotifyResponseRegionChanged
- * @tc.desc: Test DisableNotifyResponseRegionChanged.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNgDisableNotifyResponseRegionChanged, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: Call the function NotifyResponseRegionChanged.
-     * @tc.expected: Test the member thpExtraMgr_ is not nullptr.
-     */
-    ASSERT_NE(context_, nullptr);
-    RefPtr<FrameNode> rootNode = AceType::MakeRefPtr<FrameNode>("test1", 1, AceType::MakeRefPtr<Pattern>());
-    context_->thpExtraMgr_ = AceType::MakeRefPtr<NG::THPExtraManagerImpl>();
-    context_->NotifyResponseRegionChanged(rootNode);
-    EXPECT_TRUE(context_->thpExtraMgr_);
-
-    /**
-     * @tc.steps2: Call the function DisableNotifyResponseRegionChanged.
-     * @tc.expected: Test the member thpExtraMgr_ is nullptr.
-     */
-    context_->thpExtraMgr_.Reset();
-    context_->DisableNotifyResponseRegionChanged();
     EXPECT_FALSE(context_->thpExtraMgr_);
 }
 
@@ -2807,6 +2756,55 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg300, TestSize.Level1)
     EXPECT_EQ(context_->GetRootElement(), nullptr);
     context_->rootNode_ = frameNode_;
 }
+/**
+ * @tc.name: PipelineContextWindowInfoTest001
+ * @tc.desc: Test window information initialization state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextWindowInfoTest001, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalWindow = context_->window_;
+    context_->window_ = std::make_shared<Window>();
+
+    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
+
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 0.0, 100.0));
+    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
+
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 100.0, 0.0));
+    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
+
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 100.0, 100.0));
+    EXPECT_TRUE(context_->window_->IsWindowInfoInitialized());
+
+    context_->window_ = originalWindow;
+}
+/**
+ * @tc.name: PipelineContextTestNgDisableNotifyResponseRegionChanged
+ * @tc.desc: Test DisableNotifyResponseRegionChanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNgDisableNotifyResponseRegionChanged, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: Call the function NotifyResponseRegionChanged.
+     * @tc.expected: Test the member thpExtraMgr_ is not nullptr.
+     */
+    ASSERT_NE(context_, nullptr);
+    RefPtr<FrameNode> rootNode = AceType::MakeRefPtr<FrameNode>("test1", 1, AceType::MakeRefPtr<Pattern>());
+    context_->thpExtraMgr_ = AceType::MakeRefPtr<NG::THPExtraManagerImpl>();
+    context_->NotifyResponseRegionChanged(rootNode);
+    EXPECT_TRUE(context_->thpExtraMgr_);
+
+    /**
+     * @tc.steps2: Call the function DisableNotifyResponseRegionChanged.
+     * @tc.expected: Test the member thpExtraMgr_ is nullptr.
+     */
+    context_->thpExtraMgr_.Reset();
+    context_->DisableNotifyResponseRegionChanged();
+    EXPECT_FALSE(context_->thpExtraMgr_);
+}
 
 /* @tc.name: PipelineContextTestNg301
  * @tc.desc: Test SetBackgroundColorModeUpdated.
@@ -3024,98 +3022,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg407, TestSize.Level1)
 }
 
 /**
- * @tc.name: FlushMouseEventForHover001
- * @tc.desc: Test FlushMouseEventForHover.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, FlushMouseEventForHover001, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: Construction input parameter, call FlushMouseEventForHover.
-     * @tc.expected: The value of button is correct.
-     */
-    ASSERT_NE(context_, nullptr);
-    context_->isTransFlag_ = true;
-    MouseEvent mouseEvent;
-    mouseEvent.sourceType = SourceType::MOUSE;
-    mouseEvent.action = MouseAction::MOVE;
-    context_->lastMouseEvent_ = std::make_unique<MouseEvent>(mouseEvent);
-    context_->lastSourceType_ = SourceType::MOUSE;
-    context_->lastMouseEvent_->button = MouseButton::NONE_BUTTON;
-    context_->FlushMouseEventForHover();
-    EXPECT_EQ(context_->lastMouseEvent_->button, MouseButton::NONE_BUTTON);
-    context_->lastMouseEvent_->button = MouseButton::LEFT_BUTTON;
-    context_->FlushMouseEventForHover();
-    EXPECT_EQ(context_->lastMouseEvent_->button, MouseButton::LEFT_BUTTON);
-}
-
-/**
- * @tc.name: PostTaskResponseRegion001
- * @tc.desc: Test PostTask Response Region.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PostTaskResponseRegion001, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: Call the function PostTaskResponseRegion.
-     * @tc.expected: Test the member windowModal_ is not equal to CONTAINER_MODAL.
-     */
-    ASSERT_NE(context_, nullptr);
-    context_->windowModal_ = WindowModal::DIALOG_MODAL;
-    EXPECT_FALSE(context_->IsContainerModalVisible());
-
-    auto manager = AceType::MakeRefPtr<TextFieldManagerNG>();
-    manager->SetLaterAvoid(true);
-    context_->textFieldManager_ = manager;
-    context_->PostTaskResponseRegion(DEFAULT_DELAY_THP);
-    EXPECT_TRUE(manager->GetLaterAvoid());
-}
-
-/**
- * @tc.name: ConsumeTouchEventsInterpolationTest001
- * @tc.desc: Test ConsumeTouchEventsInterpolation.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, ConsumeTouchEventsInterpolationTest001, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: Create consumeTouchEventsInterpolation testcase.
-     */
-    std::unordered_set<int32_t> ids = { 1, 2, 3 };
-    std::map<int32_t, int32_t> timestampToIds = { { 1, 0 }, { 2, 1 }, { 3, 2 }, { 4, 3 } };
-    std::unordered_map<int32_t, TouchEvent> newIdTouchPoints;
-    TouchEvent touchEventBefore = TouchEvent();
-    touchEventBefore.time = TimeStamp(std::chrono::nanoseconds(BEFORE_VSYNC_TIME));
-    TouchEvent touchEventAfter = TouchEvent();
-    touchEventAfter.time = TimeStamp(std::chrono::nanoseconds(AFTER_VSYNC_TIME));
-    std::unordered_map<int, TouchEvent> idToTouchPoints = { { 2, touchEventBefore }, { 3, touchEventAfter } };
-    ASSERT_NE(context_, nullptr);
-    context_->resampleTimeStamp_ = DEFAULT_VSYNC_TIME;
-    context_->historyPointsById_.clear();
-    context_->ConsumeTouchEventsInterpolation(ids, timestampToIds, newIdTouchPoints, idToTouchPoints);
-    EXPECT_EQ(context_->historyPointsById_.size(), 1);
-}
-
-/**
- * @tc.name: PipelineContextTestNg500
- * @tc.desc: Test OnDumpInfo.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNg500, TestSize.Level1)
-{
-    ASSERT_NE(context_, nullptr);
-    bool onShow = context_->onShow_;
-    context_->onShow_ = true;
-    std::vector<std::string> params;
-    params.push_back("-simplify");
-    params.push_back("-compname");
-    params.push_back("test");
-    auto ret = context_->OnDumpInfo(params);
-    EXPECT_TRUE(ret);
-    context_->onShow_ = onShow;
-}
-
-/**
  * @tc.name: PipelineContextTestNg408
  * @tc.desc: Test onTouchEvent with SourceTool.PEN.
  * @tc.type: FUNC
@@ -3206,6 +3112,98 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg410, TestSize.Level1)
         ASSERT_TRUE(std::chrono::high_resolution_clock::now() - currentTime < timeoutMs);
     }
     EXPECT_EQ(context_->compatibleManager_.GetCurrentStateType(), StateType::IDLE);
+}
+
+/**
+ * @tc.name: PipelineContextTestNg500
+ * @tc.desc: Test OnDumpInfo.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg500, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    bool onShow = context_->onShow_;
+    context_->onShow_ = true;
+    std::vector<std::string> params;
+    params.push_back("-simplify");
+    params.push_back("-compname");
+    params.push_back("test");
+    auto ret = context_->OnDumpInfo(params);
+    EXPECT_TRUE(ret);
+    context_->onShow_ = onShow;
+}
+
+/**
+ * @tc.name: FlushMouseEventForHover001
+ * @tc.desc: Test FlushMouseEventForHover.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FlushMouseEventForHover001, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: Construction input parameter, call FlushMouseEventForHover.
+     * @tc.expected: The value of button is correct.
+     */
+    ASSERT_NE(context_, nullptr);
+    context_->isTransFlag_ = true;
+    MouseEvent mouseEvent;
+    mouseEvent.sourceType = SourceType::MOUSE;
+    mouseEvent.action = MouseAction::MOVE;
+    context_->lastMouseEvent_ = std::make_unique<MouseEvent>(mouseEvent);
+    context_->lastSourceType_ = SourceType::MOUSE;
+    context_->lastMouseEvent_->button = MouseButton::NONE_BUTTON;
+    context_->FlushMouseEventForHover();
+    EXPECT_EQ(context_->lastMouseEvent_->button, MouseButton::NONE_BUTTON);
+    context_->lastMouseEvent_->button = MouseButton::LEFT_BUTTON;
+    context_->FlushMouseEventForHover();
+    EXPECT_EQ(context_->lastMouseEvent_->button, MouseButton::LEFT_BUTTON);
+}
+
+/**
+ * @tc.name: PostTaskResponseRegion001
+ * @tc.desc: Test PostTask Response Region.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PostTaskResponseRegion001, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: Call the function PostTaskResponseRegion.
+     * @tc.expected: Test the member windowModal_ is not equal to CONTAINER_MODAL.
+     */
+    ASSERT_NE(context_, nullptr);
+    context_->windowModal_ = WindowModal::DIALOG_MODAL;
+    EXPECT_FALSE(context_->IsContainerModalVisible());
+
+    auto manager = AceType::MakeRefPtr<TextFieldManagerNG>();
+    manager->SetLaterAvoid(true);
+    context_->textFieldManager_ = manager;
+    context_->PostTaskResponseRegion(DEFAULT_DELAY_THP);
+    EXPECT_TRUE(manager->GetLaterAvoid());
+}
+
+/**
+ * @tc.name: ConsumeTouchEventsInterpolationTest001
+ * @tc.desc: Test ConsumeTouchEventsInterpolation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, ConsumeTouchEventsInterpolationTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: Create consumeTouchEventsInterpolation testcase.
+     */
+    std::unordered_set<int32_t> ids = { 1, 2, 3 };
+    std::map<int32_t, int32_t> timestampToIds = { { 1, 0 }, { 2, 1 }, { 3, 2 }, { 4, 3 } };
+    std::unordered_map<int32_t, TouchEvent> newIdTouchPoints;
+    TouchEvent touchEventBefore = TouchEvent();
+    touchEventBefore.time = TimeStamp(std::chrono::nanoseconds(BEFORE_VSYNC_TIME));
+    TouchEvent touchEventAfter = TouchEvent();
+    touchEventAfter.time = TimeStamp(std::chrono::nanoseconds(AFTER_VSYNC_TIME));
+    std::unordered_map<int, TouchEvent> idToTouchPoints = { { 2, touchEventBefore }, { 3, touchEventAfter } };
+    ASSERT_NE(context_, nullptr);
+    context_->resampleTimeStamp_ = DEFAULT_VSYNC_TIME;
+    context_->historyPointsById_.clear();
+    context_->ConsumeTouchEventsInterpolation(ids, timestampToIds, newIdTouchPoints, idToTouchPoints);
+    EXPECT_EQ(context_->historyPointsById_.size(), 1);
 }
 } // namespace NG
 

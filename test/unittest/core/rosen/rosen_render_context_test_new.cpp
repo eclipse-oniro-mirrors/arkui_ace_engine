@@ -1345,7 +1345,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew030, TestSize.Level1)
     EXPECT_NEAR(positionZ, 3.0f, 0.01f);
 }
 
-
 /**
  * @tc.name: RosenRenderContextTestNew031
  * @tc.desc: SetRenderPivot().
@@ -1522,22 +1521,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew040, TestSize.Level1)
     auto stagingProperties = rsNdoe->GetStagingProperties();
     auto borderDashWidth = stagingProperties.GetBorderDashWidth();
     EXPECT_NEAR(borderDashWidth[0], 1.0f, 0.01f);
-}
-
-/**
- * @tc.name: RSUIContext002
- * @tc.desc: Test RSUIContext001 Func.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, RSUIContext002, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("frame", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    ASSERT_NE(frameNode, nullptr);
-    ComponentSnapshot snapshot;
-    snapshot.SetRSUIContext(frameNode, nullptr);
-    auto pipeline = MockPipelineContext::GetCurrentContext();
-    auto rsUIContext = snapshot.GetRSUIContext(pipeline);
-    EXPECT_EQ(rsUIContext, nullptr);
 }
 
 /**
@@ -1811,6 +1794,21 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew051, TestSize.Level1)
     ASSERT_NE(rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX], nullptr);
     EXPECT_TRUE(*rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX] == *expectedTextRect);
     EXPECT_FALSE(*rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX] == *expectedClearRect);
+}
+/**
+ * @tc.name: RSUIContext002
+ * @tc.desc: Test RSUIContext001 Func.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RSUIContext002, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("frame", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    ComponentSnapshot snapshot;
+    snapshot.SetRSUIContext(frameNode, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    auto rsUIContext = snapshot.GetRSUIContext(pipeline);
+    EXPECT_EQ(rsUIContext, nullptr);
 }
 
 /**

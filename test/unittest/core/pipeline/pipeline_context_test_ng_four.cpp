@@ -1007,108 +1007,6 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028, TestSize.Level
 }
 
 /**
- * @tc.name: PipelineContextFourTestNg028A
- * @tc.desc: Test ReloadNodesResource sets isSystemColorChange_ for FrameNode callbacks.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028A, TestSize.Level1)
-{
-    ASSERT_NE(context_, nullptr);
-    context_->SetupRootElement();
-
-    bool configChangePerform = g_isConfigChangePerform;
-    g_isConfigChangePerform = true;
-
-    auto pattern = AceType::MakeRefPtr<ReloadResourceTestPattern>();
-    auto frameNode = FrameNode::CreateFrameNode("ReloadComponent", 2001, pattern);
-    ASSERT_NE(frameNode, nullptr);
-    pattern->AttachToFrameNode(AceType::WeakClaim(AceType::RawPtr(frameNode)));
-    frameNode->AttachContext(AceType::RawPtr(context_));
-
-    context_->SetIsSystemColorChange(false);
-    context_->needReloadResource_ = true;
-    context_->needReloadNodes_.clear();
-    context_->needReloadNodes_.emplace_back(AceType::WeakClaim(AceType::RawPtr(frameNode)));
-
-    context_->ReloadNodesResource();
-
-    EXPECT_EQ(pattern->callCount_, 1);
-    EXPECT_TRUE(pattern->observedSystemColorChange_);
-    EXPECT_EQ(pattern->observedColorMode_, static_cast<uint32_t>(context_->GetColorMode()));
-    EXPECT_FALSE(context_->IsSystemColorChange());
-    EXPECT_FALSE(context_->needReloadResource_);
-
-    g_isConfigChangePerform = configChangePerform;
-}
-
-/**
- * @tc.name: PipelineContextFourTestNg028B
- * @tc.desc: Test ReloadNodesResource sets isSystemColorChange_ for non-FrameNode callbacks.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028B, TestSize.Level1)
-{
-    ASSERT_NE(context_, nullptr);
-    context_->SetupRootElement();
-
-    bool configChangePerform = g_isConfigChangePerform;
-    g_isConfigChangePerform = true;
-
-    auto testNode = AceType::MakeRefPtr<ReloadResourceTestNode>(2002);
-    ASSERT_NE(testNode, nullptr);
-    testNode->AttachContext(AceType::RawPtr(context_));
-
-    context_->SetIsSystemColorChange(false);
-    context_->needReloadResource_ = true;
-    context_->needReloadNodes_.clear();
-    context_->needReloadNodes_.emplace_back(AceType::WeakClaim(AceType::RawPtr(testNode)));
-
-    context_->ReloadNodesResource();
-
-    EXPECT_EQ(testNode->callCount_, 1);
-    EXPECT_TRUE(testNode->observedSystemColorChange_);
-    EXPECT_EQ(testNode->observedColorMode_, static_cast<uint32_t>(context_->GetColorMode()));
-    EXPECT_FALSE(context_->IsSystemColorChange());
-    EXPECT_FALSE(context_->needReloadResource_);
-
-    g_isConfigChangePerform = configChangePerform;
-}
-
-/**
- * @tc.name: PipelineContextFourTestNg028C
- * @tc.desc: Test ReloadNodesResource restores original isSystemColorChange_ value.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028C, TestSize.Level1)
-{
-    ASSERT_NE(context_, nullptr);
-    context_->SetupRootElement();
-
-    bool configChangePerform = g_isConfigChangePerform;
-    g_isConfigChangePerform = true;
-
-    auto pattern = AceType::MakeRefPtr<ReloadResourceTestPattern>();
-    auto frameNode = FrameNode::CreateFrameNode("ReloadRestoreComponent", 2003, pattern);
-    ASSERT_NE(frameNode, nullptr);
-    pattern->AttachToFrameNode(AceType::WeakClaim(AceType::RawPtr(frameNode)));
-    frameNode->AttachContext(AceType::RawPtr(context_));
-
-    context_->SetIsSystemColorChange(true);
-    context_->needReloadResource_ = true;
-    context_->needReloadNodes_.clear();
-    context_->needReloadNodes_.emplace_back(AceType::WeakClaim(AceType::RawPtr(frameNode)));
-
-    context_->ReloadNodesResource();
-
-    EXPECT_EQ(pattern->callCount_, 1);
-    EXPECT_TRUE(pattern->observedSystemColorChange_);
-    EXPECT_TRUE(context_->IsSystemColorChange());
-    EXPECT_FALSE(context_->needReloadResource_);
-
-    g_isConfigChangePerform = configChangePerform;
-}
-
-/**
  * @tc.name: PipelineContextFourTestNg029
  * @tc.desc: Test SetOnWindowFocused with valid task executor.
  * @tc.type: FUNC
@@ -2074,6 +1972,105 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg056, TestSize.Level
 
     PipelineContextFourTestNg::context_->safeAreaManager_ = originalSafeAreaManager;
     PipelineContextFourTestNg::context_->minPlatformVersion_ = originalMinPlatformVersion;
+}
+/**
+ * @tc.name: PipelineContextFourTestNg028A
+ * @tc.desc: Test ReloadNodesResource sets isSystemColorChange_ for FrameNode callbacks.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028A, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+
+    bool configChangePerform = g_isConfigChangePerform;
+    g_isConfigChangePerform = true;
+
+    auto pattern = AceType::MakeRefPtr<ReloadResourceTestPattern>();
+    auto frameNode = FrameNode::CreateFrameNode("ReloadComponent", 2001, pattern);
+    ASSERT_NE(frameNode, nullptr);
+    pattern->AttachToFrameNode(AceType::WeakClaim(AceType::RawPtr(frameNode)));
+    frameNode->AttachContext(AceType::RawPtr(context_));
+
+    context_->SetIsSystemColorChange(false);
+    context_->needReloadResource_ = true;
+    context_->needReloadNodes_.clear();
+    context_->needReloadNodes_.emplace_back(AceType::WeakClaim(AceType::RawPtr(frameNode)));
+
+    context_->ReloadNodesResource();
+
+    EXPECT_EQ(pattern->callCount_, 1);
+    EXPECT_TRUE(pattern->observedSystemColorChange_);
+    EXPECT_EQ(pattern->observedColorMode_, static_cast<uint32_t>(context_->GetColorMode()));
+    EXPECT_FALSE(context_->IsSystemColorChange());
+    EXPECT_FALSE(context_->needReloadResource_);
+
+    g_isConfigChangePerform = configChangePerform;
+}
+/**
+ * @tc.name: PipelineContextFourTestNg028B
+ * @tc.desc: Test ReloadNodesResource sets isSystemColorChange_ for non-FrameNode callbacks.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028B, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+
+    bool configChangePerform = g_isConfigChangePerform;
+    g_isConfigChangePerform = true;
+
+    auto testNode = AceType::MakeRefPtr<ReloadResourceTestNode>(2002);
+    ASSERT_NE(testNode, nullptr);
+    testNode->AttachContext(AceType::RawPtr(context_));
+
+    context_->SetIsSystemColorChange(false);
+    context_->needReloadResource_ = true;
+    context_->needReloadNodes_.clear();
+    context_->needReloadNodes_.emplace_back(AceType::WeakClaim(AceType::RawPtr(testNode)));
+
+    context_->ReloadNodesResource();
+
+    EXPECT_EQ(testNode->callCount_, 1);
+    EXPECT_TRUE(testNode->observedSystemColorChange_);
+    EXPECT_EQ(testNode->observedColorMode_, static_cast<uint32_t>(context_->GetColorMode()));
+    EXPECT_FALSE(context_->IsSystemColorChange());
+    EXPECT_FALSE(context_->needReloadResource_);
+
+    g_isConfigChangePerform = configChangePerform;
+}
+/**
+ * @tc.name: PipelineContextFourTestNg028C
+ * @tc.desc: Test ReloadNodesResource restores original isSystemColorChange_ value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextFourTestNg028C, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+
+    bool configChangePerform = g_isConfigChangePerform;
+    g_isConfigChangePerform = true;
+
+    auto pattern = AceType::MakeRefPtr<ReloadResourceTestPattern>();
+    auto frameNode = FrameNode::CreateFrameNode("ReloadRestoreComponent", 2003, pattern);
+    ASSERT_NE(frameNode, nullptr);
+    pattern->AttachToFrameNode(AceType::WeakClaim(AceType::RawPtr(frameNode)));
+    frameNode->AttachContext(AceType::RawPtr(context_));
+
+    context_->SetIsSystemColorChange(true);
+    context_->needReloadResource_ = true;
+    context_->needReloadNodes_.clear();
+    context_->needReloadNodes_.emplace_back(AceType::WeakClaim(AceType::RawPtr(frameNode)));
+
+    context_->ReloadNodesResource();
+
+    EXPECT_EQ(pattern->callCount_, 1);
+    EXPECT_TRUE(pattern->observedSystemColorChange_);
+    EXPECT_TRUE(context_->IsSystemColorChange());
+    EXPECT_FALSE(context_->needReloadResource_);
+
+    g_isConfigChangePerform = configChangePerform;
 }
 
 /**

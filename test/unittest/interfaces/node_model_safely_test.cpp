@@ -52,24 +52,6 @@ HWTEST_F(NodeModelSafelyTest, NodeModelSafelyTest001, TestSize.Level1)
 }
 
 /**
- * @tc.name: NodeModelSafelyTestArcSwiper001
- * @tc.desc: Test CreateNodeSafely function for arc swiper.
- * @tc.type: FUNC
- */
-HWTEST_F(NodeModelSafelyTest, NodeModelSafelyTestArcSwiper001, TestSize.Level1)
-{
-    ArkUI_NodeHandle nodeHandle = CreateNodeSafely(ArkUI_NodeType::ARKUI_NODE_ARC_SWIPER);
-    ASSERT_NE(nodeHandle, nullptr);
-    EXPECT_EQ(nodeHandle->threadSafeNode, true);
-
-    bool isValid = IsValidArkUINodeMultiThread(nodeHandle);
-    EXPECT_EQ(isValid, true);
-    DisposeNodeSafely(nodeHandle);
-    isValid = IsValidArkUINodeMultiThread(nodeHandle);
-    EXPECT_EQ(isValid, false);
-}
-
-/**
  * @tc.name: NodeModelSafelyTest002
  * @tc.desc: Test DisposeNodeSafely function.
  * @tc.type: FUNC
@@ -394,7 +376,6 @@ HWTEST_F(NodeModelSafelyTest, NodeModelSafelyTest013, TestSize.Level1)
 
     DisposeNodeSafely(node);
 }
-
 
 /**
  * @tc.name: NodeModelSafelyTest014
@@ -863,4 +844,21 @@ HWTEST_F(NodeModelSafelyTest, NodeModelSafelyTest031, TestSize.Level1)
     DisposeNodeSafely(parent);
     DisposeNodeSafely(child1);
     DisposeNodeSafely(child2);
+}
+/**
+ * @tc.name: NodeModelSafelyTestArcSwiper001
+ * @tc.desc: Test CreateNodeSafely function for arc swiper.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeModelSafelyTest, NodeModelSafelyTestArcSwiper001, TestSize.Level1)
+{
+    ArkUI_NodeHandle nodeHandle = CreateNodeSafely(ArkUI_NodeType::ARKUI_NODE_ARC_SWIPER);
+    ASSERT_NE(nodeHandle, nullptr);
+    EXPECT_EQ(nodeHandle->threadSafeNode, true);
+
+    bool isValid = IsValidArkUINodeMultiThread(nodeHandle);
+    EXPECT_EQ(isValid, true);
+    DisposeNodeSafely(nodeHandle);
+    isValid = IsValidArkUINodeMultiThread(nodeHandle);
+    EXPECT_EQ(isValid, false);
 }
