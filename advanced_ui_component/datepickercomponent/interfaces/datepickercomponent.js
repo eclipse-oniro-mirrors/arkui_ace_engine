@@ -991,11 +991,13 @@ export class DatePickerComponent extends ViewPU {
                 if (this.selectedMonth >= 11 && gregorianDate.getMonth() <= 1) {
                     this.selectedYear -= 1;
                 }
-                if (this.selectedYear < this.startYear) {
-                    this.selectedYear = this.startYear;
+                const clampStart = this.lunar && this.lunarStartYear > 0 ? this.lunarStartYear : this.startYear;
+                const clampEnd = this.lunar && this.lunarEndYear > 0 ? this.lunarEndYear : this.endYear;
+                if (this.selectedYear < clampStart) {
+                    this.selectedYear = clampStart;
                 }
-                if (this.selectedYear > this.endYear) {
-                    this.selectedYear = this.endYear;
+                if (this.selectedYear > clampEnd) {
+                    this.selectedYear = clampEnd;
                 }
                 // Detect if the date falls in a leap month
                 this.selectedIsLeapMonth = this.isDateInLeapMonth(gregorianDate, this.selectedYear, this.selectedMonth);
@@ -2200,7 +2202,9 @@ export class DatePickerComponent extends ViewPU {
                     if (m >= DatePickerConstant.MIN_MONTH && m <= DatePickerConstant.MAX_MONTH &&
                         d >= DatePickerConstant.MIN_DAY && d <= maxDay) {
                         selectedIsResult = true;
-                        if (this.selectedYear < this.startYear || this.selectedYear > this.endYear) {
+                        const validStart = this.lunar ? this.lunarStartYear : this.startYear;
+                        const validEnd = this.lunar ? this.lunarEndYear : this.endYear;
+                        if (this.selectedYear < validStart || this.selectedYear > validEnd) {
                             this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
                         }
                         this.selectedMonth = m;
@@ -2253,11 +2257,11 @@ export class DatePickerComponent extends ViewPU {
                 if (this.selectedMonth >= 11 && targetDate.getMonth() <= 1) {
                     this.selectedYear -= 1;
                 }
-                if (this.selectedYear < this.startYear) {
-                    this.selectedYear = this.startYear;
+                if (this.selectedYear < this.lunarStartYear) {
+                    this.selectedYear = this.lunarStartYear;
                 }
-                if (this.selectedYear > this.endYear) {
-                    this.selectedYear = this.endYear;
+                if (this.selectedYear > this.lunarEndYear) {
+                    this.selectedYear = this.lunarEndYear;
                 }
                 // Detect if the target date falls in a leap month
                 this.selectedIsLeapMonth = this.isDateInLeapMonth(targetDate, this.selectedYear, this.selectedMonth);
