@@ -141,6 +141,9 @@ public:
     ACE_NON_VIRTUAL bool DispatchTouchEvent(const TouchEvent& point, bool sendOnTouch = true);
     static bool IsAgentTouchInScope(const TouchEvent& event);
     bool IsAgentTouchAllowed(const TouchEvent& event, const RefPtr<NG::FrameNode>& node);
+    void PrepareAgentKeyEvent(const KeyEvent& event, const std::vector<RefPtr<NG::FrameNode>>& nodes);
+    bool IsAgentKeyAllowed(const KeyEvent& event, const RefPtr<NG::FrameNode>& node);
+    void FinishAgentKeyEvent(const KeyEvent& event);
     void PrepareAgentMousePress(const MouseEvent& event);
     bool DispatchTouchEvent(const AxisEvent& event, bool sendOnTouch = true);
     void DispatchTouchCancelToRecognizer(
@@ -566,15 +569,15 @@ private:
     void UpdateInfoWhenFinishDispatch(const TouchEvent& point, bool sendOnTouch);
     void EraseEventRefereeWithStrategy(const TouchEvent& point);
     void EraseAgentTouchState(const TouchEvent& point);
+    void PrepareAgentTouchState(const TouchEvent& point, const TouchTestResult& targets);
+    void PrepareAgentMouseDerivedTouchState(const TouchEvent& point, const TouchTestResult& targets);
     void DoSingleMouseActionRelease(const PressMouseInfo& pressMouseInfo);
     bool DispatchPreparedTouchEvent(
         const TouchEvent& event, TouchEvent& point, const TouchTestResult& targets, bool sendOnTouch);
     bool IsAgentMouseInScope(const MouseEvent& event) const;
     bool IsAgentMouseAllowed(const MouseEvent& event, const RefPtr<NG::FrameNode>& node);
     bool PrepareAgentMousePressGate(const MouseEvent& event, const PressMouseInfo& key);
-    void PruneAgentMouseEntered(const MouseEvent& event, const PressMouseInfo& key);
-    void RepeatAgentMouseReport(const PressMouseInfo& key);
-    void FinishAgentMouseGesture(const MouseEvent& event, const PressMouseInfo& key);
+    bool FinishAgentMouseGesture(const MouseEvent& event, const PressMouseInfo& key);
     bool DispatchMouseEventInGreatOrEqualAPI13(const MouseEvent& event);
     bool DispatchMouseEventInLessAPI13(const MouseEvent& event);
     void DispatchMouseEventToPressResults(const MouseEvent& event, const MouseTestResult& targetResults,
@@ -594,6 +597,16 @@ private:
     void ProcessTouchTestWithReferee(const TouchEvent& touchPoint, const RefPtr<NG::FrameNode>& frameNode,
       TouchRestrict& touchRestrict, const Offset& offset, float viewScale, bool needAppend,
       const TouchTestResult& hitTestResult);
+    struct AgentKeyState {
+        int32_t agentWindowId = -1;
+        int32_t callingUid = -1;
+        uint64_t sessionId = 0;
+        int64_t deviceId = 0;
+        KeyCode code = KeyCode::KEY_UNKNOWN;
+        bool hasSession = false;
+        std::shared_ptr<NG::AgentGestureState> decision;
+    };
+    AgentKeyState* FindAgentKeyState(const KeyEvent& event);
     void AxisTouchTestResultsClear(int32_t eventHandleId);
     void TouchTestResultsClear(int32_t eventHandleId);
     void DownFingerIdsClear(int32_t eventHandleId);
@@ -613,6 +626,7 @@ private:
     std::unordered_map<PressMouseInfo, MouseTestResult, PressMouseInfoHashFunc> pressMouseTestResultsMap_;
     std::unordered_map<PressMouseInfo, std::shared_ptr<NG::AgentGestureState>, PressMouseInfoHashFunc>
         agentMouseStates_;
+    std::list<AgentKeyState> agentKeyStates_;
     std::unordered_map<int32_t, HoverTestResult> currHoverTestResultsMap_;
     std::unordered_map<int32_t, HoverTestResult> lastHoverTestResultsMap_;
     HoverTestResult curAccessibilityHoverResults_;

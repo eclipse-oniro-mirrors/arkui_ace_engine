@@ -15,7 +15,6 @@
 #include "focus_event_handler.h"
 #include "core/common/container.h"
 
-#include "base/input_manager/input_manager.h"
 #include "core/common/event_manager.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/node_sensitive_input.h"
@@ -27,10 +26,25 @@
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/event/crown_event.h"
 namespace OHOS::Ace::NG {
+namespace {
+bool IsAgentEnterCode(const KeyEvent& key)
+{
+    return !key.isRedispatch &&
+        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
+}
+
+bool IsAgentEnter(const KeyEvent& key)
+{
+    return key.isAgent && IsAgentEnterCode(key);
+}
+
+} // namespace
+
 struct NodeSensitiveKeyDispatch {
     WeakPtr<FrameNode> initialNode;
+    RefPtr<EventManager> eventManager;
     bool notified = false;
-    std::unordered_set<int32_t> reportedNodes;
+    int32_t depth = 0;
 };
 
 std::vector<RefPtr<FrameNode>> FocusEventHandler::CollectSensitiveKeyNodes(const FocusEvent& event)
@@ -63,6 +77,16 @@ void FocusEventHandler::PrepareSensitiveKeyDispatch(const FocusEvent& event)
     if (!nodes.empty()) {
         dispatch->initialNode = nodes.back();
     }
+    auto node = GetFrameNode();
+    auto pipeline = node ? node->GetContext() : nullptr;
+    dispatch->eventManager = pipeline ? pipeline->GetEventManager() : nullptr;
+    const auto& key = static_cast<const KeyEvent&>(event.event);
+    if (!IsAgentEnter(key)) {
+        return;
+    }
+    if (dispatch->eventManager) {
+        dispatch->eventManager->PrepareAgentKeyEvent(key, nodes);
+    }
 }
 
 bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
@@ -72,6 +96,11 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
     const auto& key = static_cast<const KeyEvent&>(event.event);
     auto node = GetFrameNode();
     CHECK_NULL_RETURN(node, false);
+    const bool controlled = IsAgentEnter(key);
+    bool allowed = true;
+    if (controlled) {
+        allowed = dispatch->eventManager && dispatch->eventManager->IsAgentKeyAllowed(key, node);
+    }
     auto hit = dispatch->initialNode.Upgrade();
     if (!dispatch->notified && hit && !key.isRedispatch) {
         dispatch->notified = true;
@@ -81,28 +110,20 @@ bool FocusEventHandler::RejectAgentKeyEvent(const FocusEvent& event)
         info.keyEvent = &key;
         NotifyNodeSensitiveInput(hit, info);
     }
-    const bool controlled = key.isAgent && !key.isRedispatch &&
-        (key.code == KeyCode::KEY_ENTER || key.code == KeyCode::KEY_NUMPAD_ENTER);
-    const bool fenced = controlled && InputManager::HasControlComponentPermission();
-    if (controlled && key.hasSafSessionId && node->HasAgentControlMode() &&
-        !dispatch->reportedNodes.count(node->GetId()) &&
-        (key.action == KeyAction::DOWN || key.action == KeyAction::UP || key.action == KeyAction::CANCEL)) {
-        dispatch->reportedNodes.insert(node->GetId());
-        auto compId = node->GetInspectorId().value_or("");
-        if (compId.empty()) {
-            compId = std::to_string(node->GetId());
-        }
-        AgentInputResult result;
-        result.sessionId = key.safSessionId;
-        result.callingUid = key.callingUid;
-        result.instanceId = Container::CurrentId();
-        result.nodeId = node->GetId();
-        result.compId = compId;
-        result.tag = node->GetTag();
-        result.allowed = !fenced || node->GetAgentControlMode() != AgentControlMode::DENY;
-        InputManager::ReportAgentInputDecision(result);
+    return controlled && !allowed;
+}
+
+void FinishAgentKeyDispatch(const FocusEvent& event)
+{
+    auto dispatch = event.sensitiveInput;
+    CHECK_NULL_VOID(dispatch);
+    const auto& key = static_cast<const KeyEvent&>(event.event);
+    if (!IsAgentEnterCode(key) || (key.action != KeyAction::UP && key.action != KeyAction::CANCEL)) {
+        return;
     }
-    return fenced && node->GetAgentControlMode() == AgentControlMode::DENY;
+    if (dispatch->eventManager) {
+        dispatch->eventManager->FinishAgentKeyEvent(key);
+    }
 }
 
 FocusIntension FocusEvent::GetFocusIntension(const NonPointerEvent& event)
@@ -195,6 +216,11 @@ bool FocusEventHandler::OnFocusEvent(const FocusEvent& event)
 
     const bool customDispatch = HasCustomKeyEventDispatch(event);
     PrepareSensitiveKeyDispatch(event);
+    auto dispatch = event.sensitiveInput;
+    const bool isRootDispatch = dispatch && dispatch->depth == 0;
+    if (dispatch) {
+        ++dispatch->depth;
+    }
     // A scope without a custom dispatcher visits its focused child before checking its own policy.
     bool result = false;
     if (customDispatch) {
@@ -207,6 +233,12 @@ bool FocusEventHandler::OnFocusEvent(const FocusEvent& event)
         result = OnFocusEventNode(event);
     } else {
         TAG_LOGW(AceLogTag::ACE_FOCUS, "Current node focus type: %{public}d is invalid.", focusType_);
+    }
+    if (dispatch) {
+        --dispatch->depth;
+    }
+    if (isRootDispatch) {
+        FinishAgentKeyDispatch(event);
     }
     return result;
 }
@@ -269,7 +301,9 @@ bool FocusEventHandler::HandleKeyEvent(const KeyEvent& event, FocusIntension int
 {
     FocusEvent focusEvent(event);
     PrepareSensitiveKeyDispatch(focusEvent);
-    return RejectAgentKeyEvent(focusEvent) || HandleKeyEventInternal(event, intension);
+    const bool result = RejectAgentKeyEvent(focusEvent) || HandleKeyEventInternal(event, intension);
+    FinishAgentKeyDispatch(focusEvent);
+    return result;
 }
 
 bool FocusEventHandler::HandleKeyEventInternal(const KeyEvent& event, FocusIntension intension)

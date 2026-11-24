@@ -20,7 +20,6 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 #include "base/memory/ace_type.h"
 
@@ -57,7 +56,6 @@ struct AgentInputResult {
     int32_t nodeId = -1;
     std::string compId;
     std::string tag;
-    // Only reported when allowed is false; allowed is a reserved field.
     bool allowed = false;
     // Bundle name of the app hosting the target (target app), empty when unavailable.
     std::string bundleName;
@@ -65,19 +63,25 @@ struct AgentInputResult {
 };
 
 struct NodeSnapshot {
-    WeakPtr<FrameNode> node;
     std::string compId;
+    std::string tag;
     bool allowed = true;
     bool hasControlMode = false;
 };
 
 struct AgentGestureState {
-    int32_t initialNodeId = -1;
     bool hasSession = false;
+    bool hasDeny = false;
+    bool derivedTouchSeen = false;
+    bool touchEnded = false;
+    bool mouseEnded = false;
     uint64_t sessionId = 0;
+    int32_t agentWindowId = -1;
     int32_t callingUid = -1;
     int32_t instanceId = -1;
-    std::unordered_set<int32_t> enteredNodes;
+    int32_t denyNodeId = -1;
+    std::string denyCompId;
+    std::string denyTag;
     std::unordered_map<int32_t, NodeSnapshot> nodes;
 };
 
