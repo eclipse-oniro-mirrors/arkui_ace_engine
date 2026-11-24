@@ -186,10 +186,14 @@ bool ContainerPickerPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper
     auto pickerAlgorithm = DynamicCast<ContainerPickerLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(pickerAlgorithm, false);
     GetLayoutProperties(pickerAlgorithm);
+    if (!isDragging_ && !isAnimationRunning_) {
+        SetDefaultTextStyle(false);
+    }
     FireChangeEvent();
     PostIdleTask(GetHost());
-    SetDefaultTextStyle(false);
-    SetSelectedTextStyle(false);
+    if (!isDragging_ && !isAnimationRunning_) {
+        SetSelectedTextStyle(false);
+    }
     HandleTargetIndex();
 
     if (isNeedPlayInertialAnimation_) {
@@ -285,7 +289,6 @@ void ContainerPickerPattern::GetLayoutProperties(const RefPtr<ContainerPickerLay
     // Layout has applied the scroll offset into itemPosition_, so reset the accumulated delta
     // to avoid double-counting in proximity calculation.
     mainDeltaSum_ = 0.0f;
-    SetSelectedTextStyle(false);
     currentOffset_ -= algo->GetCurrentOffset();
     offScreenItemsIndex_ = algo->GetOffScreenItems();
     contentMainSize_ = algo->GetContentMainSize();
@@ -440,7 +443,9 @@ void ContainerPickerPattern::FireChangeEvent()
         CHECK_NULL_VOID(pickerEventHub);
         pickerEventHub->FireChangeEvent(selectedIndex_);
         distancePercent_ = 0.0;
-        SetSelectedTextStyle(false);
+        if (!isDragging_ && !isAnimationRunning_) {
+            SetSelectedTextStyle(false);
+        }
     }
 }
 
@@ -466,6 +471,10 @@ void ContainerPickerPattern::FireAnimationEndEvent()
     FireScrollStopEvent();
     ForceResetWithoutAnimation();
     SetSelectedTextStyle(false);
+    // Items scrolled into the visible window while the animation was running never got the picker
+    // default text style (OnDirtyLayoutWrapperSwap skips SetDefaultTextStyle during that time).
+    // Re-apply the default font size/color so those items match the other options.
+    SetDefaultTextStyle(false);
 }
 
 void ContainerPickerPattern::UpdateClipEdge()
@@ -513,7 +522,12 @@ void ContainerPickerPattern::SetDefaultTextStyle(RefPtr<FrameNode> node, Color d
     if (node->GetTag() == V2::TEXT_ETS_TAG) {
         auto textLayoutProperty = node->GetLayoutProperty<TextLayoutProperty>();
         CHECK_NULL_VOID(textLayoutProperty);
-        if (!textLayoutProperty->GetFontSize().has_value()) {
+        // Do not force the default font size when the user configured adaptive font sizes
+        // (min/max font size without an explicit font size): an explicit value diables
+        // the adaptive layout and clips the text (e.g. single truncated line).
+        if (!textLayoutProperty->GetFontSize().has_value() &&
+            !textLayoutProperty->GetAdaptMinFontSize().has_value() &&
+            !textLayoutProperty->GetAdaptMaxFontSize().has_value()) {
             textLayoutProperty->UpdateFontSize(Dimension(DEFAULT_FONT_SIZE, DimensionUnit::FP));
             isModified_ = true;
         }
@@ -550,12 +564,26 @@ void ContainerPickerPattern::UpdateDefaultTextStyle(RefPtr<FrameNode> node, Colo
     if (node->GetTag() == V2::TEXT_ETS_TAG) {
         auto textLayoutProperty = node->GetLayoutProperty<TextLayoutProperty>();
         CHECK_NULL_VOID(textLayoutProperty);
+        bool colorUpdated = false;
         if (isUseDefaultFontColor_) {
-            textLayoutProperty->UpdateTextColor(defaultColor);
+            if (!textLayoutProperty->HasTextColor() ||
+                textLayoutProperty->GetTextColor().value() != defaultColor) {
+                    textLayoutProperty->UpdateTextColor(defaultColor);
+                    colorUpdated = true;
+                }
         } else if (textLayoutProperty->HasTextColor() &&
                    textLayoutProperty->GetTextColor().value() == cachedThemeFontColor_ &&
                    cachedThemeFontColor_ != defaultColor) {
             textLayoutProperty->UpdateTextColor(defaultColor);
+            colorUpdated = true;
+        }
+        if (colorUpdated) {
+            // The theme-scope update path (OnThemeScopeUpdate) only marks the picker node with
+            // PROPERTY_UPDATE_RENDER, which never rebuilds the text render style (TextStyle).
+            // Re-sync the text node explicity, otherwise it keeps rendering the previous
+            // color-mode font color (e.g. light text on a light background, invisibe).
+            node->MarkModifyDone();
+            node->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         }
     } else {
         auto& children = node->GetChildren();
@@ -635,7 +663,7 @@ void ContainerPickerPattern::AddAnimationTextProperties(
     int32_t currentIndex, const RefPtr<TextLayoutProperty>& textLayoutProperty)
 {
     CHECK_NULL_VOID(textLayoutProperty);
-    TextProperties properties;
+    ContainerPickerTextProperties properties;
     if (textLayoutProperty->HasFontSize()) {
         properties.fontSize = textLayoutProperty->GetFontSize().value();
     } else {
@@ -656,41 +684,6 @@ void ContainerPickerPattern::AddAnimationTextProperties(
         animationProperties_[currentIndex - 1].downFontWeight = properties.fontWeight;
     }
     animationProperties_.emplace_back(properties);
-}
-
-void ContainerPickerPattern::UpdatePickerTextProperties(int32_t dataIndex, int32_t animIdx,
-    int32_t showCount, const RefPtr<TextLayoutProperty>& textLayoutProperty,
-    const Color& defaultColor, const Dimension& defaultSize)
-{
-    CHECK_NULL_VOID(textLayoutProperty);
-    bool isCenter = (dataIndex == selectedIndex_);
-    if (isCenter && HasSelectedTextStyle()) {
-        if (selectedTextStyle_.fontSize.has_value() && selectedTextStyle_.fontSize->IsValid()) {
-            textLayoutProperty->UpdateFontSize(selectedTextStyle_.fontSize.value());
-        }
-        if (selectedTextStyle_.textColor.has_value()) {
-            textLayoutProperty->UpdateTextColor(selectedTextStyle_.textColor.value());
-        }
-        if (selectedTextStyle_.fontWeight.has_value()) {
-            textLayoutProperty->UpdateFontWeight(selectedTextStyle_.fontWeight.value());
-        }
-        if (selectedTextStyle_.minFontSize.has_value()) {
-            textLayoutProperty->UpdateAdaptMinFontSize(selectedTextStyle_.minFontSize.value());
-        }
-        if (selectedTextStyle_.maxFontSize.has_value()) {
-            textLayoutProperty->UpdateAdaptMaxFontSize(selectedTextStyle_.maxFontSize.value());
-        }
-        if (selectedTextStyle_.textOverflow.has_value()) {
-            textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
-        }
-    } else if (HasSelectedTextStyle()) {
-        textLayoutProperty->UpdateFontSize(defaultSize);
-        textLayoutProperty->UpdateTextColor(defaultColor);
-        textLayoutProperty->ResetAdaptMinFontSize();
-        textLayoutProperty->ResetAdaptMaxFontSize();
-        textLayoutProperty->ResetTextOverflow();
-    }
-    AddAnimationTextProperties(animIdx, textLayoutProperty);
 }
 
 void ContainerPickerPattern::UpdateSingleItemTextLinear(
@@ -804,7 +797,7 @@ void ContainerPickerPattern::FlushAnimationTextProperties(bool isDown)
             animationProperties_.erase(animationProperties_.begin());
         }
     } else {
-        TextProperties properties;
+        ContainerPickerTextProperties properties;
         if (!animationProperties_.empty()) {
             properties.fontSize = animationProperties_.front().fontSize;
             properties.currentColor = animationProperties_.front().currentColor;
@@ -827,19 +820,42 @@ void ContainerPickerPattern::UpdateScrollTextAnimation(double delta)
 }
 
 void ContainerPickerPattern::CacheOriginalItemStyle(int32_t index,
-    const RefPtr<TextLayoutProperty>& textLayoutProperty, const Dimension& defaultSize, const Color& defaultColor)
+    const RefPtr<TextLayoutProperty>& textLayoutProperty, const Dimension& defaultSize, const Color& defaultColor,
+    int32_t nodeId)
 {
-    if (originalItemStyle_.find(index) != originalItemStyle_.end()) {
-        return;
+    auto cachedIt = originalItemStyle_.find(index);
+    if (cachedIt != originalItemStyle_.end()) {
+        if (textLayoutProperty && nodeId >= 0 && cachedIt->second.nodeId >= 0 &&
+            cachedIt->second.nodeId != nodeId) {
+            // The item under this loop index was rebuit (content switch): the cached style
+            // belongs to a previous node and must not be restored onto the new one.
+            originalItemStyle_.erase(cachedIt);
+        } else {
+            return;
+        }
     }
     cachedThemeFontColor_ = defaultColor;
-    TextProperties orig;
+    ContainerPickerTextProperties orig;
+    orig.nodeId = nodeId;
+    orig.hasExplicitFontSize = textLayoutProperty->HasFontSize();
     orig.fontSize = textLayoutProperty->HasFontSize()
         ? textLayoutProperty->GetFontSize().value() : defaultSize;
+    if (textLayoutProperty->HasAdaptMinFontSize()) {
+        orig.adaptMinFontSize = textLayoutProperty->GetAdaptMinFontSize().value();
+    }
+    if (textLayoutProperty->HasAdaptMaxFontSize()) {
+        orig.adaptMaxFontSize = textLayoutProperty->GetAdaptMaxFontSize().value();
+    }
     orig.currentColor = textLayoutProperty->HasTextColor()
         ? textLayoutProperty->GetTextColor().value() : defaultColor;
     if (textLayoutProperty->HasFontWeight()) {
         orig.fontWeight = textLayoutProperty->GetFontWeight().value();
+    }
+    if (textLayoutProperty->HasMaxLines()) {
+        orig.maxLines = textLayoutProperty->GetMaxLines().value();
+    }
+    if (textLayoutProperty->HasTextOverflow()) {
+        orig.textOverflow = textLayoutProperty->GetTextOverflow().value();
     }
     originalItemStyle_[index] = orig;
 }
@@ -864,7 +880,13 @@ void ContainerPickerPattern::ApplyCenterItemSelectedStyle(
         textLayoutProperty->UpdateAdaptMaxFontSize(selectedTextStyle_.maxFontSize.value());
     }
     if (selectedTextStyle_.textOverflow.has_value()) {
-        textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
+        if (selectedTextStyle_.textOverflow.value() != TextOverflow::MARQUEE) {
+            textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
+            textLayoutProperty->UpdateMaxLines(1);
+        } else {
+            textLayoutProperty->ResetTextOverflow();
+            textLayoutProperty->ResetMaxLines();
+        }
     }
     textLayoutProperty->UpdateAlignment(Alignment::CENTER);
 }
@@ -876,12 +898,37 @@ void ContainerPickerPattern::RestoreItemOriginalStyle(int32_t index,
     if (it == originalItemStyle_.end()) {
         return;
     }
-    textLayoutProperty->UpdateFontSize(it->second.fontSize);
+    bool itemUsedAdaptiveSize = !it->second.hasExplicitFontSize &&
+        (it->second.adaptMinFontSize.has_value() || it->second.adaptMaxFontSize.has_value());
+    if (itemUsedAdaptiveSize) {
+        // Adaptive sizing configured without an explicit font size: keep the item on its
+        // original adaptive config instead of forcing the picker default font size.
+        textLayoutProperty->ResetFontSize();
+    } else {
+        textLayoutProperty->UpdateFontSize(it->second.fontSize);
+    }
     textLayoutProperty->UpdateTextColor(it->second.currentColor);
     textLayoutProperty->UpdateFontWeight(it->second.fontWeight);
-    textLayoutProperty->ResetAdaptMinFontSize();
-    textLayoutProperty->ResetAdaptMaxFontSize();
-    textLayoutProperty->ResetTextOverflow();
+    if (it->second.adaptMinFontSize.has_value()) {
+        textLayoutProperty->UpdateAdaptMinFontSize(it->second.adaptMinFontSize.value());
+    } else {
+        textLayoutProperty->ResetAdaptMinFontSize();
+    }
+    if (it->second.adaptMaxFontSize.has_value()) {
+        textLayoutProperty->UpdateAdaptMaxFontSize(it->second.adaptMaxFontSize.value());
+    } else {
+        textLayoutProperty->ResetAdaptMaxFontSize();
+    }
+    if (it->second.textOverflow.has_value()) {
+        textLayoutProperty->UpdateTextOverflow(it->second.textOverflow.value());
+    } else {
+        textLayoutProperty->ResetTextOverflow();
+    }
+    if (it->second.maxLines.has_value()) {
+        textLayoutProperty->UpdateMaxLines(it->second.maxLines.value());
+    } else {
+        textLayoutProperty->ResetMaxLines();
+    }
     applyColor = it->second.currentColor;
 }
 
@@ -903,8 +950,13 @@ void ContainerPickerPattern::SetSelectedTextStyle(bool isUpdateTextStyle)
             idx++;
             continue;
         }
-        CacheOriginalItemStyle(index, textLayoutProperty, defaultSize, defaultColor);
+        CacheOriginalItemStyle(index, textLayoutProperty, defaultSize, defaultColor,
+            static_cast<int32_t>(textNode->GetId()));
         bool isCenter = (index == selectedIndex_);
+        auto prevFontSize = textLayoutProperty->GetFontSize();
+        auto prevTextColor = textLayoutProperty->GetTextColor();
+        auto prevAdaptMin = textLayoutProperty->GetAdaptMinFontSize();
+        auto prevAdaptMax = textLayoutProperty->GetAdaptMaxFontSize();
         Color applyColor = textLayoutProperty->HasTextColor()
             ? textLayoutProperty->GetTextColor().value() : defaultColor;
         if (isCenter && HasSelectedTextStyle()) {
@@ -912,6 +964,16 @@ void ContainerPickerPattern::SetSelectedTextStyle(bool isUpdateTextStyle)
             ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
         } else {
             RestoreItemOriginalStyle(index, textLayoutProperty, applyColor);
+        }
+        // Restore/apply write the layout property directly; without re-syncing the text
+        // pattern's render style (MarkModifyDone) the property says one size while the
+        // text keeps rendering with the style built before the update.
+        if (textLayoutProperty->GetFontSize() != prevFontSize ||
+            textLayoutProperty->GetTextColor() != prevTextColor ||
+            textLayoutProperty->GetAdaptMinFontSize() != prevAdaptMin ||
+            textLayoutProperty->GetAdaptMaxFontSize() != prevAdaptMax) {
+            textNode->MarkModifyDone();
+            textNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         }
         AddAnimationTextProperties(idx, textLayoutProperty);
         if (HasSelectedTextStyle()) {
@@ -1538,7 +1600,12 @@ void ContainerPickerPattern::PlayInertialAnimation()
                 pattern->lastAnimationScroll_ = 0.0f;
             }
             pattern->isAnimationRunning_ = false;
-            if (!NearZero(pattern->CalculateMiddleLineOffset())) {
+            // Non-loop fling may end out of boundary; mainDeltaSum_ set by CalcEndOffset is
+            // cleared by GetLayoutProperties on every layout pass during the animation, so
+            // detect the out-of-boundary end state directly and spring back (same as the
+            // drag out-of-boundary path in CheckDragOutOfBoundary).
+            if (!NearZero(pattern->mainDeltaSum_) ||
+                (!pattern->isLoop_ && pattern->IsOutOfBoundary())) {
                 pattern->PlaySpringAnimation();
             } else {
                 pattern->FireAnimationEndEvent();
@@ -1938,14 +2005,20 @@ bool ContainerPickerPattern::OnThemeScopeUpdate(int32_t themeScopeId)
         }
     }
 
-    if (needThemeResync || isUseDefaultFontColor_) {
-        if (needThemeResync) {
-            SyncSelectionIndicatorWithTheme();
-        }
-        result = true;
-        host->SetNeedCallChildrenUpdate(true);
-        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE | PROPERTY_UPDATE_RENDER);
+    if (needThemeResync) {
+        SyncSelectionIndicatorWithTheme();
     }
+    // Item text colors that follow the theme must be refreshed on every theme-scope
+    // update. The previous gating (needThemeResync || isUseDefaultFontColor_) left
+    // pickers whose indicator colors are all user-set keep stale item colors when
+    // only the WithTheme coloeMode flipped (e.g. dark-mode rext left on a light
+    // background, invisible).
+    originalItemStyle_.clear();
+    SetDefaultTextStyle(true);
+    SetSelectedTextStyle(true);
+    result = true;
+    host->SetNeedCallChildrenUpdate(true);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE | PROPERTY_UPDATE_RENDER);
     return result;
 }
 

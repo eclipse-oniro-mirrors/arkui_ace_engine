@@ -50,7 +50,7 @@ public:
     int32_t itemNodeId = 0;
 };
 
-struct TextProperties {
+struct ContainerPickerTextProperties {
     Dimension upFontSize;
     Dimension fontSize;
     Dimension downFontSize;
@@ -60,6 +60,17 @@ struct TextProperties {
     Color upColor;
     Color currentColor;
     Color downColor;
+    std::optional<uint32_t> maxLines;
+    std::optional<TextOverflow> textOverflow;
+    // Cached adaptive font size set by the user (no explicit fontSize configured).
+    std::optional<Dimension> adaptMinFontSize;
+    std::optional<Dimension> adaptMaxFontSize;
+    // Whether the item had an explicit fontSize (vs. only adaptive sizing).
+    bool hasExplicitFontSize = false;
+    // Identity of the text node the style was cached from. When the item content is
+    // rebuilt (e.g. ForEach content switch under the same loop index), the cached style
+    // of the previous node must not be applied to the new node.
+    int32_t nodeId = -1;
 };
 
 enum class ContainerPickerDirection {
@@ -214,9 +225,6 @@ public:
     void ApplyTextStyleToItem(const RefPtr<FrameNode>& node, bool isSelected);
     Dimension LinearFontSize(const Dimension& startFontSize, const Dimension& endFontSize, double percent);
     void AddAnimationTextProperties(int32_t currentIndex, const RefPtr<TextLayoutProperty>& textLayoutProperty);
-    void UpdatePickerTextProperties(int32_t dataIndex, int32_t animIdx, int32_t showCount,
-        const RefPtr<TextLayoutProperty>& textLayoutProperty,
-        const Color& defaultColor, const Dimension& defaultSize);
     void UpdateTextPropertiesLinear(bool isDown, double scale);
     void TextPropertiesLinearAnimation(const RefPtr<TextLayoutProperty>& textLayoutProperty, int32_t index,
         int32_t showCount, bool isDown, double scale);
@@ -360,7 +368,7 @@ private:
     void SyncPickerParamsFromLayout();
 
     void CacheOriginalItemStyle(int32_t index, const RefPtr<TextLayoutProperty>& textLayoutProperty,
-        const Dimension& defaultSize, const Color& defaultColor);
+        const Dimension& defaultSize, const Color& defaultColor, int32_t nodeId = -1);
     void ApplyCenterItemSelectedStyle(const RefPtr<TextLayoutProperty>& textLayoutProperty, Color& applyColor);
     void RestoreItemOriginalStyle(int32_t index, const RefPtr<TextLayoutProperty>& textLayoutProperty,
         Color& applyColor);
@@ -459,8 +467,8 @@ private:
     float pickerHeightBeforeRotate_ = 0.0f;
     PickerIndicatorStyle indicatorStyle_;
     PickerTextStyle selectedTextStyle_;
-    std::vector<TextProperties> animationProperties_;
-    std::map<int32_t, TextProperties> originalItemStyle_;
+    std::vector<ContainerPickerTextProperties> animationProperties_;
+    std::map<int32_t, ContainerPickerTextProperties> originalItemStyle_;
     double distancePercent_ = 0.0;
 };
 } // namespace OHOS::Ace::NG

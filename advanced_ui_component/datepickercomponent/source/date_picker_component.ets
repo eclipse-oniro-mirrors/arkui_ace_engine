@@ -1387,16 +1387,13 @@ private formatHour(hour24: number): string {
     const newSelectedTextStyle = this.options.selectedTextStyle;
     const newItemTextStyle = this.options.itemTextStyle;
     const newSelectionIndicator = this.options.selectionIndicator;
-    if (newSelectedTextStyle !== undefined &&
-        !this.deepEqual(newSelectedTextStyle as Object, this.selectedTextStyle as Object)) {
+    if (!this.textStyleEqual(newSelectedTextStyle, this.selectedTextStyle)) {
       this.selectedTextStyle = newSelectedTextStyle;
     }
-    if (newItemTextStyle !== undefined &&
-        !this.deepEqual(newItemTextStyle as Object, this.itemTextStyle as Object)) {
+    if (!this.textStyleEqual(newItemTextStyle, this.itemTextStyle)) {
       this.itemTextStyle = newItemTextStyle;
     }
-    if (newSelectionIndicator !== undefined &&
-        !this.deepEqual(newSelectionIndicator as Object, this.selectionIndicator as Object)) {
+    if (!this.indicatorStyleEqual(newSelectionIndicator, this.selectionIndicator)) {
       this.selectionIndicator = newSelectionIndicator;
     }
     
@@ -2791,31 +2788,118 @@ private formatHour(hour24: number): string {
     return Math.max(calculatedRadius, 0);
   }
 
-  private deepEqual(a: Object | undefined, b: Object | undefined): boolean {
+  private textStyleEqual(a: PickerComponentTextStyle | undefined, b: PickerComponentTextStyle | undefined): boolean {
     if (a === b) {
       return true;
     }
     if (!a || !b) {
       return false;
     }
-    const keysA = Object.keys(a);
-    const keysB = Object.keys(b);
-    if (keysA.length !== keysB.length) {
+    if (a.color !== b.color) {
       return false;
     }
-    for (const key of keysA) {
-      const valA = (a as Record<string, Object>)[key];
-      const valB = (b as Record<string, Object>)[key];
-      if (valA === valB) {
-        continue;
-      }
-      if (typeof valA === 'object' && typeof valB === 'object' && valA && valB) {
-        if (!this.deepEqual(valA, valB)) {
-          return false;
-        }
-      } else {
+    if (a.overflow !== b.overflow) {
+      return false;
+    }
+    if (a.minFontSize !== b.minFontSize) {
+      return false;
+    }
+    if (a.maxFontSize !== b.maxFontSize) {
+      return false;
+    }
+    if (a.font === b.font) {
+      return true;
+    }
+    if (!a.font || !b.font) {
+      return false;
+    }
+    if (a.font.size !== b.font.size) {
+      return false;
+    }
+    if (a.font.weight !== b.font.weight) {
+      return false;
+    }
+    if (a.font.family !== b.font.family) {
+      return false;
+    }
+    if (a.font.style !== b.font.style) {
+      return false;
+    }
+    return true;
+  }
+
+  private lengthMetricsEqual(a: LengthMetrics | undefined, b: LengthMetrics | undefined): boolean {
+    if (a === b) {
+      return true;
+    }
+    if (!a || !b) {
+      return false;
+    }
+    return a.value === b.value && a.unit === b.unit;
+  }
+
+  private borderRadiusEqual(a: LengthMetrics | BorderRadiuses | LocalizedBorderRadiuses | undefined,
+                            b: LengthMetrics | BorderRadiuses | LocalizedBorderRadiuses | undefined): boolean {
+    if (a === b) {
+      return true;
+    }
+    if (!a || !b) {
+      return false;
+    }
+    const lmA = a as LengthMetrics;
+    const lmB = b as LengthMetrics;
+    if (lmA.value !== undefined || lmB.value !== undefined) {
+      if (lmA.value === undefined || lmB.value === undefined) {
         return false;
       }
+      return lmA.value === lmB.value && lmA.unit === lmB.unit;
+    }
+    const lrA = a as LocalizedBorderRadiuses;
+    const lrB = b as LocalizedBorderRadiuses;
+    if (lrA.topStart !== undefined || lrA.topEnd !== undefined ||
+        lrA.bottomStart !== undefined || lrA.bottomEnd !== undefined ||
+        lrB.topStart !== undefined || lrB.topEnd !== undefined ||
+        lrB.bottomStart !== undefined || lrB.bottomEnd !== undefined) {
+      return this.lengthMetricsEqual(lrA.topStart, lrB.topStart) &&
+             this.lengthMetricsEqual(lrA.topEnd, lrB.topEnd) &&
+             this.lengthMetricsEqual(lrA.bottomStart, lrB.bottomStart) &&
+             this.lengthMetricsEqual(lrA.bottomEnd, lrB.bottomEnd);
+    }
+    const rbA = a as BorderRadiuses;
+    const rbB = b as BorderRadiuses;
+    return rbA.topLeft === rbB.topLeft &&
+           rbA.topRight === rbB.topRight &&
+           rbA.bottomLeft === rbB.bottomLeft &&
+           rbA.bottomRight === rbB.bottomRight;
+  }
+
+  private indicatorStyleEqual(a: PickerIndicatorStyle | undefined, b: PickerIndicatorStyle | undefined): boolean {
+    if (a === b) {
+      return true;
+    }
+    if (!a || !b) {
+      return false;
+    }
+    if (a.type !== b.type) {
+      return false;
+    }
+    if (a.dividerColor !== b.dividerColor) {
+      return false;
+    }
+    if (a.backgroundColor !== b.backgroundColor) {
+      return false;
+    }
+    if (!this.lengthMetricsEqual(a.startMargin, b.startMargin)) {
+      return false;
+    }
+    if (!this.lengthMetricsEqual(a.endMargin, b.endMargin)) {
+      return false;
+    }
+    if (!this.lengthMetricsEqual(a.strokeWidth, b.strokeWidth)) {
+      return false;
+    }
+    if (!this.borderRadiusEqual(a.borderRadius, b.borderRadius)) {
+      return false;
     }
     return true;
   }
@@ -2919,21 +3003,21 @@ private formatHour(hour24: number): string {
         tl = tr = bl = br = lm.value;
       } else if (lr.topStart !== undefined) {
         if (this.isRTL()) {
-          tl = (lr.topEnd as LengthMetrics).value;
+          tl = lr.topEnd !== undefined ? (lr.topEnd as LengthMetrics).value : defaultRadius;
           tr = (lr.topStart as LengthMetrics).value;
-          bl = (lr.bottomEnd as LengthMetrics).value;
-          br = (lr.bottomStart as LengthMetrics).value;
+          bl = lr.bottomEnd !== undefined ? (lr.bottomEnd as LengthMetrics).value : defaultRadius;
+          br = lr.bottomStart !== undefined ? (lr.bottomStart as LengthMetrics).value : defaultRadius;
         } else {
           tl = (lr.topStart as LengthMetrics).value;
-          tr = (lr.topEnd as LengthMetrics).value;
-          bl = (lr.bottomStart as LengthMetrics).value;
-          br = (lr.bottomEnd as LengthMetrics).value;
+          tr = lr.topEnd !== undefined ? (lr.topEnd as LengthMetrics).value : defaultRadius;
+          bl = lr.bottomStart !== undefined ? (lr.bottomStart as LengthMetrics).value : defaultRadius;
+          br = lr.bottomEnd !== undefined ? (lr.bottomEnd as LengthMetrics).value : defaultRadius;
         }
       } else if (rb.topLeft !== undefined) {
         tl = rb.topLeft as number;
-        tr = rb.topRight as number;
-        bl = rb.bottomLeft as number;
-        br = rb.bottomRight as number;
+        tr = rb.topRight !== undefined ? rb.topRight as number : defaultRadius;
+        bl = rb.bottomLeft !== undefined ? rb.bottomLeft as number : defaultRadius;
+        br = rb.bottomRight !== undefined ? rb.bottomRight as number : defaultRadius;
       }
     }
     if (position === 'middle') {
@@ -2949,25 +3033,24 @@ private formatHour(hour24: number): string {
     const totalWidthPx = this.getTotalWidthPx();
     const currentColumnWidthPx = totalWidthPx > 0 ? this.getColumnWidthPx(columnIndex) : 0;
     if (totalWidthPx > 0 && currentColumnWidthPx > 0) {
-      const safetyMargin = 2;
-      const safeColumnWidth = Math.max(0, currentColumnWidthPx - safetyMargin);
-      const precedingWidthPx = this.getPrecedingWidthPx(columnIndex);
-      const followingWidthPx = this.getFollowingWidthPx(columnIndex);
-      let remainingStart = 0;
-      let remainingEnd = 0;
+      let rawStartPx = 0;
+      let rawEndPx = 0;
       if (indicator.startMargin) {
-        const userStartPx = this.lengthMetricsToPx(indicator.startMargin);
-        remainingStart = Math.max(0, userStartPx - precedingWidthPx);
+        rawStartPx = Math.max(0, this.lengthMetricsToPx(indicator.startMargin));
       }
       if (indicator.endMargin) {
-        const userEndPx = this.lengthMetricsToPx(indicator.endMargin);
-        remainingEnd = Math.max(0, userEndPx - followingWidthPx);
+        rawEndPx = Math.max(0, this.lengthMetricsToPx(indicator.endMargin));
       }
-      if (remainingStart + remainingEnd >= currentColumnWidthPx) {
-        adjustedStrokeWidth = LengthMetrics.px(0);
+      if (rawStartPx + rawEndPx > totalWidthPx) {
         adjustedStartMargin = undefined;
         adjustedEndMargin = undefined;
       } else {
+        const precedingWidthPx = this.getPrecedingWidthPx(columnIndex);
+        const followingWidthPx = this.getFollowingWidthPx(columnIndex);
+        const remainingStart = Math.max(0, rawStartPx - precedingWidthPx);
+        const remainingEnd = Math.max(0, rawEndPx - followingWidthPx);
+        const safetyMargin = 2;
+        const safeColumnWidth = Math.max(0, currentColumnWidthPx - safetyMargin);
         const cappedStart = Math.min(remainingStart, safeColumnWidth);
         adjustedStartMargin = cappedStart > 0 ? LengthMetrics.px(cappedStart) : undefined;
         const cappedEnd = Math.min(remainingEnd, safeColumnWidth);
