@@ -39,6 +39,7 @@
 #include "core/components/web/web_property.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/web/web_dom_document.h"
 #include "core/components_ng/pattern/web/view_data_common.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -1620,6 +1621,47 @@ HWTEST_F(WebPatternMiscTest, ConvertMouseToTouchByWhiteList002, TestSize.Level1)
     bool result = webPattern->ConvertMouseToTouchByWhiteList(mouseInfo, touchEventInfo);
     EXPECT_FALSE(result);
 #endif
+}
+
+/**
+ * @tc.name: QueryHandednessAnchorTest001
+ * @tc.desc: Test QueryHandednessAnchor with and without focused element rect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMiscTest, QueryHandednessAnchorTest001, TestSize.Level1)
+{
+    auto webPattern = CreateWebPattern();
+    ASSERT_NE(webPattern, nullptr);
+    auto host = webPattern->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto context = host->GetContext();
+    ASSERT_NE(context, nullptr);
+    ASSERT_DOUBLE_EQ(context->GetDensity(), 1.0);
+    auto webOffset = host->GetOffsetRelativeToWindow();
+    EXPECT_FLOAT_EQ(webOffset.GetX(), 0.0f);
+    EXPECT_FLOAT_EQ(webOffset.GetY(), 0.0f);
+    constexpr int32_t nodeId = 100;
+    auto anchor = webPattern->QueryHandednessAnchor(nodeId);
+    EXPECT_EQ(anchor.first, -1);
+    webPattern->UpdateFocusedElementRect(true, 10, 20, 100, 50);
+    anchor = webPattern->QueryHandednessAnchor(nodeId);
+    EXPECT_EQ(anchor.first, nodeId);
+    EXPECT_FLOAT_EQ(anchor.second.GetX(), 60.0f);
+    EXPECT_FLOAT_EQ(anchor.second.GetY(), 45.0f);
+}
+
+/**
+ * @tc.name: GetAdaptToHandednessModeTest001
+ * @tc.desc: Test GetAdaptToHandednessMode with attribute updated.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternMiscTest, GetAdaptToHandednessModeTest001, TestSize.Level1)
+{
+    auto webPattern = CreateWebPattern();
+    ASSERT_NE(webPattern, nullptr);
+    EXPECT_EQ(webPattern->GetAdaptToHandednessMode(), 0);
+    webPattern->UpdateAdaptToHandedness(static_cast<int32_t>(HandednessFollowMode::FOLLOW_ANCHOR));
+    EXPECT_EQ(webPattern->GetAdaptToHandednessMode(), 1);
 }
 
 } // namespace OHOS::Ace::NG

@@ -701,6 +701,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ScrollBarColor, std::string);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, CaretColor, Color);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, OverScrollMode, int32_t);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, AdaptToHandedness, int32_t);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BlurOnKeyboardHideMode, int32_t);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, CopyOptionMode, int32_t);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, MetaViewport, bool);
@@ -1307,6 +1308,11 @@ public:
     bool HandleWindowRectSet(int32_t x, int32_t y, uint32_t w, uint32_t h);
     bool HandleWindowStateGet(std::string& state);
     bool HandleWindowStateSet(const std::string& state);
+    void UpdateFocusedElementRect(bool hasFocusedRect, int32_t x, int32_t y, int32_t width, int32_t height);
+    void ResetFocusedElementRect();
+    std::pair<int32_t, NG::OffsetF> QueryHandednessAnchor(int32_t nodeId);
+    int32_t GetAdaptToHandednessMode();
+
 protected:
     void ModifyWebSrc(const std::string& webSrc)
     {
@@ -1423,6 +1429,7 @@ private:
     void OnScrollBarColorUpdate(const std::string& value);
     void OnCaretColorUpdate(const Color& value);
     void OnOverScrollModeUpdate(const int32_t value);
+    void OnAdaptToHandednessUpdate(const int32_t& value);
     void OnBlurOnKeyboardHideModeUpdate(const int32_t value);
     void OnCopyOptionModeUpdate(const int32_t value);
     void OnMetaViewportUpdate(bool value);
@@ -1729,6 +1736,7 @@ private:
     OnOpenAppLinkCallback onOpenAppLinkCallback_ = nullptr;
     SetFaviconCallback setFaviconCallback_ = nullptr;
     DefaultFileSelectorShowCallback defaultFileSelectorShowCallback_ = nullptr;
+    std::optional<NG::RectF> focusedElementRect_;
     OnWebNativeMessageConnectCallback onWebNativeMessageConnectCallback_ = nullptr;
     OnFullScreenVideoOverlayEnterCallback onFullScreenVideoOverlayEnterCallback_ = nullptr;
     OnWebNativeMessageDisConnectCallback onWebNativeMessageDisConnectCallback_ = nullptr;

@@ -117,6 +117,7 @@ public:
     void SetRefreshAccessedHistoryId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetCacheMode(WebCacheMode cacheMode) override;
     void SetOverScrollMode(OverScrollMode mode) override;
+    void SetAdaptToHandedness(int32_t mode) override;
     void SetBlurOnKeyboardHideMode(BlurOnKeyboardHideMode mode) override;
     void SetCopyOptionMode(CopyOptions mode) override;
     void SetOverviewModeAccessEnabled(bool isOverviewModeAccessEnabled) override;
@@ -385,6 +386,7 @@ public:
     static void SetOnSearchResultReceive(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOverScrollMode(FrameNode* frameNode, OverScrollMode mode);
+    static void SetAdaptToHandedness(FrameNode* frameNode, int32_t mode);
     static void SetOnTouchIconUrlReceived(
         FrameNode* frameNode, std::function<void(const std::shared_ptr<BaseEventInfo>& info)>&& touchIconUrlId);
     static void SetOnRenderProcessResponding(

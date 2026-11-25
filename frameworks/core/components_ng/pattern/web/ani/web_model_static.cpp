@@ -474,6 +474,18 @@ void WebModelStatic::SetOverScrollMode(FrameNode* frameNode, const std::optional
     }
 }
 
+void WebModelStatic::SetAdaptToHandedness(FrameNode* frameNode, const std::optional<int32_t>& mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    if (mode) {
+        webPatternStatic->UpdateAdaptToHandedness(mode.value());
+    } else {
+        webPatternStatic->UpdateAdaptToHandedness(0);
+    }
+}
+
 void WebModelStatic::SetLayoutMode(FrameNode* frameNode, const std::optional<WebLayoutMode>& mode)
 {
     CHECK_NULL_VOID(frameNode);

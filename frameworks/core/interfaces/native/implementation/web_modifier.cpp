@@ -19,6 +19,7 @@
 
 #ifdef WEB_SUPPORTED
 #include "arkweb_utils.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/web/ani/web_model_static.h"
 #include "core/interfaces/native/implementation/webview_controller_peer_impl.h"
 #include "core/interfaces/native/implementation/web_modifier_callbacks.h"
@@ -505,6 +506,24 @@ void SetOverScrollModeImpl(Ark_NativePointer node,
     CHECK_NULL_VOID(frameNode);
     auto convValue = Converter::OptConvert<OverScrollMode>(*value);
     WebModelStatic::SetOverScrollMode(frameNode, convValue);
+#endif // WEB_SUPPORTED
+}
+void SetAdaptToHandednessImpl(Ark_NativePointer node,
+    Ark_WebHandednessFollowMode value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto mode = NG::HandednessFollowMode::NONE;
+    switch (value) {
+        case ARK_WEB_HANDEDNESS_FOLLOW_MODE_FOLLOW_ANCHOR:
+            mode = NG::HandednessFollowMode::FOLLOW_ANCHOR;
+            break;
+        default:
+            mode = NG::HandednessFollowMode::NONE;
+            break;
+    }
+    WebModelStatic::SetAdaptToHandedness(frameNode, static_cast<int32_t>(mode));
 #endif // WEB_SUPPORTED
 }
 void SetBlurOnKeyboardHideModeImpl(Ark_NativePointer node,
@@ -3477,6 +3496,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnZoomChangeImpl,
         WebAttributeModifier::SetFlingSpeedLimitImpl,
         WebAttributeModifier::SetVisitedLinkPersistEnabledImpl,
+        WebAttributeModifier::SetAdaptToHandednessImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,

@@ -81,7 +81,18 @@ static bool GetObjectFromPtr(ani_env* env, std::string classDesc, ani_ref* obj, 
     return true;
 }
 
-static void DefaultOnShowFileSelector(ani_vm* vm, void* paramPeer, void* resultPeer, std::function<void(void*)> release)
+struct SelectorDialogArgs {
+    ani_class cls;
+    ani_object obj;
+    ani_ref paramObj;
+    ani_ref resultObj;
+    int32_t adaptToHandedness;
+};
+
+static void CallDefaultOnShowFileSelector(ani_env* env, const SelectorDialogArgs& args);
+
+static void DefaultOnShowFileSelector(ani_vm* vm, void* paramPeer, void* resultPeer, int32_t adaptToHandedness,
+    std::function<void(void*)> release)
 {
     HILOGI("Call defaultOnShowFileSelector start");
     ani_env* env = GetAniEnv(vm);
@@ -117,13 +128,32 @@ static void DefaultOnShowFileSelector(ani_vm* vm, void* paramPeer, void* resultP
         HILOGE("Object_New fail: SelectorDialog");
         return;
     }
-    if (env->Class_FindMethod(cls, "defaultOnShowFileSelector",
+    SelectorDialogArgs args = { cls, obj, paramObj, resultObj, adaptToHandedness };
+    CallDefaultOnShowFileSelector(env, args);
+}
+
+static void CallDefaultOnShowFileSelector(ani_env* env, const SelectorDialogArgs& args)
+{
+    ani_method method;
+    if (env->Class_FindMethod(args.cls, "defaultOnShowFileSelectorWithHandedness",
+                              "C{arkui.component.web.FileSelectorParam}C{arkui.component.web.FileSelectorResult}i:",
+                              &method) == ANI_OK) {
+        if (env->Object_CallMethod_Void(args.obj, method, args.paramObj, args.resultObj,
+                                        static_cast<ani_int>(args.adaptToHandedness)) != ANI_OK) {
+            HILOGE("Call defaultOnShowFileSelectorWithHandedness fail");
+            return;
+        }
+        HILOGI("Call defaultOnShowFileSelectorWithHandedness done");
+        return;
+    }
+    HILOGI("defaultOnShowFileSelectorWithHandedness not found, fallback to defaultOnShowFileSelector");
+    if (env->Class_FindMethod(args.cls, "defaultOnShowFileSelector",
                               "C{arkui.component.web.FileSelectorParam}C{arkui.component.web.FileSelectorResult}:",
                               &method) != ANI_OK) {
         HILOGE("Class_FindMethod fail, defaultOnShowFileSelector");
         return;
     }
-    if (env->Object_CallMethod_Void(obj, method, paramObj, resultObj) != ANI_OK) {
+    if (env->Object_CallMethod_Void(args.obj, method, args.paramObj, args.resultObj) != ANI_OK) {
         HILOGE("Call defaultOnShowFileSelector fail");
         return;
     }
@@ -295,16 +325,17 @@ static void GetWebOptionsFunc(ani_vm* vm, ani_ref savePtr,
         }
         envTemp->GlobalReference_Delete(object);
     };
-    auto defaultOnShowFileSelectorFunc = [vm](void* paramPeer, void* resultPeer, std::function<void(void*)> release) {
-        DefaultOnShowFileSelector(vm, paramPeer, resultPeer, std::move(release));
-    };
+
     auto defaultPermissionClipboardFunc = [vm](void* peer, std::function<void()> release) {
         DefaultPermissionClipboard(vm, peer, std::move(release));
     };
     webviewControllerPeer->setWebIdFunc = std::move(setWebIdFunc);
     webviewControllerPeer->setHapPathFunc = std::move(setHapPathFunc);
     webviewControllerPeer->setWebDetachFunc = std::move(setWebDetachFunc);
-    webviewControllerPeer->defaultOnShowFileSelectorFunc = std::move(defaultOnShowFileSelectorFunc);
+    webviewControllerPeer->defaultOnShowFileSelectorFunc =
+        [vm](void* paramPeer, void* resultPeer, int32_t adaptToHandedness, std::function<void(void*)> release) {
+            DefaultOnShowFileSelector(vm, paramPeer, resultPeer, adaptToHandedness, std::move(release));
+        };
     webviewControllerPeer->defaultPermissionClipboardFunc = std::move(defaultPermissionClipboardFunc);
     auto defaultOnFullScreenVideoOverlayEnterFunc =
         [vm](void* handlerPeer, void* mediaInfoPeer, std::function<void(void*)> release) {

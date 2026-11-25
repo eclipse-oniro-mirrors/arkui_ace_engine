@@ -1487,6 +1487,7 @@ declare class ArkWebComponent extends ArkComponent implements WebAttribute {
     wideViewModeAccess(wideViewModeAccess: boolean): this;
     overviewModeAccess(overviewModeAccess: boolean): this;
     overScrollMode(mode: OverScrollMode): this;
+    adaptToHandedness(mode: WebHandednessFollowMode): this;
     textZoomAtio(textZoomAtio: number): this;
     textZoomRatio(textZoomRatio: number): this;
     databaseAccess(databaseAccess: boolean): this;

@@ -138,6 +138,8 @@ public:
     void SetRenderMode(RenderMode);
     void SetLayoutMode(WebLayoutMode mode);
 
+    void UpdateAdaptToHandedness(int32_t mode) {}
+
     void JavaScriptOnDocumentStart(const ScriptItems&);
     void JavaScriptOnDocumentEnd(const ScriptItems&);
     void JavaScriptOnDocumentStartByOrder(const ScriptItems& scriptItems,

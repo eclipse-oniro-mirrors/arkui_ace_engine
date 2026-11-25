@@ -94,7 +94,7 @@ typedef struct webview_WebviewControllerPeer {
     std::function<void(int32_t)> setWebIdFunc = nullptr;
     std::function<void(const std::string&)> setHapPathFunc = nullptr;
     std::function<void(int32_t)> setWebDetachFunc = nullptr;
-    std::function<void(void*, void*, std::function<void(void*)>)> defaultOnShowFileSelectorFunc = nullptr;
+    std::function<void(void*, void*, int32_t, std::function<void(void*)>)> defaultOnShowFileSelectorFunc = nullptr;
     std::function<void(void*, std::function<void()>)> defaultPermissionClipboardFunc = nullptr;
     std::function<void(void*, void*, std::function<void(void*)>)> defaultOnFullScreenVideoOverlayEnterFunc = nullptr;
 } WebviewControllerPeer;

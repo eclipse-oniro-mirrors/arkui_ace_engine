@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_WEB_WEB_EVENT_H
 
 #include <map>
+#include <memory>
 
 #include "base/image/pixel_map.h"
 #include "base/memory/ace_type.h"
@@ -143,6 +144,7 @@ struct AcceptFileType {
 using AcceptFileTypeList = std::vector<AcceptFileType>;
 using AcceptFileTypeLists = std::vector<AcceptFileTypeList>;
 
+struct WebFocusedElementRect;
 class WebFileSelectorParam : public AceType {
     DECLARE_ACE_TYPE(WebFileSelectorParam, AceType);
 public:
@@ -159,6 +161,7 @@ public:
     virtual std::vector<std::string> GetDescriptions() = 0;
     virtual bool IsAcceptAllOptionExcluded() = 0;
     virtual AcceptFileTypeLists GetAccepts() = 0;
+    virtual std::shared_ptr<WebFocusedElementRect> GetFocusedElementRect();
 };
 
 class ACE_EXPORT WebError : public AceType {
@@ -1729,9 +1732,18 @@ public:
         return result_;
     }
 
+    void SetAdaptToHandedness(int32_t adaptToHandedness);
+    int32_t GetAdaptToHandedness() const;
+    void SetWebOffset(float webOffsetX, float webOffsetY);
+    float GetWebOffsetX() const;
+    float GetWebOffsetY() const;
+
 private:
     RefPtr<WebFileSelectorParam> param_;
     RefPtr<FileSelectorResult> result_;
+    int32_t adaptToHandedness_ = 0;
+    float webOffsetX_ = 0.0f;
+    float webOffsetY_ = 0.0f;
 };
 
 class ACE_EXPORT ResourceLoadEvent : public BaseEventInfo {

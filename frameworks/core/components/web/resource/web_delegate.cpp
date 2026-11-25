@@ -14,6 +14,8 @@
  */
 
 #include "core/components/web/resource/web_delegate.h"
+#include "core/components/web/web_focused_element_rect.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/pipeline/container_window_manager.h"
 
 #include <cctype>
@@ -603,6 +605,54 @@ std::vector<AcceptFileType> JsStringToFileTypeList(std::unique_ptr<JsonValue> ac
     return result;
 }
 
+std::shared_ptr<WebFocusedElementRect> WebFileSelectorParam::GetFocusedElementRect()
+{
+    return nullptr;
+}
+
+void FileSelectorEvent::SetAdaptToHandedness(int32_t adaptToHandedness)
+{
+    adaptToHandedness_ = adaptToHandedness;
+}
+
+int32_t FileSelectorEvent::GetAdaptToHandedness() const
+{
+    return adaptToHandedness_;
+}
+
+void FileSelectorEvent::SetWebOffset(float webOffsetX, float webOffsetY)
+{
+    webOffsetX_ = webOffsetX;
+    webOffsetY_ = webOffsetY;
+}
+
+float FileSelectorEvent::GetWebOffsetX() const
+{
+    return webOffsetX_;
+}
+
+float FileSelectorEvent::GetWebOffsetY() const
+{
+    return webOffsetY_;
+}
+
+std::shared_ptr<WebFocusedElementRect> FileSelectorParamOhos::GetFocusedElementRect()
+{
+    if (!param_) {
+        return nullptr;
+    }
+    auto focusedElementRect = param_->GetFocusedElementRect();
+    if (!focusedElementRect) {
+        return nullptr;
+    }
+    auto webFocusedElementRect = std::make_shared<WebFocusedElementRect>();
+    webFocusedElementRect->x = focusedElementRect->GetX();
+    webFocusedElementRect->y = focusedElementRect->GetY();
+    webFocusedElementRect->width = focusedElementRect->GetWidth();
+    webFocusedElementRect->height = focusedElementRect->GetHeight();
+    return webFocusedElementRect;
+}
+
 AcceptFileTypeLists FileSelectorParamOhos::GetAccepts()
 {
     AcceptFileTypeLists result = AcceptFileTypeLists();
@@ -636,6 +686,15 @@ void FileSelectorResultOhos::HandleFileList(std::vector<std::string>& result)
         return;
     }
     delegate->SetIsFileSelectorShow(false);
+    delegate->ResetFileSelectorFocusedRect();
+}
+
+void WebDelegate::ResetFileSelectorFocusedRect()
+{
+    auto webPattern = webPattern_.Upgrade();
+    if (webPattern) {
+        webPattern->ResetFocusedElementRect();
+    }
 }
 
 void WebPermissionRequestOhos::Deny() const
@@ -7081,6 +7140,38 @@ void WebDelegate::OnRouterPush(const std::string& param)
     OHOS::Ace::Framework::DelegateClient::GetInstance().RouterPush(param);
 }
 
+void WebDelegate::UpdateFileSelectorHandednessInfo(const std::shared_ptr<BaseEventInfo>& info)
+{
+    auto* fileSelectorEvent = TypeInfoHelper::DynamicCast<FileSelectorEvent>(info.get());
+    if (!fileSelectorEvent) {
+        return;
+    }
+    auto webPattern = webPattern_.Upgrade();
+    if (!webPattern) {
+        return;
+    }
+    const auto& param = fileSelectorEvent->GetParam();
+    if (!param) {
+        return;
+    }
+    auto focusedElementRect = param->GetFocusedElementRect();
+    if (focusedElementRect) {
+        webPattern->UpdateFocusedElementRect(true, focusedElementRect->x, focusedElementRect->y,
+            focusedElementRect->width, focusedElementRect->height);
+    } else {
+        webPattern->UpdateFocusedElementRect(false, 0, 0, 0, 0);
+    }
+    bool hasValidRect =
+        focusedElementRect != nullptr && focusedElementRect->width > 0 && focusedElementRect->height > 0;
+    fileSelectorEvent->SetAdaptToHandedness(
+        hasValidRect ? webPattern->GetAdaptToHandednessMode() : static_cast<int32_t>(NG::HandednessFollowMode::NONE));
+    auto host = webPattern->GetHost();
+    if (host) {
+        auto webOffset = host->GetOffsetRelativeToWindow();
+        fileSelectorEvent->SetWebOffset(webOffset.GetX(), webOffset.GetY());
+    }
+}
+
 bool WebDelegate::OnFileSelectorShow(const std::shared_ptr<BaseEventInfo>& info)
 {
     CHECK_NULL_RETURN(taskExecutor_, false);
@@ -7112,6 +7203,7 @@ bool WebDelegate::OnFileSelectorShow(const std::shared_ptr<BaseEventInfo>& info)
             CHECK_NULL_VOID(delegate);
             auto webPattern = delegate->webPattern_.Upgrade();
             CHECK_NULL_VOID(webPattern);
+            delegate->UpdateFileSelectorHandednessInfo(info);
             auto fileSelectCallback = webPattern->GetDefaultFileSelectorShowCallback();
             CHECK_NULL_VOID(fileSelectCallback);
             fileSelectCallback(info);

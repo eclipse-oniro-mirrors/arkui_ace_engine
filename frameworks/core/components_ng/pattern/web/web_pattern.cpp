@@ -93,6 +93,8 @@
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
+#include "core/components_ng/manager/handedness/handedness_types.h"
 #include "core/components_ng/pattern/date_picker/picker_setting_data.h"
 #include "core/components_ng/pattern/text_picker/textpicker_event_types.h"
 #include "core/components_ng/pattern/text_picker/textpicker_types.h"
@@ -123,6 +125,7 @@
 #include "core/components_ng/pattern/web/web_command_wrapper.h"
 #include "core/components_ng/pattern/web/web_dom_document.h"
 #include "core/components_ng/pattern/web/web_event_hub.h"
+#include "core/components_ng/pattern/web/web_handedness_anchor.h"
 #include "core/components_ng/pattern/web/view_data_common.h"
 #include "core/components_ng/pattern/web/transitional_node_info.h"
 #include "core/event/key_event.h"
@@ -1801,6 +1804,7 @@ void WebPattern::OnAttachToFrameNode()
 
 void WebPattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
+    ResetFocusedElementRect();
     CHECK_NULL_VOID(delegate_);
     isFocus_ = false;
     delegate_->OnBlur();
@@ -4541,6 +4545,63 @@ void WebPattern::OnOverScrollModeUpdate(int mode)
     if (delegate_) {
         delegate_->UpdateOverScrollMode(mode);
     }
+}
+
+void WebPattern::OnAdaptToHandednessUpdate(const int32_t& value) {}
+
+void WebPattern::ResetFocusedElementRect()
+{
+    focusedElementRect_.reset();
+}
+
+std::pair<int32_t, NG::OffsetF> WebPattern::QueryHandednessAnchor(int32_t nodeId)
+{
+    constexpr int32_t invalidNodeId = -1;
+    if (!focusedElementRect_.has_value() || focusedElementRect_->Width() <= 0 ||
+        focusedElementRect_->Height() <= 0) {
+        return { invalidNodeId, NG::OffsetF(0, 0) };
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, std::make_pair(invalidNodeId, NG::OffsetF(0, 0)));
+    auto context = GetContext();
+    CHECK_NULL_RETURN(context, std::make_pair(invalidNodeId, NG::OffsetF(0, 0)));
+    auto webOffset = host->GetOffsetRelativeToWindow();
+    float density = static_cast<float>(context->GetDensity());
+    float anchorX = webOffset.GetX() +
+        (focusedElementRect_->GetX() + focusedElementRect_->Width() / 2.0f) * density;
+    float anchorY = webOffset.GetY() +
+        (focusedElementRect_->GetY() + focusedElementRect_->Height() / 2.0f) * density;
+    return { nodeId, NG::OffsetF(anchorX, anchorY) };
+}
+
+void WebPattern::UpdateFocusedElementRect(bool hasFocusedRect, int32_t x, int32_t y, int32_t width, int32_t height)
+{
+    if (hasFocusedRect && width > 0 && height > 0) {
+        focusedElementRect_ = NG::RectF(static_cast<float>(x), static_cast<float>(y),
+            static_cast<float>(width), static_cast<float>(height));
+    } else {
+        focusedElementRect_.reset();
+    }
+    auto mainContext = PipelineContext::GetMainPipelineContext();
+    if (mainContext) {
+        auto mainManager = mainContext->GetHandednessManager();
+        if (mainManager) {
+            mainManager->SetWebHandednessAnchorQueryFunc(&QueryWebHandednessAnchor);
+        }
+    }
+    auto context = GetContext();
+    if (context) {
+        auto handednessManager = context->GetHandednessManager();
+        if (handednessManager) {
+            handednessManager->SetWebHandednessAnchorQueryFunc(&QueryWebHandednessAnchor);
+        }
+    }
+}
+
+int32_t WebPattern::GetAdaptToHandednessMode()
+{
+    const auto& adaptToHandedness = GetAdaptToHandedness();
+    return adaptToHandedness.value_or(static_cast<int32_t>(NG::HandednessFollowMode::NONE));
 }
 
 void WebPattern::OnBlurOnKeyboardHideModeUpdate(int mode)
@@ -7875,6 +7936,30 @@ void WebPattern::UninitTouchEventListener()
     context->UnregisterTouchEventListener(AceType::WeakClaim(this));
 }
 
+class DateTimeChooserDismissGuard : public NWeb::NWebDateTimeChooserCallback {
+public:
+    DateTimeChooserDismissGuard(std::shared_ptr<NWeb::NWebDateTimeChooserCallback> callback,
+        const WeakPtr<WebPattern>& webPattern)
+        : callback_(callback), webPattern_(webPattern)
+    {}
+    ~DateTimeChooserDismissGuard() override = default;
+
+    void Continue(bool success, const NWeb::DateTime& value) override
+    {
+        if (callback_) {
+            callback_->Continue(success, value);
+        }
+        auto webPattern = webPattern_.Upgrade();
+        if (webPattern) {
+            webPattern->ResetFocusedElementRect();
+        }
+    }
+
+private:
+    std::shared_ptr<NWeb::NWebDateTimeChooserCallback> callback_;
+    WeakPtr<WebPattern> webPattern_;
+};
+
 void WebPattern::OnDateTimeChooserPopup(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser> chooser,
     const std::vector<std::shared_ptr<OHOS::NWeb::NWebDateTimeSuggestion>>& suggestions,
     std::shared_ptr<NWeb::NWebDateTimeChooserCallback> callback)
@@ -7882,17 +7967,25 @@ void WebPattern::OnDateTimeChooserPopup(std::shared_ptr<OHOS::NWeb::NWebDateTime
     if (!chooser) {
         return;
     }
+    auto focusedElementRect = chooser->GetFocusedElementRect();
+    if (focusedElementRect) {
+        UpdateFocusedElementRect(true, focusedElementRect->GetX(), focusedElementRect->GetY(),
+            focusedElementRect->GetWidth(), focusedElementRect->GetHeight());
+    } else {
+        UpdateFocusedElementRect(false, 0, 0, 0, 0);
+    }
 
+    auto guardedCallback = std::make_shared<DateTimeChooserDismissGuard>(callback, WeakClaim(this));
     bool result = false;
     if (suggestions.size() != 0) {
-        result = ShowDateTimeSuggestionDialog(chooser, suggestions, callback);
+        result = ShowDateTimeSuggestionDialog(chooser, suggestions, guardedCallback);
     } else if (chooser->GetType() == NWeb::DTC_TIME) {
-        result = ShowTimeDialog(chooser, suggestions, callback);
+        result = ShowTimeDialog(chooser, suggestions, guardedCallback);
     } else {
-        result = ShowDateTimeDialog(chooser, suggestions, callback);
+        result = ShowDateTimeDialog(chooser, suggestions, guardedCallback);
     }
     if (!result) {
-        callback->Continue(false, OHOS::NWeb::DateTime());
+        guardedCallback->Continue(false, OHOS::NWeb::DateTime());
     }
 }
 
@@ -7906,7 +7999,19 @@ DialogProperties WebPattern::GetDialogProperties(const RefPtr<DialogTheme>& them
     }
     properties.customStyle = false;
     properties.offset = DimensionOffset(Offset(0, -theme->GetMarginBottom().ConvertToPx()));
-    return properties;
+    bool followAnchor = GetAdaptToHandedness() == static_cast<int32_t>(NG::HandednessFollowMode::FOLLOW_ANCHOR);
+    bool hasRect = focusedElementRect_.has_value() && focusedElementRect_->Width() > 0 &&
+        focusedElementRect_->Height() > 0;
+    auto mainContext = PipelineContext::GetMainPipelineContext();
+    auto handednessManager = mainContext ? mainContext->GetHandednessManager() : nullptr;
+    bool breakpointMet = handednessManager && handednessManager->IsBreakpointMet();
+    if (!followAnchor || !hasRect || !breakpointMet) {
+        return properties;
+    }
+    DialogProperties handednessProperties;
+    handednessProperties.customStyle = false;
+    handednessProperties.adaptToHandedness = NG::HandednessFollowMode::FOLLOW_ANCHOR;
+    return handednessProperties;
 }
 
 bool WebPattern::ShowDateTimeDialog(std::shared_ptr<OHOS::NWeb::NWebDateTimeChooser> chooser,

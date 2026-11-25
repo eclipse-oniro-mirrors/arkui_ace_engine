@@ -9457,6 +9457,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOverScrollModeModifier.identity, WebOverScrollModeModifier, mode);
     return this;
   }
+  adaptToHandedness(mode) {
+    modifierWithKey(this._modifiersWithKeys, WebAdaptToHandednessModifier.identity, WebAdaptToHandednessModifier, mode);
+    return this;
+  }
   textZoomAtio(textZoomAtio) {
     throw new Error('Method not implemented.');
   }
@@ -11126,6 +11130,21 @@ class WebOverScrollModeModifier extends ModifierWithKey {
 }
 }
 WebOverScrollModeModifier.identity = Symbol('webOverScrollModeModifier');
+
+class WebAdaptToHandednessModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetAdaptToHandedness(node);
+    }
+    else {
+      getUINativeModule().web.setAdaptToHandedness(node, this.value);
+    }
+}
+}
+WebAdaptToHandednessModifier.identity = Symbol('webAdaptToHandednessModifier');
 
 class WebOnRenderProcessRespondingModifier extends ModifierWithKey {
   constructor(value) {

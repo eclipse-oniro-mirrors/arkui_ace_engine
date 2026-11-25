@@ -641,6 +641,13 @@ void WebModelNG::SetOverScrollMode(OverScrollMode mode)
     webPattern->UpdateOverScrollMode(mode);
 }
 
+void WebModelNG::SetAdaptToHandedness(int32_t mode)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateAdaptToHandedness(mode);
+}
+
 void WebModelNG::SetBlurOnKeyboardHideMode(BlurOnKeyboardHideMode mode)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -2367,6 +2374,14 @@ void WebModelNG::SetOverScrollMode(FrameNode* frameNode, OverScrollMode mode)
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateOverScrollMode(mode);
+}
+
+void WebModelNG::SetAdaptToHandedness(FrameNode* frameNode, int32_t mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateAdaptToHandedness(mode);
 }
 void WebModelNG::SetOnTouchIconUrlReceived(FrameNode* frameNode, OnWebAsyncFunc&& touchIconUrlId)
 {

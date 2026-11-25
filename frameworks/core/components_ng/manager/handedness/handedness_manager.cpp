@@ -24,6 +24,7 @@
 #include "base/log/log.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_abstract.h"
+
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -156,6 +157,12 @@ std::pair<int32_t, OffsetF> HandednessManager::QueryAnchorPosition(int32_t nodeI
     auto frameNode = DynamicCast<FrameNode>(node);
     if (!frameNode) {
         return { INVALID_NODE_ID, OffsetF(0, 0) };
+    }
+    if (webHandednessAnchorQueryFunc_ != nullptr) {
+        auto webAnchor = webHandednessAnchorQueryFunc_(frameNode->GetPattern(), targetId);
+        if (webAnchor.has_value() && webAnchor->first >= 0) {
+            return webAnchor.value();
+        }
     }
     auto geoNode = frameNode->GetGeometryNode();
     CHECK_NULL_RETURN(geoNode, std::make_pair(INVALID_NODE_ID, OffsetF(0, 0)));

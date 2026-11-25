@@ -1577,6 +1577,11 @@ let OverScrollMode;
   OverScrollMode[OverScrollMode.NEVER = 0] = 'NEVER';
   OverScrollMode[OverScrollMode.ALWAYS = 1] = 'ALWAYS';
 })(OverScrollMode || (OverScrollMode = {}));
+let WebHandednessFollowMode;
+(function (WebHandednessFollowMode) {
+  WebHandednessFollowMode[WebHandednessFollowMode.NONE = 0] = 'NONE';
+  WebHandednessFollowMode[WebHandednessFollowMode.FOLLOW_ANCHOR = 1] = 'FOLLOW_ANCHOR';
+})(WebHandednessFollowMode || (WebHandednessFollowMode = {}));
 
 let BlurOnKeyboardHideMode;
 (function (BlurOnKeyboardHideMode) {

@@ -2295,6 +2295,8 @@ struct CJUIWebModifier {
     void (*resetVisitedLinkPersistEnabled)(ArkUINodeHandle node);
     void (*setCaretColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
     void (*resetCaretColor)(ArkUINodeHandle node);
+    void (*setAdaptToHandedness)(ArkUINodeHandle node, ArkUI_Int32 value);
+    void (*resetAdaptToHandedness)(ArkUINodeHandle node);
 };
 
 struct CJUIBlankModifier {

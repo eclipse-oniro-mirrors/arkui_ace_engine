@@ -208,6 +208,7 @@ public:
         const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder) {};
     virtual void JavaScriptOnDocumentEnd(const ScriptItems& scriptItems) {};
     virtual void SetOverScrollMode(OverScrollMode mode) {}
+    virtual void SetAdaptToHandedness(int32_t mode) {}
     virtual void SetCopyOptionMode(CopyOptions mode) {};
 
     virtual void SetDefaultFileSelectorShow(std::function<void(const std::shared_ptr<BaseEventInfo>&)>&& jsCallback) {};

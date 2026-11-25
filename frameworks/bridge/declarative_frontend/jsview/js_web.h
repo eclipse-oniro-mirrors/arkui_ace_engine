@@ -160,6 +160,7 @@ public:
     static void SetNestedScroll(const JSCallbackInfo& info);
     static void SetMetaViewport(const JSCallbackInfo& args);
     static void OverScrollMode(int overScrollMode);
+    static void AdaptToHandedness(int adaptToHandedness);
     static void BlurOnKeyboardHideMode(int blurOnKeyboardHideMode);
     static void EnableNativeEmbedMode(bool isEmbedModeEnabled);
     static void NativeEmbedOptions(const JSCallbackInfo& args);
@@ -196,6 +197,7 @@ public:
     static JSRef<JSVal> CreateCommonDialogResultHandler(const WebDialogEvent& eventInfo);
     static JSRef<JSVal> CreateFileSelectorResultHandler(const FileSelectorEvent& eventInfo);
     static JSRef<JSVal> CreateFileSelectorParamHandler(const FileSelectorEvent& eventInfo);
+    static JSRef<JSVal> CreateFocusedElementRectHandler(const FileSelectorEvent& eventInfo);
     static JSRef<JSVal> CreateContextMenuParamHandler(const ContextMenuEvent& eventInfo);
     static JSRef<JSVal> CreateContextMenuResultHandler(const ContextMenuEvent& eventInfo);
     static JSRef<JSVal> CreateRequestErrorHandler(const ReceivedErrorEvent& eventInfo);
