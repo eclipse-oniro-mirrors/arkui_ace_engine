@@ -20,6 +20,7 @@
 #include "base/display_manager/display_manager.h"
 #include "base/geometry/dimension.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
+#include "base/image/image_color_filter.h"
 #include "base/json/json_util.h"
 #include "base/log/dump_log.h"
 #include "base/memory/referenced.h"
@@ -2050,6 +2051,18 @@ void SheetPresentationPattern::UpdateTitleBarVibrancy(const SheetStyle& sheetSty
         if (iconSymbol) {
             ViewAbstract::SetVibrancyMode(AceType::RawPtr(iconSymbol), mode);
         }
+    }
+}
+
+void SheetPresentationPattern::UpdateColorFilterEffect(const SheetStyle& sheetStyle)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (sheetStyle.colorFilterEffect.has_value() &&
+        sheetStyle.colorFilterEffect.value().size() == Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        ViewAbstract::SetColorFilterEffect(AceType::RawPtr(host), sheetStyle.colorFilterEffect.value());
+    } else {
+        ViewAbstract::ResetColorFilterEffect(AceType::RawPtr(host));
     }
 }
 

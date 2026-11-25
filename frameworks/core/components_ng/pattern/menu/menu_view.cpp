@@ -17,6 +17,7 @@
 
 #include "base/subwindow/subwindow_manager.h"
 #include "base/geometry/dimension.h"
+#include "base/image/image_color_filter.h"
 #include "base/memory/ace_type.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/common/container.h"
@@ -1213,6 +1214,20 @@ void MenuView::SetMenuSystemMaterial(const RefPtr<FrameNode>& menuNode, const Me
     paintProperty->UpdateIsUserSetMaterial(isSetMenuSystemMaterial);
 }
 
+void MenuView::SetMenuColorFilterEffect(const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam)
+{
+    CHECK_NULL_VOID(menuNode);
+    if (!menuParam.colorFilterEffect.has_value()) {
+        return;
+    }
+    const auto& matrix = menuParam.colorFilterEffect.value();
+    if (matrix.size() == Ace::ImageColorFilter::COLOR_FILTER_MATRIX_SIZE) {
+        ViewAbstract::SetColorFilterEffect(AceType::RawPtr(menuNode), matrix);
+    } else {
+        ViewAbstract::ResetColorFilterEffect(AceType::RawPtr(menuNode));
+    }
+}
+
 bool MenuView::ShouldHandleLowEndImmersiveMaterial(const RefPtr<UiMaterial>& systemMaterial)
 {
     if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::SMOOTH) {
@@ -1573,6 +1588,7 @@ RefPtr<FrameNode> MenuView::Create(std::vector<OptionParam>&& params, int32_t ta
     CHECK_NULL_RETURN(wrapperNode && menuNode, nullptr);
     ReloadMenuParam(menuNode, menuParam);
     SetMenuSystemMaterial(menuNode, menuParam);
+    SetMenuColorFilterEffect(menuNode, menuParam);
     UpdateMenuBackgroundStyle(menuNode, menuParam);
     auto column = FrameNode::CreateFrameNode(COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<LinearLayoutPattern>(true));
@@ -1652,6 +1668,7 @@ RefPtr<FrameNode> MenuView::Create(std::vector<OptionParam>&& params, int32_t ta
     // set up option menu items
     ReloadMenuParam(menuNode, menuParam);
     SetMenuSystemMaterial(menuNode, menuParam);
+    SetMenuColorFilterEffect(menuNode, menuParam);
     UpdateMenuBackgroundStyle(menuNode, menuParam);
     auto column = FrameNode::CreateFrameNode(COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<LinearLayoutPattern>(true));
@@ -1847,6 +1864,7 @@ RefPtr<FrameNode> MenuView::Create(const RefPtr<UINode>& customNode, int32_t tar
 
     CustomPreviewNodeProc(previewNode, menuParam, previewCustomNode);
     SetMenuSystemMaterial(menuNode, menuParam);
+    SetMenuColorFilterEffect(menuNode, menuParam);
     UpdateMenuBackgroundStyle(menuNode, menuParam);
     SetPreviewTransitionEffect(wrapperNode, menuParam);
     SetHasCustomRadius(wrapperNode, menuNode, menuParam);

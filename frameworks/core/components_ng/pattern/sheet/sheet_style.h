@@ -273,6 +273,7 @@ struct SheetStyle {
     std::optional<DisplayMode> scrollBarState;
     RefPtr<UiMaterial> closeButtonMaterial;
     std::optional<VibrancyMode> titleBarVibrancyMode;
+    std::optional<std::vector<float>> colorFilterEffect;
 
     SheetStyle() = default;
     // constructor for image generator dialog
@@ -306,7 +307,8 @@ struct SheetStyle {
                 titleBarBackgroundBlur == sheetStyle.titleBarBackgroundBlur &&
                 titleBarHoverMode == sheetStyle.titleBarHoverMode && scrollBarState == sheetStyle.scrollBarState &&
                 closeButtonMaterial == sheetStyle.closeButtonMaterial &&
-                titleBarVibrancyMode == sheetStyle.titleBarVibrancyMode);
+                titleBarVibrancyMode == sheetStyle.titleBarVibrancyMode &&
+                colorFilterEffect == sheetStyle.colorFilterEffect);
     }
 
     void PartialUpdate(const SheetStyle& sheetStyle)
@@ -368,6 +370,8 @@ struct SheetStyle {
         closeButtonMaterial = sheetStyle.closeButtonMaterial ? sheetStyle.closeButtonMaterial : closeButtonMaterial;
         titleBarVibrancyMode =
             sheetStyle.titleBarVibrancyMode.has_value() ? sheetStyle.titleBarVibrancyMode : titleBarVibrancyMode;
+        colorFilterEffect =
+            sheetStyle.colorFilterEffect.has_value() ? sheetStyle.colorFilterEffect : colorFilterEffect;
     }
 
     // Register the set/get method of the resource.

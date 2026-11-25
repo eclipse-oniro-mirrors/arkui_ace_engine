@@ -37,6 +37,7 @@
 #include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/pattern/sheet/sheet_view.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "base/image/image_color_filter.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -274,6 +275,76 @@ HWTEST_F(SheetPresentationTestNineNg, SheetUpdateBackgroundColorIfNoMaterialColo
     ASSERT_TRUE(backgroundColor.has_value());
     EXPECT_EQ(backgroundColor.value(), Color::RED);
 
+    SheetPresentationTestNineNg::TearDownTestCase();
+}
+
+/**
+ * @tc.name: UpdateColorFilterEffect001
+ * @tc.desc: UpdateColorFilterEffect with a valid 20-element matrix sets FrontColorFilterEffect on the host node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetPresentationTestNineNg, UpdateColorFilterEffect001, TestSize.Level1)
+{
+    SheetPresentationTestNineNg::SetUpTestCase();
+    auto callback = [](const std::string&) {};
+    auto sheetNode = FrameNode::CreateFrameNode("Sheet", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<SheetPresentationPattern>(0, "SheetPresentation", std::move(callback)));
+    ASSERT_NE(sheetNode, nullptr);
+    auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
+    ASSERT_NE(sheetPattern, nullptr);
+    auto renderContext = sheetNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+
+    std::vector<float> matrix(ImageColorFilter::COLOR_FILTER_MATRIX_SIZE, 0.5f);
+    matrix[0] = 1.0f;
+    matrix[6] = 1.0f;
+    matrix[12] = 1.0f;
+    matrix[18] = 0.25f;
+    SheetStyle sheetStyle;
+    sheetStyle.colorFilterEffect = matrix;
+
+    sheetPattern->UpdateColorFilterEffect(sheetStyle);
+
+    EXPECT_TRUE(renderContext->HasFrontColorFilterEffect());
+    auto value = renderContext->GetFrontColorFilterEffect();
+    ASSERT_TRUE(value.has_value());
+    EXPECT_EQ(value.value().size(), ImageColorFilter::COLOR_FILTER_MATRIX_SIZE);
+    EXPECT_EQ(value.value()[0], 1.0f);
+    EXPECT_EQ(value.value()[18], 0.25f);
+    SheetPresentationTestNineNg::TearDownTestCase();
+}
+
+/**
+ * @tc.name: UpdateColorFilterEffect002
+ * @tc.desc: UpdateColorFilterEffect with nullopt resets FrontColorFilterEffect on the host node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetPresentationTestNineNg, UpdateColorFilterEffect002, TestSize.Level1)
+{
+    SheetPresentationTestNineNg::SetUpTestCase();
+    auto callback = [](const std::string&) {};
+    auto sheetNode = FrameNode::CreateFrameNode("Sheet", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<SheetPresentationPattern>(0, "SheetPresentation", std::move(callback)));
+    ASSERT_NE(sheetNode, nullptr);
+    auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
+    ASSERT_NE(sheetPattern, nullptr);
+    auto renderContext = sheetNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+
+    // step1: set a valid matrix first to ensure the property is present.
+    std::vector<float> matrix(ImageColorFilter::COLOR_FILTER_MATRIX_SIZE, 0.5f);
+    SheetStyle setStyle;
+    setStyle.colorFilterEffect = matrix;
+    sheetPattern->UpdateColorFilterEffect(setStyle);
+    ASSERT_TRUE(renderContext->HasFrontColorFilterEffect());
+
+    // step2: sheetStyle without colorFilterEffect triggers reset.
+    SheetStyle resetStyle;
+    sheetPattern->UpdateColorFilterEffect(resetStyle);
+
+    EXPECT_FALSE(renderContext->HasFrontColorFilterEffect());
+    auto value = renderContext->GetFrontColorFilterEffect();
+    EXPECT_FALSE(value.has_value());
     SheetPresentationTestNineNg::TearDownTestCase();
 }
 } // namespace OHOS::Ace::NG

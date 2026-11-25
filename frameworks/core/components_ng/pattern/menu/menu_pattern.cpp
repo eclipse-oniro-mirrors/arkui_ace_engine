@@ -1648,6 +1648,7 @@ RefPtr<FrameNode> MenuPattern::DuplicateMenuNode(const RefPtr<FrameNode>& menuNo
     }
     SetMenuBackGroundStyle(duplicateMenuNode, menuParam);
     MenuView::SetMenuSystemMaterial(duplicateMenuNode, menuParam);
+    MenuView::SetMenuColorFilterEffect(duplicateMenuNode, menuParam);
     return duplicateMenuNode;
 }
 

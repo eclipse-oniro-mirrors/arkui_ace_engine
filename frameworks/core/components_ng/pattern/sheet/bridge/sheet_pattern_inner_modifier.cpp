@@ -650,6 +650,14 @@ void SheetUpdateSheetScrollBar(const RefPtr<FrameNode>& sheetPageNode, const She
     sheetPattern->UpdateSheetScrollBar(sheetStyle);
 }
 
+void SheetUpdateColorFilterEffect(const RefPtr<FrameNode>& sheetPageNode, const SheetStyle& sheetStyle)
+{
+    CHECK_NULL_VOID(sheetPageNode);
+    auto sheetPattern = sheetPageNode->GetPattern<SheetPresentationPattern>();
+    CHECK_NULL_VOID(sheetPattern);
+    sheetPattern->UpdateColorFilterEffect(sheetStyle);
+}
+
 bool SheetIsOnDisappearing(const RefPtr<FrameNode>& sheetNode)
 {
     CHECK_NULL_RETURN(sheetNode, false);
@@ -749,6 +757,7 @@ const ArkUISheetPatternInnerModifier* GetSheetPatternInnerModifier()
         .sheetIsPresentationPattern = SheetIsPresentationPattern,
         .sheetSetSheetBlurSnapshotFreeze = SheetSetSheetBlurSnapshotFreeze,
         .sheetUpdateSheetScrollBar = SheetUpdateSheetScrollBar,
+        .sheetUpdateColorFilterEffect = SheetUpdateColorFilterEffect,
         .sheetIsOnDisappearing = SheetIsOnDisappearing,
         .sheetUpdateBackgroundColorIfNoMaterialColor = SheetUpdateBackgroundColorIfNoMaterialColor,
     };
