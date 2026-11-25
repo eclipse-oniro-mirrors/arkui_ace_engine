@@ -434,6 +434,16 @@ ArkUI_Int32 ParseCommandPayload(const ArkUI_CharPtr json, ArkUI_Uint32 jsonSize,
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID, "invalid json payload");
         return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    if (!parsedJson->Contains("schemaVersion")) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID, "missing schemaVersion");
+        return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    auto schemaVersion = parsedJson->GetValue("schemaVersion");
+    if (!schemaVersion || !schemaVersion->IsNumber() || schemaVersion->GetDouble() != 1.0) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID,
+            "schemaVersion must be the number 1");
+        return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
     auto cmdObj = parsedJson->GetValue("cmd");
     if (!cmdObj || !cmdObj->IsObject()) {
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID, "missing cmd object");

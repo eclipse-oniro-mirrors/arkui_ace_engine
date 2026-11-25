@@ -672,10 +672,10 @@ HWTEST_F(UIEventCommandTest, ParseCommandPayloadRejections001, TestSize.Level1)
     struct TestCase { const char* json; const char* expectMsg; };
     const TestCase cases[] = {
         {"not json",                                            "invalid json payload"},
-        {R"({"action_info":{}})",                              "missing cmd object"},
-        {R"({"cmd":{"type":"","action_info":{}}})",            "missing cmd.type"},
-        {R"({"cmd":{"type":"setText"}})",                      "missing action_info object"},
-        {"{\"cmd\":{\"type\":\"nope\",\"action_info\":{}}}",   "unknown command type"},
+        {R"({"schemaVersion":1,"action_info":{}})",             "missing cmd object"},
+        {R"({"schemaVersion":1,"cmd":{"type":"","action_info":{}}})", "missing cmd.type"},
+        {R"({"schemaVersion":1,"cmd":{"type":"setText"}})",     "missing action_info object"},
+        {"{\"schemaVersion\":1,\"cmd\":{\"type\":\"nope\",\"action_info\":{}}}", "unknown command type"},
     };
     for (const auto& tc : cases) {
         ResetErrorStore();
@@ -723,6 +723,38 @@ HWTEST_F(UIEventCommandTest, InvalidCommandFieldsRejectedBeforeQueue001, TestSiz
     }
     EXPECT_EQ(RunInject(uid, ValidJson()), ARKUI_ERROR_CODE_NO_ERROR);
     executor->Drain(); // Invalid input must not leave the process occupied.
+}
+
+HWTEST_F(UIEventCommandTest, SchemaVersionRejected001, TestSize.Level1)
+{
+    auto executor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    MockPipelineContext::GetCurrent()->SetTaskExecutor(executor);
+    const auto uid = CreateNode();
+    const std::vector<std::pair<std::string, const char*>> payloads = {
+        { R"({})", "missing schemaVersion" },
+        { R"({"cmd":{"type":"setText","action_info":{"value":"x"}}})", "missing schemaVersion" },
+        { R"({"schemaVersion":2})", "schemaVersion must be the number 1" },
+        { R"({"schemaVersion":2,"cmd":{"type":"setText","action_info":{"value":"x"}}})",
+            "schemaVersion must be the number 1" },
+        { R"({"schemaVersion":"1","cmd":{"type":"setText","action_info":{"value":"x"}}})",
+            "schemaVersion must be the number 1" },
+        { R"({"schemaVersion":true,"cmd":{"type":"setText","action_info":{"value":"x"}}})",
+            "schemaVersion must be the number 1" },
+        { R"({"schemaVersion":null,"cmd":{"type":"setText","action_info":{"value":"x"}}})",
+            "schemaVersion must be the number 1" },
+    };
+    for (const auto& [json, expectMsg] : payloads) {
+        SCOPED_TRACE(json);
+        CallbackState state;
+        ResetErrorStore();
+        EXPECT_EQ(RunInject(uid, json, &state), ARKUI_ERROR_CODE_PARAM_INVALID);
+        EXPECT_TRUE(ErrorMessageContains(expectMsg)) << "Expected message: " << expectMsg;
+        EXPECT_FALSE(executor->RunNext());
+        executor->Drain();
+        EXPECT_EQ(state.count, 0);
+    }
+    EXPECT_EQ(RunInject(uid, ValidJson()), ARKUI_ERROR_CODE_NO_ERROR);
+    executor->Drain();
 }
 
 // Validate only the new converter/dispatch protocol; TestPattern does not execute component branches.
