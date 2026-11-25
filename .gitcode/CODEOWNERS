@@ -2335,6 +2335,9 @@ frameworks/core/components_v2/pattern_lock/ @huawei_g_five
 frameworks/core/components_v2/swiper/ @arkui_navigation
 frameworks/core/components_v2/water_flow/ @arkuiscroll
 frameworks/core/event/ @ArkUI_Event
+frameworks/core/common/application_shortcut.cpp @ArkUI_Event
+frameworks/core/common/application_shortcut.h @ArkUI_Event
+frameworks/core/event/function_key_name.h @ArkUI_Event
 frameworks/core/focus/ @ArkUI_Event
 frameworks/core/gestures/ @ArkUI_Event
 frameworks/core/image/ @arkui001
@@ -3270,6 +3273,7 @@ interfaces/napi/kits/router/ @arkui_navigation
 interfaces/napi/kits/text_menu_controller/ @huawei_g_five
 interfaces/napi/kits/ui_material/ @arkuicodepulse
 interfaces/napi/kits/utils/ @arkui_framework_xnode
+interfaces/napi/kits/application_shortcut/ @ArkUI_Event
 
 [Arkoala]
 
