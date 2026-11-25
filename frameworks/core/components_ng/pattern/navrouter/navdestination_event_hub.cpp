@@ -134,7 +134,7 @@ void NavDestinationEventHub::FireOnShownEvent(
         }
     }
 #else
-    pipelineContext->GetMemoryManager()->RebuildImageByPage(AceType::DynamicCast<FrameNode>(navDestination));
+    pipelineContext->GetMemoryManager()->RebuildImageByPage(RefPtr<FrameNode>(navDestination));
 #endif
 }
 
