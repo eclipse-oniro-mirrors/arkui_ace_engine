@@ -38,8 +38,8 @@ Local<JSValueRef> GetObjectProperty(EcmaVM* vm, const Local<panda::ObjectRef>& o
     return object->Get(vm, panda::StringRef::NewFromUtf8(vm, name));
 }
 
-void ParseContainerSize(ArkUIRuntimeCallInfo* runtimeCallInfo, EcmaVM* vm, int32_t* containerSizeArray,
-    int32_t argOffset = 1)
+void ParseContainerSize(ArkUIRuntimeCallInfo* runtimeCallInfo, EcmaVM* vm,
+    int32_t (&containerSizeArray)[MAX_NUMBER_BREAKPOINT], int32_t argOffset = 1)
 {
     Local<JSValueRef> xs = runtimeCallInfo->GetCallArgRef(XS + argOffset);
     Local<JSValueRef> sm = runtimeCallInfo->GetCallArgRef(SM + argOffset);
@@ -47,12 +47,12 @@ void ParseContainerSize(ArkUIRuntimeCallInfo* runtimeCallInfo, EcmaVM* vm, int32
     Local<JSValueRef> lg = runtimeCallInfo->GetCallArgRef(LG + argOffset);
     Local<JSValueRef> xl = runtimeCallInfo->GetCallArgRef(XL + argOffset);
     Local<JSValueRef> xxl = runtimeCallInfo->GetCallArgRef(XXL + argOffset);
-    containerSizeArray[XS] = xs->IsNumber() && xs->Int32Value(vm) >= 0 ? xs->Int32Value(vm) : -1;
-    containerSizeArray[SM] = sm->IsNumber() && sm->Int32Value(vm) >= 0 ? sm->Int32Value(vm) : -1;
-    containerSizeArray[MD] = md->IsNumber() && md->Int32Value(vm) >= 0 ? md->Int32Value(vm) : -1;
-    containerSizeArray[LG] = lg->IsNumber() && lg->Int32Value(vm) >= 0 ? lg->Int32Value(vm) : -1;
-    containerSizeArray[XL] = xl->IsNumber() && xl->Int32Value(vm) >= 0 ? xl->Int32Value(vm) : -1;
-    containerSizeArray[XXL] = xxl->IsNumber() && xxl->Int32Value(vm) >= 0 ? xxl->Int32Value(vm) : -1;
+    containerSizeArray[XS] = !xs.IsEmpty() && xs->IsNumber() && xs->Int32Value(vm) >= 0 ? xs->Int32Value(vm) : -1;
+    containerSizeArray[SM] = !sm.IsEmpty() && sm->IsNumber() && sm->Int32Value(vm) >= 0 ? sm->Int32Value(vm) : -1;
+    containerSizeArray[MD] = !md.IsEmpty() && md->IsNumber() && md->Int32Value(vm) >= 0 ? md->Int32Value(vm) : -1;
+    containerSizeArray[LG] = !lg.IsEmpty() && lg->IsNumber() && lg->Int32Value(vm) >= 0 ? lg->Int32Value(vm) : -1;
+    containerSizeArray[XL] = !xl.IsEmpty() && xl->IsNumber() && xl->Int32Value(vm) >= 0 ? xl->Int32Value(vm) : -1;
+    containerSizeArray[XXL] = !xxl.IsEmpty() && xxl->IsNumber() && xxl->Int32Value(vm) >= 0 ? xxl->Int32Value(vm) : -1;
 }
 
 void ApplyGridColOffset(ArkUINodeHandle nativeNode, const RefPtr<V2::GridContainerSize>& offset)
