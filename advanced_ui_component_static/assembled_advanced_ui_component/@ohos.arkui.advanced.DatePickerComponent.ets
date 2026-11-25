@@ -1652,11 +1652,7 @@ export struct DatePickerComponent {
           if (m >= DatePickerConstant.MIN_MONTH && m <= DatePickerConstant.MAX_MONTH &&
               d >= DatePickerConstant.MIN_DAY && d <= maxDay) {
             selectedIsResult = true;
-            const validStart: int = this.lunar ? this.lunarStartYear : this.startYear;
-            const validEnd: int = this.lunar ? this.lunarEndYear : this.endYear;
-            if (this.selectedYear < validStart || this.selectedYear > validEnd) {
-              this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
-            }
+            this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
             this.selectedMonth = m;
             this.selectedDay = d;
             this.selectedIsLeapMonth = false;
