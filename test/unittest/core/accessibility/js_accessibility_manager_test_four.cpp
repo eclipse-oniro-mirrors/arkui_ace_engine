@@ -23,6 +23,7 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
+#include "adapter/ohos/entrance/ace_container.h"
 #include "adapter/ohos/osal/js_accessibility_manager.h"
 #include "adapter/ohos/osal/ui_session_accessibility_action.h"
 
@@ -509,6 +510,103 @@ HWTEST_F(JsAccessibilityManagerTestFour, RegisterInteractionOperationAsChildTree
     SUCCEED();
 
     GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-end RegisterInteractionOperationAsChildTree001";
+}
+
+/**
+ * @tc.name: RegisterInteractionOperationAsChildTree002
+ * @tc.desc: Test top-level child tree registration (parentTreeId == 0) takes the host window id
+ *           carried by the registration request as the manager window id, so a registration
+ *           re-sent after cross-window migration binds to the new host window even while the
+ *           local pipeline still caches the stale old host window id
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, RegisterInteractionOperationAsChildTree002, TestSize.Level1)
+{
+    GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-begin RegisterInteractionOperationAsChildTree002";
+
+    /**
+     * @tc.steps: step1. construct JsAccessibilityManager on a UIExtension window whose local
+     *            pipeline still caches the stale old host window id (the window manager
+     *            updates it later than the re-registration)
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    jsAccessibilityManager->SetPipelineContext(context);
+    constexpr uint32_t STALE_HOST_WINDOW_ID = 42;
+    context->SetRealHostWindowId(STALE_HOST_WINDOW_ID);
+    auto container = Platform::AceContainer::GetContainer(context->GetInstanceId());
+    ASSERT_NE(container, nullptr);
+    container->SetUIExtensionSubWindow(true);
+
+    /**
+     * @tc.steps: step2. register as a top-level child tree (parent is the new host window's
+     *            main tree, parentTreeId == 0) carrying the new host window id in the request
+     */
+    constexpr uint32_t NEW_HOST_WINDOW_ID = 100;
+    constexpr int64_t ELEMENT_ID = 7;
+    jsAccessibilityManager->RegisterInteractionOperationAsChildTree(NEW_HOST_WINDOW_ID, 0, ELEMENT_ID);
+
+    /**
+     * @tc.expected: the manager window id equals the request-carried new host window id
+     * (top-level window id freshness), not the stale local pipeline value
+     */
+    EXPECT_EQ(jsAccessibilityManager->GetWindowId(), NEW_HOST_WINDOW_ID);
+
+    // Restore shared mock state (singleton container and pipeline) for subsequent tests
+    container->SetUIExtensionSubWindow(false);
+    context->realHostWindowId_.reset();
+
+    GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-end RegisterInteractionOperationAsChildTree002";
+}
+
+/**
+ * @tc.name: RegisterInteractionOperationAsChildTree003
+ * @tc.desc: Test nested child tree registration (parentTreeId != 0) keeps resolving the manager
+ *           window id from the local pipeline real host window id (original semantics unchanged)
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, RegisterInteractionOperationAsChildTree003, TestSize.Level1)
+{
+    GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-begin RegisterInteractionOperationAsChildTree003";
+
+    /**
+     * @tc.steps: step1. construct JsAccessibilityManager on a UIExtension window with a known
+     *            local pipeline host window id
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    jsAccessibilityManager->SetPipelineContext(context);
+    constexpr uint32_t HOST_WINDOW_ID = 42;
+    context->SetRealHostWindowId(HOST_WINDOW_ID);
+    auto container = Platform::AceContainer::GetContainer(context->GetInstanceId());
+    ASSERT_NE(container, nullptr);
+    container->SetUIExtensionSubWindow(true);
+
+    /**
+     * @tc.steps: step2. register as a nested child tree (parent is another child tree,
+     *            parentTreeId != 0)
+     */
+    constexpr uint32_t PARENT_WINDOW_ID = 100;
+    constexpr int32_t NESTED_PARENT_TREE_ID = 5;
+    constexpr int64_t ELEMENT_ID = 8;
+    jsAccessibilityManager->RegisterInteractionOperationAsChildTree(
+        PARENT_WINDOW_ID, NESTED_PARENT_TREE_ID, ELEMENT_ID);
+
+    /**
+     * @tc.expected: the manager window id keeps the direct parent window resolved from the
+     * local pipeline (nested semantics unchanged by the top-level freshness fix)
+     */
+    EXPECT_EQ(jsAccessibilityManager->GetWindowId(), HOST_WINDOW_ID);
+
+    // Restore shared mock state (singleton container and pipeline) for subsequent tests
+    container->SetUIExtensionSubWindow(false);
+    context->realHostWindowId_.reset();
+
+    GTEST_LOG_(INFO) << "JsAccessibilityManagerTestFour-end RegisterInteractionOperationAsChildTree003";
 }
 
 /**

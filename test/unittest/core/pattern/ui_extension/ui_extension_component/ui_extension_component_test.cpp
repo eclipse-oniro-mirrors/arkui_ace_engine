@@ -932,6 +932,61 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionOnConnectTest, TestSize.Level1)
 }
 
 /**
+ * @tc.name: UIExtensionOnConnectAccessibilityRebuildTest
+ * @tc.desc: Test the accessibility child tree callback left by a previous session or
+ *           cross-window migration is always released for rebuild and not re-created while
+ *           the manager is unresolvable: the rebuild sequence OnConnect performs on a stale
+ *           callback. OnConnect itself cannot be driven end-to-end in host UT because its
+ *           RosenRenderContext gate exits early (RenderContext::Create returns nullptr
+ *           without ENABLE_ROSEN_BACKEND), so the sequence is invoked directly here
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionOnConnectAccessibilityRebuildTest, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    /**
+     * @tc.steps: step1. construct a UIExtensionComponent Node with a valid session
+     */
+    auto uiExtensionNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto uiExtensionNode = FrameNode::GetOrCreateFrameNode(
+        UI_EXTENSION_COMPONENT_ETS_TAG, uiExtensionNodeId, []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
+    ASSERT_NE(uiExtensionNode, nullptr);
+    auto pattern = uiExtensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->AttachToFrameNode(uiExtensionNode);
+    ContainerScope scope(pattern->instanceId_);
+    ValidSession(pattern);
+
+    /**
+     * @tc.steps: step2. inject a callback left by a previous session/migration
+     */
+    int64_t accessibilityId = uiExtensionNode->GetAccessibilityId();
+    pattern->accessibilityChildTreeCallback_ =
+        std::make_shared<UIExtensionAccessibilityChildTreeCallback>(pattern, accessibilityId);
+    ASSERT_NE(pattern->accessibilityChildTreeCallback_, nullptr);
+    auto* staleCallback = pattern->accessibilityChildTreeCallback_.get();
+
+    /**
+     * @tc.steps: step3. run the rebuild sequence OnConnect performs on a stale callback
+     *           (reset releases unconditionally, then InitializeAccessibility re-creates it
+     *           when the manager is resolvable); the full OnConnect entry is gated by the
+     *           render context in host UT and returns before this sequence
+     */
+    pattern->ResetAccessibilityChildTreeCallback();
+    pattern->InitializeAccessibility();
+
+    /**
+     * @tc.expected: the stale callback is always released for rebuild even when the accessibility
+     * manager is unresolvable in the mock environment (reset releases first, deregisters
+     * best-effort); the callback is re-created when the manager is resolvable, otherwise it stays
+     * released until the next initialization
+     */
+    EXPECT_NE(pattern->accessibilityChildTreeCallback_.get(), staleCallback);
+    EXPECT_EQ(pattern->accessibilityChildTreeCallback_, nullptr);
+#endif
+}
+
+/**
  * @tc.name: UIExtensionHandleEventTest
  * @tc.desc: Test pattern KeyEvent
  * @tc.type: FUNC
