@@ -2592,11 +2592,12 @@ bool AddImageSpanFromCollaboration(
     if (!richEditorPattern->GetTextSelector().SelectNothing()) {
         richEditorPattern->DeleteBackward(1);
     }
-    options.offset = richEditorPattern->GetCaretPosition() + helper->photoCount_;
+    options.offset = richEditorPattern->GetCaretPosition() + static_cast<int32_t>(helper->photoCount_);
     richEditorPattern->AddImageSpanFromCollaboration(options, false);
     helper->photoCount_++;
     if (code == SEND_PHOTO_SUCCESS) {
-        richEditorPattern->SetCaretPosition(richEditorPattern->GetCaretPosition() + helper->photoCount_);
+        richEditorPattern->SetCaretPosition(
+            richEditorPattern->GetCaretPosition() + static_cast<int32_t>(helper->photoCount_));
     }
     return true;
 }

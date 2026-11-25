@@ -1383,15 +1383,16 @@ void JSRichEditorController::AddRichEditorBuilderSpan(const JSCallbackInfo& args
     ContainerScope scope(instanceId_ < 0 ? Container::CurrentId() : instanceId_);
     auto customNode = ExecuteBuilder(args);
     CHECK_NULL_VOID(customNode);
-    // Safe to cast: ExecuteBuilder guarantees args[0] is Function or Object
-    auto customObject = JSRef<JSObject>::Cast(args[0]);
     SpanOptionBase options;
     BuilderSpanRecord builderSpanRecord;
     auto controller = controllerWeak_.Upgrade();
     auto richEditorController = AceType::DynamicCast<RichEditorControllerBase>(controller);
     int32_t spanIndex = 0;
     if (richEditorController) {
-        ParseBuilderSpanInfo(args, customObject, options, builderSpanRecord);
+        if (args[0]->IsObject()) {
+            auto customObject = JSRef<JSObject>::Cast(args[0]);
+            ParseBuilderSpanInfo(args, customObject, options, builderSpanRecord);
+        }
         spanIndex = richEditorController->AddPlaceholderSpan(customNode, options, builderSpanRecord);
     }
     args.SetReturnValue(JSRef<JSVal>::Make(ToJSValue(spanIndex)));
