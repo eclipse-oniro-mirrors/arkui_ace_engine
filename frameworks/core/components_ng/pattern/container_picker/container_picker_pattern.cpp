@@ -15,6 +15,7 @@
 #include "core/components_ng/pattern/container_picker/container_picker_pattern.h"
 #include "core/components_ng/base/modifier.h"
 
+#include <cmath>
 #include <string_view>
 
 #include <sys/time.h>
@@ -34,6 +35,7 @@
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
+#include "core/components/common/properties/text_style.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -632,6 +634,22 @@ Dimension ContainerPickerPattern::LinearFontSize(
     return start + (end - start) * percent;
 }
 
+FontWeight ContainerPickerPattern::LinearFontWeight(FontWeight start, FontWeight end, double percent)
+{
+    int startNum = static_cast<int>(ConvertFontWeight(start));
+    int endNum = static_cast<int>(ConvertFontWeight(end));
+    double result = static_cast<double>(startNum) +
+        (static_cast<double>(endNum) - static_cast<double>(startNum)) * percent;
+    int rounded = static_cast<int>(std::round(result));
+    if (rounded < 0) {
+        rounded = 0;
+    }
+    if (rounded > static_cast<int>(FontWeight::W900)) {
+        rounded = static_cast<int>(FontWeight::W900);
+    }
+    return static_cast<FontWeight>(rounded);
+}
+
 void ContainerPickerPattern::ApplyTextStyleToItem(const RefPtr<FrameNode>& node, bool isSelected)
 {
     CHECK_NULL_VOID(node);
@@ -722,6 +740,11 @@ void ContainerPickerPattern::UpdateSingleItemTextLinear(
     textLayoutProperty->UpdateFontSize(updateSize);
     Color updateColor = evaluator->Evaluate(itemColor, selectedColor, static_cast<float>(t));
     textLayoutProperty->UpdateTextColor(updateColor);
+    if (selectedTextStyle_.fontWeight.has_value()) {
+        FontWeight defaultWeight = (it != originalItemStyle_.end()) ? it->second.fontWeight : FontWeight::REGULAR;
+        FontWeight updateWeight = LinearFontWeight(defaultWeight, selectedTextStyle_.fontWeight.value(), t);
+        textLayoutProperty->UpdateFontWeight(updateWeight);
+    }
     textLayoutProperty->UpdateAlignment(Alignment::CENTER);
     UpdateTextNodeFontColor(textNode, updateColor);
 }
@@ -884,8 +907,8 @@ void ContainerPickerPattern::ApplyCenterItemSelectedStyle(
             textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
             textLayoutProperty->UpdateMaxLines(1);
         } else {
-            textLayoutProperty->ResetTextOverflow();
-            textLayoutProperty->ResetMaxLines();
+            textLayoutProperty->UpdateTextOverflow(TextOverflow::MARQUEE);
+            textLayoutProperty->UpdateMaxLines(1);
         }
     }
     textLayoutProperty->UpdateAlignment(Alignment::CENTER);

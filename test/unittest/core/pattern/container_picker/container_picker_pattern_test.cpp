@@ -3669,13 +3669,13 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ApplyCenterItemS
 }
 
 /**
- * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeNotApplied001
- * @tc.desc: Test ApplyCenterItemSelectedStyle does not apply MARQUEE overflow — both
- *            textOverflow and maxLines are reset so marquee effect does not take effect.
+ * @tc.name: ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeApplied001
+ * @tc.desc: Test ApplyCenterItemSelectedStyle applies MARQUEE overflow — both
+ *            textOverflow and maxLines are set so marquee effect takes effect.
  * @tc.type: FUNC
  */
 HWTEST_F(ContainerPickerPatternTest,
-    ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeNotApplied001, TestSize.Level1)
+    ContainerPickerPatternTest_ApplyCenterItemSelectedStyle_MarqueeApplied001, TestSize.Level1)
 {
     auto frameNode = CreateContainerPickerNode();
     ASSERT_NE(frameNode, nullptr);
@@ -3701,8 +3701,10 @@ HWTEST_F(ContainerPickerPatternTest,
     Color applyColor = Color::RED;
     pattern->ApplyCenterItemSelectedStyle(textLayoutProperty, applyColor);
 
-    EXPECT_FALSE(textLayoutProperty->HasTextOverflow());
-    EXPECT_FALSE(textLayoutProperty->HasMaxLines());
+    EXPECT_TRUE(textLayoutProperty->HasTextOverflow());
+    EXPECT_TRUE(textLayoutProperty->HasMaxLines());
+    EXPECT_EQ(textLayoutProperty->GetTextOverflow().value(), TextOverflow::MARQUEE);
+    EXPECT_EQ(textLayoutProperty->GetMaxLines().value(), 1);
 }
 
 /**

@@ -3056,11 +3056,9 @@ private onYearChange(selectedIndex: int): void {
         const followingWidthPx: number = this.getFollowingWidthPx(columnIndex);
         const remainingStart: number = Math.max(0, rawStartPx - precedingWidthPx);
         const remainingEnd: number = Math.max(0, rawEndPx - followingWidthPx);
-        const safetyMargin: number = 2;
-        const safeColumnWidth: number = Math.max(0, currentColumnWidthPx - safetyMargin);
-        const cappedStart: number = Math.min(remainingStart, safeColumnWidth);
+        const cappedStart: number = Math.min(remainingStart, currentColumnWidthPx);
         adjustedStartMargin = cappedStart > 0 ? LengthMetrics.px(cappedStart) : undefined;
-        const cappedEnd: number = Math.min(remainingEnd, safeColumnWidth);
+        const cappedEnd: number = Math.min(remainingEnd, currentColumnWidthPx);
         adjustedEndMargin = cappedEnd > 0 ? LengthMetrics.px(cappedEnd) : undefined;
       }
     } else {

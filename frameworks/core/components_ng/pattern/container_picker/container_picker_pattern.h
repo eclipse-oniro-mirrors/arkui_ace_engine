@@ -224,6 +224,7 @@ public:
     void SetSelectedTextStyle(bool isUpdateTextStyle);
     void ApplyTextStyleToItem(const RefPtr<FrameNode>& node, bool isSelected);
     Dimension LinearFontSize(const Dimension& startFontSize, const Dimension& endFontSize, double percent);
+    FontWeight LinearFontWeight(FontWeight start, FontWeight end, double percent);
     void AddAnimationTextProperties(int32_t currentIndex, const RefPtr<TextLayoutProperty>& textLayoutProperty);
     void UpdateTextPropertiesLinear(bool isDown, double scale);
     void TextPropertiesLinearAnimation(const RefPtr<TextLayoutProperty>& textLayoutProperty, int32_t index,
