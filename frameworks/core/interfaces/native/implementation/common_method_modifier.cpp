@@ -111,6 +111,8 @@
 #include "core/components/common/properties/placement.h"
 #include "core/components_ng/animation/geometry_transition.h"
 #include "core/interfaces/native/node/select_modifier.h"
+#include "core/event/function_key_name.h"
+#include "core/event/key_event.h"
 
 using namespace OHOS::Ace::NG::Converter;
 
@@ -7364,10 +7366,17 @@ void SetKeyboardShortcutImpl(Ark_NativePointer node,
         ViewAbstractModelStatic::SetKeyboardShortcut(frameNode, {}, {}, nullptr);
         return;
     }
-    auto strValue = Converter::OptConvertPtr<std::string>(value);
-    if (value->value.selector == 0 && (!strValue.has_value() || strValue.value().size() != 1)) {
-        ViewAbstractModelStatic::SetKeyboardShortcut(frameNode, {}, {}, nullptr);
-        return;
+    std::optional<std::string> strValue;
+    if (value->value.selector == 1) {
+        // FunctionKey: convert the enum value to its canonical name string via the
+        // core mapping (KeyEvent::GetFunctionKeyName), shared with the dynamic frontend.
+        strValue = GetFunctionKeyName(static_cast<FunctionKey>(value->value.value1));
+    } else {
+        strValue = Converter::OptConvertPtr<std::string>(value);
+        if (!strValue.has_value() || strValue.value().size() != 1) {
+            ViewAbstractModelStatic::SetKeyboardShortcut(frameNode, {}, {}, nullptr);
+            return;
+        }
     }
     auto keysOptVect = Converter::OptConvertPtr<std::vector<std::optional<ModifierKey>>>(keys);
     if (!keysOptVect) {

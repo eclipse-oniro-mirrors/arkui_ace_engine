@@ -27,6 +27,7 @@
 #include "core/common/container_scope.h"
 #include "core/common/frontend.h"
 #include "core/components/common/layout/constants.h"
+#include "core/event/function_key_name.h"
 #include "core/event/key_code.h"
 
 namespace OHOS::Ace::Napi {
@@ -247,14 +248,27 @@ static bool ParseShortcutValue(napi_env env, napi_value arg, std::string& outVal
     CHECK_NULL_RETURN(arg, false);
     napi_valuetype type = napi_undefined;
     napi_typeof(env, arg, &type);
-    if (type != napi_string) {
-        return false;
+    if (type == napi_string) {
+        char buffer[STR_BUFFER_SIZE] = { 0 };
+        size_t outSize = 0;
+        napi_get_value_string_utf8(env, arg, buffer, STR_BUFFER_SIZE, &outSize);
+        outValue.assign(buffer, outSize);
+        if (outValue.size() != 1) {
+            return false;
+        }
+        return true;
     }
-    char buffer[STR_BUFFER_SIZE] = { 0 };
-    size_t outSize = 0;
-    napi_get_value_string_utf8(env, arg, buffer, STR_BUFFER_SIZE, &outSize);
-    outValue.assign(buffer, outSize);
-    return true;
+    if (type == napi_number) {
+        // FunctionKey enum value: convert to canonical name string.
+        double numValue = 0;
+        if (napi_get_value_double(env, arg, &numValue) != napi_ok || !std::isfinite(numValue) ||
+            std::trunc(numValue) != numValue) {
+            return false;
+        }
+        outValue = GetFunctionKeyName(static_cast<FunctionKey>(static_cast<int32_t>(numValue)));
+        return !outValue.empty();
+    }
+    return false;
 }
 
 static bool ParseModifierKey(napi_env env, napi_value element, uint8_t& bit)
@@ -337,7 +351,7 @@ static napi_value JSRegisterApplicationShortcut(napi_env env, napi_callback_info
 
     std::string value;
     if (!ParseShortcutValue(env, argv[ARG_INDEX_ZERO], value)) {
-        LOGE("The first parameter must be a string.");
+        LOGE("The first parameter must be a string or FunctionKey.");
         return result;
     }
 

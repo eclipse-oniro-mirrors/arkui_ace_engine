@@ -61,6 +61,7 @@ import { ColumnLayoutAlgorithm } from "arkui/LayoutAlgorithm"
 import { CustomLayoutAlgorithm } from "arkui/LayoutAlgorithm"
 import { GridLayoutAlgorithm } from "arkui/LayoutAlgorithm"
 import { LazyLayoutAlgorithm } from "arkui/LazyLayoutAlgorithm"
+import { FunctionKey } from 'arkui/component/enums'
 
 export class ArkUIAniModule {
     static {
@@ -430,7 +431,7 @@ export class ArkUIAniModule {
     native static _DestroyWindowFreeContainer(instanceId: KInt): void
 
     // for UIContext
-    native static _RegisterApplicationShortcut(value: string, modifiers: KInt,
+    native static _RegisterApplicationShortcut(value: string, functionKey: KInt, modifiers: KInt,
         callback: (instanceId: KInt) => void): KInt
     native static _UnregisterApplicationShortcut(registrationId: KInt): void
     native static _GetCallingScopeUIContext(): KInt

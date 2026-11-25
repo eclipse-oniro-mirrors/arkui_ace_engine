@@ -42,6 +42,8 @@ public:
 
     bool TryTriggerApplicationShortcut(const KeyEvent& event, int32_t triggerInstanceId);
 
+    static bool IsValidShortcutValue(const std::string& value);
+
 private:
     ApplicationShortcutManager() = default;
     ~ApplicationShortcutManager() = default;

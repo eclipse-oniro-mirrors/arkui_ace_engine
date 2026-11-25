@@ -45,6 +45,8 @@
 #endif
 #include "drag_and_drop/native_drag_drop_global.h"
 #include "utils/ani_utils.h"
+#include "core/event/function_key_name.h"
+#include "core/event/key_event.h"
 
 namespace OHOS::Ace::Ani {
 namespace {
@@ -2076,7 +2078,7 @@ void ExecuteApplicationShortcutCallback(ani_vm* vm, ani_ref callback, int32_t in
 } // namespace
 
 ani_int RegisterApplicationShortcut(ani_env* env, [[maybe_unused]] ani_object obj, ani_string value,
-    ani_int modifiers, ani_fn_object callback)
+    ani_int functionKey, ani_int modifiers, ani_fn_object callback)
 {
     CHECK_NULL_RETURN(env, 0);
     CHECK_NULL_RETURN(callback, 0);
@@ -2093,7 +2095,18 @@ ani_int RegisterApplicationShortcut(ani_env* env, [[maybe_unused]] ani_object ob
         return 0;
     }
     auto callbackRef = std::make_shared<ApplicationShortcutCallbackRef>(vm, ref);
-    auto shortcut = AniUtils::ANIStringToStdString(env, value);
+    // The TS layer discriminates string vs FunctionKey (via instanceof + valueOf, same as
+    // the component shortcut peer) and passes the numeric value as functionKey. -1 means
+    // the value is a string. This avoids ani_object method-call extraction at the C++ level.
+    std::string shortcut;
+    if (functionKey >= 0) {
+        shortcut = GetFunctionKeyName(static_cast<FunctionKey>(functionKey));
+    } else {
+        shortcut = AniUtils::ANIStringToStdString(env, value);
+        if (shortcut.size() != 1) {
+            return 0;
+        }
+    }
     return common->registerApplicationShortcut(shortcut, static_cast<uint8_t>(modifiers),
         [vm, callbackRef](int32_t instanceId) {
             ExecuteApplicationShortcutCallback(vm, callbackRef->Get(), instanceId);

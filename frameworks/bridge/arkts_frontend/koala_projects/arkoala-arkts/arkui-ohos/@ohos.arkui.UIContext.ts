@@ -75,7 +75,7 @@ import { BusinessError, ErrorCallback, RecordData } from '@ohos.base'
 import { ArkUIGeneratedNativeModule } from '#components';
 import { GlobalScopeUicontextFontScale, GlobalScopeUicontextTextMenu } from "#generated"
 import { deserializeAndCallCallback } from 'arkui/framework/peers/CallbackDeserializeCall';
-import { RawInputEventType, SmartGestureAction, OperateIntention } from 'arkui/component/enums';
+import { RawInputEventType, SmartGestureAction, OperateIntention, FunctionKey } from 'arkui/component/enums';
 import { TouchEvent, MouseEvent, TouchEventHandwritten, RawInputEventWrapper } from 'arkui/component/common';
 
 export enum GestureActionPhase {
@@ -914,7 +914,7 @@ export class UIContext {
 
     callCallbacks(): void {}
 
-    static registerApplicationShortcut(value: string, keys: Array<ModifierKey>,
+    static registerApplicationShortcut(value: string | FunctionKey, keys: Array<ModifierKey>,
         callback: Callback<ApplicationShortcutCallbackInfo>): int32 {
         let modifiers: int32 = 0;
         for (const key of keys) {
@@ -933,7 +933,14 @@ export class UIContext {
             }
             modifiers |= bit;
         }
-        const registrationId = ArkUIAniModule._RegisterApplicationShortcut(value, modifiers,
+        let valueStr: string = '';
+        let functionKey: int32 = -1;
+        if (value instanceof FunctionKey) {
+            functionKey = value.valueOf();
+        } else {
+            valueStr = value;
+        }
+        const registrationId = ArkUIAniModule._RegisterApplicationShortcut(valueStr, functionKey, modifiers,
             (instanceId: int32): void => {
                 const info: ApplicationShortcutCallbackInfo = {
                     uiContext: UIContextUtil.getOrCreateUIContextById(instanceId)
