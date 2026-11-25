@@ -1355,6 +1355,11 @@ void JsCardParser::ParseVariable(
     std::string& value, const std::unique_ptr<JsonValue>& dataJson, const std::unique_ptr<JsonValue>& propsJson)
 {
     baseDepth_++;
+    // Guard at entry: ParseComplexExpression may short-circuit GetVariable.
+    if (baseDepth_ >= maxDepth_) {
+        baseDepth_ = 0;
+        return;
+    }
     // {{value}} --> value
     auto variable = value.substr(2, value.size() - 4);
     if (GetAndParseProps(variable, propsJson) || ParseComplexExpression(variable, dataJson) ||
