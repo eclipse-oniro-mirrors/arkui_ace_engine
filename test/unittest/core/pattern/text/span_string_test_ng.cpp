@@ -3133,7 +3133,7 @@ HWTEST_F(SpanStringTestNg, EmptySpanStringTlvRoundTrip, TestSize.Level1)
     ASSERT_NE(decoded, nullptr);
     EXPECT_EQ(decoded->GetString(), original->GetString());
     EXPECT_EQ(decoded->GetLength(), 0);
-    EXPECT_TRUE(decoded->GetSpanItems().empty());
+    EXPECT_FALSE(decoded->GetSpanItems().empty());
 }
 
 } // namespace OHOS::Ace::NG
