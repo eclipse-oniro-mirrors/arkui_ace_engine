@@ -884,8 +884,8 @@ void ContainerPickerPattern::ApplyCenterItemSelectedStyle(
             textLayoutProperty->UpdateTextOverflow(selectedTextStyle_.textOverflow.value());
             textLayoutProperty->UpdateMaxLines(1);
         } else {
-            textLayoutProperty->ResetTextOverflow();
-            textLayoutProperty->ResetMaxLines();
+            textLayoutProperty->UpdateTextOverflow(TextOverflow::MARQUEE);
+            textLayoutProperty->UpdateMaxLines(1);
         }
     }
     textLayoutProperty->UpdateAlignment(Alignment::CENTER);

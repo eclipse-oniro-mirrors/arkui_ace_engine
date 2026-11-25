@@ -3564,11 +3564,9 @@ export class DatePickerComponent extends ViewPU {
                 const followingWidthPx = this.getFollowingWidthPx(columnIndex);
                 const remainingStart = Math.max(0, rawStartPx - precedingWidthPx);
                 const remainingEnd = Math.max(0, rawEndPx - followingWidthPx);
-                const safetyMargin = 2;
-                const safeColumnWidth = Math.max(0, currentColumnWidthPx - safetyMargin);
-                const cappedStart = Math.min(remainingStart, safeColumnWidth);
+                const cappedStart = Math.min(remainingStart, currentColumnWidthPx);
                 adjustedStartMargin = cappedStart > 0 ? LengthMetrics.px(cappedStart) : undefined;
-                const cappedEnd = Math.min(remainingEnd, safeColumnWidth);
+                const cappedEnd = Math.min(remainingEnd, currentColumnWidthPx);
                 adjustedEndMargin = cappedEnd > 0 ? LengthMetrics.px(cappedEnd) : undefined;
             }
         }
