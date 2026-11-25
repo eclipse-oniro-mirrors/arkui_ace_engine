@@ -736,6 +736,29 @@ TEST(CommandResultTest, SpecialComponentFailureUsesDedicatedContract)
     EXPECT_FALSE(legacy->Contains("extraInfo"));
 }
 
+TEST(CommandResultTest, SendCommandCallbackTimeoutCoversDeclaredHold)
+{
+    const int32_t defaultWindow = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
+    // Nested cmd.action_info.hold_ms extends the window: default + hold + margin(500).
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":5000}}})"),
+        defaultWindow + 5000 + 500);
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":100}}})"),
+        defaultWindow + 100 + 500);
+    // Non-press_key commands keep the default window.
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"wheel_scroll","action_info":{"delta":1,"hold_ms":5000}}})"), defaultWindow);
+    // Out-of-range/negative input is rejected by the parser anyway; keep the default window.
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":-1}}})"), defaultWindow);
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":2147483647}}})"), defaultWindow);
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":100.5}}})"),
+        defaultWindow + 100 + 500);
+}
+
 TEST(CommandResultTest, PcUnavailableCodesPreserveMessagesAndLegacyContract)
 {
     struct UnavailableResult {

@@ -46,6 +46,11 @@ public:
         return true;
     }
 
+    bool HasProducedInput() const override
+    {
+        return clicksDone_ > 0;
+    }
+
 private:
     PointF coordinates_;
     int32_t clickCount_ = 1;

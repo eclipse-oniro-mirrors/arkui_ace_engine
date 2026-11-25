@@ -34,6 +34,10 @@ SimulateTouchExecutor::SimulateTouchExecutor(WeakPtr<PipelineContext> context, c
 
 ExecutorResult SimulateTouchExecutor::ExecuteStep()
 {
+    if (clicksDone_ >= clickCount_) {
+        // Completion guard: no further input after the declared click_count is delivered.
+        return ExecutorResult::SUCCESS;
+    }
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");

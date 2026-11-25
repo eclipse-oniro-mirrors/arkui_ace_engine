@@ -47,6 +47,13 @@ public:
         return 0;
     }
 
+    // Input already delivered by this executor (partial multi-click): used to stop AUTO
+    // fallback from replaying the full count after a partial success.
+    virtual bool HasProducedInput() const
+    {
+        return false;
+    }
+
     // P2 security seam: stamp deny callback and identity before execution.
     virtual void SetDenyCallback(RelaxedDenyCallback callback, const RelaxedCommandIdentity& identity)
     {
@@ -82,16 +89,23 @@ protected:
 
     FrameNodeMatch FindFrameNode(double x, double y, GestureRecognizerPred pred);
     bool IsTargetDeniedAt(double x, double y);
+
+    // Handles a hit on a special-component placeholder node (UIExtension/DynamicComponent):
+    // the security gate precedes any hit information (DENY nodes are audited and reported as
+    // SECURITY_DENIED without a payload); otherwise stashes nodeId + component-local offset
+    // (converted with the same NGGestureRecognizer::Transform used by real-input forwarding),
+    // records TARGET_NOT_FOUND failure state and returns true.
+    bool HandleSpecialComponentHit(const RefPtr<FrameNode>& node, double x, double y);
+
     WeakPtr<PipelineContext> context_;
     ExecutionState failureState_ = ExecutionState::FAILED;
     RelaxedDenyCallback denyCallback_;
     RelaxedCommandIdentity identity_;
 
 public:
-    // Detects a hit on a special-component placeholder node (UIExtension/DynamicComponent).
-    // On hit: records TARGET_NOT_FOUND failure state, stashes nodeId + component-local offset
-    // (converted with the same NGGestureRecognizer::Transform used by real-input forwarding)
-    // and returns true; the caller should return ExecutorResult::FAILED.
+    // Detects a hit on a special-component placeholder node (UIExtension/DynamicComponent)
+    // at the injection point; returns true when the caller should fail with the
+    // SEC_UEC_FAILED contract.
     bool DetectSpecialComponentHit(double x, double y);
 
     // Special-component hit payload consumed by the result serialization (SEC_UEC_FAILED).

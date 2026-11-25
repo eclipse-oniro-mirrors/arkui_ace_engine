@@ -5,6 +5,7 @@
 #include "core/components_ng/relaxed_interaction/executors/mouse_click_executor.h"
 
 #include <algorithm>
+#include <chrono>
 
 #include "core/components_ng/relaxed_interaction/utils/relaxed_event_factory.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -63,10 +64,13 @@ MouseClickExecutor::MouseClickExecutor(WeakPtr<PipelineContext> context, const C
     auto button = ToMouseButton(input.button);
     auto pressedKeys = ToModifierKeys(input.modifiers);
     for (int32_t index = 0; index < input.clickCount; ++index) {
+        // One press moment per click: PRESS and RELEASE share pressedTime (real mouse sequences
+        // keep the press-start time for the whole press/release cycle); action time stays per event.
+        const auto pressTime = std::chrono::high_resolution_clock::now();
         events_.emplace_back(RelaxedEventFactory::CreateMouseEvent(coordinates, MouseAction::PRESS, button,
-            static_cast<int32_t>(button), pressedKeys));
+            static_cast<int32_t>(button), pressedKeys, pressTime));
         events_.emplace_back(RelaxedEventFactory::CreateMouseEvent(coordinates, MouseAction::RELEASE, button,
-            0, pressedKeys));
+            0, pressedKeys, pressTime));
     }
 }
 

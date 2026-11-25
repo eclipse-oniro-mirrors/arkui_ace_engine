@@ -245,8 +245,10 @@ bool RelaxedInteractionManager::HandleWorkflowTimeout(std::function<void(Executi
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - workflow.startTime).count();
     // A declared hold extends the effective timeout: hold_ms can legitimately reach 5000 ms,
     // equal to the default window, so judge TIMEOUT only past hold + scheduling margin.
-    const auto effectiveTimeout =
-        std::max(commandTimeoutMs_, static_cast<int32_t>(workflow.holdDurationMs + WORKFLOW_TIMEOUT_MARGIN_MS));
+    // Workflows without a hold keep the configured window unchanged.
+    const auto effectiveTimeout = workflow.holdDurationMs > 0
+        ? std::max(commandTimeoutMs_, workflow.holdDurationMs + WORKFLOW_TIMEOUT_MARGIN_MS)
+        : commandTimeoutMs_;
     if (elapsed < static_cast<int64_t>(effectiveTimeout)) {
         return false;
     }
@@ -346,6 +348,12 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
                 auto failure = choreographer_->GetFailureState();
                 CompleteCurrentWorkflow(finishCallback, true);
                 return failure;
+            }
+            if (workflow.isPcCommand && choreographer_->CurrentExecutorHasProducedInput()) {
+                // The failed executor already delivered input (partial multi-click): a fallback
+                // would replay the full count, so finish the workflow as failed without fallback.
+                CompleteCurrentWorkflow(finishCallback, true);
+                return choreographer_->GetFailureState();
             }
             if (workflow.remainingExecutors > 0) {
                 --workflow.remainingExecutors;

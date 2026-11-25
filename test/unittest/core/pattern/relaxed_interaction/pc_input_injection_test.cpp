@@ -38,6 +38,9 @@
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_manager.h"
 #include "core/components_ng/relaxed_interaction/utils/relaxed_event_factory.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/pattern/command/ui_command_security_gate.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "test/mock/adapter/ohos/osal/mock_input_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 using namespace testing;
@@ -465,7 +468,8 @@ HWTEST_F(PcInputInjectionParserTest, Manager_CompletesWorkflowWithTimeout, TestS
             ++callbackCount;
         }, true), ProcessResult::SUCCESS);
     ASSERT_EQ(manager->ExecuteNextStep(), ExecutionState::RUNNING);
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    // hold_ms=100 extends the effective timeout to hold+margin(500)=600ms; judge past it.
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
     EXPECT_EQ(manager->ExecuteNextStep(), ExecutionState::TIMEOUT);
     EXPECT_EQ(observed, ExecutionState::TIMEOUT);
     EXPECT_FALSE(manager->HasPendingWorkflow());
@@ -1590,7 +1594,8 @@ HWTEST_F(PcCommandEntryTest, StandardEntry_TimeoutAndMalformedArgumentsReturnFix
     manager_->SetCommandTimeoutMs(1);
     Submit(PC_ENTRY_COMMANDS[3]);
     Flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    // hold_ms=1000 extends the effective timeout to hold+margin(500)=1500ms; judge past it.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1600));
     Flush();
     ASSERT_EQ(results_.size(), 1U);
     EXPECT_EQ(results_.front().errorType, RelaxedCommandErrorType::TIMEOUT);
@@ -1647,6 +1652,81 @@ HWTEST_F(PcInputInjectionParserTest, Manager_BoundaryHoldCompletesInsteadOfTimeo
     }
     EXPECT_EQ(result, NG::ExecutionState::SUCCESS);
     EXPECT_EQ(observed, NG::ExecutionState::SUCCESS);
+}
+
+HWTEST_F(PcInputInjectionParserTest, SpecialComponent_NodeHitProducesContractPayload, TestSize.Level1)
+{
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::UI_EXTENSION_COMPONENT_ETS_TAG, 1234, AceType::MakeRefPtr<Pattern>());
+    SimulateTouchExecutor executor(WeakPtr<PipelineContext>(), PointF(0.0f, 0.0f));
+    EXPECT_TRUE(executor.HandleSpecialComponentHit(frameNode, 100.0, 200.0));
+    EXPECT_EQ(executor.GetFailureState(), NG::ExecutionState::TARGET_NOT_FOUND);
+    NG::SpecialComponentHitInfo info;
+    NG::BaseExecutor::ConsumeSpecialComponentHit(info);
+    EXPECT_TRUE(info.hit);
+    EXPECT_EQ(info.nodeId, 1234);
+    // Default-matrix node keeps the input coordinates after the transform.
+    EXPECT_FLOAT_EQ(info.offsetX, 100.0f);
+    EXPECT_FLOAT_EQ(info.offsetY, 200.0f);
+    NG::BaseExecutor::ClearSpecialComponentHit();
+}
+
+HWTEST_F(PcInputInjectionParserTest, SpecialComponent_DeniedNodeReportsSecurityWithoutPayload, TestSize.Level1)
+{
+    // needSecurityAuth + DENY node + control permission: the security gate precedes the
+    // special-component contract (SECURITY_DENIED, audited, and no hit payload is carried).
+    const bool savedGranted = MockInputManager::controlComponentPermissionGranted;
+    MockInputManager::controlComponentPermissionGranted = true;
+    NG::UiCommandSecurityGate::SetContext(NG::CommandSecurityContext { true, 234 });
+    auto frameNode = FrameNode::CreateFrameNode(
+        V2::UI_EXTENSION_COMPONENT_ETS_TAG, 5678, AceType::MakeRefPtr<Pattern>());
+    frameNode->SetAgentControlMode(AgentControlMode::DENY);
+    SimulateTouchExecutor executor(WeakPtr<PipelineContext>(), PointF(0.0f, 0.0f));
+    EXPECT_TRUE(executor.HandleSpecialComponentHit(frameNode, 100.0, 200.0));
+    EXPECT_EQ(executor.GetFailureState(), NG::ExecutionState::SECURITY_DENIED);
+    NG::SpecialComponentHitInfo info;
+    NG::BaseExecutor::ConsumeSpecialComponentHit(info);
+    EXPECT_FALSE(info.hit);
+    NG::UiCommandSecurityGate::ClearContext();
+    MockInputManager::controlComponentPermissionGranted = savedGranted;
+}
+
+HWTEST_F(PcInputInjectionParserTest, SimulateTouchExecutor_ReportsProducedInput, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    SimulateTouchExecutor executor(context, PointF(10.0f, 20.0f), 2);
+    EXPECT_FALSE(executor.HasProducedInput());
+    EXPECT_EQ(executor.ExecuteStep(), ExecutorResult::PENDING);
+    EXPECT_TRUE(executor.HasProducedInput());
+}
+
+HWTEST_F(PcInputInjectionParserTest, MouseClickExecutor_KeepsPressedTimeWithinClick, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    ClickInput input;
+    input.clickCount = 2;
+    MouseClickExecutor executor(context, input);
+    for (int32_t index = 0; index < 4; ++index) {
+        executor.ExecuteStep();
+    }
+    ASSERT_EQ(context->mice.size(), 4U);
+    // PRESS and RELEASE of one click share the press moment; different clicks differ.
+    EXPECT_EQ(context->mice[0].pressedTime, context->mice[1].pressedTime);
+    EXPECT_EQ(context->mice[2].pressedTime, context->mice[3].pressedTime);
+    EXPECT_NE(context->mice[0].pressedTime, context->mice[2].pressedTime);
+}
+
+HWTEST_F(PcInputInjectionParserTest, MouseMove_KeepsPressedTimeAcrossSequence, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    PressAndMoveExecutor executor(context, RecoveryMoveInput(MoveInputType::MOUSE));
+    for (int32_t index = 0; index < 10; ++index) {
+        executor.ExecuteStep();
+    }
+    ASSERT_EQ(context->mice.size(), 10U);
+    // The whole press/move/release sequence shares one press moment.
+    EXPECT_EQ(context->mice.front().pressedTime, context->mice.back().pressedTime);
+    EXPECT_EQ(context->mice[4].pressedTime, context->mice.front().pressedTime);
 }
 
 } // namespace OHOS::Ace::NG

@@ -769,21 +769,11 @@ int32_t UIContentServiceProxy::SendCommand(
         SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback, securityAuth);
 }
 
-namespace {
-// The ACE-side effective timeout extends with a declared hold_ms (hold_ms can legitimately
-// reach the 5000 ms default window); keep the callback record past the server-side latest
-// completion so a boundary-hold result is not silently dropped.
-int32_t SendCommandCallbackTimeout(const std::string& command)
-{
-    int32_t callbackTimeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
-    if (auto commandJson = InspectorJsonUtil::ParseJsonString(command)) {
-        if (auto actionInfo = commandJson->GetValue("action_info")) {
-            callbackTimeout += actionInfo->GetInt("hold_ms", 0);
-        }
-    }
-    return callbackTimeout;
-}
-} // namespace
+// press_key parser bound (MAX_KEY_HOLD_DURATION_MS in relaxed_interaction): hold_ms beyond
+// this is invalid input and keeps the default window.
+constexpr int32_t MAX_PC_HOLD_MS = 5000;
+// Mirrors WORKFLOW_TIMEOUT_MARGIN_MS on the ACE side (scheduling slack past the hold).
+constexpr int32_t SEND_COMMAND_CALLBACK_MARGIN_MS = 500;
 
 int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
     uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback,
@@ -833,6 +823,33 @@ int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
         return REPLY_ERROR;
     }
     return NO_ERROR;
+}
+
+int32_t UIContentServiceProxy::SendCommandCallbackTimeout(const std::string& command)
+{
+    int32_t callbackTimeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
+    auto commandJson = InspectorJsonUtil::ParseJsonString(command);
+    if (!commandJson) {
+        return callbackTimeout;
+    }
+    // The declared hold lives at cmd.action_info.hold_ms and only press_key supports it.
+    auto cmd = commandJson->GetValue("cmd");
+    if (!cmd || !cmd->IsObject() || cmd->GetString("type") != "press_key") {
+        return callbackTimeout;
+    }
+    auto actionInfo = cmd->GetValue("action_info");
+    if (!actionInfo || !actionInfo->IsObject() || !actionInfo->Contains("hold_ms")) {
+        return callbackTimeout;
+    }
+    const int32_t holdMs = actionInfo->GetInt("hold_ms", -1);
+    if (holdMs < 0 || holdMs > MAX_PC_HOLD_MS) {
+        // Out-of-range/negative input is rejected by the parser anyway; keep the default window.
+        return callbackTimeout;
+    }
+    // Default window + declared hold + scheduling margin, mirroring the ACE-side effective
+    // timeout (max(default, hold + margin)) with extra slack for IPC and task dispatch.
+    const int64_t extended = static_cast<int64_t>(callbackTimeout) + holdMs + SEND_COMMAND_CALLBACK_MARGIN_MS;
+    return static_cast<int32_t>(extended);
 }
 
 int32_t UIContentServiceProxy::UnregisterClickEventCallback()

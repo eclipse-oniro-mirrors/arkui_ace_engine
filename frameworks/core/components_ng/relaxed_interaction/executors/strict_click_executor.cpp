@@ -30,6 +30,10 @@ StrictClickExecutor::StrictClickExecutor(WeakPtr<PipelineContext> context, const
 
 ExecutorResult StrictClickExecutor::ExecuteStep()
 {
+    if (clicksDone_ >= clickCount_) {
+        // Completion guard: no further input after the declared click_count is delivered.
+        return ExecutorResult::SUCCESS;
+    }
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "StrictClickExecutor ExecuteStep begin.");
     auto context = context_.Upgrade();
     if (!context) {

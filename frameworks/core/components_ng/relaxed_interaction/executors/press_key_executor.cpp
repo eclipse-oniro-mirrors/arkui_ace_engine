@@ -31,8 +31,12 @@ PressKeyExecutor::PressKeyExecutor(WeakPtr<PipelineContext> context, const KeyIn
         events_.emplace_back(RelaxedEventFactory::CreateKeyEvent(key, KeyAction::DOWN, pressedKeys));
     }
     for (auto iter = input.keys.rbegin(); iter != input.keys.rend(); ++iter) {
+        // Intention is computed from the pre-release set (including the key being released),
+        // matching the real pipeline where intention precedes key removal; the externally
+        // visible pressedCodes stay post-release (DispatchKeyEvent refreshes them).
+        const std::vector<KeyCode> intentionCodes = pressedKeys;
         pressedKeys.erase(std::remove(pressedKeys.begin(), pressedKeys.end(), *iter), pressedKeys.end());
-        events_.emplace_back(RelaxedEventFactory::CreateKeyEvent(*iter, KeyAction::UP, pressedKeys));
+        events_.emplace_back(RelaxedEventFactory::CreateKeyEvent(*iter, KeyAction::UP, intentionCodes));
     }
 }
 

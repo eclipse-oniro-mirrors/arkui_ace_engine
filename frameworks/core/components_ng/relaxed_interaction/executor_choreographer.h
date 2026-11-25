@@ -48,6 +48,13 @@ public:
         return currentExecutor_ != nullptr;
     }
 
+    // Whether the running executor already delivered input (partial multi-click): a later
+    // failure must not trigger the AUTO fallback, which would replay the full count.
+    bool CurrentExecutorHasProducedInput() const
+    {
+        return currentExecutor_ && currentExecutor_->HasProducedInput();
+    }
+
     bool HasNext() const
     {
         return !executorQueue_.empty();

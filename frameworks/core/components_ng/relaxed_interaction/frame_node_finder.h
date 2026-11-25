@@ -19,6 +19,7 @@
 #include <string>
 #include <set>
 #include <utility>
+#include <vector>
 
 #include "base/memory/referenced.h"
 #include "core/components_ng/base/frame_node.h"
@@ -115,6 +116,11 @@ public:
      * @return RefPtr<FrameNode> Pointer to the found FrameNode, returns nullptr if not found
      */
     FrameNodeMatch FindAt(float x, float y);
+
+    // TouchTest at the point and return the attached nodes of ALL touch targets (gesture
+    // recognizers and TouchEventImpl targets alike), with gesture referee state cleanup
+    // applied, so tag-based probing can see nodes that register no gesture recognizers.
+    std::vector<RefPtr<FrameNode>> FindAtRawNodes(float x, float y);
 
 private:
     WeakPtr<PipelineContext> context_;

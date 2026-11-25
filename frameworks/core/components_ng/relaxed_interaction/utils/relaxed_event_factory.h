@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_UTILS_RELAXED_EVENT_FACTORY_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RELAXED_INTERACTION_UTILS_RELAXED_EVENT_FACTORY_H
 
+#include <chrono>
+
 #include "base/geometry/ng/point_t.h"
 #include "base/geometry/offset.h"
 #include "core/event/axis_event.h"
@@ -37,7 +39,8 @@ public:
     static TouchEvent CreateTouchEvent(const PointF& coordinates, TouchType touchType);
 
     static MouseEvent CreateMouseEvent(const PointF& coordinates, MouseAction action, MouseButton button,
-        int32_t pressedButtons, const std::vector<KeyCode>& pressedKeyCodes);
+        int32_t pressedButtons, const std::vector<KeyCode>& pressedKeyCodes,
+        const TimeStamp& pressedTime = std::chrono::high_resolution_clock::now());
 
     static AxisEvent CreateAxisEvent(const PointF& coordinates, double delta,
         const std::vector<KeyCode>& pressedCodes);

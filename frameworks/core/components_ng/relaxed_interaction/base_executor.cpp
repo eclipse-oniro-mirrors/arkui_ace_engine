@@ -45,10 +45,30 @@ thread_local SpecialComponentHitInfo BaseExecutor::specialComponentHit_;
 bool BaseExecutor::DetectSpecialComponentHit(double x, double y)
 {
     FrameNodeFinder finder(context_, [](const RefPtr<NGGestureRecognizer>&) { return true; });
-    auto result = finder.FindAt(static_cast<float>(x), static_cast<float>(y));
-    auto node = result.GetNode();
-    if (!node || !IsSpecialComponentTag(node->GetTag())) {
+    for (const auto& node : finder.FindAtRawNodes(static_cast<float>(x), static_cast<float>(y))) {
+        if (node && IsSpecialComponentTag(node->GetTag()) && HandleSpecialComponentHit(node, x, y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool BaseExecutor::HandleSpecialComponentHit(const RefPtr<FrameNode>& node, double x, double y)
+{
+    if (!node) {
         return false;
+    }
+    // Security gate precedes any hit information: a DENY-marked node is audited via
+    // ReportDeniedCommand and reported as SECURITY_DENIED without a hit payload, so the
+    // special-component contract never bypasses or leaks through the security gate.
+    const auto& security = UiCommandSecurityGate::GetContext();
+    if (UiCommandSecurityGate::IsCommandDenied(node, security.needSecurityAuth)) {
+        UiCommandSecurityGate::ReportDeniedCommand(node, security);
+        specialComponentHit_ = SpecialComponentHitInfo();
+        SetFailureState(ExecutionState::SECURITY_DENIED);
+        WorkflowDumper::GetInstance().AddLog(
+            "Special component node denied by security gate " + node->ToString());
+        return true;
     }
     // Same conversion as real-input forwarding (Platform::CalculatePointerEvent):
     // window-client coordinates -> component-local coordinates via the placeholder's

@@ -136,7 +136,8 @@ TouchEvent RelaxedEventFactory::CreateTouchEvent(const PointF& coordinates, Touc
 }
 
 MouseEvent RelaxedEventFactory::CreateMouseEvent(const PointF& coordinates, MouseAction action,
-    MouseButton button, int32_t pressedButtons, const std::vector<KeyCode>& pressedKeyCodes)
+    MouseButton button, int32_t pressedButtons, const std::vector<KeyCode>& pressedKeyCodes,
+    const TimeStamp& pressedTime)
 {
     MouseEvent event;
     auto now = std::chrono::high_resolution_clock::now();
@@ -147,7 +148,7 @@ MouseEvent RelaxedEventFactory::CreateMouseEvent(const PointF& coordinates, Mous
     event.globalDisplayX = coordinates.GetX();
     event.globalDisplayY = coordinates.GetY();
     event.time = now;
-    event.pressedTime = now;
+    event.pressedTime = pressedTime;
     event.action = action;
     event.button = button;
     event.pressedButtons = pressedButtons;
