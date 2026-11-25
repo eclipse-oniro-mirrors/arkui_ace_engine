@@ -1564,7 +1564,6 @@ HWTEST_F(ButtonFunctionTestNg, IsDefaultResponseRegionExpandingNeeded002, TestSi
 
     auto buttonPattern = frameNode->GetPattern<ButtonPattern>();
     ASSERT_NE(buttonPattern, nullptr);
-    AceApplicationInfo::GetInstance().apiVersion_ = static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX);
 
     auto layoutProperty = frameNode->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
@@ -1575,7 +1574,10 @@ HWTEST_F(ButtonFunctionTestNg, IsDefaultResponseRegionExpandingNeeded002, TestSi
     ASSERT_TRUE(calcLayoutConstraint->selfIdealSize.has_value());
     EXPECT_FALSE(calcLayoutConstraint->selfIdealSize->Height().has_value());
 
+    auto backupApiVersion = frameNode->apiVersion_;
+    frameNode->apiVersion_ = static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX);
     EXPECT_TRUE(buttonPattern->IsDefaultResponseRegionExpandingNeeded(SourceType::TOUCH));
+    frameNode->apiVersion_ = backupApiVersion;
 }
 
 /**

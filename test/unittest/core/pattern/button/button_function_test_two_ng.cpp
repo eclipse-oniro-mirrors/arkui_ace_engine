@@ -24,6 +24,7 @@
 #define protected public
 #define private public
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -2342,7 +2343,10 @@ HWTEST_F(ButtonFunctionTestTwoNg, OnThemeScopeUpdate001, TestSize.Level1)
      * @tc.steps: step3. Call OnThemeScopeUpdate.
      * @tc.expected: step3. OnThemeScopeUpdate returns true because FontColorFlagByUser is false.
      */
+    MockContainer::SetUp();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
     auto result = pattern->OnThemeScopeUpdate(0);
+    MockContainer::TearDown();
     EXPECT_TRUE(result);
 }
 
@@ -2378,7 +2382,10 @@ HWTEST_F(ButtonFunctionTestTwoNg, OnThemeScopeUpdate002, TestSize.Level1)
      * @tc.steps: step3. Call OnThemeScopeUpdate.
      * @tc.expected: step3. OnThemeScopeUpdate returns true because IsUserSetBackgroundColor is false.
      */
+    MockContainer::SetUp();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
     auto result = pattern->OnThemeScopeUpdate(0);
+    MockContainer::TearDown();
     EXPECT_TRUE(result);
 }
 
@@ -2416,7 +2423,10 @@ HWTEST_F(ButtonFunctionTestTwoNg, OnThemeScopeUpdate003, TestSize.Level1)
      * @tc.steps: step3. Call OnThemeScopeUpdate.
      * @tc.expected: step3. OnThemeScopeUpdate returns true and updates text color.
      */
+    MockContainer::SetUp();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
     auto result = pattern->OnThemeScopeUpdate(0);
+    MockContainer::TearDown();
     EXPECT_TRUE(result);
 }
 
@@ -2461,7 +2471,10 @@ HWTEST_F(ButtonFunctionTestTwoNg, OnThemeScopeUpdate004, TestSize.Level1)
      * @tc.steps: step4. Call OnThemeScopeUpdate.
      * @tc.expected: step4. OnThemeScopeUpdate returns true.
      */
+    MockContainer::SetUp();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
     auto result = pattern->OnThemeScopeUpdate(0);
+    MockContainer::TearDown();
     EXPECT_TRUE(result);
 
     /**
