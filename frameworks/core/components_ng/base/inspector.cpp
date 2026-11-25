@@ -713,7 +713,7 @@ void Inspector::GetRectangleById(const std::string& key, Rectangle& rectangle)
 {
     auto frameNode = Inspector::GetFrameNodeByKey(key, true);
     if (!frameNode) {
-        LOGW("Can't find component, check your parameters");
+        LOGD("Can't find component, check your parameters");
         return;
     }
     rectangle.size = frameNode->GetGeometryNode()->GetFrameSize();
