@@ -123,6 +123,11 @@ public:
     std::vector<RefPtr<FrameNode>> FindAtRawNodes(float x, float y);
 
 private:
+    void RunTouchTest(float x, float y, TouchEvent& touchPoint, TouchTestResult& touchTestResult);
+    void CollectAttachedNodes(
+        const TouchTestResult& touchTestResult, int32_t touchId, std::vector<RefPtr<FrameNode>>& nodes);
+
+private:
     WeakPtr<PipelineContext> context_;
     GestureRecognizerPred pred_;
 
