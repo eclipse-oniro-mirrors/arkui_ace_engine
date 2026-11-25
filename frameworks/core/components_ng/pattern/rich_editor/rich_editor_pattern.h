@@ -802,6 +802,7 @@ public:
     void UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValueBase> value) override;
     void OnColorModeChange(uint32_t colorMode) override;
     void OnColorConfigurationUpdate() override;
+    void OnSkinConfigurationUpdate() override;
     void HandleColorConfigurationUpdate();
     bool IsDisabled() const override;
     float GetLineHeight() const override;

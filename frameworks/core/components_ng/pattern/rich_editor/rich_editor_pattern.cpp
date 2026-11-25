@@ -7217,6 +7217,14 @@ void RichEditorPattern::OnColorConfigurationUpdate()
     HandleColorConfigurationUpdate();
 }
 
+// skin_change callback: refresh already-rendered span/URL colors on skin/theme change
+void RichEditorPattern::OnSkinConfigurationUpdate()
+{
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "OnSkinConfigurationUpdate");
+    Pattern::OnSkinConfigurationUpdate();
+    HandleColorConfigurationUpdate();
+}
+
 // withTheme callback
 bool RichEditorPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 {
