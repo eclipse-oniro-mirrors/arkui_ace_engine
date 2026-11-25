@@ -540,17 +540,25 @@ public:
         float scrollSnapDelta, float scrollSnapVelocity, bool fromScrollBar, int32_t source = SCROLL_FROM_NONE,
         bool useSlowSpring = false);
 
-    // Feat-20260806915268: two-stage item snap for a custom ScrollSnapOffsetProvider — approach spring by
-    // [approachDelta], then a [targetGetter]-resolved final spring (stage contract in
-    // scrollable_item_snap.cpp; approach is skipped when [approachDelta] is near zero).
+    // Provider approach follows the original fling budget, extended only if approachDelta is farther.
+    // It hands off at approachDelta inside budget, or after completion at/beyond budget.
+    // Zero approachDelta skips directly to the targetGetter-resolved final spring.
     void StartItemSnapTwoStageAnimation(float approachDelta, float scrollSnapVelocity, bool fromScrollBar,
-        std::function<float(float handoffVelocity)>&& targetGetter, int32_t source = SCROLL_FROM_NONE);
+        std::function<float(float handoffVelocity)>&& targetGetter, int32_t source = SCROLL_FROM_NONE,
+        float flingDelta = 0.0f);
 
     // Runs one spring stage of the two-stage item snap; invoked with finalStage=true by the handoff of
     // the approach stage. Not intended for external use.
-    void RunItemSnapStage(float endPos, float velocity, bool finalStage, std::function<void(float, float)>&& onHandoff);
+    void RunItemSnapStage(float endPos, float velocity, bool finalStage, std::function<void(float)>&& onHandoff);
 
 private:
+    void RunItemSnapApproach(
+        float approachDelta, float flingDelta, float velocity, std::function<void(float)>&& onHandoff);
+    bool ProcessItemSnapApproach(float position);
+    bool UpdateSnapVelocity(float position);
+    float GetFlingFriction() const;
+    void CompleteItemSnapApproach(uint32_t generation, float position);
+    void FlushItemSnapAnimationStart();
     bool TryItemSnapTakeover();
     void ProcessItemSnapFrictionFrame(float position);
     void CompleteItemSnapTakeover(uint32_t generation, float remaining, float velocity);
@@ -560,9 +568,9 @@ private:
     void CancelItemSnapChain();
 
     void OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source,
-        std::function<void(float, float)>&& onHandoff);
-    void PostItemSnapHandoff(uint32_t generation, float providerVelocity, float motionVelocity,
-        std::function<void(float, float)>&& onHandoff);
+        std::function<void(float)>&& onHandoff);
+    void FinalizeItemSnapStage(int32_t source);
+    void PostItemSnapHandoff(uint32_t generation, float velocity, std::function<void(float)>&& onHandoff);
 
 public:
 
@@ -612,6 +620,7 @@ public:
     void SetItemSnapLookaheadDistance(float distance);
     void MarkItemSnapChainActive();
     void SetPendingItemSnapKickoff(std::function<void()>&& kickoff);
+    void StartScrollBarSnapFling(float mainPosition, SnapAnimationOptions options);
     void FlushPendingItemSnapKickoff();
     void SetDeferItemSnapKickoff(bool defer);
     // Returns whether the snap callback took over the motion (a settle spring is now in
@@ -792,6 +801,8 @@ private:
     void ProcessPanActionEndEvents(const GestureEvent& info);
     bool UpdateScrollPosition(double offset, int32_t source) const;
     void ProcessSpringMotion(double position);
+    bool TrySnapOnScrollMotionStop();
+    int32_t GetScrollMotionSource(int32_t source) const;
     void ProcessScrollMotion(double position, int32_t source = SCROLL_FROM_ANIMATION);
     void ProcessListSnapMotion(double position);
     void TriggerFrictionAnimation(float mainPosition, float friction, float correctVelocity);
@@ -936,9 +947,19 @@ private:
     bool snapAnimationFromScrollBar_ = false;
     int32_t snapAnimationSource_ = 0;
     float snapVelocity_ = 0.0f;
+    struct ItemSnapApproach {
+        uint32_t generation;
+        float endPos;
+        bool earlyHandoff;
+        std::function<void(float)> onHandoff;
+    };
+    std::optional<ItemSnapApproach> itemSnapApproach_;
     // Generation token of the two-stage item snap chain: bumped on every stage start and on
     // interruption so completion callbacks of superseded/interrupted stages are ignored.
     uint32_t itemSnapGeneration_ = 0;
+    // Stabilization stages published by the current chain (OnItemSnapStageFinished re-handoffs);
+    // bounded by MAX_ITEM_SNAP_STABILIZATIONS and reset on every chain start/cancel.
+    uint32_t itemSnapStabilizations_ = 0;
     // Feat-20260806915268: a friction fling is running whose stop must trigger the item snap settle
     // (built-in align). Cleared by the settle itself and by CancelItemSnapChain.
     bool needItemSnapSettle_ = false;

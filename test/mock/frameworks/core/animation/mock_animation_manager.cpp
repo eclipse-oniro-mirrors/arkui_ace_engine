@@ -144,6 +144,8 @@ bool MockAnimationManager::AllFinished()
 void MockAnimationManager::SetParams(const AnimationOption& option, AnimationCallbacks&& cbs)
 {
     params_.callbacks = std::move(cbs);
+    params_.curve = option.GetCurve();
+    params_.velocity = 0.0f;
     if (AceType::InstanceOf<InterpolatingSpring>(option.GetCurve()) || option.GetDuration() > 0) {
         params_.type = AnimationOperation::PLAY;
     } else {

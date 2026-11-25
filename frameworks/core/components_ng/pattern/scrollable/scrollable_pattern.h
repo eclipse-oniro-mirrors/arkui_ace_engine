@@ -1344,6 +1344,8 @@ private:
     float itemSnapReleaseMotionVelocity_ = 0.0f;
     void RefreshTrackedItemSnap();
     void PrepareItemSnapFling(float motionVelocity, float motionDelta);
+    bool IsItemSnapBlockedByScrollBar(const SnapAnimationOptions& snapAnimationOptions);
+    void QueueScrollBarSnapFling(const SnapAnimationOptions& snapAnimationOptions);
     SnapSelectResult SelectItemSnapForAxis(ScrollSnapAlign align, const std::vector<SnapCandidate>& candidates,
         float currentOffset, SnapDirection snapDirection);
     SnapSelectResult SelectItemSnapForAlign(const ScrollSnapStrategy& strategy,
