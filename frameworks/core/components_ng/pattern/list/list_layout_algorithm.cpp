@@ -2595,8 +2595,6 @@ void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapp
     if (decodeWindow <= 0) {
         return;
     }
-    auto host = layoutWrapper->GetHostNode();
-    CHECK_NULL_VOID(host);
 
     const int32_t startIndex = GetStartIndex();
     const int32_t endIndex = GetEndIndex();
