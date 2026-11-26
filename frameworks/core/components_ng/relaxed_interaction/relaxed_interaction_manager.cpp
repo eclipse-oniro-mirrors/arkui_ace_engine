@@ -349,7 +349,7 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
                 CompleteCurrentWorkflow(finishCallback, true);
                 return failure;
             }
-            if (workflow.isPcCommand && choreographer_->CurrentExecutorHasProducedInput()) {
+            if (workflow.isPcCommand && choreographer_->LastExecutorHasProducedInput()) {
                 // The failed executor already delivered input (partial multi-click): a fallback
                 // would replay the full count, so finish the workflow as failed without fallback.
                 CompleteCurrentWorkflow(finishCallback, true);

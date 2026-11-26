@@ -1615,7 +1615,26 @@ HWTEST_F(PcInputInjectionParserTest, PressKeyParser_HomeMapsToKeyboardMoveHome, 
     EXPECT_EQ(executors.front()->ExecuteStep(), ExecutorResult::SUCCESS);
     ASSERT_EQ(context->keys.size(), 2U);
     EXPECT_EQ(context->keys.front().code, KeyCode::KEY_MOVE_HOME);
-    EXPECT_EQ(context->keys.front().keyIntention, KeyIntention::INTENTION_HOME);
+    // DOWN and UP carry the HOME intention; UP pressedCodes stay post-release.
+    EXPECT_EQ(context->keys[0].keyIntention, KeyIntention::INTENTION_HOME);
+    EXPECT_EQ(context->keys[1].keyIntention, KeyIntention::INTENTION_HOME);
+    EXPECT_TRUE(context->keys[1].pressedCodes.empty());
+}
+
+HWTEST_F(PcInputInjectionParserTest, PressKey_CancelCompensationUpKeepsIntention, TestSize.Level1)
+{
+    // Cancel compensation UP also carries the pre-release intention (R7复审).
+    auto context = AceType::MakeRefPtr<PcRecoveryContext>();
+    KeyInput input {{KeyCode::KEY_MOVE_HOME}, 1000};
+    PressKeyExecutor executor(context, input);
+    ASSERT_EQ(executor.ExecuteStep(), ExecutorResult::PENDING);
+    executor.Cancel();
+    ASSERT_EQ(context->keys.size(), 2U);
+    EXPECT_EQ(context->keys.back().action, KeyAction::UP);
+    EXPECT_EQ(context->keys.back().code, KeyCode::KEY_MOVE_HOME);
+    EXPECT_EQ(context->keys.back().keyIntention, KeyIntention::INTENTION_HOME);
+    EXPECT_TRUE(context->keys.back().pressedCodes.empty());
+    EXPECT_TRUE(context->keys.back().msg.empty());
 }
 
 HWTEST_F(PcInputInjectionParserTest, SimulateTouchExecutor_RepeatsClickPerClickCount, TestSize.Level1)

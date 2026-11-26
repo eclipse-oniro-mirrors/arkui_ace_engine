@@ -61,9 +61,15 @@ void PressKeyExecutor::Cancel()
         if (context->IsDestroyed()) {
             break;
         }
+        // Intention from the pre-release set (including the key being released), matching
+        // the normal UP path and the real pipeline; the externally visible pressedCodes are
+        // filled with the post-release set right before dispatch.
+        const std::vector<KeyCode> intentionCodes = pressedKeys;
         const auto key = pressedKeys.back();
         pressedKeys.pop_back();
-        context->OnNonPointerEvent(RelaxedEventFactory::CreateKeyEvent(key, KeyAction::UP, pressedKeys));
+        auto event = RelaxedEventFactory::CreateKeyEvent(key, KeyAction::UP, intentionCodes);
+        event.pressedCodes = pressedKeys;
+        context->OnNonPointerEvent(event);
     }
 }
 

@@ -15,6 +15,9 @@
 
 #include "interfaces/inner_api/ui_session/ui_content_proxy.h"
 
+#include <cmath>
+
+#include "cJSON.h"
 #include "ipc_skeleton.h"
 
 #include "adapter/ohos/entrance/ui_session/content_change_config_impl.h"
@@ -841,14 +844,22 @@ int32_t UIContentServiceProxy::SendCommandCallbackTimeout(const std::string& com
     if (!actionInfo || !actionInfo->IsObject() || !actionInfo->Contains("hold_ms")) {
         return callbackTimeout;
     }
-    const int32_t holdMs = actionInfo->GetInt("hold_ms", -1);
-    if (holdMs < 0 || holdMs > MAX_PC_HOLD_MS) {
-        // Out-of-range/negative input is rejected by the parser anyway; keep the default window.
+    // Validate a finite integer in 0..MAX_PC_HOLD_MS BEFORE any conversion: GetInt would
+    // silently truncate fractions and overflow on huge values (the parser rejects both,
+    // so such input keeps the default window).
+    const auto* holdItem = cJSON_GetObjectItemCaseSensitive(actionInfo->GetJsonObject(), "hold_ms");
+    if (!holdItem || !cJSON_IsNumber(holdItem)) {
+        return callbackTimeout;
+    }
+    const double holdValue = holdItem->valuedouble;
+    const bool isFiniteInteger = std::isfinite(holdValue) && holdValue == std::floor(holdValue);
+    if (!isFiniteInteger || holdValue < 0.0 || holdValue > static_cast<double>(MAX_PC_HOLD_MS)) {
         return callbackTimeout;
     }
     // Default window + declared hold + scheduling margin, mirroring the ACE-side effective
     // timeout (max(default, hold + margin)) with extra slack for IPC and task dispatch.
-    const int64_t extended = static_cast<int64_t>(callbackTimeout) + holdMs + SEND_COMMAND_CALLBACK_MARGIN_MS;
+    const int64_t extended = static_cast<int64_t>(callbackTimeout) +
+        static_cast<int64_t>(holdValue) + SEND_COMMAND_CALLBACK_MARGIN_MS;
     return static_cast<int32_t>(extended);
 }
 

@@ -39,6 +39,9 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
         ExecutorResultToString(result));
     failureState_ = currentExecutor_->GetFailureState();
     if (result != ExecutorResult::PENDING) {
+        // Snapshot before reset: the manager must still see whether the finished
+        // executor delivered input (AUTO fallback suppression for partial multi-click).
+        lastExecutorHasProducedInput_ = currentExecutor_->HasProducedInput();
         currentExecutor_.reset();
     }
 

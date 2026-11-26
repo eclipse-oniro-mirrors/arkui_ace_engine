@@ -754,9 +754,10 @@ TEST(CommandResultTest, SendCommandCallbackTimeoutCoversDeclaredHold)
         R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":-1}}})"), defaultWindow);
     EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
         R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":2147483647}}})"), defaultWindow);
+    // Fractional hold_ms is rejected by the parser anyway; GetInt would truncate it, so the
+    // window keeps the default (consistent with the press_key contract, no partial extension).
     EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
-        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":100.5}}})"),
-        defaultWindow + 100 + 500);
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":100.5}}})"), defaultWindow);
 }
 
 TEST(CommandResultTest, PcUnavailableCodesPreserveMessagesAndLegacyContract)
