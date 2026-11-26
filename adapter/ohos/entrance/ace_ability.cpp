@@ -916,7 +916,8 @@ void AceAbility::OnAvoidAreaChanged(const OHOS::Rosen::AvoidArea& avoidArea, OHO
     auto safeArea = ConvertAvoidArea(avoidArea);
     ContainerScope scope(abilityId_);
     taskExecutor->PostTask(
-        [pipeline, safeArea, type]() {
+        [pipeline, safeArea, type, instanceId = abilityId_]() {
+            ContainerScope scope(instanceId);
             if (type == OHOS::Rosen::AvoidAreaType::TYPE_SYSTEM) {
                 pipeline->UpdateSystemSafeArea(safeArea);
             } else if (type == OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT) {

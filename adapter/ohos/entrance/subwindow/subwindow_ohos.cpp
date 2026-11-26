@@ -2537,12 +2537,19 @@ void SubwindowOhos::MarkDirtyDialogSafeArea()
     CHECK_NULL_VOID(aceContainer);
     auto context = DynamicCast<NG::PipelineContext>(aceContainer->GetPipelineContext());
     CHECK_NULL_VOID(context);
-    ContainerScope scope(context->GetInstanceId());
-    auto rootNode = context->GetRootElement();
-    CHECK_NULL_VOID(rootNode);
-    auto lastChild = rootNode->GetLastChild();
-    CHECK_NULL_VOID(lastChild);
-    lastChild->MarkDirtyNode(NG::PROPERTY_UPDATE_MEASURE);
+    auto instanceId = context->GetInstanceId();
+    auto taskExecutor = aceContainer->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    taskExecutor->PostTask(
+        [context, instanceId]() {
+            ContainerScope scope(instanceId);
+            auto rootNode = context->GetRootElement();
+            CHECK_NULL_VOID(rootNode);
+            auto lastChild = rootNode->GetLastChild();
+            CHECK_NULL_VOID(lastChild);
+            lastChild->MarkDirtyNode(NG::PROPERTY_UPDATE_MEASURE);
+        },
+        TaskExecutor::TaskType::UI, "ArkUISubwindowMarkDirtyDialogSafeArea");
 }
 
 bool SubwindowOhos::CheckHostWindowStatus() const

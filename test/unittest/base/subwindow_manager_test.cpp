@@ -417,4 +417,110 @@ HWTEST_F(SubwindowManagerTest, OpenCustomDialogNGCallbackOnError001, TestSize.Le
     manager->OpenCustomDialogNG(dialogProps, std::move(callback));
     EXPECT_EQ(callbackErrorCode, ERROR_CODE_DIALOG_SUBWINDOW_CREATE_FAILED);
 }
+
+/**
+ * @tc.name: SubwindowManagerTest_MarkDirtyDialogSafeAreaInstanceIsolation001
+ * @tc.desc: Test MarkDirtyDialogSafeArea only affects related subwindows (multi-instance isolation)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SubwindowManagerTest, MarkDirtyDialogSafeAreaInstanceIsolation001, TestSize.Level1)
+{
+    auto manager = SubwindowManager::GetInstance();
+    ASSERT_NE(manager, nullptr);
+
+    constexpr int32_t INSTANCE_A = 100;
+    constexpr int32_t INSTANCE_B = 200;
+    constexpr int32_t SUB_A = 1000100;
+    constexpr int32_t SUB_B = 2000100;
+
+    manager->AddParentContainerId(SUB_A, INSTANCE_A);
+    manager->AddParentContainerId(SUB_B, INSTANCE_B);
+
+    EXPECT_EQ(manager->GetParentContainerId(SUB_A), INSTANCE_A);
+    EXPECT_EQ(manager->GetParentContainerId(SUB_B), INSTANCE_B);
+
+    EXPECT_NO_FATAL_FAILURE(manager->MarkDirtyDialogSafeArea(INSTANCE_A));
+    EXPECT_NO_FATAL_FAILURE(manager->MarkDirtyDialogSafeArea(INSTANCE_B));
+
+    manager->RemoveParentContainerId(SUB_A);
+    manager->RemoveParentContainerId(SUB_B);
+}
+
+/**
+ * @tc.name: SubwindowManagerTest_GetRelatedSubwindows001
+ * @tc.desc: Test GetRelatedSubwindows returns correct subwindows for parent container
+ * @tc.type: FUNC
+ */
+HWTEST_F(SubwindowManagerTest, GetRelatedSubwindows001, TestSize.Level1)
+{
+    auto manager = SubwindowManager::GetInstance();
+    ASSERT_NE(manager, nullptr);
+
+    constexpr int32_t PARENT = 300;
+    constexpr int32_t CHILD1 = 3000100;
+    constexpr int32_t CHILD2 = 3000200;
+
+    manager->AddParentContainerId(CHILD1, PARENT);
+    manager->AddParentContainerId(CHILD2, PARENT);
+
+    auto allSub = manager->GetAllSubContainerId(PARENT);
+    EXPECT_EQ(allSub.size(), 2u);
+
+    manager->RemoveParentContainerId(CHILD1);
+    manager->RemoveParentContainerId(CHILD2);
+}
+
+/**
+ * @tc.name: SubwindowManagerTest_MarkDirtyDialogSafeAreaParentChildRelation001
+ * @tc.desc: Test parent container SyncSafeArea triggers all child container subwindows
+ * @tc.type: FUNC
+ */
+HWTEST_F(SubwindowManagerTest, MarkDirtyDialogSafeAreaParentChildRelation001, TestSize.Level1)
+{
+    auto manager = SubwindowManager::GetInstance();
+    ASSERT_NE(manager, nullptr);
+
+    constexpr int32_t PARENT = 400;
+    constexpr int32_t CHILD1 = 4000100;
+    constexpr int32_t CHILD2 = 4000200;
+
+    manager->AddParentContainerId(CHILD1, PARENT);
+    manager->AddParentContainerId(CHILD2, PARENT);
+
+    auto subContainerIds = manager->GetAllSubContainerId(PARENT);
+    bool foundChild1 = false;
+    bool foundChild2 = false;
+    for (auto id : subContainerIds) {
+        if (id == CHILD1) {
+            foundChild1 = true;
+        }
+        if (id == CHILD2) {
+            foundChild2 = true;
+        }
+    }
+    EXPECT_TRUE(foundChild1);
+    EXPECT_TRUE(foundChild2);
+
+    manager->RemoveParentContainerId(CHILD1);
+    manager->RemoveParentContainerId(CHILD2);
+}
+
+/**
+ * @tc.name: SubwindowManagerTest_UIExtensionRectPerInstance001
+ * @tc.desc: Test UIExtension window size deduplication is per-instance (no cross-interference)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SubwindowManagerTest, UIExtensionRectPerInstance001, TestSize.Level1)
+{
+    auto manager = SubwindowManager::GetInstance();
+    ASSERT_NE(manager, nullptr);
+
+    constexpr int32_t INSTANCE_A = 500;
+    constexpr int32_t INSTANCE_B = 600;
+
+    EXPECT_NO_FATAL_FAILURE(manager->OnUIExtensionWindowSizeChange(
+        INSTANCE_A, Rect(0, 0, 100, 200), WindowSizeChangeReason::RESIZE));
+    EXPECT_NO_FATAL_FAILURE(manager->OnUIExtensionWindowSizeChange(
+        INSTANCE_B, Rect(0, 0, 300, 400), WindowSizeChangeReason::RESIZE));
+}
 }

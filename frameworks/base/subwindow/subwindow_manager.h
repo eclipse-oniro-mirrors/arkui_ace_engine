@@ -165,7 +165,6 @@ public:
         const std::vector<Rect>& rects, SubwindowType type, int32_t nodeId = -1, int32_t instanceId = -1);
     bool AddDialogSubwindow(int32_t instanceId, const RefPtr<Subwindow>& subwindow);
     // Get the dialog subwindow of instance, return the window or nullptr.
-    int32_t GetDialogSubwindowInstanceId(int32_t SubwindowId);
     const RefPtr<Subwindow> GetDialogSubwindow(int32_t instanceId);
     void SetCurrentDialogSubwindow(const RefPtr<Subwindow>& subwindow);
     RefPtr<Subwindow> GetCurrentDialogWindow();
@@ -193,7 +192,7 @@ public:
     void CloseCustomDialog(const WeakPtr<NG::UINode>& node, std::function<void(int32_t)> &&callback);
 
     void ResizeWindowForFoldStatus(int32_t parentContainerId);
-    void MarkDirtyDialogSafeArea();
+    void MarkDirtyDialogSafeArea(int32_t instanceId);
     void OnWindowSizeChanged(int32_t containerId, Rect windowRect, WindowSizeChangeReason reason);
     void HideSystemTopMostWindow();
     const RefPtr<Subwindow> GetSystemToastWindow(int32_t instanceId);
@@ -279,16 +278,15 @@ private:
     RefPtr<Subwindow> GetOrCreateToastWindow(int32_t containerId, const NG::ToastShowMode& showMode);
     RefPtr<Subwindow> GetOrCreateToastWindowNG(int32_t containerId, const ToastWindowType& windowType,
         uint32_t mainWindowId);
-    const std::vector<RefPtr<NG::OverlayManager>> GetAllSubOverlayManager();
+    const std::vector<RefPtr<NG::OverlayManager>> GetSubOverlayManagerByInstance(int32_t instanceId);
+    const std::vector<RefPtr<Subwindow>> GetRelatedSubwindows(int32_t instanceId);
     SubwindowKey GetCurrentSubwindowKey(int32_t instanceId, SubwindowType windowType, int32_t nodeId = -1);
     void MarkSetSubwindowRect(const NG::RectF& rect, int32_t instanceId, SubwindowType type);
     RefPtr<Subwindow> GetSubwindowBySearchKey(const SubwindowKey& searchKey);
-    RefPtr<Subwindow> CheckSubwindowDisplayId(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow);
     void RemoveSubwindowBySearchKey(const SubwindowKey& searchKey);
     bool AddSubwindowBySearchKey(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow);
     RefPtr<Subwindow> RemoveSubwindowMapByNodeId(const int32_t nodeId);
     const std::vector<RefPtr<Subwindow>> RemoveSubwindowMapByInstanceId(const int32_t instanceId);
-    const std::vector<RefPtr<Subwindow>> GetAllSubWindow();
     static std::mutex instanceMutex_;
     static std::shared_ptr<SubwindowManager> instance_;
 
@@ -312,7 +310,7 @@ private:
     SubwindowMap dialogSubwindowMap_;
     std::mutex currentDialogSubwindowMutex_;
     RefPtr<Subwindow> currentDialogSubwindow_;
-    Rect uiExtensionWindowRect_;
+    std::unordered_map<int32_t, Rect> uiExtensionWindowRectMap_;
     bool isSuperFoldDisplayDevice_ = false;
 };
 

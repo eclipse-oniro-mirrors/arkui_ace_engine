@@ -111,7 +111,7 @@ const RefPtr<Subwindow> SubwindowManager::GetSubwindowByType(int32_t instanceId,
 
 void SubwindowManager::ResizeWindowForFoldStatus(int32_t parentContainerId) {}
 
-void SubwindowManager::MarkDirtyDialogSafeArea() {}
+void SubwindowManager::MarkDirtyDialogSafeArea(int32_t instanceId) {}
 
 void SubwindowManager::ClearAllMenuPopup(int32_t instanceId)
 {
