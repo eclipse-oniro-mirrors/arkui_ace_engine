@@ -539,6 +539,10 @@ public:
     void StartScrollSnapAnimation(
         float scrollSnapDelta, float scrollSnapVelocity, bool fromScrollBar, int32_t source = SCROLL_FROM_NONE,
         bool useSlowSpring = false);
+    // Slide an in-flight item-snap spring with a preceding item's height change. contentDelta is the
+    // content-space shift already applied to the scroll offset (positive when the anchor moves
+    // toward the end). The running curve is kept; restarting it drops the next frames.
+    void RetargetItemSnapContent(float contentDelta);
 
     // Provider approach follows the original fling budget, extended only if approachDelta is farther.
     // It hands off at approachDelta inside budget, or after completion at/beyond budget.
@@ -966,6 +970,9 @@ private:
     float itemSnapTakeoverDistance_ = 0.0f;
     float itemSnapFlingRate_ = 0.0f;
     bool itemSnapMonotonicSpring_ = false;
+    // Added to snap-property samples while a running spring is slid to a moved anchor.
+    // The property itself keeps its original curve.
+    float itemSnapContentBias_ = 0.0f;
     std::function<void()> itemSnapTrackingCallback_;
     bool itemSnapTargetReady_ = false;
     float itemSnapLookaheadDistance_ = 0.0f;

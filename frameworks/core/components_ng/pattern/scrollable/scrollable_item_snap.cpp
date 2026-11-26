@@ -114,6 +114,7 @@ void Scrollable::SetItemSnapLookaheadDistance(float distance)
 void Scrollable::RunItemSnapStage(
     float endPos, float velocity, bool finalStage, std::function<void(float)>&& onHandoff)
 {
+    itemSnapContentBias_ = 0.0f;
     endPos_ = endPos;
     itemSnapMonotonicSpring_ = finalStage;
     if (finalStage && (endPos - currentPos_) * velocity < 0.0f) {
@@ -165,6 +166,7 @@ void Scrollable::RunItemSnapApproach(
         GetSnapProperty();
     }
     const double limit = std::numeric_limits<float>::max();
+    itemSnapContentBias_ = 0.0f;
     endPos_ = static_cast<float>(
         std::clamp(currentPos_ + static_cast<double>(approachDelta), -limit, limit));
     const bool earlyHandoff = std::isfinite(flingDelta) && std::abs(flingDelta) > std::abs(approachDelta);

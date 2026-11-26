@@ -145,6 +145,7 @@ public:
     void BeginTrackedItemSnap(float coordinate) override;
     std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align) override;
     float GetItemSnapCalibrationMargin() const override;
+    void OnItemSnapAlignTarget(int32_t index, float anchorOffset) override;
 
     using LayoutMode = WaterFlowLayoutMode;
     // Replaying the active mode preserves snap geometry and retained height, including modifier/C API
@@ -472,6 +473,11 @@ private:
     void AppendSnapItemGeometry(
         const RefPtr<LayoutWrapper>& item, int32_t index, float leadingPadding, float totalOffset);
     void UpdateSnapGeometryAfterLayout(bool isLayoutValid);
+    void ClearSnapFollow();
+    float SnapAnchorOffset(ScrollSnapAlign align, const SnapItemGeometry& geometry, float viewport) const;
+    std::optional<float> ResolveSnapAnchorOffset(
+        int32_t index, const std::vector<SnapItemGeometry>& previous) const;
+    void FollowSnapAnchorAfterLayout(const std::vector<SnapItemGeometry>& previous);
     // layoutDirection changed: drop anchors sampled on the previous axis and rebase origins
     // onto the current content offset.
     void ResetSnapGeometry();
@@ -479,6 +485,11 @@ private:
     // Total offset including a sliding-window delta that is applied at the next layout.
     double GetItemSnapCurrentOffset() const override;
     std::vector<SnapItemGeometry> snapItemGeometryCache_;
+    // Item the align spring committed to, and that item's content-space anchor. A later layout
+    // that grows a preceding lazy child moves this anchor; the spring or the settled offset follows it.
+    std::optional<int32_t> snapFollowIndex_;
+    float snapFollowAnchor_ = 0.0f;
+    bool snapFollowApplying_ = false;
     // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
     float snapGeometryEstimatedOffset_ = 0.0f;
     float snapGeometryStableOffset_ = 0.0f;

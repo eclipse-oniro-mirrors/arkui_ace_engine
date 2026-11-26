@@ -683,6 +683,7 @@ void Scrollable::CancelItemSnapChain()
     itemSnapTakeoverDistance_ = 0.0f;
     itemSnapFlingRate_ = 0.0f;
     itemSnapMonotonicSpring_ = false;
+    itemSnapContentBias_ = 0.0f;
     itemSnapTrackingCallback_ = nullptr;
     itemSnapTargetReady_ = false;
     itemSnapLookaheadDistance_ = 0.0f;
@@ -1511,6 +1512,7 @@ void Scrollable::StartScrollSnapAnimation(
     if (NearZero(scrollSnapDelta)) {
         return;
     }
+    itemSnapContentBias_ = 0.0f;
     endPos_ = currentPos_ + scrollSnapDelta;
     finalPosition_ = endPos_;
     snapAnimationFromScrollBar_ = fromScrollBar;
@@ -1549,6 +1551,26 @@ void Scrollable::StartScrollSnapAnimation(
     lastVsyncTime_ = context->GetVsyncTime();
     MarkNeedFlushAnimationStartTime();
     context->RequestFrame();
+}
+
+void Scrollable::RetargetItemSnapContent(float contentDelta)
+{
+    if (state_ != AnimationState::SNAP || !std::isfinite(contentDelta) || NearZero(contentDelta)) {
+        return;
+    }
+    // The caller already moved the content by contentDelta. Slide the spring coordinate by the
+    // same amount and leave the curve running. Rebuilding it with Set(currentPos_) plus a new
+    // start time consumes the next samples, which is the hitch at the start of the fling.
+    // Spring positions decrease as the content offset increases.
+    itemSnapContentBias_ -= contentDelta;
+    endPos_ -= contentDelta;
+    finalPosition_ = endPos_;
+    currentPos_ -= contentDelta;
+    // Provider approach compares samples with its own endpoint. Keep that endpoint in the
+    // same shifted coordinate, or the handoff fires against the pre-resize position.
+    if (itemSnapApproach_) {
+        itemSnapApproach_->endPos -= contentDelta;
+    }
 }
 
 void Scrollable::UpdateScrollSnapStartOffset(double offset)
@@ -1992,13 +2014,20 @@ void Scrollable::ProcessScrollMotion(double position, int32_t source)
     }
     // UpdateScrollPosition return false, means reach to scroll limit.
     source = GetScrollMotionSource(source);
+    const double posBeforeScroll = currentPos_;
     HandleScroll(mainDelta, source, NestedState::GESTURE);
     if (!moved_) {
         ResetContinueDragCount();
         StopFrictionAnimation();
         StopSnapAnimation();
     }
-    currentPos_ = position;
+    // A layout inside HandleScroll may slide this spring onto a moved anchor. Keep that shift;
+    // assigning the sample alone would drop it and the next frame would step backward.
+    if (state_ == AnimationState::SNAP) {
+        currentPos_ = position + (currentPos_ - posBeforeScroll);
+    } else {
+        currentPos_ = position;
+    }
 #ifdef SUPPORT_DIGITAL_CROWN
     if (state_ == AnimationState::SNAP && NearEqual(currentPos_, finalPosition_)) {
         StopSnapAnimation();
@@ -2262,6 +2291,7 @@ RefPtr<NodeAnimatablePropertyFloat> Scrollable::GetSnapProperty()
         if (scroll->state_ != AnimationState::SNAP) {
             return;
         }
+        position += scroll->itemSnapContentBias_;
         if (scroll->ProcessItemSnapApproach(position)) {
             return;
         }
@@ -2351,6 +2381,7 @@ void Scrollable::StopSpringAnimation(bool reachFinalPosition)
 
 void Scrollable::StopSnapAnimation()
 {
+    itemSnapContentBias_ = 0.0f;
     if (state_ == AnimationState::SNAP) {
         ACE_SCOPED_TRACE("StopSnapAnimation, animation state:%d, id:%d, tag:%s", state_, nodeId_, nodeTag_.c_str());
         state_ = AnimationState::IDLE;
