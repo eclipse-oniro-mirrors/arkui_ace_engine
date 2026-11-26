@@ -23,11 +23,17 @@
 
 namespace OHOS::Ace::NG {
 
-StrictClickExecutor::StrictClickExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates)
-    : BaseExecutor(context), coordinates_(coordinates) {}
+StrictClickExecutor::StrictClickExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates,
+    int32_t clickCount)
+    : BaseExecutor(context), coordinates_(coordinates), clickCount_(clickCount > 0 ? clickCount : 1)
+{}
 
 ExecutorResult StrictClickExecutor::ExecuteStep()
 {
+    if (clicksDone_ >= clickCount_) {
+        // Completion guard: no further input after the declared click_count is delivered.
+        return ExecutorResult::SUCCESS;
+    }
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "StrictClickExecutor ExecuteStep begin.");
     auto context = context_.Upgrade();
     if (!context) {
@@ -36,6 +42,9 @@ ExecutorResult StrictClickExecutor::ExecuteStep()
     }
     if (IsDenied(coordinates_)) {
         return SetFailureState(ExecutionState::CONTROL_DENIED);
+    }
+    if (DetectSpecialComponentHit(coordinates_.GetX(), coordinates_.GetY())) {
+        return ExecutorResult::FAILED;
     }
 
     // Use FrameNodeFinder to query FrameNode at coordinates
@@ -53,7 +62,9 @@ ExecutorResult StrictClickExecutor::ExecuteStep()
     auto info = RelaxedEventFactory::CreateClickGestureEvent(result.GetNode());
     result.GetClickFunc()(info);
     TAG_LOGD(AceLogTag::ACE_UIEVENT, "StrictClickExecutor ExecuteStep end.");
-    return ExecutorResult::SUCCESS;
+    // One click per frame-paced step so multi-click gestures observe the click_count rhythm.
+    ++clicksDone_;
+    return clicksDone_ < clickCount_ ? ExecutorResult::PENDING : ExecutorResult::SUCCESS;
 }
 
 } // namespace OHOS::Ace::NG

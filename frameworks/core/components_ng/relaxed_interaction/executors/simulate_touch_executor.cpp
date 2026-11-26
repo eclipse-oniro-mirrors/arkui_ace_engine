@@ -27,11 +27,17 @@
 
 namespace OHOS::Ace::NG {
 
-SimulateTouchExecutor::SimulateTouchExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates)
-    : BaseExecutor(context), coordinates_(coordinates) {}
+SimulateTouchExecutor::SimulateTouchExecutor(WeakPtr<PipelineContext> context, const PointF& coordinates,
+    int32_t clickCount)
+    : BaseExecutor(context), coordinates_(coordinates), clickCount_(clickCount > 0 ? clickCount : 1)
+{}
 
 ExecutorResult SimulateTouchExecutor::ExecuteStep()
 {
+    if (clicksDone_ >= clickCount_) {
+        // Completion guard: no further input after the declared click_count is delivered.
+        return ExecutorResult::SUCCESS;
+    }
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
@@ -43,6 +49,9 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
 
     if (IsTargetDeniedAt(coordinates_.GetX(), coordinates_.GetY())) {
         return SetFailureState(ExecutionState::SECURITY_DENIED);
+    }
+    if (DetectSpecialComponentHit(coordinates_.GetX(), coordinates_.GetY())) {
+        return ExecutorResult::FAILED;
     }
 
     // Create touch event
@@ -56,7 +65,9 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
     }
     context->OnTouchEvent(upEvent);
 
-    return ExecutorResult::SUCCESS;
+    // One DOWN/UP group per frame-paced step so multi-click gestures observe the click_count rhythm.
+    ++clicksDone_;
+    return clicksDone_ < clickCount_ ? ExecutorResult::PENDING : ExecutorResult::SUCCESS;
 }
 
 } // namespace OHOS::Ace::NG

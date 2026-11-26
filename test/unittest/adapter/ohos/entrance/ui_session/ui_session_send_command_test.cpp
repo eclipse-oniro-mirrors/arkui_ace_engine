@@ -709,6 +709,57 @@ TEST(CommandResultTest, JsonContractAndUtf8Boundaries)
     cJSON_Delete(root);
 }
 
+TEST(CommandResultTest, SpecialComponentFailureUsesDedicatedContract)
+{
+    NG::RelaxedCommandResult result = NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE);
+    result.specialComponentFailed = true;
+    result.specialNodeId = 1234;
+    result.specialOffsetX = 12.5f;
+    result.specialOffsetY = 30.0f;
+    auto json = JsonUtil::ParseJsonString(SerializeCommandResult(result));
+    ASSERT_TRUE(json && json->IsObject());
+    EXPECT_EQ(json->GetString("resultCode"), "SEC_UEC_FAILED");
+    EXPECT_TRUE(json->Contains("message"));
+    auto extraInfo = json->GetValue("extraInfo");
+    ASSERT_TRUE(extraInfo && extraInfo->IsObject());
+    EXPECT_EQ(extraInfo->GetInt("nodeId"), 1234);
+    auto offset = extraInfo->GetValue("offset");
+    ASSERT_TRUE(offset && offset->IsObject());
+    EXPECT_EQ(offset->GetInt("x"), 12);
+    EXPECT_EQ(offset->GetInt("y"), 30);
+
+    // Ordinary failures keep the legacy three-field contract (no resultCode/extraInfo).
+    auto legacy = JsonUtil::ParseJsonString(SerializeCommandResult(
+        NG::RelaxedCommandResult::Error(NG::RelaxedCommandErrorType::TARGET_UNAVAILABLE)));
+    ASSERT_TRUE(legacy && legacy->IsObject());
+    EXPECT_FALSE(legacy->Contains("resultCode"));
+    EXPECT_FALSE(legacy->Contains("extraInfo"));
+}
+
+TEST(CommandResultTest, SendCommandCallbackTimeoutCoversDeclaredHold)
+{
+    const int32_t defaultWindow = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
+    // Nested cmd.action_info.hold_ms extends the window: default + hold + margin(500).
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":5000}}})"),
+        defaultWindow + 5000 + 500);
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":100}}})"),
+        defaultWindow + 100 + 500);
+    // Non-press_key commands keep the default window.
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"wheel_scroll","action_info":{"delta":1,"hold_ms":5000}}})"), defaultWindow);
+    // Out-of-range/negative input is rejected by the parser anyway; keep the default window.
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":-1}}})"), defaultWindow);
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":2147483647}}})"), defaultWindow);
+    // Fractional hold_ms is rejected by the parser anyway; GetInt would truncate it, so the
+    // window keeps the default (consistent with the press_key contract, no partial extension).
+    EXPECT_EQ(UIContentServiceProxy::SendCommandCallbackTimeout(
+        R"({"cmd":{"type":"press_key","action_info":{"key":"a","hold_ms":100.5}}})"), defaultWindow);
+}
+
 TEST(CommandResultTest, PcUnavailableCodesPreserveMessagesAndLegacyContract)
 {
     struct UnavailableResult {

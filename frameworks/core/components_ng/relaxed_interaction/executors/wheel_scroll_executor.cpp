@@ -4,6 +4,8 @@
  */
 #include "core/components_ng/relaxed_interaction/executors/wheel_scroll_executor.h"
 
+#include <algorithm>
+
 #include "core/components_ng/relaxed_interaction/utils/relaxed_event_factory.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -36,19 +38,27 @@ ExecutorResult WheelScrollExecutor::ExecuteStep()
         return SetFailureState(ExecutionState::CONTEXT_UNAVAILABLE);
     }
     if (!began_) {
+        const auto rootRect = context->GetRootRect();
         if (!hasCoordinates_) {
-            const auto rootRect = context->GetRootRect();
             if (!rootRect.IsValid() || rootRect.IsEmpty()) {
                 return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
             }
             coordinates_ = PointF(rootRect.Left() + rootRect.Width() / 2.0f,
                 rootRect.Top() + rootRect.Height() / 2.0f);
+        } else if (rootRect.IsValid() && !rootRect.IsEmpty()) {
+            // Uniform with press_and_move/mouse_click: clip explicit coordinates into the
+            // window rect so off-window scroll lands on the nearest in-window point.
+            coordinates_.SetX(std::clamp(coordinates_.GetX(), rootRect.Left(), rootRect.Right()));
+            coordinates_.SetY(std::clamp(coordinates_.GetY(), rootRect.Top(), rootRect.Bottom()));
         }
         if (!denyChecked_) {
             denyChecked_ = true;
             if (IsDenied(coordinates_)) {
                 return SetFailureState(ExecutionState::CONTROL_DENIED);
             }
+        }
+        if (DetectSpecialComponentHit(coordinates_.GetX(), coordinates_.GetY())) {
+            return ExecutorResult::FAILED;
         }
         const auto windowOffset = context->GetDisplayWindowRectInfo().GetOffset();
         // The first frame opens the axis session and carries the scroll delta.

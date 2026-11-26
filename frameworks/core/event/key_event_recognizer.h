@@ -25,6 +25,11 @@ namespace OHOS::Ace {
 
 bool IsValidKeyCode(int32_t code);
 
+// Shared code-to-string and code-to-intention mappings used by both the real keyboard
+// pipeline (KeyEventRecognizer::GetKeyEvents) and synthetic event builders.
+const char* KeyCodeToString(int32_t keyCode);
+KeyIntention keyItemsTransKeyIntention(const std::vector<KeyCode>& items);
+
 class KeyEventRecognizer {
 public:
     // This method recognizes events by recording raw key events. If the raw event can be identified as a special

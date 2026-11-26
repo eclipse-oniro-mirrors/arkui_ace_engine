@@ -15,6 +15,9 @@
 
 #include "interfaces/inner_api/ui_session/ui_content_proxy.h"
 
+#include <cmath>
+
+#include "cJSON.h"
 #include "ipc_skeleton.h"
 
 #include "adapter/ohos/entrance/ui_session/content_change_config_impl.h"
@@ -777,6 +780,12 @@ int32_t UIContentServiceProxy::SendCommand(
         SEND_COMMAND_WITH_FINISH_CALLBACK, nullptr, command, finishCallback, securityAuth);
 }
 
+// press_key parser bound (MAX_KEY_HOLD_DURATION_MS in relaxed_interaction): hold_ms beyond
+// this is invalid input and keeps the default window.
+constexpr int32_t MAX_PC_HOLD_MS = 5000;
+// Mirrors WORKFLOW_TIMEOUT_MARGIN_MS on the ACE side (scheduling slack past the hold).
+constexpr int32_t SEND_COMMAND_CALLBACK_MARGIN_MS = 500;
+
 int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
     uint32_t code, const int32_t* id, const std::string& command, const SendCommandFinishCallback& finishCallback,
     const SecurityAuthInfo& securityAuth)
@@ -813,7 +822,7 @@ int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
         report_->UnregisterSendCommandFinishCallback(requestId);
         return FAILED;
     }
-    if (!report_->PostSendCommandCallbackRemoveTask(requestId)) {
+    if (!report_->PostSendCommandCallbackRemoveTask(requestId, SendCommandCallbackTimeout(command))) {
         LOGW("SendCommandWithFinishCallback post timeout task failed");
         report_->UnregisterSendCommandFinishCallback(requestId);
         return FAILED;
@@ -825,6 +834,41 @@ int32_t UIContentServiceProxy::SendCommandWithFinishCallback(
         return REPLY_ERROR;
     }
     return NO_ERROR;
+}
+
+int32_t UIContentServiceProxy::SendCommandCallbackTimeout(const std::string& command)
+{
+    int32_t callbackTimeout = DEFAULT_SEND_COMMAND_CALLBACK_TIMEOUT_MS;
+    auto commandJson = InspectorJsonUtil::ParseJsonString(command);
+    if (!commandJson) {
+        return callbackTimeout;
+    }
+    // The declared hold lives at cmd.action_info.hold_ms and only press_key supports it.
+    auto cmd = commandJson->GetValue("cmd");
+    if (!cmd || !cmd->IsObject() || cmd->GetString("type") != "press_key") {
+        return callbackTimeout;
+    }
+    auto actionInfo = cmd->GetValue("action_info");
+    if (!actionInfo || !actionInfo->IsObject() || !actionInfo->Contains("hold_ms")) {
+        return callbackTimeout;
+    }
+    // Validate a finite integer in 0..MAX_PC_HOLD_MS BEFORE any conversion: GetInt would
+    // silently truncate fractions and overflow on huge values (the parser rejects both,
+    // so such input keeps the default window).
+    const auto* holdItem = cJSON_GetObjectItemCaseSensitive(actionInfo->GetJsonObject(), "hold_ms");
+    if (!holdItem || !cJSON_IsNumber(holdItem)) {
+        return callbackTimeout;
+    }
+    const double holdValue = holdItem->valuedouble;
+    const bool isFiniteInteger = std::isfinite(holdValue) && holdValue == std::floor(holdValue);
+    if (!isFiniteInteger || holdValue < 0.0 || holdValue > static_cast<double>(MAX_PC_HOLD_MS)) {
+        return callbackTimeout;
+    }
+    // Default window + declared hold + scheduling margin, mirroring the ACE-side effective
+    // timeout (max(default, hold + margin)) with extra slack for IPC and task dispatch.
+    const int64_t extended = static_cast<int64_t>(callbackTimeout) +
+        static_cast<int64_t>(holdValue) + SEND_COMMAND_CALLBACK_MARGIN_MS;
+    return static_cast<int32_t>(extended);
 }
 
 int32_t UIContentServiceProxy::UnregisterClickEventCallback()

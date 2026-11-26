@@ -130,7 +130,9 @@ std::vector<std::unique_ptr<BaseExecutor>> ClickCommandParser::Parse(const std::
         executors.emplace_back(std::make_unique<MouseClickExecutor>(context_, pcInput));
         return executors;
     }
-    return CreateExecutor(mode, coordinates);
+    // click_count also drives the touch-compatible path: the touch executors repeat
+    // their click per frame-paced step (the parsed pcInput would otherwise be dropped).
+    return CreateExecutor(mode, coordinates, pcInput.clickCount);
 }
 
 bool ClickCommandParser::ParsePcOptions(const JsonValue* cmdJson, ClickInput& input)
@@ -233,23 +235,23 @@ bool ClickCommandParser::ParseCoordinates(const JsonValue* cmdJson, PointF& coor
 }
 
 std::vector<std::unique_ptr<BaseExecutor>> ClickCommandParser::CreateExecutor(
-    ExecuteMode mode, const PointF& coordinates)
+    ExecuteMode mode, const PointF& coordinates, int32_t clickCount)
 {
     std::vector<std::unique_ptr<BaseExecutor>> executors;
 
     if (mode == ExecuteMode::SIMULATING) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "Creating SimulateTouchExecutor for simulating mode");
-        executors.emplace_back(std::make_unique<SimulateTouchExecutor>(context_, coordinates));
+        executors.emplace_back(std::make_unique<SimulateTouchExecutor>(context_, coordinates, clickCount));
     } else if (mode == ExecuteMode::AUTO) {
         // For auto mode, create both StrictClickExecutor and SimulateTouchExecutor
         // StrictClickExecutor goes first, SimulateTouchExecutor as fallback
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "Creating StrictClickExecutor and SimulateTouchExecutor for auto mode");
-        executors.emplace_back(std::make_unique<StrictClickExecutor>(context_, coordinates));
-        executors.emplace_back(std::make_unique<SimulateTouchExecutor>(context_, coordinates));
+        executors.emplace_back(std::make_unique<StrictClickExecutor>(context_, coordinates, clickCount));
+        executors.emplace_back(std::make_unique<SimulateTouchExecutor>(context_, coordinates, clickCount));
     } else if (mode == ExecuteMode::TARGET) {
         // For target mode, only create StrictClickExecutor
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "Creating StrictClickExecutor for target mode");
-        executors.emplace_back(std::make_unique<StrictClickExecutor>(context_, coordinates));
+        executors.emplace_back(std::make_unique<StrictClickExecutor>(context_, coordinates, clickCount));
     }
 
     return executors;

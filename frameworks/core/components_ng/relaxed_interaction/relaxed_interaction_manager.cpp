@@ -15,6 +15,8 @@
 
 #include "core/components_ng/relaxed_interaction/relaxed_interaction_manager.h"
 
+#include <algorithm>
+
 #include "base/json/json_util.h"
 #include "base/log/log.h"
 #include "core/components_ng/pattern/command/ui_command_security_gate.h"
@@ -125,6 +127,9 @@ ProcessResult RelaxedInteractionManager::ParseAndEnqueueCommand(const std::uniqu
     const std::function<void(ExecutionState)>& finishCallback, bool preserveLegacySemantics, bool interruptibleByUser,
     bool isPcCommand)
 {
+    // Drop any stale special-component hit payload left by a previous workflow.
+    BaseExecutor::ClearSpecialComponentHit();
+
     // P2: stamp the security identity carried by this command before parsing.
     executorGenerator_->SetIdentity(ParseCommandIdentity(json));
 
@@ -151,11 +156,16 @@ ProcessResult RelaxedInteractionManager::ParseAndEnqueueCommand(const std::uniqu
             commandType = cmd->GetString(TYPE_KEY);
         }
     }
+    // A declared hold legitimately extends the workflow timeout window (see HandleWorkflowTimeout).
+    int32_t holdDurationMs = 0;
+    for (const auto& executor : executors) {
+        holdDurationMs = std::max(holdDurationMs, executor->GetHoldMs());
+    }
     choreographer_->Enqueue(std::move(executors));
     // startTime stays zero: a workflow's timeout window opens when it becomes the running one.
     workflowStates_.push_back({ executorCount, finishCallback, preserveLegacySemantics,
         interruptibleByUser ? InterruptionPolicy::INTERRUPTIBLE : InterruptionPolicy::IGNORE_USER_INPUT,
-        securityContext.needSecurityAuth, securityContext.agentTokenId,
+        securityContext.needSecurityAuth, securityContext.agentTokenId, holdDurationMs,
         commandType, std::chrono::steady_clock::time_point {}, isPcCommand });
     return ProcessResult::SUCCESS;
 }
@@ -233,10 +243,16 @@ bool RelaxedInteractionManager::HandleWorkflowTimeout(std::function<void(Executi
         return false;
     }
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - workflow.startTime).count();
-    if (elapsed < static_cast<int64_t>(commandTimeoutMs_)) {
+    // A declared hold extends the effective timeout: hold_ms can legitimately reach 5000 ms,
+    // equal to the default window, so judge TIMEOUT only past hold + scheduling margin.
+    // Workflows without a hold keep the configured window unchanged.
+    const auto effectiveTimeout = workflow.holdDurationMs > 0
+        ? std::max(commandTimeoutMs_, workflow.holdDurationMs + WORKFLOW_TIMEOUT_MARGIN_MS)
+        : commandTimeoutMs_;
+    if (elapsed < static_cast<int64_t>(effectiveTimeout)) {
         return false;
     }
-    TAG_LOGW(AceLogTag::ACE_UIEVENT, "Workflow exceeded command timeout %{public}d ms", commandTimeoutMs_);
+    TAG_LOGW(AceLogTag::ACE_UIEVENT, "Workflow exceeded command timeout %{public}d ms", effectiveTimeout);
     WorkflowDumper::GetInstance().AddLog("Workflow exceeded command timeout, completing with TIMEOUT");
     auto cancelledExecutors = choreographer_->ExtractExecutors(std::vector<bool>(workflow.remainingExecutors, true));
     timeoutCallback = std::move(workflow.finishCallback);
@@ -332,6 +348,12 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
                 auto failure = choreographer_->GetFailureState();
                 CompleteCurrentWorkflow(finishCallback, true);
                 return failure;
+            }
+            if (workflow.isPcCommand && choreographer_->LastExecutorHasProducedInput()) {
+                // The failed executor already delivered input (partial multi-click): a fallback
+                // would replay the full count, so finish the workflow as failed without fallback.
+                CompleteCurrentWorkflow(finishCallback, true);
+                return choreographer_->GetFailureState();
             }
             if (workflow.remainingExecutors > 0) {
                 --workflow.remainingExecutors;

@@ -39,6 +39,7 @@
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/manager/gesture/active_recognizer_manager.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/relaxed_interaction/base_executor.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/event/focus_axis_event.h"
 #include "core/event/crown_event.h"
@@ -4591,7 +4592,20 @@ NG::RelaxedCommandResult CommandExecutionResult(NG::ExecutionState state, bool p
             break;
         default: break;
     }
-    return pcCommand ? PcCommandError(type) : NG::RelaxedCommandResult::Error(type);
+    auto result = pcCommand ? PcCommandError(type) : NG::RelaxedCommandResult::Error(type);
+    if (pcCommand && state == NG::ExecutionState::TARGET_NOT_FOUND) {
+        // Special-component failure contract: attach the placeholder hit payload
+        // (nodeId + component-local offset) for the SEC_UEC_FAILED result shape.
+        NG::SpecialComponentHitInfo info;
+        NG::BaseExecutor::ConsumeSpecialComponentHit(info);
+        if (info.hit) {
+            result.specialComponentFailed = true;
+            result.specialNodeId = info.nodeId;
+            result.specialOffsetX = info.offsetX;
+            result.specialOffsetY = info.offsetY;
+        }
+    }
+    return result;
 }
 
 #endif

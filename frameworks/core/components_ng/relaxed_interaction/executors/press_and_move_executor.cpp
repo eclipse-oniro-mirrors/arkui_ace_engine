@@ -5,6 +5,7 @@
 #include "core/components_ng/relaxed_interaction/executors/press_and_move_executor.h"
 
 #include <algorithm>
+#include <chrono>
 
 #include "core/components_ng/relaxed_interaction/utils/relaxed_event_factory.h"
 #include "core/common/event_manager.h"
@@ -46,15 +47,18 @@ PressAndMoveExecutor::PressAndMoveExecutor(WeakPtr<PipelineContext> context, con
             PointF(coordinates.x2, coordinates.y2), TouchType::UP));
     } else {
         const auto button = MouseButton::LEFT_BUTTON;
+        // The whole press/move/release sequence shares one press moment (real mouse sequences
+        // keep pressedTime at the press start); action time stays per event.
+        const auto sequenceTime = std::chrono::high_resolution_clock::now();
         mouseEvents_.emplace_back(RelaxedEventFactory::CreateMouseEvent(
             PointF(coordinates.x1, coordinates.y1), MouseAction::PRESS, button,
-            static_cast<int32_t>(button), {}));
+            static_cast<int32_t>(button), {}, sequenceTime));
         for (int32_t step = 1; step <= MOVE_STEPS; ++step) {
             mouseEvents_.emplace_back(RelaxedEventFactory::CreateMouseEvent(Interpolate(coordinates, step),
-                MouseAction::MOVE, button, static_cast<int32_t>(button), {}));
+                MouseAction::MOVE, button, static_cast<int32_t>(button), {}, sequenceTime));
         }
         mouseEvents_.emplace_back(RelaxedEventFactory::CreateMouseEvent(
-            PointF(coordinates.x2, coordinates.y2), MouseAction::RELEASE, button, 0, {}));
+            PointF(coordinates.x2, coordinates.y2), MouseAction::RELEASE, button, 0, {}, sequenceTime));
     }
 }
 
@@ -109,8 +113,9 @@ void PressAndMoveExecutor::Cancel()
     }
 }
 
-// One-shot deny checks at the first injected point. Returns false when the move is
-// denied; the failure state has already been recorded on the executor.
+// One-shot deny and special-component checks at the first injected point. Returns false
+// when the move is denied or targets a special component; the failure state has already
+// been recorded on the executor.
 bool PressAndMoveExecutor::CheckDenyOnce()
 {
     denyChecked_ = true;
@@ -119,6 +124,9 @@ bool PressAndMoveExecutor::CheckDenyOnce()
         : PointF(mouseEvents_.front().x, mouseEvents_.front().y);
     if (IsDenied(point)) {
         SetFailureState(ExecutionState::CONTROL_DENIED);
+        return false;
+    }
+    if (DetectSpecialComponentHit(point.GetX(), point.GetY())) {
         return false;
     }
     return true;

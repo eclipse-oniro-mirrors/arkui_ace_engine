@@ -134,6 +134,10 @@ public:
         const std::string command, const SendCommandFinishCallback& finishCallback,
         SecurityAuthInfo securityAuth = {}) override;
 
+    // Effective callback-removal window for one PC command: the default window extended by a
+    // declared press_key hold_ms (invalid or missing input keeps the default). Exposed for tests.
+    static int32_t SendCommandCallbackTimeout(const std::string& command);
+
 private:
     int32_t SendCommandWithFinishCallback(uint32_t code, const int32_t* id, const std::string& command,
         const SendCommandFinishCallback& finishCallback, const SecurityAuthInfo& securityAuth);

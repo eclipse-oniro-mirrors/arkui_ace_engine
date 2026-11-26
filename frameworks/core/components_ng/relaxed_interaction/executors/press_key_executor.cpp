@@ -31,8 +31,12 @@ PressKeyExecutor::PressKeyExecutor(WeakPtr<PipelineContext> context, const KeyIn
         events_.emplace_back(RelaxedEventFactory::CreateKeyEvent(key, KeyAction::DOWN, pressedKeys));
     }
     for (auto iter = input.keys.rbegin(); iter != input.keys.rend(); ++iter) {
+        // Intention is computed from the pre-release set (including the key being released),
+        // matching the real pipeline where intention precedes key removal; the externally
+        // visible pressedCodes stay post-release (DispatchKeyEvent refreshes them).
+        const std::vector<KeyCode> intentionCodes = pressedKeys;
         pressedKeys.erase(std::remove(pressedKeys.begin(), pressedKeys.end(), *iter), pressedKeys.end());
-        events_.emplace_back(RelaxedEventFactory::CreateKeyEvent(*iter, KeyAction::UP, pressedKeys));
+        events_.emplace_back(RelaxedEventFactory::CreateKeyEvent(*iter, KeyAction::UP, intentionCodes));
     }
 }
 
@@ -57,9 +61,15 @@ void PressKeyExecutor::Cancel()
         if (context->IsDestroyed()) {
             break;
         }
+        // Intention from the pre-release set (including the key being released), matching
+        // the normal UP path and the real pipeline; the externally visible pressedCodes are
+        // filled with the post-release set right before dispatch.
+        const std::vector<KeyCode> intentionCodes = pressedKeys;
         const auto key = pressedKeys.back();
         pressedKeys.pop_back();
-        context->OnNonPointerEvent(RelaxedEventFactory::CreateKeyEvent(key, KeyAction::UP, pressedKeys));
+        auto event = RelaxedEventFactory::CreateKeyEvent(key, KeyAction::UP, intentionCodes);
+        event.pressedCodes = pressedKeys;
+        context->OnNonPointerEvent(event);
     }
 }
 
@@ -90,7 +100,7 @@ ExecutorResult PressKeyExecutor::ExecuteStep()
     if (nextEvent_ == 0 && !holdStarted_) {
         holdStarted_ = true;
         holdStart_ = std::chrono::steady_clock::now();
-        DispatchKeyEvent(context, events_[nextEvent_++]);
+        anyHandled_ |= DispatchKeyEvent(context, events_[nextEvent_++]);
         if (completed_) {
             return ExecutorResult::SUCCESS;
         }
@@ -98,7 +108,7 @@ ExecutorResult PressKeyExecutor::ExecuteStep()
             return ExecutorResult::PENDING;
         }
     } else if (holdMs_ > 0 && nextEvent_ < keyCount_) {
-        DispatchKeyEvent(context, events_[nextEvent_++]);
+        anyHandled_ |= DispatchKeyEvent(context, events_[nextEvent_++]);
     }
     if (completed_) {
         return ExecutorResult::SUCCESS;
@@ -117,13 +127,18 @@ ExecutorResult PressKeyExecutor::FinishSequence(const RefPtr<PipelineContext>& c
             Cancel();
             return SetFailureState(ExecutionState::CONTEXT_UNAVAILABLE);
         }
-        DispatchKeyEvent(context, events_[nextEvent_++]);
+        anyHandled_ |= DispatchKeyEvent(context, events_[nextEvent_++]);
     }
     completed_ = true;
+    if (!anyHandled_) {
+        // Every DOWN/UP was swallowed (no focus or a custom dispatcher); report the
+        // sequence as failed instead of a silent no-op success.
+        return SetFailureState(ExecutionState::FAILED);
+    }
     return ExecutorResult::SUCCESS;
 }
 
-void PressKeyExecutor::DispatchKeyEvent(const RefPtr<PipelineContext>& context, KeyEvent event)
+bool PressKeyExecutor::DispatchKeyEvent(const RefPtr<PipelineContext>& context, KeyEvent event)
 {
     if (event.action == KeyAction::DOWN) {
         if (std::find(pressedKeys_.begin(), pressedKeys_.end(), event.code) == pressedKeys_.end()) {
@@ -133,6 +148,6 @@ void PressKeyExecutor::DispatchKeyEvent(const RefPtr<PipelineContext>& context, 
         pressedKeys_.erase(std::remove(pressedKeys_.begin(), pressedKeys_.end(), event.code), pressedKeys_.end());
     }
     event.pressedCodes = pressedKeys_;
-    context->OnNonPointerEvent(event);
+    return context->OnNonPointerEvent(event);
 }
 } // namespace OHOS::Ace::NG

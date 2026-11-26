@@ -19,8 +19,83 @@
 #include "core/components_ng/pattern/command/ui_command_security_gate.h"
 #include "core/components_ng/relaxed_interaction/frame_node_finder.h"
 #include "core/components_ng/relaxed_interaction/utils/workflow_dumper.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+// Special-component placeholder tags: injection into these nodes cannot reach the
+// isolated content (independent window/session), so the command fails with the
+// SEC_UEC_FAILED contract instead of a silent no-op delivery.
+constexpr const char* SPECIAL_COMPONENT_TAGS[] = { V2::UI_EXTENSION_COMPONENT_ETS_TAG,
+    V2::UI_EXTENSION_COMPONENT_TAG, V2::UI_EXTENSION_SURFACE_TAG, V2::DYNAMIC_COMPONENT_ETS_TAG };
+
+bool IsSpecialComponentTag(const std::string& tag)
+{
+    for (const auto* specialTag : SPECIAL_COMPONENT_TAGS) {
+        if (tag == specialTag) {
+            return true;
+        }
+    }
+    return false;
+}
+} // namespace
+
+thread_local SpecialComponentHitInfo BaseExecutor::specialComponentHit_;
+
+bool BaseExecutor::DetectSpecialComponentHit(double x, double y)
+{
+    FrameNodeFinder finder(context_, [](const RefPtr<NGGestureRecognizer>&) { return true; });
+    for (const auto& node : finder.FindAtRawNodes(static_cast<float>(x), static_cast<float>(y))) {
+        if (node && IsSpecialComponentTag(node->GetTag()) && HandleSpecialComponentHit(node, x, y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool BaseExecutor::HandleSpecialComponentHit(const RefPtr<FrameNode>& node, double x, double y)
+{
+    if (!node) {
+        return false;
+    }
+    // Security gate precedes any hit information: a DENY-marked node is audited via
+    // ReportDeniedCommand and reported as SECURITY_DENIED without a hit payload, so the
+    // special-component contract never bypasses or leaks through the security gate.
+    const auto& security = UiCommandSecurityGate::GetContext();
+    if (UiCommandSecurityGate::IsCommandDenied(node, security.needSecurityAuth)) {
+        UiCommandSecurityGate::ReportDeniedCommand(node, security);
+        specialComponentHit_ = SpecialComponentHitInfo();
+        SetFailureState(ExecutionState::SECURITY_DENIED);
+        WorkflowDumper::GetInstance().AddLog(
+            "Special component node denied by security gate " + node->ToString());
+        return true;
+    }
+    // Same conversion as real-input forwarding (Platform::CalculatePointerEvent):
+    // window-client coordinates -> component-local coordinates via the placeholder's
+    // realtime transform matrix (covers translate/scale/rotation of the ancestor chain).
+    PointF localPoint(static_cast<float>(x), static_cast<float>(y));
+    NGGestureRecognizer::Transform(localPoint, node);
+    SpecialComponentHitInfo info;
+    info.hit = true;
+    info.nodeId = node->GetId();
+    info.offsetX = localPoint.GetX();
+    info.offsetY = localPoint.GetY();
+    specialComponentHit_ = info;
+    SetFailureState(ExecutionState::TARGET_NOT_FOUND);
+    WorkflowDumper::GetInstance().AddLog("Hit special component placeholder node " + node->ToString());
+    return true;
+}
+
+void BaseExecutor::ConsumeSpecialComponentHit(SpecialComponentHitInfo& info)
+{
+    info = specialComponentHit_;
+    specialComponentHit_ = SpecialComponentHitInfo();
+}
+
+void BaseExecutor::ClearSpecialComponentHit()
+{
+    specialComponentHit_ = SpecialComponentHitInfo();
+}
 
 FrameNodeMatch BaseExecutor::FindFrameNode(
     double x, double y, GestureRecognizerPred pred)

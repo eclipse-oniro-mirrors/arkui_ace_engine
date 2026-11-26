@@ -35,7 +35,7 @@ bool ParseKey(const std::string& value, KeyCode& key)
         { "BACKSPACE", KeyCode::KEY_DEL }, { "DELETE", KeyCode::KEY_FORWARD_DEL },
         { "CTRL", KeyCode::KEY_CTRL_LEFT }, { "CONTROL", KeyCode::KEY_CTRL_LEFT },
         { "SHIFT", KeyCode::KEY_SHIFT_LEFT }, { "ALT", KeyCode::KEY_ALT_LEFT },
-        { "HOME", KeyCode::KEY_HOME }, { "END", KeyCode::KEY_MOVE_END },
+        { "HOME", KeyCode::KEY_MOVE_HOME }, { "END", KeyCode::KEY_MOVE_END },
         { "UP", KeyCode::KEY_DPAD_UP }, { "DOWN", KeyCode::KEY_DPAD_DOWN },
         { "LEFT", KeyCode::KEY_DPAD_LEFT }, { "RIGHT", KeyCode::KEY_DPAD_RIGHT },
     };

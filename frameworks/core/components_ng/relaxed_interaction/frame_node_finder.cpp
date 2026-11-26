@@ -174,6 +174,79 @@ FrameNodeMatch FrameNodeFinder::FindAt(const RefPtr<UINode>& rootNode, float x, 
     return result;
 }
 
+std::vector<RefPtr<FrameNode>> FrameNodeFinder::FindAtRawNodes(float x, float y)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return {};
+    }
+    TouchEvent touchPoint;
+    TouchTestResult touchTestResult;
+    RunTouchTest(x, y, touchPoint, touchTestResult);
+
+    std::vector<RefPtr<FrameNode>> nodes;
+    CollectAttachedNodes(touchTestResult, touchPoint.id, nodes);
+    return nodes;
+}
+
+void FrameNodeFinder::RunTouchTest(float x, float y, TouchEvent& touchPoint, TouchTestResult& touchTestResult)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    auto rootNode = context->GetRootElement();
+    if (!rootNode) {
+        return;
+    }
+    touchPoint.x = x;
+    touchPoint.y = y;
+    touchPoint.id = 0;
+    touchPoint.type = TouchType::DOWN;
+    TouchRestrict touchRestrict;
+    touchRestrict.touchEvent = touchPoint;
+    touchRestrict.inputEventType = InputEventType::TOUCH_SCREEN;
+    ResponseLinkResult responseLinkResult;
+    NG::PointF globalPoint(x, y);
+    NG::PointF parentLocalPoint(x, y);
+    NG::PointF parentRevertPoint(x, y);
+    rootNode->TouchTest(globalPoint, parentLocalPoint, parentRevertPoint,
+        touchRestrict, touchTestResult, touchPoint.id, responseLinkResult);
+}
+
+void FrameNodeFinder::CollectAttachedNodes(
+    const TouchTestResult& touchTestResult, int32_t touchId, std::vector<RefPtr<FrameNode>>& nodes)
+{
+    // Attached nodes of ALL touch targets: gesture recognizers and TouchEventImpl targets
+    // alike (e.g. UIExtension/DynamicComponent placeholders register the latter only).
+    std::set<WeakPtr<NG::FrameNode>> touchedNodes;
+    std::list<RefPtr<NG::NGGestureRecognizer>> hitGestures;
+    for (const auto& item : touchTestResult) {
+        if (!item) {
+            continue;
+        }
+        auto node = item->GetAttachedNode().Upgrade();
+        if (node) {
+            nodes.emplace_back(node);
+            touchedNodes.emplace(node);
+        }
+        if (auto gesture = AceType::DynamicCast<NGGestureRecognizer>(item)) {
+            hitGestures.emplace_back(gesture);
+        }
+    }
+    GetFrameNodes(touchedNodes, hitGestures);
+    // Same referee cleanup as FindAt so the probing TouchTest leaves no gesture state behind.
+    auto eventManager = context_.Upgrade()->GetEventManager();
+    if (eventManager) {
+        auto ref = eventManager->GetGestureRefereeNG(nullptr);
+        if (ref) {
+            ref->CleanGestureStateVoluntarily(touchId);
+            ref->CleanGestureScope(touchId);
+        }
+    }
+    CleanFrameNodes(touchedNodes);
+}
+
 FrameNodeMatch FrameNodeFinder::Find(const TouchTestResult& touchTestResult)
 {
     if (touchTestResult.empty()) {

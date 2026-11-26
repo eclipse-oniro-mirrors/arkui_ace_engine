@@ -48,6 +48,15 @@ public:
         return currentExecutor_ != nullptr;
     }
 
+    // Whether the LAST executed executor already delivered input (partial multi-click):
+    // a later failure must not trigger the AUTO fallback, which would replay the full
+    // count. Snapshotted before ExecuteNext resets the current executor, so it stays
+    // readable after the executor finished (successfully or with a failure).
+    bool LastExecutorHasProducedInput() const
+    {
+        return lastExecutorHasProducedInput_;
+    }
+
     bool HasNext() const
     {
         return !executorQueue_.empty();
@@ -66,6 +75,7 @@ private:
     std::deque<std::unique_ptr<BaseExecutor>> executorQueue_;
 
     std::unique_ptr<BaseExecutor> currentExecutor_;
+    bool lastExecutorHasProducedInput_ = false;
     ExecutionState failureState_ = ExecutionState::FAILED;
 };
 
