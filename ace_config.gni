@@ -42,6 +42,9 @@ declare_args() {
   # Set pgo profdata path
   ace_engine_feature_pgo_path = ""
 
+  # Enable dynamic type profiling for building.
+  ace_engine_feature_enable_dtp = false
+
   # Enable atomic for building.
   ace_engine_feature_enable_atomic = false
 
