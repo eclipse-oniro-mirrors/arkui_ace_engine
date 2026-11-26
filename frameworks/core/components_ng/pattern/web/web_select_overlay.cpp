@@ -25,6 +25,7 @@
 #include "core/common/share/text_share_adapter.h"
 #include "core/components_ng/manager/select_content_overlay/select_content_overlay_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
+#include "core/components_ng/pattern/select_overlay/select_overlay_property.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
 #include "core/components_ng/pattern/web/view_data_common.h"
 #include "core/components_ng/pattern/web/transitional_node_info.h"
@@ -392,14 +393,14 @@ void WebSelectOverlay::SetMenuOptions(SelectOverlayInfo& selectInfo,
     CHECK_NULL_VOID(delegate);
     auto copyOption = delegate->GetCopyOptionMode();
     uint32_t flags = static_cast<uint32_t>(params->GetEditStateFlags());
-    selectInfo.menuInfo.showCut = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) &&
+    selectInfo.menuInfo.showCut = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_CUT) != 0 &&
         copyOption != OHOS::NWeb::NWebPreference::CopyOptionMode::NONE;
     selectInfo.menuInfo.showCopy = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_COPY) != 0;
     selectInfo.menuInfo.showPaste = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_PASTE) != 0;
     selectInfo.menuInfo.showCopyAll = (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_SELECT_ALL) != 0;
     selectInfo.menuInfo.showAutoFill = IsShowMenuOfAutoFill(flags, selectInfo);
     selectInfo.menuInfo.showTranslateInput = selectInfo.isSingleHandle &&
-        (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT) && CanShowTranslateInput();
+        (flags & OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT) != 0 && CanShowTranslateInput();
 
     auto value = GetSelectedText();
     auto queryWord = std::regex_replace(value, std::regex("^\\s+|\\s+$"), "");
@@ -937,6 +938,7 @@ void WebSelectOverlay::HandleOnTranslateInput()
     bool canRequest = quickMenuCallback_ && webSelectInfo_.isSingleHandle &&
         webSelectInfo_.menuInfo.showTranslateInput;
     // Reuse the eligibility established for this menu; IMF validates the request.
+    // Consume the entry even if this action is rejected; the menu closes below.
     webSelectInfo_.menuInfo.showTranslateInput = false;
     if (canRequest) {
         quickMenuCallback_->Continue(OHOS::NWeb::NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT,
