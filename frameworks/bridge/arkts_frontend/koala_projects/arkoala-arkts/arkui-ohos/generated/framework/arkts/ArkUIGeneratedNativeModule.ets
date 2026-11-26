@@ -121,6 +121,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _ButtonAttribute_setMaxFontScale(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _ButtonAttribute_setVibrancyMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _CalendarPicker_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
     native static _CalendarPickerInterface_setCalendarPickerOptions(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void

@@ -25,7 +25,7 @@ import { PeerNode } from './../PeerNode'
 import { ArkUIGeneratedNativeModule } from '#components'
 import { ArkCommonMethodPeer, CommonMethod, CommonConfiguration, ExtendableCommonMethod, ArkCommonMethodComponent } from './common'
 import { ResourceColor, Resource as arkui_component_units_Resource, Length, ResourceStr, Font as arkui_component_units_Font, arkui_component_units_Font_serializer } from './units'
-import { Color as arkui_component_enums_Color, FontWeight, FontStyle, TextOverflow, TextHeightAdaptivePolicy, TextAlign } from './enums'
+import { Color as arkui_component_enums_Color, FontWeight, FontStyle, VibrancyMode, TextOverflow, TextHeightAdaptivePolicy, TextAlign } from './enums'
 import { Resource as global_resource_Resource } from 'global.resource'
 import { ContentModifier, AttributeModifier, hookButtonContentModifier, hookButtonAttributeModifier, AttributeUpdater } from '#handwritten'
 import { CustomBuilder, ConstructorT, CustomBuilderT } from './builder'
@@ -303,6 +303,18 @@ export class ArkButtonPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._ButtonAttribute_setMaxFontScale(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setVibrancyModeAttribute(value: VibrancyMode | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as VibrancyMode)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._ButtonAttribute_setVibrancyMode(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
 }
 export enum ButtonType {
     Capsule = 0,
@@ -538,6 +550,18 @@ export interface ButtonAttribute extends CommonMethod {
         }
         throw new Error('Unimplemented method maxFontScale')
     }
+    vibrancyMode(value: VibrancyMode | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as ButtonAttribute).vibrancyMode(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Button attribute vibrancyMode can only be set when creating an extendable component.')
+            }
+        }
+        throw new Error('Unimplemented method vibrancyMode')
+    }
     attributeModifier(value: AttributeModifier<ButtonAttribute> | AttributeModifier<CommonMethod> | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -704,6 +728,11 @@ export class ArkButtonComponent extends ArkCommonMethodComponent implements Butt
     public maxFontScale(value: double | global_resource_Resource | undefined): this {
         const value_casted = value as (double | global_resource_Resource | undefined)
         this.getPeer()?.setMaxFontScaleAttribute(value_casted)
+        return this
+    }
+    public vibrancyMode(value: VibrancyMode | undefined): this {
+        const value_casted = value as (VibrancyMode | undefined)
+        this.getPeer()?.setVibrancyModeAttribute(value_casted)
         return this
     }
     public attributeModifier(value: AttributeModifier<ButtonAttribute> | AttributeModifier<CommonMethod> | undefined): this {
