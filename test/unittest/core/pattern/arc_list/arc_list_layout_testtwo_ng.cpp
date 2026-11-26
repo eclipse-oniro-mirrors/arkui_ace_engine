@@ -28,7 +28,9 @@
 
 namespace OHOS::Ace::NG {
 
-namespace {} // namespace
+namespace {
+constexpr int32_t TEST_MAX_LIST_ITEM_INDEX = 2;
+} // namespace
 
 class ArcListLayoutTestTwoNg : public ArcListTestNg {
 public:
@@ -36,6 +38,8 @@ public:
     RefPtr<ListPaintMethod> UpdateOverlayModifier();
     AssertionResult VerifySticky(int32_t groupIndex, bool isHeader, float expectOffsetY);
     void UpdateDividerMap();
+    RefPtr<LayoutWrapperNode> CreateWrapperWithNullHostChild();
+    void PrepareMissingCenterState();
 };
 
 void ArcListLayoutTestTwoNg::UpdateContentModifier()
@@ -74,6 +78,28 @@ void ArcListLayoutTestTwoNg::UpdateDividerMap()
         cur++;
     }
     UpdateContentModifier();
+}
+
+RefPtr<LayoutWrapperNode> ArcListLayoutTestTwoNg::CreateWrapperWithNullHostChild()
+{
+    auto parent = AceType::MakeRefPtr<LayoutWrapperNode>(
+        frameNode_, frameNode_->GetGeometryNode(), layoutProperty_);
+    auto child = AceType::MakeRefPtr<LayoutWrapperNode>(
+        nullptr, AceType::MakeRefPtr<GeometryNode>(), layoutProperty_);
+    parent->AppendChild(child);
+    return parent;
+}
+
+void ArcListLayoutTestTwoNg::PrepareMissingCenterState()
+{
+    pattern_->itemPosition_.clear();
+    pattern_->itemPosition_[0] = { 0, 0.0f, 100.0f, false };
+    pattern_->centerIndex_ = 1;
+    pattern_->startIndex_ = 0;
+    pattern_->endIndex_ = 0;
+    pattern_->maxListItemIndex_ = TEST_MAX_LIST_ITEM_INDEX;
+    pattern_->startMainPos_ = 60.0f;
+    pattern_->contentMainSize_ = 100.0f;
 }
 
 /**
@@ -333,6 +359,54 @@ HWTEST_F(ArcListLayoutTestTwoNg, CreateLayoutAlgorithm001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: LayoutALineForwardNullHost001
+ * @tc.desc: A child wrapper without a host returns before measuring or changing forward layout state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListLayoutTestTwoNg, LayoutALineForwardNullHost001, TestSize.Level1)
+{
+    CreateList();
+    auto layoutWrapper = CreateWrapperWithNullHostChild();
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto child = layoutWrapper->GetOrCreateChildByIndex(0);
+    ASSERT_NE(child, nullptr);
+    ASSERT_EQ(child->GetHostNode(), nullptr);
+    ArcListLayoutAlgorithm algorithm(-1, 0);
+    algorithm.totalItemCount_ = 1;
+    int32_t currentIndex = -1;
+    float endPos = 37.0f;
+
+    EXPECT_EQ(algorithm.LayoutALineForward(AceType::RawPtr(layoutWrapper), currentIndex, 10.0f, endPos), 0);
+    EXPECT_EQ(currentIndex, -1);
+    EXPECT_EQ(endPos, 37.0f);
+    EXPECT_TRUE(algorithm.itemPosition_.empty());
+}
+
+/**
+ * @tc.name: LayoutALineBackwardNullHost001
+ * @tc.desc: A child wrapper without a host returns before measuring or changing backward layout state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListLayoutTestTwoNg, LayoutALineBackwardNullHost001, TestSize.Level1)
+{
+    CreateList();
+    auto layoutWrapper = CreateWrapperWithNullHostChild();
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto child = layoutWrapper->GetOrCreateChildByIndex(0);
+    ASSERT_NE(child, nullptr);
+    ASSERT_EQ(child->GetHostNode(), nullptr);
+    ArcListLayoutAlgorithm algorithm(-1, 0);
+    algorithm.totalItemCount_ = 1;
+    int32_t currentIndex = 1;
+    float startPos = 37.0f;
+
+    EXPECT_EQ(algorithm.LayoutALineBackward(AceType::RawPtr(layoutWrapper), currentIndex, 100.0f, startPos), 0);
+    EXPECT_EQ(currentIndex, 1);
+    EXPECT_EQ(startPos, 37.0f);
+    EXPECT_TRUE(algorithm.itemPosition_.empty());
+}
+
+/**
  * @tc.name: GetSnapCenterOverScrollPos001
  * @tc.desc: Test ArcListPattern::GetSnapCenterOverScrollPos
  * @tc.type: FUNC
@@ -379,6 +453,22 @@ HWTEST_F(ArcListLayoutTestTwoNg, GetSnapCenterOverScrollPos002, TestSize.Level1)
         AceType::DynamicCast<ArcListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
     listLayoutAlgorithm->FixPredictSnapOffset(layoutProperty_);
     EXPECT_TRUE(NearEqual(listLayoutAlgorithm->GetPredictSnapEndPosition().value_or(-0.001), -0.001));
+}
+
+/**
+ * @tc.name: GetSnapCenterOverScrollPos003
+ * @tc.desc: A missing center item preserves the previous scroll and does not insert a default item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListLayoutTestTwoNg, GetSnapCenterOverScrollPos003, TestSize.Level1)
+{
+    CreateList();
+    PrepareMissingCenterState();
+    constexpr float prevScroll = 7.0f;
+
+    EXPECT_EQ(pattern_->GetSnapCenterOverScrollPos(60.0f, prevScroll), prevScroll);
+    EXPECT_EQ(pattern_->itemPosition_.size(), 1U);
+    EXPECT_EQ(pattern_->itemPosition_.find(pattern_->centerIndex_), pattern_->itemPosition_.end());
 }
 
 /**
@@ -493,6 +583,27 @@ HWTEST_F(ArcListLayoutTestTwoNg, HandleScrollBarOutBoundary004, TestSize.Level1)
         AceType::DynamicCast<ArcListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
     listLayoutAlgorithm->FixPredictSnapOffset(layoutProperty_);
     EXPECT_TRUE(NearEqual(listLayoutAlgorithm->GetPredictSnapEndPosition().value_or(-0.001), -0.001));
+}
+
+/**
+ * @tc.name: HandleScrollBarOutBoundary005
+ * @tc.desc: A missing center item leaves the boundary extent intact and does not insert a default item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ArcListLayoutTestTwoNg, HandleScrollBarOutBoundary005, TestSize.Level1)
+{
+    CreateList();
+    PrepareMissingCenterState();
+    ASSERT_TRUE(pattern_->GetScrollBar() || pattern_->GetScrollBarProxy());
+    ASSERT_TRUE(pattern_->IsOutOfBoundary(false));
+    pattern_->isScrollable_ = true;
+    constexpr float boundaryExtent = 7.0f;
+    pattern_->scrollBarOutBoundaryExtent_ = boundaryExtent;
+
+    pattern_->HandleScrollBarOutBoundary();
+    EXPECT_EQ(pattern_->scrollBarOutBoundaryExtent_, boundaryExtent);
+    EXPECT_EQ(pattern_->itemPosition_.size(), 1U);
+    EXPECT_EQ(pattern_->itemPosition_.find(pattern_->centerIndex_), pattern_->itemPosition_.end());
 }
 
 /**

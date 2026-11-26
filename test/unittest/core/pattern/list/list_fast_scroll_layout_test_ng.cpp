@@ -486,6 +486,28 @@ HWTEST_F(ListFastScrollLayoutTestNg, OrdinaryListDoesNotAllocateFastScrollState0
 }
 
 /**
+ * @tc.name: FastScrollNullRequestGuards001
+ * @tc.desc: Every fast-scroll helper rejects an absent request before dereferencing request state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollNullRequestGuards001, TestSize.Level1)
+{
+    RefPtr<ListPattern> pattern = AceType::MakeRefPtr<ListPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ASSERT_EQ(pattern->GetFastScrollRequest(), nullptr);
+
+    EXPECT_FALSE(pattern->MarkFastScrollVisibleTargetPrepared());
+    float position = 37.0f;
+    EXPECT_FALSE(pattern->GetFastScrollTargetPosition(position));
+    EXPECT_EQ(position, 37.0f);
+    EXPECT_NO_FATAL_FAILURE(pattern->ResolveFastScrollAlign());
+    EXPECT_NO_FATAL_FAILURE(pattern->UpdateFastScrollAnimation(0.0f));
+    EXPECT_NO_FATAL_FAILURE(pattern->ApplyFastScrollPreparationResult(nullptr));
+    EXPECT_EQ(pattern->GetFastScrollRequest(), nullptr);
+    EXPECT_EQ(pattern->fastScrollPreparation_, nullptr);
+}
+
+/**
  * @tc.name: FastScrollAllocatesAndReleasesPreparationState001
  * @tc.desc: A fast request owns its preparation state; cancellation does not leave it on an ordinary list.
  * @tc.type: FUNC

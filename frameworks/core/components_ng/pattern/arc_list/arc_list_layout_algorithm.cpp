@@ -196,7 +196,9 @@ int32_t ArcListLayoutAlgorithm::LayoutALineForward(
 
     auto wrapper = GetListItem(layoutWrapper, currentIndex + 1);
     CHECK_NULL_RETURN(wrapper, 0);
-    int32_t id = wrapper->GetHostNode()->GetId();
+    auto node = wrapper->GetHostNode();
+    CHECK_NULL_RETURN(node, 0);
+    int32_t id = node->GetId();
     ++currentIndex;
     ACE_SCOPED_TRACE("ArcListLayoutAlgorithm::MeasureListItem:%d, %f", currentIndex, startPos);
 
@@ -219,7 +221,9 @@ int32_t ArcListLayoutAlgorithm::LayoutALineBackward(
 
     auto wrapper = GetListItem(layoutWrapper, currentIndex - 1);
     CHECK_NULL_RETURN(wrapper, 0);
-    int32_t id = wrapper->GetHostNode()->GetId();
+    auto node = wrapper->GetHostNode();
+    CHECK_NULL_RETURN(node, 0);
+    int32_t id = node->GetId();
     --currentIndex;
     ACE_SCOPED_TRACE("ArcListLayoutAlgorithm::MeasureListItem:%d, %f", currentIndex, endPos);
 

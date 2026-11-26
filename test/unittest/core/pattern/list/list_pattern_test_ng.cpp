@@ -32,6 +32,23 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr int DEFAULT_HEADER_VALUE = 2;
 constexpr int DEFAULT_FOOTER_VALUE = 3;
+
+class ChildIndexTrackingFrameNode : public FrameNode {
+public:
+    explicit ChildIndexTrackingFrameNode(const RefPtr<Pattern>& pattern)
+        : FrameNode(V2::LIST_ETS_TAG, -1, pattern)
+    {}
+
+    RefPtr<LayoutWrapper> GetChildByIndex(uint32_t index, bool /*isCache*/) override
+    {
+        ++getChildByIndexCount_;
+        lastChildIndex_ = index;
+        return nullptr;
+    }
+
+    int32_t getChildByIndexCount_ = 0;
+    uint32_t lastChildIndex_ = 0;
+};
 } // namespace
 
 using namespace testing;
@@ -3695,6 +3712,36 @@ HWTEST_F(ListPatternTestNg, FindChildFocusNodeByIndexWithoutListProperty001, Tes
      */
     ASSERT_NE(frameNode_->GetLayoutProperty<ListLayoutProperty>(), nullptr);
     pattern_->FindChildFocusNodeByIndex(0, FocusStep::DOWN, 0);
+}
+
+/**
+ * @tc.name: GetListItemGroupAnimatePosRejectsNegativeIndex001
+ * @tc.desc: Negative group indexes return before any child lookup and leave target positions intact.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, GetListItemGroupAnimatePosRejectsNegativeIndex001, TestSize.Level1)
+{
+    RefPtr<ListPattern> listPattern = AceType::MakeRefPtr<ListPattern>();
+    ASSERT_NE(listPattern, nullptr);
+    auto host = AceType::MakeRefPtr<ChildIndexTrackingFrameNode>(listPattern);
+    ASSERT_NE(host, nullptr);
+    listPattern->frameNode_ = host;
+
+    float targetWithoutIndex = 123.0f;
+    float targetWithIndex = 456.0f;
+    EXPECT_FALSE(listPattern->GetListItemGroupAnimatePosWithoutIndexInGroup(
+        -1, 0.0f, 100.0f, ScrollAlign::START, targetWithoutIndex));
+    EXPECT_FALSE(listPattern->GetListItemGroupAnimatePosWithIndexInGroup(
+        -1, 0, 0.0f, ScrollAlign::START, targetWithIndex));
+    EXPECT_EQ(targetWithoutIndex, 123.0f);
+    EXPECT_EQ(targetWithIndex, 456.0f);
+    EXPECT_EQ(host->getChildByIndexCount_, 0);
+
+    // Positive control: the same host observes a lookup when the index is valid.
+    EXPECT_FALSE(listPattern->GetListItemGroupAnimatePosWithoutIndexInGroup(
+        0, 0.0f, 100.0f, ScrollAlign::START, targetWithoutIndex));
+    EXPECT_EQ(host->getChildByIndexCount_, 1);
+    EXPECT_EQ(host->lastChildIndex_, 0U);
 }
 
 } // namespace OHOS::Ace::NG
