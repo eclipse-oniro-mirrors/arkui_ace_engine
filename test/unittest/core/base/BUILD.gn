@@ -179,6 +179,7 @@ ace_unittest("view_abstract_model_test_ng") {
   sources = [
     "view_abstract_model_test_ng.cpp",
     "view_abstract_model_test_two_ng.cpp",
+    "view_abstract_model_test_three_ng.cpp",
   ]
 }
 
@@ -188,6 +189,7 @@ if (is_host_product) {
     module_name = "DialogSet-Menu"
     sources = [
       "view_abstract_model_static_test_two_ng.cpp",
+      "view_abstract_model_static_test_three_ng.cpp",
       "view_abstract_spatial_effect_test_ng.cpp",
     ]
   }
@@ -197,6 +199,7 @@ if (is_host_product) {
     type = "new"
     sources = [
       "view_abstract_model_static_test_two_ng.cpp",
+      "view_abstract_model_static_test_three_ng.cpp",
       "view_abstract_spatial_effect_test_ng.cpp",
     ]
   }

@@ -21,6 +21,12 @@
 #include "gtest/gtest.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 
+#include "base/geometry/matrix4.h"
+#include "core/components/common/properties/clip_path.h"
+#include "core/components_ng/pattern/blank/blank_paint_property.h"
+#include "core/components_ng/pattern/blank/blank_pattern.h"
+#include "core/components_ng/property/progress_mask_property.h"
+
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/inspector_occlusion_collector.h"
 #include "core/components_ng/base/inspector_occlusion_region.h"
@@ -537,4 +543,449 @@ TEST(OcclusionCollectorTest, ScrollContainerKeepsDescendantOcclusion)
 }
 
 } // namespace
+
+namespace {
+constexpr int32_t MAX_SNAPSHOTS = 4096;
+constexpr int32_t MAX_DOMAINS = 16;
+constexpr int32_t MAX_DEPTH = 128;
+const double INF = std::numeric_limits<double>::infinity();
+
+RefPtr<FrameNode> MakeNode(const std::string& tag = V2::BLANK_ETS_TAG)
+{
+    return FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>(), true);
+}
+
+void SyncNode(const RefPtr<FrameNode>& node)
+{
+    node->SetActive(true);
+    node->ClearNeedSyncRenderTree();
+}
+
+OcclusionPaintSnapshot TrustedSnapshot(int32_t nodeId, int32_t domainId, double finalOpacity = 1.0)
+{
+    OcclusionPaintSnapshot snapshot;
+    snapshot.nodeId = nodeId;
+    snapshot.domainId = domainId;
+    snapshot.candidateEnvelope = RectF(0.0f, 0.0f, 10.0f, 10.0f);
+    snapshot.opaqueEvidence = RectF(0.0f, 0.0f, 10.0f, 10.0f);
+    snapshot.finalOpacity = finalOpacity;
+    snapshot.paintOrderTrusted = true;
+    snapshot.candidateTrusted = true;
+    snapshot.evidenceTrusted = true;
+    return snapshot;
+}
+} // namespace
+
+/**
+ * @tc.name: EvaluateRejectsInvalidThreshold
+ * @tc.desc: Evaluate rejects non-finite and out-of-range thresholds.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, EvaluateRejectsInvalidThreshold)
+{
+    /**
+     * @tc.steps: evaluate with NaN / infinite / out-of-range thresholds.
+     * @tc.expected: non-finite or out-of-range thresholds produce empty decisions.
+     */
+    std::vector<OcclusionPaintSnapshot> paintOrder = { TrustedSnapshot(1, 10) };
+    EXPECT_TRUE(InspectorOcclusionCollector::Evaluate(paintOrder, std::nan("")).empty());
+    EXPECT_TRUE(InspectorOcclusionCollector::Evaluate(paintOrder, INF).empty());
+    EXPECT_TRUE(InspectorOcclusionCollector::Evaluate(paintOrder, -0.1).empty());
+    EXPECT_TRUE(InspectorOcclusionCollector::Evaluate(paintOrder, 1.5).empty());
+    EXPECT_FALSE(InspectorOcclusionCollector::Evaluate(paintOrder, 1.0).empty());
+}
+
+/**
+ * @tc.name: EvaluateRejectsOversizedPaintOrder
+ * @tc.desc: Evaluate rejects paint order beyond the snapshot budget.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, EvaluateRejectsOversizedPaintOrder)
+{
+    /**
+     * @tc.steps: evaluate with a paint order beyond the snapshot budget.
+     * @tc.expected: oversized input is rejected with empty decisions.
+     */
+    std::vector<OcclusionPaintSnapshot> paintOrder;
+    paintOrder.reserve(static_cast<size_t>(MAX_SNAPSHOTS) + 1);
+    for (int32_t i = 0; i <= MAX_SNAPSHOTS; ++i) {
+        paintOrder.push_back(TrustedSnapshot(i, 10));
+    }
+    EXPECT_TRUE(InspectorOcclusionCollector::Evaluate(paintOrder, 1.0).empty());
+}
+
+/**
+ * @tc.name: EvaluateDomainBudgetFallsBackToUnknown
+ * @tc.desc: Evaluate falls back to UNKNOWN beyond the domain budget.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, EvaluateDomainBudgetFallsBackToUnknown)
+{
+    /**
+     * @tc.steps: feed snapshots of more distinct domains than the budget.
+     * @tc.expected: the first domains decide normally; domains beyond the
+     *               budget resolve to UNKNOWN.
+     */
+    std::vector<OcclusionPaintSnapshot> paintOrder;
+    for (int32_t domain = 0; domain <= MAX_DOMAINS; ++domain) {
+        paintOrder.push_back(TrustedSnapshot(domain, domain));
+    }
+    const auto decisions = InspectorOcclusionCollector::Evaluate(paintOrder, 1.0);
+    EXPECT_EQ(decisions.size(), static_cast<size_t>(MAX_DOMAINS) + 1);
+    // Evaluate walks paintOrder in reverse, so the highest domain is seen first.
+    EXPECT_EQ(decisions.at(0), OcclusionDecision::UNKNOWN);
+    EXPECT_EQ(decisions.at(MAX_DOMAINS), OcclusionDecision::VISIBLE);
+}
+
+/**
+ * @tc.name: EvaluateNaNFinalOpacitySkipsEvidence
+ * @tc.desc: Evaluate skips evidence with NaN final opacity.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, EvaluateNaNFinalOpacitySkipsEvidence)
+{
+    /**
+     * @tc.steps: mark an evidence snapshot with NaN final opacity.
+     * @tc.expected: the NaN check drops the evidence; later nodes in the same
+     *               domain are not covered by it.
+     */
+    std::vector<OcclusionPaintSnapshot> paintOrder = {
+        TrustedSnapshot(1, 10, std::nan("")),
+        TrustedSnapshot(2, 10),
+    };
+    const auto decisions = InspectorOcclusionCollector::Evaluate(paintOrder, 1.0);
+    EXPECT_EQ(decisions.at(1), OcclusionDecision::OCCLUDED); // no evidence added, node stays visible
+    EXPECT_EQ(decisions.at(2), OcclusionDecision::VISIBLE);
+}
+
+/**
+ * @tc.name: CollectRejectsNullNodeAndInvalidThreshold
+ * @tc.desc: Collect rejects null node and non-finite threshold.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, CollectRejectsNullNodeAndInvalidThreshold)
+{
+    /**
+     * @tc.steps: collect with a null node and a non-finite threshold.
+     * @tc.expected: both guard branches produce empty decisions.
+     */
+    RefPtr<FrameNode> nullNode;
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(nullNode, 1.0, 1).empty());
+    auto node = MakeNode();
+    SyncNode(node);
+    auto context = AceType::DynamicCast<MockRenderContext>(node->GetRenderContext());
+    ASSERT_NE(context, nullptr);
+    context->UpdateBackgroundColor(Color::BLUE);
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(node, std::nan(""), 1).empty());
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(node, INF, 1).empty());
+}
+
+/**
+ * @tc.name: CollectStopsAtDepthBudget
+ * @tc.desc: Collect stops at the depth budget.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, CollectStopsAtDepthBudget)
+{
+    /**
+     * @tc.steps: build a chain deeper than the traversal budget.
+     * @tc.expected: the depth budget aborts collection with empty decisions.
+     */
+    auto parent = MakeNode();
+    SyncNode(parent);
+    auto current = parent;
+    for (int32_t i = 0; i < MAX_DEPTH + 3; ++i) {
+        auto child = MakeNode();
+        SyncNode(child);
+        current->AddChild(child);
+        current = child;
+    }
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(parent, 1.0, 1).empty());
+}
+
+/**
+ * @tc.name: CollectStopsAtChildWindowBoundary
+ * @tc.desc: Collect stops at a child window boundary.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, CollectStopsAtChildWindowBoundary)
+{
+    /**
+     * @tc.steps: mark a non-root node as a window boundary.
+     * @tc.expected: the subtree walk stops at the boundary child.
+     */
+    auto parent = MakeNode();
+    auto child = MakeNode();
+    SyncNode(parent);
+    SyncNode(child);
+    parent->AddChild(child);
+    child->SetWindowBoundary(true);
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(parent, 1.0, 1).empty());
+}
+
+/**
+ * @tc.name: CollectStopsAtNaNOpacity
+ * @tc.desc: Collect stops at non-finite opacity on node or parent.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, CollectStopsAtNaNOpacity)
+{
+    /**
+     * @tc.steps: set NaN opacity on the start node and on a parent.
+     * @tc.expected: both non-finite opacity guards abort collection.
+     */
+    auto parent = MakeNode();
+    auto child = MakeNode();
+    SyncNode(parent);
+    SyncNode(child);
+    parent->AddChild(child);
+
+    auto childContext = AceType::DynamicCast<MockRenderContext>(child->GetRenderContext());
+    ASSERT_NE(childContext, nullptr);
+    childContext->UpdateOpacity(std::nan(""));
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(parent, 1.0, 1).empty());
+
+    // restore child opacity, poison the parent opacity instead: the child's
+    // inherited parent opacity check fails
+    childContext->UpdateOpacity(1.0);
+    auto parentContext = AceType::DynamicCast<MockRenderContext>(parent->GetRenderContext());
+    ASSERT_NE(parentContext, nullptr);
+    parentContext->UpdateOpacity(std::nan(""));
+    EXPECT_TRUE(InspectorOcclusionCollector::Collect(child, 1.0, 1).empty());
+}
+
+/**
+ * @tc.name: CollectRemainingExternalTagsStayUnknown
+ * @tc.desc: Collect keeps remaining external tags UNKNOWN.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, CollectRemainingExternalTagsStayUnknown)
+{
+    /**
+     * @tc.steps: collect leaf nodes with the four tag families missing from
+     *            the existing external-tag test.
+     * @tc.expected: all of them resolve to UNKNOWN.
+     */
+    const std::array<const char*, 4> externalTags = { V2::WEB_ETS_TAG, V2::UI_EXTENSION_COMPONENT_TAG,
+        V2::UI_EXTENSION_SURFACE_TAG, V2::UI_EXTENSION_COMPONENT_ETS_TAG };
+    for (const auto* tag : externalTags) {
+        SCOPED_TRACE(tag);
+        auto node = MakeNode(tag);
+        SyncNode(node);
+        auto context = AceType::DynamicCast<MockRenderContext>(node->GetRenderContext());
+        ASSERT_NE(context, nullptr);
+        context->UpdateBackgroundColor(Color::BLUE);
+        context->UpdateClipEdge(true);
+        const auto result = InspectorOcclusionCollector::Collect(node, 1.0, 1);
+        ASSERT_EQ(result.count(node->GetId()), 1u);
+        EXPECT_EQ(result.at(node->GetId()), OcclusionDecision::UNKNOWN);
+    }
+}
+
+/**
+ * @tc.name: UnsupportedGeometryMarksEvidenceUntrusted
+ * @tc.desc: Unsupported geometry marks evidence untrusted.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, UnsupportedGeometryMarksEvidenceUntrusted)
+{
+    /**
+     * @tc.steps: attach each unsupported geometry decoration to a plain leaf.
+     * @tc.expected: unsupported geometry keeps the snapshot untrusted so the
+     *               node resolves to UNKNOWN.
+     */
+    auto applyUnsupported = [](const RefPtr<FrameNode>& node, int variant) {
+        auto context = AceType::DynamicCast<MockRenderContext>(node->GetRenderContext());
+        switch (variant) {
+            case 0:
+                context->UpdateTransformMatrix(Matrix4::CreateIdentity());
+                break;
+            case 1:
+                context->UpdateTransform3DMatrix(Matrix4::CreateIdentity());
+                break;
+            case 2:
+                context->UpdateClipShape(AceType::MakeRefPtr<BasicShape>());
+                break;
+            case 3:
+                context->UpdateProgressMask(AceType::MakeRefPtr<ProgressMaskProperty>());
+                break;
+            default:
+                break;
+        }
+    };
+    for (int variant = 0; variant < 4; ++variant) {
+        auto node = MakeNode();
+        SyncNode(node);
+        auto context = AceType::DynamicCast<MockRenderContext>(node->GetRenderContext());
+        ASSERT_NE(context, nullptr);
+        context->UpdateBackgroundColor(Color::BLUE);
+        context->UpdateClipEdge(true);
+        applyUnsupported(node, variant);
+        const auto result = InspectorOcclusionCollector::Collect(node, 1.0, 1);
+        ASSERT_EQ(result.count(node->GetId()), 1u);
+        EXPECT_EQ(result.at(node->GetId()), OcclusionDecision::UNKNOWN);
+    }
+}
+
+/**
+ * @tc.name: AncestorDisqualifiersAbortCollection
+ * @tc.desc: Ancestor disqualifiers abort collection.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, AncestorDisqualifiersAbortCollection)
+{
+    /**
+     * @tc.steps: build a leaf under a mid ancestor and trip every ancestor
+     *            disqualifier one at a time.
+     * @tc.expected: pending sync, geometry transition, transition animator and
+     *               external tag ancestors all abort the ancestor walk.
+     */
+    auto makeChain = [](const std::string& midTag = V2::BLANK_ETS_TAG) {
+        auto root = MakeNode("root");
+        auto mid = MakeNode(midTag);
+        auto leaf = MakeNode();
+        SyncNode(root);
+        SyncNode(mid);
+        SyncNode(leaf);
+        root->AddChild(mid);
+        mid->AddChild(leaf);
+        return std::tuple { root, mid, leaf };
+    };
+
+    {
+        auto [root, mid, leaf] = makeChain();
+        mid->MarkNeedSyncRenderTree();
+        EXPECT_TRUE(InspectorOcclusionCollector::Collect(leaf, 1.0, 1).empty());
+    }
+    {
+        auto [root, mid, leaf] = makeChain();
+        mid->SetIsGeometryTransitionIn(true);
+        EXPECT_TRUE(InspectorOcclusionCollector::Collect(leaf, 1.0, 1).empty());
+    }
+    {
+        auto [root, mid, leaf] = makeChain();
+        mid->SetIsUseTransitionAnimator(true);
+        EXPECT_TRUE(InspectorOcclusionCollector::Collect(leaf, 1.0, 1).empty());
+    }
+    {
+        auto [root, mid, leaf] = makeChain(V2::WEB_ETS_TAG);
+        EXPECT_TRUE(InspectorOcclusionCollector::Collect(leaf, 1.0, 1).empty());
+    }
+    {
+        auto [root, mid, leaf] = makeChain();
+        auto midContext = AceType::DynamicCast<MockRenderContext>(mid->GetRenderContext());
+        ASSERT_NE(midContext, nullptr);
+        midContext->UpdateOpacity(std::nan(""));
+        EXPECT_TRUE(InspectorOcclusionCollector::Collect(leaf, 1.0, 1).empty());
+    }
+}
+
+/**
+ * @tc.name: AncestorClipAccumulationSucceeds
+ * @tc.desc: Ancestor clip and boundary accumulation succeeds.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, AncestorClipAccumulationSucceeds)
+{
+    /**
+     * @tc.steps: walk from a leaf through clipping and boundary ancestors.
+     * @tc.expected: the ancestor walk accumulates the clip, the boundary break
+     *               stops the walk and collection still reports the leaf.
+     */
+    {
+        // clipped ancestor + root tag ancestor: clip branches accumulate
+        auto root = MakeNode(V2::ROOT_ETS_TAG);
+        auto mid = MakeNode();
+        auto leaf = MakeNode();
+        root->AddChild(mid);
+        mid->AddChild(leaf);
+        SyncNode(root);
+        SyncNode(mid);
+        SyncNode(leaf);
+        auto midContext = AceType::DynamicCast<MockRenderContext>(mid->GetRenderContext());
+        ASSERT_NE(midContext, nullptr);
+        midContext->UpdateClipEdge(true);
+        midContext->SetPaintRectWithTransform(RectF(0.0f, 0.0f, 8.0f, 8.0f));
+        auto leafContext = AceType::DynamicCast<MockRenderContext>(leaf->GetRenderContext());
+        ASSERT_NE(leafContext, nullptr);
+        leafContext->UpdateBackgroundColor(Color::BLUE);
+        const auto result = InspectorOcclusionCollector::Collect(leaf, 1.0, 1);
+        EXPECT_EQ(result.count(leaf->GetId()), 1u);
+    }
+    {
+        // ancestor marked as window boundary ends the walk and still collects
+        auto root = MakeNode();
+        auto mid = MakeNode();
+        auto leaf = MakeNode();
+        root->AddChild(mid);
+        mid->AddChild(leaf);
+        SyncNode(root);
+        SyncNode(mid);
+        SyncNode(leaf);
+        root->SetWindowBoundary(true);
+        auto leafContext = AceType::DynamicCast<MockRenderContext>(leaf->GetRenderContext());
+        ASSERT_NE(leafContext, nullptr);
+        leafContext->UpdateBackgroundColor(Color::BLUE);
+        const auto result = InspectorOcclusionCollector::Collect(leaf, 1.0, 1);
+        EXPECT_EQ(result.count(leaf->GetId()), 1u);
+    }
+    {
+        // start node itself is a window boundary: the ancestor walk short-circuits
+        auto leaf = MakeNode();
+        SyncNode(leaf);
+        leaf->SetWindowBoundary(true);
+        auto leafContext = AceType::DynamicCast<MockRenderContext>(leaf->GetRenderContext());
+        ASSERT_NE(leafContext, nullptr);
+        leafContext->UpdateBackgroundColor(Color::BLUE);
+        const auto result = InspectorOcclusionCollector::Collect(leaf, 1.0, 1);
+        EXPECT_EQ(result.count(leaf->GetId()), 1u);
+    }
+}
+
+/**
+ * @tc.name: BlankColorEvidenceVariants
+ * @tc.desc: Blank color evidence variants.
+ * @tc.type: FUNC
+ */
+TEST(OcclusionCollectorGapTest, BlankColorEvidenceVariants)
+{
+    /**
+     * @tc.steps: run real BlankPattern leaves with a full-alpha color, a
+     *            zero-alpha color and without any color.
+     * @tc.expected: full alpha paints evidence; zero alpha and missing color
+     *               keep the snapshot without evidence.
+     */
+    auto makeBlank = []() {
+        auto node = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<BlankPattern>(), true);
+        SyncNode(node);
+        return node;
+    };
+
+    {
+        auto blank = makeBlank();
+        auto property = blank->GetPaintProperty<BlankPaintProperty>();
+        ASSERT_NE(property, nullptr);
+        property->UpdateColor(Color::BLUE);
+        const auto result = InspectorOcclusionCollector::Collect(blank, 1.0, 1);
+        EXPECT_EQ(result.count(blank->GetId()), 1u);
+    }
+    {
+        auto blank = makeBlank();
+        auto property = blank->GetPaintProperty<BlankPaintProperty>();
+        ASSERT_NE(property, nullptr);
+        property->UpdateColor(Color::TRANSPARENT);
+        const auto result = InspectorOcclusionCollector::Collect(blank, 1.0, 1);
+        EXPECT_EQ(result.count(blank->GetId()), 1u);
+    }
+    {
+        auto blank = makeBlank();
+        auto property = blank->GetPaintProperty<BlankPaintProperty>();
+        ASSERT_NE(property, nullptr);
+        EXPECT_FALSE(property->HasColor());
+        const auto result = InspectorOcclusionCollector::Collect(blank, 1.0, 1);
+        EXPECT_EQ(result.count(blank->GetId()), 1u);
+    }
+}
 } // namespace OHOS::Ace::NG
