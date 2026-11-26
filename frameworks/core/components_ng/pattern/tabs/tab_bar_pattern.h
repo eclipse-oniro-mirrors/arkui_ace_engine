@@ -166,6 +166,11 @@ public:
     TabBarPattern();
     ~TabBarPattern() override;
 
+    bool HasUserDefinedTranslate() const
+    {
+        return hasUserDefinedTranslate_;
+    }
+
     bool IsAtomicNode() const override
     {
         return false;
@@ -973,6 +978,7 @@ private:
     std::optional<WindowSizeChangeReason> windowSizeChangeReason_;
     std::pair<double, double> prevRootSize_;
     float userDefinedTranslateY_ = 0.0f;
+    bool hasUserDefinedTranslate_ = false;
 
     std::optional<int32_t> jumpIndex_;
     std::optional<int32_t> targetIndex_;
