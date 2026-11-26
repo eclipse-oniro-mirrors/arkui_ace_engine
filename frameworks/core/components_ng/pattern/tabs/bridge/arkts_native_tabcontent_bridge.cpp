@@ -1285,8 +1285,15 @@ ArkUINativeModuleValue TabContentBridge::SetSidebarSection(ArkUIRuntimeCallInfo*
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
 
+    // undefined/null — reset the section so switching between a value and
+    // undefined re-groups the sidebar correctly.
+    if (sectionArg.IsNull() || sectionArg->IsUndefined()) {
+        GetArkUINodeModifiers()->getTabContentModifier()->resetSidebarSection(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+
     std::string title;
-    if (!sectionArg.IsNull() && !sectionArg->IsUndefined() && sectionArg->IsObject(vm)) {
+    if (sectionArg->IsObject(vm)) {
         auto sectionObj = sectionArg->ToObject(vm);
         // Parse "title" - can be string or Resource
         Local<JSValueRef> titleVal = ArkTSUtils::GetProperty(vm, sectionObj, "title");

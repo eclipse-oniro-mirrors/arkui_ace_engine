@@ -1042,4 +1042,73 @@ HWTEST_F(TabsSideBarTabListTestNg, IsHiddenBySearchFilter003, TestSize.Level1)
      */
     EXPECT_FALSE(tree.tabListPattern->IsHiddenBySearchFilter(0));
 }
+
+/**
+ * @tc.name: OnColorConfigurationUpdate_EmphasizedUsesSelectedColor_001
+ * @tc.desc: OnColorConfigurationUpdate restores an EMPHASIZED header's text color to the
+ *           sidebar selected text color (detected via FontWeight::BOLD).
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, OnColorConfigurationUpdate_EmphasizedUsesSelectedColor_001, TestSize.Level1)
+{
+    SideBarSectionTestTree tree;
+    SideBarSectionTestTree::TabConfig cfg;
+    cfg.text = "Alice";
+    OHOS::Ace::SidebarSection section;
+    section.title = "Favorites";
+    section.titleStyle = SidebarSectionTitleStyle::EMPHASIZED;
+    cfg.section = section;
+    tree.Build({ cfg });
+    tree.tabListPattern->RebuildSections();
+
+    RefPtr<FrameNode> header = nullptr;
+    for (const auto& child : tree.columnNode->GetChildren()) {
+        if (child && child->GetTag() == "TabsSidebarSectionHeader") {
+            header = AceType::DynamicCast<FrameNode>(child);
+            break;
+        }
+    }
+    ASSERT_NE(header, nullptr);
+    auto textChild = AceType::DynamicCast<FrameNode>(header->GetChildren().front());
+    ASSERT_NE(textChild, nullptr);
+    auto textProp = textChild->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textProp, nullptr);
+
+    // Corrupt then refresh.
+    textProp->UpdateTextColor(Color::RED);
+    tree.tabListPattern->OnColorConfigurationUpdate();
+
+    auto tabTheme = tree.tabsNode->GetTheme<TabTheme>(true);
+    ASSERT_NE(tabTheme, nullptr);
+    EXPECT_EQ(textProp->GetTextColorValue(Color()), tabTheme->GetSideBarSelectedTextColor());
+}
+
+/**
+ * @tc.name: OnColorConfigurationUpdate_NullTabsNode_NoCrash_001
+ * @tc.desc: OnColorConfigurationUpdate must not crash when tabsNode_ is unset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, OnColorConfigurationUpdate_NullTabsNode_NoCrash_001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->OnColorConfigurationUpdate();
+    EXPECT_NE(pattern, nullptr);
+}
+
+/**
+ * @tc.name: OnColorConfigurationUpdate_NoColumnNode_NoCrash_001
+ * @tc.desc: OnColorConfigurationUpdate must not crash when the tab item container is unset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, OnColorConfigurationUpdate_NoColumnNode_NoCrash_001, TestSize.Level1)
+{
+    SideBarSectionTestTree tree;
+    SideBarSectionTestTree::TabConfig cfg;
+    cfg.text = "Alice";
+    tree.Build({ cfg });
+    tree.tabListPattern->SetColumnNode(nullptr);
+    tree.tabListPattern->OnColorConfigurationUpdate();
+    EXPECT_NE(tree.tabListPattern, nullptr);
+}
 } // namespace OHOS::Ace::NG

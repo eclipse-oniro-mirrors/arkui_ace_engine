@@ -2092,6 +2092,10 @@ void TabContentModelNG::SetSidebarSection(FrameNode* node, const SidebarSection&
     } else {
         pattern->RemoveResObj("tabContent.sidebarSectionTitle");
     }
+    // sidebarSection_ lives on the pattern (not a LayoutProperty), so writing it
+    // does not dirty the node by itself. Mark dirty so OnModifyDone runs and
+    // detects the section change (sectionChanged) to trigger sidebar re-grouping.
+    node->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void TabContentModelNG::SetKeepAlive(FrameNode* node, bool keepAlive)

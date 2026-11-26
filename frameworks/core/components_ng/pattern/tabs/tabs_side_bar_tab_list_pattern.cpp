@@ -37,6 +37,7 @@
 #include "core/components_ng/pattern/shape/polygon_model_ng.h"
 #include "core/components_ng/pattern/shape/polygon_pattern.h"
 #include "core/components_ng/pattern/shape/shape_abstract_model_ng.h"
+#include "core/components_ng/pattern/shape/shape_paint_property.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
 #include "core/components_ng/pattern/tabs/tab_content_pattern.h"
 #include "core/components_ng/pattern/tabs/tab_content_layout_property.h"
@@ -283,6 +284,69 @@ void TabsSideBarTabListPattern::RefreshAllTabItemColors()
     if (currentIndex_ >= 0) {
         UpdateTabItemStyle(currentIndex_, true);
     }
+}
+
+void TabsSideBarTabListPattern::RefreshSectionHeaderColors()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabTheme = tabsNode->GetTheme<TabTheme>(true);
+    CHECK_NULL_VOID(tabTheme);
+    auto columnNode = GetTabItemContainerNode();
+    CHECK_NULL_VOID(columnNode);
+    for (const auto& child : columnNode->GetChildren()) {
+        if (!child || child->GetTag() != TABS_SIDE_BAR_SECTION_HEADER_TAG) {
+            continue;
+        }
+        auto headerNode = AceType::DynamicCast<FrameNode>(child);
+        CHECK_NULL_CONTINUE(headerNode);
+        // Header children: [0] = title text, [1] = arrow polyline
+        const auto& headerChildren = headerNode->GetChildren();
+        if (!headerChildren.empty()) {
+            auto textNode = AceType::DynamicCast<FrameNode>(headerChildren.front());
+            if (textNode) {
+                auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+                if (textLayoutProperty) {
+                    // Keep in sync with CreateOrUpdateSectionHeader:
+                    // emphasized title follows the selected color, standard follows unselected.
+                    FontWeight weight = textLayoutProperty->GetFontWeightValue(FontWeight::MEDIUM);
+                    bool isEmphasized = weight == FontWeight::BOLD;
+                    textLayoutProperty->UpdateTextColor(isEmphasized
+                        ? tabTheme->GetSideBarSelectedTextColor()
+                        : tabTheme->GetSideBarUnselectedTextColor());
+                    textNode->MarkModifyDone();
+                    // Dirty flags propagate up the node tree, no need to dirty the host.
+                    textNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+                }
+            }
+        }
+        if (headerChildren.size() > 1) {
+            auto arrowNode = AceType::DynamicCast<FrameNode>(headerChildren.back());
+            if (arrowNode) {
+                // Stroke-only arrow — re-apply stroke color from the latest theme.
+                ShapeAbstractModelNG::SetStroke(AceType::RawPtr(arrowNode), tabTheme->GetBottomTabSymbolOff());
+                // Dirty flags propagate up the node tree, no need to dirty the host.
+                arrowNode->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+            }
+        }
+    }
+}
+
+void TabsSideBarTabListPattern::OnColorConfigurationUpdate()
+{
+    RefreshSectionHeaderColors();
+}
+
+bool TabsSideBarTabListPattern::HasSectionHeaders() const
+{
+    auto columnNode = GetTabItemContainerNode();
+    CHECK_NULL_RETURN(columnNode, false);
+    for (const auto& child : columnNode->GetChildren()) {
+        if (child && child->GetTag() == TABS_SIDE_BAR_SECTION_HEADER_TAG) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void TabsSideBarTabListPattern::InitCurrentIndex(int32_t index)
@@ -1126,7 +1190,12 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::CreateOrUpdateSectionHeader(
             textLayoutProperty->UpdateFontSize(STANDARD_FONT_SIZE);
             textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
         }
-        textLayoutProperty->UpdateTextColor(tabTheme->GetSideBarUnselectedTextColor());
+        // EMPHASIZED uses font_primary, STANDARD uses font_secondary
+        if (titleStyle == SidebarSectionTitleStyle::EMPHASIZED) {
+            textLayoutProperty->UpdateTextColor(tabTheme->GetSideBarSelectedTextColor());
+        } else {
+            textLayoutProperty->UpdateTextColor(tabTheme->GetSideBarUnselectedTextColor());
+        }
         textLayoutProperty->UpdateLayoutWeight(1); // text fills remaining width, pushes arrow to the right
         // Text overflow: wrap to 2 line then ellipsis
         textLayoutProperty->UpdateMaxLines(2);
@@ -1160,9 +1229,18 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::CreateOrUpdateSectionHeader(
             arrowLayoutProperty->UpdateMargin(arrowMargin);
         }
         // Only stroke (no fill) — two line segments forming ^ shape
-        ShapeAbstractModelNG::SetStroke(AceType::RawPtr(arrowNode), tabTheme->GetSideBarUnselectedTextColor());
+        ShapeAbstractModelNG::SetStroke(AceType::RawPtr(arrowNode), tabTheme->GetBottomTabSymbolOff());
         ShapeAbstractModelNG::SetStrokeWidth(AceType::RawPtr(arrowNode), Dimension(1.5_vp));
         ShapeAbstractModelNG::SetFill(AceType::RawPtr(arrowNode), Color::TRANSPARENT);
+        // Round the arrow's three vertices: lineJoin rounds the middle vertex (tip),
+        // lineCap rounds the two end points (base corners).
+        // Note: RSPen::CapStyle values are FLAT_CAP=0, ROUND_CAP=1, SQUARE_CAP=2.
+        // RSPen::JoinStyle values are MITER_JOIN=0, BEVEL_JOIN=1, ROUND_JOIN=2.
+        auto arrowPaintProperty = arrowNode->GetPaintProperty<ShapePaintProperty>();
+        if (arrowPaintProperty) {
+            arrowPaintProperty->UpdateStrokeLineJoin(2); // ROUND_JOIN=2
+            arrowPaintProperty->UpdateStrokeLineCap(1);  // ROUND_CAP=1
+        }
         // Initial arrow state: set to the pre-toggle position so the animation starts
         // from the correct origin. Without this, the arrow renders at the post-toggle
         // (animation end) state for one frame before the animation begins.
@@ -1378,15 +1456,15 @@ void TabsSideBarTabListPattern::UpdateArrowPoints(const RefPtr<FrameNode>& arrow
 {
     CHECK_NULL_VOID(arrowNode);
     // Arrow shape in a 24x24vp component (from design icons):
-    //   chevron_up  (^):  left(5,15)  vertex(12,8)  right(18,15)
-    //   chevron_down (v): left(5,8)   vertex(12,15) right(18,8)
+    //   chevron_up  (^):  left(6,14)  vertex(12,8)  right(18,14)
+    //   chevron_down (v): left(6,9)   vertex(12,15) right(18,9)
     // All three points move linearly between the two states.
     // progress 0.0 = ^ (up), 1.0 = v (down)
-    constexpr float ARROW_LEFT_X = 5.0f;
+    constexpr float ARROW_LEFT_X = 6.0f;
     constexpr float ARROW_RIGHT_X = 18.0f;
     constexpr float ARROW_CENTER_X = 12.0f;
-    constexpr float ARROW_BASE_Y_UP = 15.0f;   // base Y when ^
-    constexpr float ARROW_BASE_Y_DOWN = 8.0f;   // base Y when v
+    constexpr float ARROW_BASE_Y_UP = 14.0f;   // base Y when ^
+    constexpr float ARROW_BASE_Y_DOWN = 9.0f;   // base Y when v
     constexpr float ARROW_VERTEX_Y_UP = 8.0f;    // vertex Y when ^
     constexpr float ARROW_VERTEX_Y_DOWN = 15.0f; // vertex Y when v
     float baseY = ARROW_BASE_Y_UP + (ARROW_BASE_Y_DOWN - ARROW_BASE_Y_UP) * progress;
@@ -1833,7 +1911,17 @@ void TabsSideBarTabListPattern::RefreshSidebarTabVisibilityAndLayout()
         RebuildSections();
         return;
     }
-    // Level 1: no sections — only update visibility, skip node reorder
+    // Level 1: no sections. If section headers still linger from a previous
+    // configuration (e.g. the last sectioned TabContent switched to undefined),
+    // rebuild a flat layout to remove them; otherwise only update visibility.
+    if (HasSectionHeaders()) {
+        std::vector<int32_t> unsectionedIndices;
+        for (int32_t i = 0; i < swiperNode->TotalChildCount(); ++i) {
+            unsectionedIndices.push_back(i);
+        }
+        ApplySectionLayout({}, unsectionedIndices);
+        return;
+    }
     UpdateDirectVisibility(swiperNode);
 }
 
@@ -1897,6 +1985,16 @@ void TabsSideBarTabListPattern::RebuildSections()
         }
     }
     if (!hasAnySection) {
+        // No tab declares a section anymore. If headers linger from a previous
+        // configuration (e.g. the last sectioned TabContent switched to undefined),
+        // rebuild a flat layout to drop them; otherwise there is nothing to do.
+        if (HasSectionHeaders()) {
+            std::vector<int32_t> unsectionedIndices;
+            for (int32_t i = 0; i < swiperNode->TotalChildCount(); ++i) {
+                unsectionedIndices.push_back(i);
+            }
+            ApplySectionLayout({}, unsectionedIndices);
+        }
         return;
     }
     std::vector<SectionInfo> sections;
