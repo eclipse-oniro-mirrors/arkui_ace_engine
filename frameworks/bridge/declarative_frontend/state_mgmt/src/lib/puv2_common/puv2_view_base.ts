@@ -87,6 +87,14 @@ function __resolveAsyncLoadTimeoutMs__Internal(timeout?: number): number {
   return Math.min(2147483647, Math.ceil(timeout));
 }
 
+// Module-level registry of views whose construction window (constructor body
+// incl. @ComponentInit) is still open. Kept outside the instances on purpose:
+// WeakSet add/delete/has never assign to the instance, so an app calling
+// Object.freeze(this) inside @ComponentInit cannot make the window bookkeeping
+// throw. Entries are weak, so a window left open by a view that never runs
+// @ComponentInit (no generated code) does not leak.
+const asyncLoadWindowsOpen: WeakSet<object> = new WeakSet<object>();
+
 abstract class PUV2ViewBase extends ViewBuildNodeBase {
 
   public __notifyDecoratedWatch__Internal(_varName: string): void {}
@@ -187,10 +195,6 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
   public __isPreRendered__Internal: boolean = false;
   private __customComponentContext__Internal?: CustomComponentContext;
   private __asyncLoadConfig__Internal?: CustomComponentAsyncLoadOptions;
-  // enableAsyncLoad only takes effect inside the construction window
-  // (constructor body incl. @ComponentInit). Opened when PUV2ViewBase construction
-  // begins; see the constructor for how it is closed.
-  private __asyncLoadWindowOpen__Internal: boolean = false;
   // The first effective request wins; later calls never rewrite the config
   // (recorded as a maintainability warning).
   private __asyncLoadRequested__Internal: boolean = false;
@@ -252,15 +256,12 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     // Read the prototype flag set by @Active/@Inactive decorators
     const hasActiveOrInactiveDecorators: string = '__hasActiveOrInactiveDecorators__Internal';
     this.__needToActiveOrInactiveLifecycle__Internal = this[hasActiveOrInactiveDecorators] === true;
-    // The subclass constructor — whose tail runs @ComponentInit — completes synchronously
-    // after super() returns, and every later callback (aboutToAppear onwards) can only run
-    // after this task yields. Draining the microtask queue therefore closes the
-    // construction window exactly between "subclass constructor done" and the first
-    // lifecycle callback.
-    this.__asyncLoadWindowOpen__Internal = true;
-    Promise.resolve().then(() => {
-      this.__asyncLoadWindowOpen__Internal = false;
-    });
+    // enableAsyncLoad only takes effect inside the construction window. The
+    // window opens here and is closed synchronously at the tail of
+    // __customComponentExecuteInit__Internal — which the generated constructor
+    // calls as its final statement (finalizeConstruction) — so it spans exactly
+    // the constructor body incl. @ComponentInit, with no microtask involved.
+    asyncLoadWindowsOpen.add(this);
     stateMgmtConsole.debug(`${this.debugInfo__()}: constructor: done`);
   }
 
@@ -333,6 +334,12 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     } catch (e) {
       stateMgmtConsole.frequentApplicationError(`Lifecycle ComponentInit error, ${this.debugInfo__()}, ${e.message} ${e.stack}`);
       throw e;
+    } finally {
+      // Close the enableAsyncLoad construction window even when @ComponentInit
+      // throws: the window is this view's own construction period, which ends
+      // here regardless. The WeakSet delete never assigns to the instance, so
+      // a frozen instance closes cleanly too.
+      asyncLoadWindowsOpen.delete(this);
     }
   }
 
@@ -499,7 +506,7 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
    * "unset" on that axis).
    */
   public __enableAsyncLoad__Internal(options?: CustomComponentAsyncLoadOptions): void {
-    if (!this.__asyncLoadWindowOpen__Internal) {
+    if (!asyncLoadWindowsOpen.has(this)) {
       // Out-of-window calls are ignored without any observable effect,
       // but are recorded as a maintainability warning log (hilog).
       stateMgmtConsole.warn(`${this.debugInfo__()}: enableAsyncLoad ignored: outside the construction window`);
@@ -509,8 +516,18 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
       stateMgmtConsole.warn(`${this.debugInfo__()}: enableAsyncLoad ignored: already requested, first request wins`);
       return;
     }
-    this.__asyncLoadRequested__Internal = true;
-    this.__asyncLoadConfig__Internal = options;
+    try {
+      this.__asyncLoadRequested__Internal = true;
+      this.__asyncLoadConfig__Internal = options;
+    } catch (e) {
+      // Assigning to a frozen instance (Object.freeze inside @ComponentInit)
+      // throws in strict mode. The request cannot be stored, so it degrades to
+      // synchronous loading semantics: warn, return void, never throw — the
+      // same degradation contract as any other invalid call (R-6).
+      stateMgmtConsole.warn(`${this.debugInfo__()}: enableAsyncLoad degraded: ` +
+        `cannot record request on instance (${e.message}), request ignored`);
+      return;
+    }
     const payload: Record<string, string | number> = {};
     const placeholder = options?.placeholder;
     const placeholderId = placeholder?.id;

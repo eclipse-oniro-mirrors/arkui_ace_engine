@@ -109,6 +109,7 @@ class MockView implements IView {
  * 8. Lifecycle Integration
  * 9. Recycle/Reuse Flags
  * 10. Edge Cases and Stress Tests
+ * 11. enableAsyncLoad construction window
  */
 export class Puv2ViewBaseTestsV2 implements ITestFile {
     private idString: string = "";
@@ -885,5 +886,115 @@ export class Puv2ViewBaseTestsV2 implements ITestFile {
         eq(id1, id2, "ID remains the same on first call");
         eq(id2, id3, "ID remains the same on second call");
         eq(id1, 50, "original ID is preserved");
+    }
+
+    // =========================================================================
+    // SECTION 11: enableAsyncLoad construction window
+    // =========================================================================
+
+    // Replaces the view's native bridge with a recording stub so the tests below
+    // never depend on the native side accepting a config for a bare view.
+    private static stubNativeConfigPush(view: ViewV2): { getConfig: () => string } {
+        let nativeConfig: string = "";
+        (view as any).nativeViewPartialUpdate = {
+            setAsyncLoadConfig: (cfg: string): void => {
+                nativeConfig = cfg;
+            }
+        };
+        return {
+            getConfig: (): string => nativeConfig
+        };
+    }
+
+    /**
+     * Test an in-window enableAsyncLoad request is accepted
+     * Expected: the request flag and config are recorded and the resolved
+     *           config is pushed to the native side
+     */
+    public testEnableAsyncLoadInWindowIsAccepted(): void {
+        const subscriberId = 751;
+        Puv2ViewBaseTestsV2.withNativeIdMocks(UINodeRegisterProxy.notRecordingDependencies, subscriberId, () => {
+            const view = new ViewV2(undefined, UINodeRegisterProxy.notRecordingDependencies, undefined);
+            const native = Puv2ViewBaseTestsV2.stubNativeConfigPush(view);
+            // A bare ViewV2 never runs the generated constructor tail, so the
+            // window is still open here.
+            (view as any).__enableAsyncLoad__Internal({ timeout: 500 });
+            eq((view as any).__asyncLoadRequested__Internal, true, "in-window request is recorded");
+            eq((view as any).__asyncLoadConfig__Internal?.timeout, 500, "in-window config is stored");
+            eq(native.getConfig().includes('"timeout":500'), true,
+                "resolved config is pushed to the native side");
+        });
+    }
+
+    /**
+     * Test the window closes synchronously at the @ComponentInit tail
+     * Expected: once __customComponentExecuteInit__Internal (the finalizeConstruction
+     *           tail the generated constructor invokes) has run, a same-task call is
+     *           already out of window: void return, nothing recorded, no native push
+     */
+    public testEnableAsyncLoadWindowClosesSynchronously(): void {
+        const subscriberId = 752;
+        Puv2ViewBaseTestsV2.withNativeIdMocks(UINodeRegisterProxy.notRecordingDependencies, subscriberId, () => {
+            const view = new ViewV2(undefined, UINodeRegisterProxy.notRecordingDependencies, undefined);
+            const native = Puv2ViewBaseTestsV2.stubNativeConfigPush(view);
+            (view as any).__customComponentExecuteInit__Internal();
+            // Same synchronous task, no microtask drain: the window must be closed.
+            let threw = false;
+            try {
+                (view as any).__enableAsyncLoad__Internal({ timeout: 500 });
+            } catch (e) {
+                threw = true;
+            }
+            eq(threw, false, "out-of-window enableAsyncLoad returns void without throwing");
+            eq((view as any).__asyncLoadRequested__Internal, false,
+                "out-of-window request is not recorded");
+            eq(native.getConfig(), "", "out-of-window call never reaches the native side");
+        });
+    }
+
+    /**
+     * Test Object.freeze(this) inside @ComponentInit cannot break the window
+     * Expected: an in-window call on a frozen instance degrades (void, warn, no
+     *           native push) instead of throwing, and closing the window on the
+     *           frozen instance is clean (window state lives outside the instance)
+     */
+    public testEnableAsyncLoadOnFrozenInstanceDegrades(): void {
+        const subscriberId = 753;
+        Puv2ViewBaseTestsV2.withNativeIdMocks(UINodeRegisterProxy.notRecordingDependencies, subscriberId, () => {
+            const view = new ViewV2(undefined, UINodeRegisterProxy.notRecordingDependencies, undefined);
+            const native = Puv2ViewBaseTestsV2.stubNativeConfigPush(view);
+            // The app freezes the instance while the window is still open.
+            Object.freeze(view);
+
+            let threw = false;
+            try {
+                (view as any).__enableAsyncLoad__Internal({ timeout: 500 });
+            } catch (e) {
+                threw = true;
+            }
+            eq(threw, false, "enableAsyncLoad on a frozen instance must not throw");
+            eq(native.getConfig(), "", "frozen-instance request must not reach the native side");
+
+            // Closing the window (the @ComponentInit tail) on a frozen instance
+            // must be clean as well.
+            let closeThrew = false;
+            try {
+                (view as any).__customComponentExecuteInit__Internal();
+            } catch (e) {
+                closeThrew = true;
+            }
+            eq(closeThrew, false, "window closes cleanly on a frozen instance");
+
+            // After the window closes, a repeat call is ordinary out-of-window
+            // behavior: void, no effect.
+            let repeatThrew = false;
+            try {
+                (view as any).__enableAsyncLoad__Internal({ timeout: 500 });
+            } catch (e) {
+                repeatThrew = true;
+            }
+            eq(repeatThrew, false, "repeat call after close stays void");
+            eq(native.getConfig(), "", "still no native side effect");
+        });
     }
 }

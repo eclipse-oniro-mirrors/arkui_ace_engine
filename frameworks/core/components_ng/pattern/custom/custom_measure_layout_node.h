@@ -118,6 +118,9 @@ public:
     {
         return jsActive_;
     }
+    // Transparent to the native active walk (tracks jsActive_ for the
+    // async-load scheduler, then descends to children like the base
+    // implementation; does not fire this host's own JS callback).
     void SetJSViewActive(bool active, bool isLazyForEachNode = false,
         bool isReuse = false, bool suppressActiveLifecycle = false) override;
 

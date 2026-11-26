@@ -97,10 +97,18 @@ bool CustomMeasureLayoutNode::RenderCustomChild(int64_t deadline)
 void CustomMeasureLayoutNode::SetJSViewActive(bool active, bool isLazyForEachNode,
     bool isReuse, bool suppressActiveLifecycle)
 {
-    if (jsActive_ != active) {
-        jsActive_ = active;
-        FireSetActiveFunc(active, isReuse, suppressActiveLifecycle);
-    }
+    // Track for the async-load scheduler's freeze gate (AsyncLoadNodeActive ->
+    // GetJsActive), but stay transparent to the native active walk like the base
+    // FrameNode was: unlike CustomNode, this host must NOT become a JS-view
+    // boundary. Firing its own JS callback here would double-notify JS children
+    // (the callback triggers the JS view tree propagation, and the walk below
+    // would fire CustomNode children again, corrupting their active count), so
+    // this host's own JS view keeps being notified through the JS view tree by
+    // its JS parent — exactly as before this override existed — while the
+    // descent keeps native-managed structures below (LazyForEach/Repeat caches,
+    // nested walk-reachable subtrees) receiving active propagation.
+    jsActive_ = active;
+    UINode::SetJSViewActive(active, isLazyForEachNode, isReuse, suppressActiveLifecycle);
 }
 
 void CustomMeasureLayoutNode::OnAttachToMainTree(bool recursive)
