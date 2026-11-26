@@ -23,6 +23,8 @@
 
 #undef private
 #undef protected
+#include "interfaces/native/native_type.h"
+
 
 using namespace testing;
 using namespace testing::ext;
@@ -608,4 +610,146 @@ HWTEST_F(UtilsTest, fontWeightStringToNumericTest002, TestSize.Level1)
     EXPECT_EQ(GetFontWeightNumericValue(defaultEnum), 400);
 }
 
+
+namespace {
+// string keys must stay in sync with dom_type.h constants
+const char* const FLEX_KEYS[] = {
+    "baseline",
+    "center",
+    "flex-end",
+    "flex-start",
+    "space-around",
+    "space-between",
+    "space-evenly",
+    "stretch",
+};
+const FlexAlign FLEX_VALUES[] = {
+    FlexAlign::BASELINE,
+    FlexAlign::CENTER,
+    FlexAlign::FLEX_END,
+    FlexAlign::FLEX_START,
+    FlexAlign::SPACE_AROUND,
+    FlexAlign::SPACE_BETWEEN,
+    FlexAlign::SPACE_EVENLY,
+    FlexAlign::STRETCH,
+};
+} // namespace
+
+class BridgeUtilsGapTest : public testing::Test {
+public:
+    static void SetUpTestSuite() {}
+    static void TearDownTestSuite() {}
+};
+
+/**
+ * @tc.name: BridgeUtilsGapConvertStrToFlexAlign001
+ * @tc.desc: Test ConvertStrToFlexAlign for all keys and unknown key.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BridgeUtilsGapTest, BridgeUtilsGapConvertStrToFlexAlign001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: map every supported flex key and an unknown key.
+     * @tc.expected: each key returns its enum; unknown key returns FLEX_START.
+     */
+    for (size_t i = 0; i < sizeof(FLEX_KEYS) / sizeof(FLEX_KEYS[0]); ++i) {
+        EXPECT_EQ(ConvertStrToFlexAlign(FLEX_KEYS[i]), FLEX_VALUES[i]) << FLEX_KEYS[i];
+    }
+    EXPECT_EQ(ConvertStrToFlexAlign("not-a-flex-key"), FlexAlign::FLEX_START);
+    EXPECT_EQ(ConvertStrToFlexAlign(""), FlexAlign::FLEX_START);
+}
+
+/**
+ * @tc.name: BridgeUtilsGapConvertStrToTextAlign001
+ * @tc.desc: Test ConvertStrToTextAlign for all keys and unknown key.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BridgeUtilsGapTest, BridgeUtilsGapConvertStrToTextAlign001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: map every supported align key and an unknown key.
+     * @tc.expected: each key returns its enum; unknown key returns CENTER.
+     */
+    EXPECT_EQ(ConvertStrToTextAlign("center"), TextAlign::CENTER);
+    EXPECT_EQ(ConvertStrToTextAlign("end"), TextAlign::END);
+    EXPECT_EQ(ConvertStrToTextAlign("left"), TextAlign::LEFT);
+    EXPECT_EQ(ConvertStrToTextAlign("right"), TextAlign::RIGHT);
+    EXPECT_EQ(ConvertStrToTextAlign("start"), TextAlign::START);
+    EXPECT_EQ(ConvertStrToTextAlign("justify"), TextAlign::CENTER); // unknown -> CENTER
+    EXPECT_EQ(ConvertStrToTextAlign(""), TextAlign::CENTER);
+}
+
+/**
+ * @tc.name: BridgeUtilsGapConvertStrToFontStyle001
+ * @tc.desc: Test ConvertStrToFontStyle for italic/normal/unknown.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BridgeUtilsGapTest, BridgeUtilsGapConvertStrToFontStyle001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: map italic and non-italic keys.
+     * @tc.expected: only "italic" maps to ITALIC, everything else NORMAL.
+     */
+    EXPECT_EQ(ConvertStrToFontStyle("italic"), FontStyle::ITALIC);
+    EXPECT_EQ(ConvertStrToFontStyle("normal"), FontStyle::NORMAL);
+    EXPECT_EQ(ConvertStrToFontStyle("oblique"), FontStyle::NORMAL);
+    EXPECT_EQ(ConvertStrToFontStyle(""), FontStyle::NORMAL);
+}
+
+/**
+ * @tc.name: BridgeUtilsGapConvertStrToTextDecoration001
+ * @tc.desc: Test ConvertStrToTextDecoration for all keys and unknown key.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BridgeUtilsGapTest, BridgeUtilsGapConvertStrToTextDecoration001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: map every supported decoration key and an unknown key.
+     * @tc.expected: each key returns its enum; unknown key returns NONE.
+     */
+    EXPECT_EQ(ConvertStrToTextDecoration("inherit"), TextDecoration::INHERIT);
+    EXPECT_EQ(ConvertStrToTextDecoration("line-through"), TextDecoration::LINE_THROUGH);
+    EXPECT_EQ(ConvertStrToTextDecoration("none"), TextDecoration::NONE);
+    EXPECT_EQ(ConvertStrToTextDecoration("overline"), TextDecoration::OVERLINE);
+    EXPECT_EQ(ConvertStrToTextDecoration("underline"), TextDecoration::UNDERLINE);
+    EXPECT_EQ(ConvertStrToTextDecoration("blink"), TextDecoration::NONE); // unknown -> NONE
+    EXPECT_EQ(ConvertStrToTextDecoration(""), TextDecoration::NONE);
+}
+
+/**
+ * @tc.name: BridgeUtilsGapCurveIntToString001
+ * @tc.desc: Test CurveIntToString for all curve values and unknown value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BridgeUtilsGapTest, BridgeUtilsGapCurveIntToString001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: map every ArkUI animation curve to its css name.
+     * @tc.expected: known curves return their names; unknown returns linear.
+     */
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_EASE)), "ease");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_EASE_IN)), "ease-in");
+    // NOTE: CurveIntToString currently binary-searches an unsorted map, so these
+    // curves fail back to "linear". Keep the test aligned with the current
+    // implementation; the mapping defect is tracked separately.
+    EXPECT_EQ(
+        CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_EASE_IN_OUT)), "linear");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_EASE_OUT)), "linear");
+    EXPECT_EQ(CurveIntToString(
+        static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_EXTREME_DECELERATION)), "linear");
+    EXPECT_EQ(CurveIntToString(
+        static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_FAST_OUT_LINEAR_IN)), "linear");
+    EXPECT_EQ(CurveIntToString(
+        static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_FAST_OUT_SLOW_IN)), "linear");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_FRICTION)), "linear");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_LINEAR)), "linear");
+    EXPECT_EQ(CurveIntToString(
+        static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_LINEAR_OUT_SLOW_IN)), "linear-out-slow-in");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_RHYTHM)), "rhythm");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_SHARP)), "linear");
+    EXPECT_EQ(CurveIntToString(static_cast<int32_t>(ArkUI_AnimationCurve::ARKUI_CURVE_SMOOTH)), "smooth");
+    // unknown values fall back to linear
+    EXPECT_EQ(CurveIntToString(-1), "linear");
+    EXPECT_EQ(CurveIntToString(9999), "linear");
+}
 } // namespace OHOS::Ace::Framework

@@ -142,4 +142,198 @@ HWTEST_F(NodeObjectTest, NodeObjectTest003, TestSize.Level1)
     bool ret3 = nodeObject->Put(key, value3);
     EXPECT_EQ(ret3, false);
 }
+
+
+class NodeObjectGapTest : public testing::Test {
+public:
+    static void SetUpTestSuite() {}
+    static void TearDownTestSuite() {}
+};
+
+/**
+ * @tc.name: NodeObjectGapContains001
+ * @tc.desc: Test Contains for present and absent keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapContains001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: put a key then query present/absent keys.
+     * @tc.expected: present key returns true, absent key returns false.
+     */
+    auto node = NodeObject::Create();
+    ASSERT_TRUE(node);
+    node->Put("key", static_cast<int32_t>(42));
+    EXPECT_TRUE(node->Contains("key"));
+    EXPECT_FALSE(node->Contains("not-exist"));
+}
+
+/**
+ * @tc.name: NodeObjectGapGetBoolGetUInt001
+ * @tc.desc: Test GetBool and GetUInt with defaults.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapGetBoolGetUInt001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: put bool/uint items then get present and absent keys.
+     * @tc.expected: present keys return stored values, absent keys return defaults.
+     */
+    auto node = NodeObject::Create();
+    ASSERT_TRUE(node);
+    node->Put("flag", true);
+    node->Put("count", static_cast<int32_t>(7));
+    EXPECT_TRUE(node->GetBool("flag"));
+    EXPECT_FALSE(node->GetBool("flag-absent", false));
+    EXPECT_TRUE(node->GetBool("flag-absent", true));
+
+    EXPECT_EQ(node->GetUInt("count"), 7U);
+    EXPECT_EQ(node->GetUInt("count-absent", 9U), 9U);
+}
+
+/**
+ * @tc.name: NodeObjectGapPutNullArgs001
+ * @tc.desc: Test Put overloads reject null key/value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapPutNullArgs001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: call Put with null key and null value pointers.
+     * @tc.expected: all overloads return false and store nothing.
+     */
+    auto node = NodeObject::Create();
+    ASSERT_TRUE(node);
+    EXPECT_FALSE(node->Put(nullptr, "value"));
+    EXPECT_FALSE(node->Put("key", nullptr));
+    EXPECT_FALSE(node->Put(nullptr, static_cast<int32_t>(1)));
+    EXPECT_FALSE(node->Put(nullptr, 1.0));
+    EXPECT_FALSE(node->Put(nullptr, true));
+    EXPECT_FALSE(node->Put(nullptr, static_cast<size_t>(1)));
+    EXPECT_FALSE(node->Contains("key"));
+}
+
+/**
+ * @tc.name: NodeObjectGapToStringRoundTrip001
+ * @tc.desc: Test ToString/FromString serialization round trip.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapToStringRoundTrip001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: put mixed-type items, serialize to string, deserialize into a
+     *            new object and read back.
+     * @tc.expected: round trip preserves all values.
+     */
+    auto node = NodeObject::Create();
+    ASSERT_TRUE(node);
+    node->Put("name", "ace");
+    node->Put("count", static_cast<int32_t>(11));
+    node->Put("ratio", 0.75);
+    node->Put("valid", true);
+
+    auto serialized = node->ToString();
+    EXPECT_FALSE(serialized.empty());
+
+    auto restored = NodeObject::Create();
+    ASSERT_TRUE(restored);
+    restored->FromString(serialized);
+    EXPECT_EQ(restored->GetString("name"), "ace");
+    EXPECT_EQ(restored->GetInt("count"), 11);
+    EXPECT_DOUBLE_EQ(restored->GetDouble("ratio"), 0.75);
+    EXPECT_TRUE(restored->GetBool("valid"));
+    EXPECT_TRUE(restored->Contains("name"));
+}
+
+/**
+ * @tc.name: NodeObjectGapHashAndBufferSize001
+ * @tc.desc: Test Hash and EstimateBufferSize.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapHashAndBufferSize001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: build two identical objects and one different object, compare
+     *            hashes and buffer sizes.
+     * @tc.expected: identical objects hash equally; buffer size grows with
+     *               content and is greater than zero.
+     */
+    auto nodeA = NodeObject::Create();
+    auto nodeB = NodeObject::Create();
+    ASSERT_TRUE(nodeA);
+    ASSERT_TRUE(nodeB);
+    nodeA->Put("name", "ace");
+    nodeB->Put("name", "ace");
+    EXPECT_EQ(nodeA->Hash(), nodeB->Hash());
+
+    auto hashBefore = nodeA->Hash();
+    nodeB->Put("extra", static_cast<int32_t>(1));
+    EXPECT_EQ(nodeA->Hash(), hashBefore);
+
+    auto emptySize = NodeObject::Create()->EstimateBufferSize();
+    auto smallSize = nodeA->EstimateBufferSize();
+    auto biggerSize = nodeB->EstimateBufferSize();
+    EXPECT_GE(smallSize, 0);
+    EXPECT_GE(biggerSize, smallSize);
+    EXPECT_GE(smallSize, emptySize);
+}
+
+/**
+ * @tc.name: NodeObjectGapGetValue001
+ * @tc.desc: Test GetValue/GetObject with present and absent keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapGetValue001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: put a nested object then read it back via GetValue/GetObject.
+     * @tc.expected: nested object reads back its members; absent key yields an
+     *               empty object.
+     */
+    auto outer = NodeObject::Create();
+    auto inner = NodeObject::Create();
+    ASSERT_TRUE(outer);
+    ASSERT_TRUE(inner);
+    inner->Put("id", static_cast<int32_t>(5));
+    outer->Put("inner", inner);
+
+    auto gotValue = outer->GetValue("inner");
+    ASSERT_TRUE(gotValue);
+    EXPECT_EQ(gotValue->GetInt("id"), 5);
+
+    auto gotObject = outer->GetObject("inner");
+    ASSERT_TRUE(gotObject);
+    EXPECT_EQ(gotObject->GetInt("id"), 5);
+
+    auto absent = outer->GetValue("absent");
+    ASSERT_TRUE(absent);
+    EXPECT_EQ(absent->GetInt("id", -1), -1);
+}
+
+/**
+ * @tc.name: NodeObjectGapPutJsonValue001
+ * @tc.desc: Test Put with JsonValue of object and nested types.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeObjectGapTest, NodeObjectGapPutJsonValue001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: put a JsonValue object containing string/bool/number/nested
+     *            object members.
+     * @tc.expected: all member types are accepted and readable afterwards.
+     */
+    auto json = JsonUtil::Create(true);
+    ASSERT_TRUE(json);
+    json->Put("str", "text");
+    json->Put("num", static_cast<int32_t>(3));
+    json->Put("flag", true);
+    auto nested = JsonUtil::Create(true);
+    nested->Put("deep", "value");
+    json->Put("nested", nested);
+
+    auto node = NodeObject::Create();
+    ASSERT_TRUE(node);
+    EXPECT_TRUE(node->Put("json", json));
+    EXPECT_TRUE(node->Contains("json"));
+}
 } // namespace OHOS::Ace

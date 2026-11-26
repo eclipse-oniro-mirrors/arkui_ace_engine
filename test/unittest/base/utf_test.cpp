@@ -14,6 +14,8 @@
  */
 
 #include "gtest/gtest.h"
+#include <cstdint>
+#include <string>
 #include "gtest/hwext/gtest-ext.h"
 #include "gtest/hwext/gtest-tag.h"
 #include "unicode/unistr.h"
@@ -232,5 +234,125 @@ HWTEST_F(UtfTestNg, SplitUtf16Pair_002, TestSize.Level1)
     
     EXPECT_EQ(result.first, 0x0041);
     EXPECT_EQ(result.second, 0x0042);
+}
+
+// internal helpers of utf.cpp without public header declarations
+size_t UTF8Length(uint32_t codePoint);
+size_t EncodeUTF8(uint32_t codePoint, uint8_t* utf8, size_t len, size_t index);
+bool IsContinuationByte(const std::string& input, size_t startIndex, uint8_t continueCount);
+std::string RemoveInvalidUft8Bytes(const std::string& input);
+
+
+class UtfGapTest : public testing::Test {
+public:
+    static void SetUpTestSuite() {}
+    static void TearDownTestSuite() {}
+};
+
+/**
+ * @tc.name: UtfGapUTF8Length001
+ * @tc.desc: Test UTF8Length for all encoding widths.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UtfGapTest, UtfGapUTF8Length001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: query encoded length of code points at range boundaries.
+     * @tc.expected: 1/2/3/4 bytes for ascii/2b/3b/4b ranges.
+     */
+    EXPECT_EQ(UTF8Length(0x00), 1U);
+    EXPECT_EQ(UTF8Length(0x41), 1U);
+    EXPECT_EQ(UTF8Length(0x7F), 1U);
+    EXPECT_EQ(UTF8Length(0x80), 2U);
+    EXPECT_EQ(UTF8Length(0x7FF), 2U);
+    EXPECT_EQ(UTF8Length(0x800), 3U);
+    EXPECT_EQ(UTF8Length(0xFFFF), 3U);
+    EXPECT_EQ(UTF8Length(0x10000), 4U);
+    EXPECT_EQ(UTF8Length(0x10FFFF), 4U);
+}
+
+/**
+ * @tc.name: UtfGapEncodeUTF8001
+ * @tc.desc: Test EncodeUTF8 for all widths and buffer overflow.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UtfGapTest, UtfGapEncodeUTF8001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: encode ascii, 2-byte, 3-byte, 4-byte code points and a
+     *            code point that does not fit the buffer.
+     * @tc.expected: correct utf-8 byte sequences; overflow returns 0.
+     */
+    uint8_t buffer[8] = { 0 };
+
+    EXPECT_EQ(EncodeUTF8(0x41, buffer, sizeof(buffer), 0), 1U);
+    EXPECT_EQ(buffer[0], 0x41);
+
+    EXPECT_EQ(EncodeUTF8(0xE9, buffer, sizeof(buffer), 0), 2U); // e-acute
+    EXPECT_EQ(buffer[0], 0xC3);
+    EXPECT_EQ(buffer[1], 0xA9);
+
+    EXPECT_EQ(EncodeUTF8(0x20AC, buffer, sizeof(buffer), 0), 3U); // euro sign
+    EXPECT_EQ(buffer[0], 0xE2);
+    EXPECT_EQ(buffer[1], 0x82);
+    EXPECT_EQ(buffer[2], 0xAC);
+
+    EXPECT_EQ(EncodeUTF8(0x1F600, buffer, sizeof(buffer), 0), 4U); // grinning face
+    EXPECT_EQ(buffer[0], 0xF0);
+    EXPECT_EQ(buffer[1], 0x9F);
+    EXPECT_EQ(buffer[2], 0x98);
+    EXPECT_EQ(buffer[3], 0x80);
+
+    // not enough room: 2-byte sequence into 1-byte buffer
+    EXPECT_EQ(EncodeUTF8(0xE9, buffer, 1, 0), 0U);
+    // index offset leaves insufficient room
+    EXPECT_EQ(EncodeUTF8(0x1F600, buffer, 4, 1), 0U);
+}
+
+/**
+ * @tc.name: UtfGapIsContinuationByte001
+ * @tc.desc: Test IsContinuationByte valid and invalid continuation bytes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UtfGapTest, UtfGapIsContinuationByte001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: check continuation patterns of 1/2/3 bytes.
+     * @tc.expected: bytes matching the continuation pattern pass, non-continuation bytes fail.
+     */
+    EXPECT_TRUE(IsContinuationByte("\xC3\xA9", 1, 1));    // 0xA9 is continuation
+    EXPECT_FALSE(IsContinuationByte("\xC3\x41", 1, 1));  // 'A' is not
+    EXPECT_TRUE(IsContinuationByte("\xE2\x82\xAC", 1, 2)); // 0x82, 0xAC
+    EXPECT_FALSE(IsContinuationByte("\xE2\x41\xAC", 1, 2));
+    EXPECT_TRUE(IsContinuationByte("\xF0\x9F\x98\x80", 1, 3)); // 0x9F,0x98,0x80
+    EXPECT_FALSE(IsContinuationByte("\xF0\x9F\x41\x80", 1, 3));
+}
+
+/**
+ * @tc.name: UtfGapRemoveInvalidUft8Bytes001
+ * @tc.desc: Test RemoveInvalidUft8Bytes keeps valid sequences only.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UtfGapTest, UtfGapRemoveInvalidUft8Bytes001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: clean ascii, valid multi-byte sequences, truncated sequences
+     *            and invalid lead bytes.
+     * @tc.expected: valid sequences survive; truncated/invalid bytes dropped.
+     */
+    EXPECT_EQ(RemoveInvalidUft8Bytes("abc"), "abc");
+
+    EXPECT_EQ(RemoveInvalidUft8Bytes("a\xC3\xA9" "b"), "a\xC3\xA9" "b"); // valid 2-byte kept
+    EXPECT_EQ(RemoveInvalidUft8Bytes("\xE2\x82\xAC"), "\xE2\x82\xAC"); // valid 3-byte
+    EXPECT_EQ(RemoveInvalidUft8Bytes("\xF0\x9F\x98\x80"), "\xF0\x9F\x98\x80"); // valid 4-byte
+
+    // truncated sequences: lead byte without enough continuation bytes
+    EXPECT_EQ(RemoveInvalidUft8Bytes("\xC3"), "");           // 2-byte lead alone
+    EXPECT_EQ(RemoveInvalidUft8Bytes("\xE2\x82"), "");      // 3-byte with 1 cont
+    EXPECT_EQ(RemoveInvalidUft8Bytes("\xF0\x9F\x98"), "");  // 4-byte with 2 cont
+    // bad continuation: lead followed by ascii
+    EXPECT_EQ(RemoveInvalidUft8Bytes("a\xC3" "b"), "ab");
+    // invalid lead byte 0xFF and orphan continuation 0x80
+    EXPECT_EQ(RemoveInvalidUft8Bytes(std::string("a\xFF" "b\x80" "c", 5)), "abc");
 }
 }
