@@ -38,6 +38,7 @@
 #include "render_service_client/core/ui_effect/effect/include/colorful_brightness_blender.h"
 #include "render_service_client/core/ui_effect/filter/include/filter_radius_gradient_blur_para.h"
 #include "render_service_client/core/ui_effect/property/include/rs_ui_shape_base.h"
+#include "render_service_client/core/ui_effect/property/include/rs_ui_blender_base.h"
 #include "render_service_client/core/ui/rs_node.h"
 #include "render_service_base/include/common/rs_color.h"
 #include "render_service_client/core/ui/rs_depth_node.h"
@@ -116,6 +117,14 @@
 #include "ui/view/draw/modifier.h"
 
 namespace OHOS::Ace::NG {
+struct RosenRenderContext::VibrancyBlenderCache {
+    std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> darkenBlender;
+    std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> brightenBlender;
+    std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> currentBlender;
+    std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> adaptiveDarkenBlender;
+    std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> adaptiveBrightenBlender;
+};
+
 #define FREE_RS_CONTEXT_CHECK(funcName, ...)                        \
     if (this->isFree_) {                                            \
         auto host = GetHost();                                      \
