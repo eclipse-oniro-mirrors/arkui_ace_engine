@@ -774,6 +774,31 @@ HWTEST_F(ScrollableCoverTestNg, StartScrollSnapAnimationTest001, TestSize.Level1
 }
 
 /**
+ * @tc.name: StartScrollSnapAnimationFlushStartTimeOnlyForAxisTest001
+ * @tc.desc: Test StartScrollSnapAnimation only flushes animation start time and requests a frame for axis input
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableCoverTestNg, StartScrollSnapAnimationFlushStartTimeOnlyForAxisTest001, TestSize.Level1)
+{
+    auto verifyFlushState = [](int32_t source, bool expected) {
+        auto context = MockPipelineContext::GetCurrent();
+        ASSERT_NE(context, nullptr);
+        auto scrollable = AceType::MakeRefPtr<Scrollable>();
+        scrollable->nodeId_ = 1;
+        scrollable->currentPos_ = 0.0;
+        scrollable->context_ = context;
+        context->isNeedFlushAnimationStartTime_ = false;
+
+        scrollable->StartScrollSnapAnimation(50.0f, 10.0f, false, source);
+
+        EXPECT_EQ(context->isNeedFlushAnimationStartTime_, expected) << "source=" << source;
+    };
+
+    verifyFlushState(SCROLL_FROM_AXIS, true);
+    verifyFlushState(SCROLL_FROM_ANIMATION, false);
+}
+
+/**
  * @tc.name: UpdateSpringMotionTest001
  * @tc.desc: Test the behavior of the UpdateSpringMotion method
  * @tc.type: FUNC

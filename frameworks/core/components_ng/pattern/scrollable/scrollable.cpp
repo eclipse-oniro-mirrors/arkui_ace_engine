@@ -1549,8 +1549,10 @@ void Scrollable::StartScrollSnapAnimation(
     auto context = context_.Upgrade();
     CHECK_NULL_VOID(context);
     lastVsyncTime_ = context->GetVsyncTime();
-    MarkNeedFlushAnimationStartTime();
-    context->RequestFrame();
+    if (source == SCROLL_FROM_AXIS) {
+        MarkNeedFlushAnimationStartTime();
+        context->RequestFrame();
+    }
 }
 
 void Scrollable::RetargetItemSnapContent(float contentDelta)
