@@ -6636,6 +6636,16 @@ void RichEditorPattern::UpdateEditingValue(const std::shared_ptr<TextEditingValu
 #ifdef CROSS_PLATFORM
         editingValue_ = value;
 #if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
+#ifdef IOS_PLATFORM
+        if (value->appendText.empty() && value->unmarkText && value->compose.IsValid() &&
+            value->compose.GetEnd() > value->compose.GetStart() &&
+            value->selection.GetStart() == value->selection.GetEnd() &&
+            value->selection.GetEnd() == value->compose.GetStart() && !value->discardedMarkedText) {
+            DeleteRange(value->compose.GetStart(), value->compose.GetEnd());
+            value->compose.Update(-1);
+            return;
+        }
+#endif
         if (value->appendText.empty()) {
             // Selection-only event (no appended text, no delete). Apply it as a
             // real caret move: it is either the IME caret echo or a

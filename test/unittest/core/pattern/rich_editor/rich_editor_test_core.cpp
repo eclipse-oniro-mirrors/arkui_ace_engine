@@ -96,4 +96,45 @@ HWTEST_F(RichEditorPatternTestCore, PushCaretInfoFocused001, TestSize.Level1)
     EXPECT_TRUE(pattern->HasFocus());
 }
 
+/**
+ * @tc.name: UpdateEditingValueEmptyAppendFallback001
+ * @tc.desc: An editing event with empty appendText (the standard-system shape of a
+ *           selection-only/clear event) falls through the compiled-out cross-platform
+ *           guards to the plain insert with empty text: no crash, content unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPatternTestCore, UpdateEditingValueEmptyAppendFallback001, TestSize.Level1)
+{
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    auto value = std::make_shared<TextEditingValue>();
+    value->text = "ni hao";
+    value->appendText = "";
+    value->isDelete = false;
+    value->selection = TextSelection(3, 3);
+    richEditorPattern->UpdateEditingValue(value);
+    EXPECT_EQ(richEditorPattern->GetTextContentLength(), 0);
+}
+
+/**
+ * @tc.name: UpdateEditingValueAppendText001
+ * @tc.desc: The second step of the WeChat two-step commit inserts the candidate as a
+ *           plain appendText event; on the standard-system test path it reaches the
+ *           insert branch and appends the candidate text.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorPatternTestCore, UpdateEditingValueAppendText001, TestSize.Level1)
+{
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    auto value = std::make_shared<TextEditingValue>();
+    value->text = "ni hao你好";
+    value->appendText = "你好";
+    value->isDelete = false;
+    richEditorPattern->UpdateEditingValue(value);
+    EXPECT_EQ(richEditorPattern->GetTextContentLength(), 2);
+}
+
 } // namespace OHOS::Ace::NG

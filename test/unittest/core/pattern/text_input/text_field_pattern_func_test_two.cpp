@@ -2029,4 +2029,48 @@ HWTEST_F(TextFieldPatternFuncTestTwo, UpdatePropertyImplMaxFontScale002, TestSiz
     auto layoutProperty = pattern_->GetLayoutProperty<TextFieldLayoutProperty>();
     ASSERT_NE(layoutProperty, nullptr);
 }
+/**
+ * @tc.name: HandleEditingEventCrossPlatformFallback001
+ * @tc.desc: On the standard-system test path the cross-platform editing handler is not
+ *           compiled: an editing event with empty appendText is left unprocessed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternFuncTestTwo, HandleEditingEventCrossPlatformFallback001, TestSize.Level1)
+{
+    auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(textFieldNode, nullptr);
+    RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto value = std::make_shared<TextEditingValue>();
+    value->text = "test";
+    value->appendText = "";
+    value->isDelete = false;
+    value->selection = TextSelection(1, 1);
+    auto result = pattern->HandleEditingEventCrossPlatform(value);
+    EXPECT_FALSE(result);
+}
+
+/**
+ * @tc.name: HandleEditingEventCrossPlatformFallback002
+ * @tc.desc: On the standard-system test path a candidate-insert editing event (non-empty
+ *           appendText) is also left unprocessed by the cross-platform handler.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternFuncTestTwo, HandleEditingEventCrossPlatformFallback002, TestSize.Level1)
+{
+    auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(textFieldNode, nullptr);
+    RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto value = std::make_shared<TextEditingValue>();
+    value->text = "ni hao你好";
+    value->appendText = "你好";
+    value->isDelete = false;
+    auto result = pattern->HandleEditingEventCrossPlatform(value);
+    EXPECT_FALSE(result);
+}
 } // namespace OHOS::Ace
