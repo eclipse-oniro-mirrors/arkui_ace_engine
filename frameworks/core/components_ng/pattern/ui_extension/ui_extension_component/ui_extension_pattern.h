@@ -131,7 +131,7 @@ public:
     void RegisterWindowSceneVisibleChangeCallback(const RefPtr<Pattern>& windowScenePattern);
     void UnRegisterWindowSceneVisibleChangeCallback(int32_t nodeId);
     void OnWindowSceneVisibleChange(bool visible);
-    void OnHostWindowInfoChanged(uint32_t hostWindowId);
+    void OnHostWindowInfoChanged(uint32_t hostWindowId, uint32_t windowSceneId);
     void OnAttachToMainTree() override;
     void OnDetachFromMainTree() override;
     void OnAttachContext(PipelineContext *context) override;
@@ -421,7 +421,7 @@ private:
     void RegisterUIExtensionManagerEvent(int32_t instanceId);
     void RegisterBrandColorChangeListener();
     void UnRegisterBrandColorChangeListener();
-    void UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId, uint32_t newHostWindowId, uint32_t newHostWindowId);
+    void UpdateSessionInstanceId(int32_t instanceId);
 
     void RegisterVisibleAreaChange();
     void MountPlaceholderNode(PlaceholderType type);

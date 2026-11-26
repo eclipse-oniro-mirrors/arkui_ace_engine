@@ -706,14 +706,14 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg013, TestSize.L
     int32_t instanceId = 100;
     sessionWrapper->instanceId_ = 100;
 
-    sessionWrapper->UpdateInstanceId(instanceId, 0);
+    sessionWrapper->UpdateInstanceId(instanceId);
 
     instanceId = 100;
     sessionWrapper->instanceId_ = 200;
     auto container = Container::GetContainer(instanceId);
     EXPECT_NE(container, nullptr);
     sessionWrapper->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
-    sessionWrapper->UpdateInstanceId(instanceId, 0);
+    sessionWrapper->UpdateInstanceId(instanceId);
     EXPECT_EQ(instanceId, sessionWrapper->instanceId_);
 }
 
@@ -1010,7 +1010,7 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg016, TestSize.L
 
     auto instanceId = pattern->GetInstanceIdFromHost();
     sessionWrapper->instanceId_ = 200;
-    sessionWrapper->UpdateInstanceId(instanceId, 0);
+    sessionWrapper->UpdateInstanceId(instanceId);
     auto ret = sessionWrapper->GetInstanceId();
     EXPECT_EQ(ret, instanceId);
 }

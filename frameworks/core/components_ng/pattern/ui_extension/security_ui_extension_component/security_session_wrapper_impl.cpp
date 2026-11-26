@@ -48,6 +48,7 @@
 namespace OHOS::Ace::NG {
 namespace {
 // Defines all error names and messages.
+constexpr int32_t INVALID_WINDOW_ID = -1;
 constexpr char START_FAIL_NAME[] = "start_ability_fail";
 constexpr char START_FAIL_MESSAGE[] = "Start ui extension ability failed, please check the want of UIextensionAbility.";
 constexpr char BACKGROUND_FAIL_NAME[] = "background_fail";
@@ -440,11 +441,7 @@ int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
     if (container->IsSceneBoardWindow()) {
         return GetWindowSceneId();
     }
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    CHECK_NULL_RETURN(window, 0);
-    auto rsWindow = window->GetRSWindow();
-    CHECK_NULL_RETURN(rsWindow, 0);
-    return static_cast<int32_t>(rsWindow->GetWindowId());
+    return pipeline->GetWindowId();
 }
 
 int32_t SecuritySessionWrapperImpl::GetWindowSceneId()
@@ -494,7 +491,7 @@ const std::shared_ptr<AAFwk::Want> SecuritySessionWrapperImpl::GetWant()
     return session_ ? customWant_ : nullptr;
 }
 
-void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
+void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 {
     if (patternInstanceId_ == instanceId) {
         PLATFORM_LOGW("patternInstanceId(%{public}d) has not changed when UpdateInstanceId.", instanceId);
@@ -504,13 +501,12 @@ void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t n
     PLATFORM_LOGI("Update patternInstanceId %{public}d to %{public}d.", patternInstanceId_, instanceId);
     patternInstanceId_ = instanceId;
     if (IsSessionValid()) {
-        UpdateExtensionParent(newHostWindowId);
-        ReDispatchWantParams();
+        NotifyExtensionParentChanged();
     }
     PLATFORM_LOGI("Update instanceId success.");
 }
 
-void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
+void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId)
 {
     CHECK_NULL_VOID(session_);
     auto container = Platform::AceContainer::GetContainer(instanceId_);
@@ -542,6 +538,42 @@ void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
         session_->GetPersistentId(), newHostWindowId, sessionInfo.callerPersistentId_);
     Rosen::ExtensionSessionManager::GetInstance().UpdateExtensionSessionParent(
         session_, newHostWindowId, sessionInfo);
+}
+
+void SecuritySessionWrapperImpl::NotifyExtensionParentChanged()
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto newHostWindowId = static_cast<uint32_t>(pipeline->GetRealHostWindowId());
+    auto focusWindowId = static_cast<uint32_t>(pipeline->GetFocusWindowId());
+    int32_t windowSceneId = GetWindowSceneId();
+    if (container->IsSceneBoardWindow() && windowSceneId != INVALID_WINDOW_ID) {
+        focusWindowId = static_cast<uint32_t>(windowSceneId);
+    }
+    UpdateExtensionParent(newHostWindowId, focusWindowId);
+    ReDispatchWantParams();
+}
+
+void SecuritySessionWrapperImpl::UpdateWindowSceneId()
+{
+    if (!IsSessionValid()) {
+        return;
+    }
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_VOID(container);
+    if (!container->IsSceneBoardWindow()) {
+        return;
+    }
+    auto newWindowSceneId = static_cast<uint32_t>(GetWindowSceneId());
+    PLATFORM_LOGI("UpdateWindowSceneId newWindowSceneId=%{public}u, oldWindowSceneId=%{public}u.",
+        newWindowSceneId, windowSceneId_);
+    if (newWindowSceneId != windowSceneId_) {
+        NotifyExtensionParentChanged();
+        windowSceneId_ = newWindowSceneId;
+    }
 }
 /******************************* End: About session ***************************************/
 

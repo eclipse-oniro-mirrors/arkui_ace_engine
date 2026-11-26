@@ -4836,14 +4836,15 @@ void UIContentImpl::UpdateHostWindowInfo(uint32_t hostWindowId)
             hostWindowInfo_.focusWindowId = hostWindowId;
             auto realHostWindowId = window_->GetRealParentId();
             hostWindowInfo_.realHostWindowId = realHostWindowId != 0 ?
-                realHostWindowId : hostWindowInfo_.realHostWindowId; 
-            auto cont = Platform::AceContainer::GetContainer(instanceId_);
-            CHECK_NULL_VOID(cont);
-            cont->SetFocusWindowId(hostWindowId);
-            cont->SetRealHostWindowId(hostWindowInfo_.realHostWindowId);
-            auto pipeline = cont->GetPipelineContext();
+                realHostWindowId : hostWindowInfo_.realHostWindowId;
+            auto container = Platform::AceContainer::GetContainer(instanceId_);
+            CHECK_NULL_VOID(container);
+            container->SetFocusWindowId(hostWindowId);
+            container->SetRealHostWindowId(hostWindowInfo_.realHostWindowId);
+            auto pipeline = container->GetPipelineContext();
             CHECK_NULL_VOID(pipeline);
-            pipeline->FlushHostWindowInfoChangedCallback(hostWindowId);
+            pipeline->FlushHostWindowInfoChangedCallback(
+                hostWindowInfo_.realHostWindowId, hostWindowInfo_.focusWindowId);
         }, TaskExecutor::TaskType::UI, "ArkUIUpdateHostWindowInfo");
 }
 

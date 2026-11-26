@@ -92,7 +92,7 @@ const std::shared_ptr<AAFwk::Want> SessionWrapperImpl::GetWant()
     return std::make_shared<AAFwk::Want>(want);
 }
 
-void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId) {}
+void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId) {}
 
 bool SessionWrapperImpl::NotifyFocusEventSync(bool isFocus)
 {
@@ -306,7 +306,9 @@ bool SessionWrapperImpl::SendBusinessData(
 
 void SessionWrapperImpl::NotifyHostWindowMode(int32_t mode) {}
 
-void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId) {}
+void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) {}
+void SessionWrapperImpl::NotifyExtensionParentChanged() {}
+void SessionWrapperImpl::UpdateWindowSceneId() {}
 
 void SessionWrapperImpl::ReDispatchWantParams() {}
 

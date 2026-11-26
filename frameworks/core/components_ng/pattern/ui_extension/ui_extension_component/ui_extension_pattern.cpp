@@ -269,7 +269,7 @@ void UIExtensionPattern::AddWindowStateChangedCallback()
     context->AddWindowStateChangedCallback(host->GetId());
 }
 
-void UIExtensionPattern::OnHostWindowInfoChanged(uint32_t hostWindowId)
+void UIExtensionPattern::OnHostWindowInfoChanged(uint32_t hostWindowId, uint32_t windowSceneId)
 {
     CHECK_NULL_VOID(sessionWrapper_);
     if (!sessionWrapper_->IsSessionValid()) {
@@ -281,9 +281,9 @@ void UIExtensionPattern::OnHostWindowInfoChanged(uint32_t hostWindowId)
     if (!container->IsUIExtensionWindow()) {
         return;
     }
-    UIEXT_LOGI("OnHostWindowInfoChanged, hostWindowId=%{public}u", hostWindowId);
-    sessionWrapper_->UpdateExtensionParent(hostWindowId);
-    sessionWrapper_->ReDispatchWantParams();
+    UIEXT_LOGI("OnHostWindowInfoChanged, hostWindowId=%{public}u, windowSceneId=%{public}u",
+        hostWindowId, windowSceneId);
+    sessionWrapper_->NotifyExtensionParentChanged();
 }
 
 void UIExtensionPattern::OnAttachContext(PipelineContext *context)
@@ -299,10 +299,12 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
         UnRegisterEvent(instanceId_);
         RegisterEvent(newInstanceId);
         instanceId_ = newInstanceId;
-        auto newHostWindowId = static_cast<uint32_t>(context->GetFocusWindowId());
-        UpdateSessionInstanceId(newInstanceId, newHostWindowId);
+        UpdateSessionInstanceId(newInstanceId);
     } else if (detachContextHappened) {
         RegisterEvent(instanceId_);
+    }
+    if (sessionWrapper_) {
+        sessionWrapper_->UpdateWindowSceneId();
     }
     AddWindowStateChangedCallback();
     RegisterAvoidInfoChangeListener(instanceId_);
@@ -319,7 +321,7 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     /* only for 1.2 end */
 }
 
-void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId, uint32_t newHostWindowId)
+void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
 {
     auto sessionWrapperImpl = AceType::DynamicCast<SessionWrapperImpl>(sessionWrapper_);
     if (!sessionWrapperImpl) {
@@ -327,7 +329,7 @@ void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId, uint32_t ne
         return;
     }
 
-    sessionWrapperImpl->UpdateInstanceId(instanceId, newHostWindowId);
+    sessionWrapperImpl->UpdateInstanceId(instanceId);
     NotifyBrandColorChange(instanceId);
 }
 
@@ -1099,10 +1101,10 @@ void UIExtensionPattern::RegisterPipelineEvent(
 #endif
     UIEXT_LOGI("RegisterPipelineEvent");
     hostWindowInfoCallbackId_ = pipeline->AddHostWindowInfoChangedCallback(
-        [weak = WeakClaim(this)](uint32_t hostWindowId) {
+        [weak = WeakClaim(this)](uint32_t hostWindowId, uint32_t windowSceneId) {
             auto pattern = weak.Upgrade();
             CHECK_NULL_VOID(pattern);
-            pattern->OnHostWindowInfoChanged(hostWindowId);
+            pattern->OnHostWindowInfoChanged(hostWindowId, windowSceneId);
         });
 }
 

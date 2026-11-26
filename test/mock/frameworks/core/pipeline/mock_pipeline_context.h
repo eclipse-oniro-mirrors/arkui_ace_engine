@@ -170,7 +170,7 @@ public:
         return xComponentDisplayConstraintEnabled_;
     }
     
-    void FlushHostWindowInfoChangedCallback(uint32_t hostWindowId) override {}
+    void FlushHostWindowInfoChangedCallback(uint32_t realHostWindowId, uint32_t focusWindowId) override {}
 
 protected:
     float fontScale_ = 1.0f;

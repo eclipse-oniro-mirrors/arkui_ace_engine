@@ -224,6 +224,7 @@ ace_unittest("ui_extension_component_testtwo_ng") {
     "$ace_root/frameworks/core/components_ng/pattern/window_scene/scene/window_scene.cpp",
     "$ace_root/test/mock/adapter/ohos/entrance/mock_ace_extra_input_data.cpp",
     "$ace_root/test/mock/adapter/ohos/entrance/mock_mmi_event_convertor.cpp",
+    "$ace_root/test/unittest/adapter/ohos/entrance/mock_rs_adapter.cpp",
     "$ace_root/test/unittest/core/pattern/ui_extension/mock/mock_ace_container.cpp",
     "$ace_root/test/unittest/core/pattern/ui_extension/mock/mock_dynamic_component_renderer_impl.cpp",
     "$ace_root/test/unittest/core/pattern/ui_extension/mock/mock_rosen_render_context.cpp",

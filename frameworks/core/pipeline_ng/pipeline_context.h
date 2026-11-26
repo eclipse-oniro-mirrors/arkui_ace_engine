@@ -621,7 +621,7 @@ public:
     using HostWindowInfoChangedCallback = PipelineBase::HostWindowInfoChangedCallback;
     int32_t AddHostWindowInfoChangedCallback(HostWindowInfoChangedCallback&& callback);
     void RemoveHostWindowInfoChangedCallback(int32_t callbackId);
-    void FlushHostWindowInfoChangedCallback(uint32_t hostWindowId) override;
+    void FlushHostWindowInfoChangedCallback(uint32_t realHostWindowId, uint32_t focusWindowId) override;
 
     void AddWindowSizeDragEndCallback(std::function<void()>&& callback);
 

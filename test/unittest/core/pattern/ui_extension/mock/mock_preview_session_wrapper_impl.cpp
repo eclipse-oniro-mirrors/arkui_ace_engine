@@ -293,7 +293,7 @@ void PreviewSessionWrapperImpl::DispatchExtensionDataToHostWindow(uint32_t custo
 {
 }
 
-void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
+void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 {
     instanceId_ = instanceId;
 }

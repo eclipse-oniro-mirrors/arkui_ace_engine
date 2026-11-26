@@ -289,7 +289,9 @@ bool SecuritySessionWrapperImpl::SendBusinessData(
 
 void SecuritySessionWrapperImpl::ReDispatchWantParams() {}
 
-void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId) {}
+void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) {}
+void SecuritySessionWrapperImpl::NotifyExtensionParentChanged() {}
+void SecuritySessionWrapperImpl::UpdateWindowSceneId() {}
 
 int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
 {
@@ -305,7 +307,7 @@ void SecuritySessionWrapperImpl::DispatchExtensionDataToHostWindow(uint32_t cust
 {
 }
 
-void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
+void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 {
 }
 } // namespace OHOS::Ace::NG

@@ -428,11 +428,7 @@ int32_t PreviewSessionWrapperImpl::GetCallerPersistentId()
     if (container->IsSceneBoardWindow()) {
         return GetWindowSceneId();
     }
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    CHECK_NULL_RETURN(window, 0);
-    auto rsWindow = window->GetRSWindow();
-    CHECK_NULL_RETURN(rsWindow, 0);
-    return static_cast<int32_t>(rsWindow->GetWindowId());
+    return pipeline->GetWindowId();
 }
 
 int32_t PreviewSessionWrapperImpl::GetWindowSceneId()
@@ -874,7 +870,7 @@ int32_t PreviewSessionWrapperImpl::GetInstanceId() const
     return instanceId_;
 }
 
-void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
+void PreviewSessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 {
     if (instanceId_ == instanceId) {
         PLATFORM_LOGW("InstanceId(%{public}d) has not changed when UpdateInstanceId.", instanceId);

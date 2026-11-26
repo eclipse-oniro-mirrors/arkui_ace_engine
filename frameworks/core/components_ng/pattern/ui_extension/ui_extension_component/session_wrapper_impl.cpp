@@ -637,7 +637,7 @@ void SessionWrapperImpl::InitAllCallback()
     InitGetStatusBarHeightFunc();
 }
 
-void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId)
+void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 {
     if (instanceId_ == instanceId) {
         UIEXT_LOGW("InstanceId(%{public}d) has not changed when UpdateInstanceId.", instanceId);
@@ -653,8 +653,7 @@ void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId, uint32_t newHostWi
     taskExecutor_ = taskExecutor;
     InitAllCallback();
     if (IsSessionValid()) {
-        UpdateExtensionParent(newHostWindowId);
-        ReDispatchWantParams();
+        NotifyExtensionParentChanged();
     }
     UIEXT_LOGI("Update instanceId success.");
 }
@@ -673,9 +672,8 @@ Rosen::SessionViewportConfig ConvertToRosenSessionViewportConfig(const SessionVi
     return config_;
 }
 
-void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
+void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId)
 {
-    std::lock_guard<std::mutex> lock(sessionMutex_);
     CHECK_NULL_VOID(session_);
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -715,6 +713,42 @@ void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId)
         persistentId_, newHostWindowId, sessionInfo.callerPersistentId_, GetFrameNodeId());
     Rosen::ExtensionSessionManager::GetInstance().UpdateExtensionSessionParent(
         session_, newHostWindowId, sessionInfo);
+}
+
+void SessionWrapperImpl::NotifyExtensionParentChanged()
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto newHostWindowId = static_cast<uint32_t>(pipeline->GetRealHostWindowId());
+    auto focusWindowId = static_cast<uint32_t>(pipeline->GetFocusWindowId());
+    int32_t windowSceneId = GetWindowSceneId();
+    if (container->IsSceneBoardWindow() && windowSceneId != INVALID_WINDOW_ID) {
+        focusWindowId = static_cast<uint32_t>(windowSceneId);
+    }
+    UpdateExtensionParent(newHostWindowId, focusWindowId);
+    ReDispatchWantParams();
+}
+
+void SessionWrapperImpl::UpdateWindowSceneId()
+{
+    if (!IsSessionValid()) {
+        return;
+    }
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    if (!container->IsSceneBoardWindow()) {
+        return;
+    }
+    auto newWindowSceneId = static_cast<uint32_t>(GetWindowSceneId());
+    UIEXT_LOGI("UpdateWindowSceneId newWindowSceneId=%{public}u, oldWindowSceneId=%{public}u.",
+        newWindowSceneId, windowSceneId_);
+    if (newWindowSceneId != windowSceneId_) {
+        NotifyExtensionParentChanged();
+        windowSceneId_ = newWindowSceneId;
+    }
 }
 
 void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
@@ -829,11 +863,7 @@ int32_t SessionWrapperImpl::GetCallerPersistentId(const RefPtr<PipelineBase>& pi
     if (container->IsSceneBoardWindow()) {
         return GetWindowSceneId();
     }
-    auto window = static_cast<RosenWindow*>(container->GetWindow());
-    CHECK_NULL_RETURN(window, 0);
-    auto rsWindow = window->GetRSWindow();
-    CHECK_NULL_RETURN(rsWindow, 0);
-    return static_cast<int32_t>(rsWindow->GetWindowId());
+    return pipeline->GetWindowId();
 }
 
 void SessionWrapperImpl::UpdateSessionConfig()

@@ -3649,10 +3649,11 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback001, TestSize.Level
     ASSERT_NE(context_, nullptr);
     uint32_t receivedId = 0;
     int32_t callbackId = context_->AddHostWindowInfoChangedCallback(
-        [&receivedId](uint32_t hostWindowId) { receivedId = hostWindowId; });
+        
+        [&receivedId](uint32_t hostWindowId, uint32_t) { receivedId = hostWindowId; });
     EXPECT_GE(callbackId, 0);
 
-    context_->FlushHostWindowInfoChangedCallback(12345u);
+    context_->FlushHostWindowInfoChangedCallback(12345u, 100u);
     EXPECT_EQ(receivedId, 12345u);
     context_->RemoveHostWindowInfoChangedCallback(callbackId);
 }
@@ -3667,12 +3668,13 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback002, TestSize.Level
     ASSERT_NE(context_, nullptr);
     uint32_t receivedId = 0;
     int32_t callbackId = context_->AddHostWindowInfoChangedCallback(
-        [&receivedId](uint32_t hostWindowId) { receivedId = hostWindowId; });
+        
+        [&receivedId](uint32_t hostWindowId, uint32_t) { receivedId = hostWindowId; });
     EXPECT_GE(callbackId, 0);
 
     context_->RemoveHostWindowInfoChangedCallback(callbackId);
     receivedId = 0;
-    context_->FlushHostWindowInfoChangedCallback(99999u);
+    context_->FlushHostWindowInfoChangedCallback(99999u, 200u);
     EXPECT_EQ(receivedId, 0u);
 }
 
@@ -3687,12 +3689,14 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback003, TestSize.Level
     uint32_t received1 = 0;
     uint32_t received2 = 0;
     int32_t id1 = context_->AddHostWindowInfoChangedCallback(
-        [&received1](uint32_t hostWindowId) { received1 = hostWindowId; });
+        
+        [&received1](uint32_t hostWindowId, uint32_t) { received1 = hostWindowId; });
     int32_t id2 = context_->AddHostWindowInfoChangedCallback(
-        [&received2](uint32_t hostWindowId) { received2 = hostWindowId; });
+        
+        [&received2](uint32_t hostWindowId, uint32_t) { received2 = hostWindowId; });
     EXPECT_NE(id1, id2);
 
-    context_->FlushHostWindowInfoChangedCallback(777u);
+    context_->FlushHostWindowInfoChangedCallback(777u, 300u);
     EXPECT_EQ(received1, 777u);
     EXPECT_EQ(received2, 777u);
     context_->RemoveHostWindowInfoChangedCallback(id1);
@@ -3708,7 +3712,7 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback004, TestSize.Level
 {
     ASSERT_NE(context_, nullptr);
     context_->hostWindowInfoChangedCallbacks_.clear();
-    context_->FlushHostWindowInfoChangedCallback(0u);
+    context_->FlushHostWindowInfoChangedCallback(0u, 0u);
     EXPECT_TRUE(context_->hostWindowInfoChangedCallbacks_.empty());
 }
 
@@ -3735,9 +3739,9 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback006, TestSize.Level
 {
     ASSERT_NE(context_, nullptr);
     context_->hostWindowInfoChangedCallbacks_.clear();
-    int32_t id1 = context_->AddHostWindowInfoChangedCallback([](uint32_t) {});
-    int32_t id2 = context_->AddHostWindowInfoChangedCallback([](uint32_t) {});
-    int32_t id3 = context_->AddHostWindowInfoChangedCallback([](uint32_t) {});
+    int32_t id1 = context_->AddHostWindowInfoChangedCallback([](uint32_t, uint32_t) {});
+    int32_t id2 = context_->AddHostWindowInfoChangedCallback([](uint32_t, uint32_t) {});
+    int32_t id3 = context_->AddHostWindowInfoChangedCallback([](uint32_t, uint32_t) {});
     EXPECT_NE(id1, id2);
     EXPECT_NE(id2, id3);
     EXPECT_NE(id1, id3);
@@ -3757,8 +3761,9 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback007, TestSize.Level
     ASSERT_NE(context_, nullptr);
     uint32_t receivedId = 1;
     int32_t callbackId = context_->AddHostWindowInfoChangedCallback(
-        [&receivedId](uint32_t hostWindowId) { receivedId = hostWindowId; });
-    context_->FlushHostWindowInfoChangedCallback(0u);
+        
+        [&receivedId](uint32_t hostWindowId, uint32_t) { receivedId = hostWindowId; });
+    context_->FlushHostWindowInfoChangedCallback(0u, 0u);
     EXPECT_EQ(receivedId, 0u);
     context_->RemoveHostWindowInfoChangedCallback(callbackId);
 }
@@ -3773,12 +3778,13 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback008, TestSize.Level
     ASSERT_NE(context_, nullptr);
     uint32_t receivedId = 0;
     int32_t callbackId = context_->AddHostWindowInfoChangedCallback(
-        [&receivedId](uint32_t hostWindowId) { receivedId = hostWindowId; });
-    context_->FlushHostWindowInfoChangedCallback(100u);
+        
+        [&receivedId](uint32_t hostWindowId, uint32_t) { receivedId = hostWindowId; });
+    context_->FlushHostWindowInfoChangedCallback(100u, 500u);
     EXPECT_EQ(receivedId, 100u);
-    context_->FlushHostWindowInfoChangedCallback(200u);
+    context_->FlushHostWindowInfoChangedCallback(200u, 600u);
     EXPECT_EQ(receivedId, 200u);
-    context_->FlushHostWindowInfoChangedCallback(300u);
+    context_->FlushHostWindowInfoChangedCallback(300u, 700u);
     EXPECT_EQ(receivedId, 300u);
     context_->RemoveHostWindowInfoChangedCallback(callbackId);
 }
@@ -3794,13 +3800,15 @@ HWTEST_F(PipelineContextTestNg, HostWindowInfoChangedCallback009, TestSize.Level
     uint32_t received1 = 0;
     uint32_t received2 = 0;
     int32_t id1 = context_->AddHostWindowInfoChangedCallback(
-        [&received1](uint32_t hostWindowId) { received1 = hostWindowId; });
+        
+        [&received1](uint32_t hostWindowId, uint32_t) { received1 = hostWindowId; });
     int32_t id2 = context_->AddHostWindowInfoChangedCallback(
-        [&received2](uint32_t hostWindowId) { received2 = hostWindowId; });
+        
+        [&received2](uint32_t hostWindowId, uint32_t) { received2 = hostWindowId; });
     context_->RemoveHostWindowInfoChangedCallback(id1);
     received1 = 999;
     received2 = 999;
-    context_->FlushHostWindowInfoChangedCallback(42u);
+    context_->FlushHostWindowInfoChangedCallback(42u, 400u);
     EXPECT_EQ(received1, 999u);
     EXPECT_EQ(received2, 42u);
     context_->RemoveHostWindowInfoChangedCallback(id2);

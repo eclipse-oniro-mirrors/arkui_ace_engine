@@ -45,8 +45,10 @@ public:
     bool IsSessionValid() override;
     int32_t GetSessionId() const override;
     const std::shared_ptr<AAFwk::Want> GetWant() override;
-    void UpdateInstanceId(int32_t instanceId, uint32_t newHostWindowId) override;
-    void UpdateExtensionParent(uint32_t newHostWindowId) override;
+    void UpdateInstanceId(int32_t instanceId) override;
+    void UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) override;
+    void NotifyExtensionParentChanged() override;
+    void UpdateWindowSceneId() override;
 
     // Synchronous interface for event notify
     bool NotifyFocusEventSync(bool isFocus) override;
@@ -128,6 +130,7 @@ private:
     RefPtr<TaskExecutor> taskExecutor_;
     int32_t instanceId_;
     int32_t patternInstanceId_;
+    uint32_t windowSceneId_ = static_cast<uint32_t>(-1);
     bool isTransferringCaller_ = false;
     SessionType sessionType_ = SessionType::UI_EXTENSION_ABILITY;
     int32_t platformId_ = 0;

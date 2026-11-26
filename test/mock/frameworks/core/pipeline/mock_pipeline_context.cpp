@@ -1627,8 +1627,6 @@ int32_t PipelineContext::AddHostWindowInfoChangedCallback(HostWindowInfoChangedC
 }
 
 void PipelineContext::RemoveHostWindowInfoChangedCallback(int32_t callbackId) {}
-
-void PipelineContext::AddWindowSizeChangeCallback(uint32_t hostWindowId) {}
 } // namespace OHOS::Ace::NG
 // pipeline_context ============================================================
 
@@ -2351,4 +2349,5 @@ std::shared_ptr<UiTranslateManagerImpl> PipelineContext::GetUiTranslateManagerIm
 {
     return uiTranslateManager_;
 }
+void PipelineContext::FlushHostWindowInfoChangedCallback(uint32_t realHostWindowId, uint32_t focusWindowId) {}
 } // namespace OHOS::Ace::NG

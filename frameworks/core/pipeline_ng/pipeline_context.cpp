@@ -158,6 +158,7 @@
 
 namespace {
 constexpr uint64_t ONE_MS_IN_NS = 1 * 1000 * 1000;
+constexpr int32_t INVALID_CALLBACK_ID = -1;
 constexpr int32_t TIME_THRESHOLD = 2 * 1000000; // 3 millisecond
 constexpr int32_t PLATFORM_VERSION_TEN = 10;
 constexpr int32_t MILLISECONDS_TO_NANOSECONDS = 1000000; // Milliseconds to nanoseconds
@@ -6414,7 +6415,7 @@ int32_t PipelineContext::AddHostWindowInfoChangedCallback(HostWindowInfoChangedC
 {
     if (!CheckThreadSafe()) {
         LOGW("AddHostWindowInfoChangedCallback doesn't run on UI thread!");
-        return -1;
+        return INVALID_CALLBACK_ID;
     }
     int32_t id = nextHostWindowInfoCallbackId_.fetch_add(1);
     hostWindowInfoChangedCallbacks_[id] = std::move(callback);
@@ -6430,7 +6431,7 @@ void PipelineContext::RemoveHostWindowInfoChangedCallback(int32_t callbackId)
     hostWindowInfoChangedCallbacks_.erase(callbackId);
 }
 
-void PipelineContext::FlushHostWindowInfoChangedCallback(uint32_t hostWindowId)
+void PipelineContext::FlushHostWindowInfoChangedCallback(uint32_t realHostWindowId, uint32_t focusWindowId)
 {
     if (!CheckThreadSafe()) {
         LOGW("FlushHostWindowInfoChangedCallback doesn't run on UI thread!");
@@ -6439,7 +6440,7 @@ void PipelineContext::FlushHostWindowInfoChangedCallback(uint32_t hostWindowId)
     auto callbacks = hostWindowInfoChangedCallbacks_;
     for (const auto& [id, callback] : callbacks) {
         if (hostWindowInfoChangedCallbacks_.find(id) != hostWindowInfoChangedCallbacks_.end()) {
-            callback(hostWindowId);
+            callback(realHostWindowId, focusWindowId);
         }
     }
 }
