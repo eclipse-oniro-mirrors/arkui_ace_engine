@@ -1655,7 +1655,9 @@ void SheetPresentationPattern::UpdateDragBarStatus()
         }
     }
     int32_t zIndex = sheetStyle.enableFloatingDragBar.value_or(false) ? INT32_MAX : 0;
-    if (CheckTitleIsStackMode(sheetStyle) || CheckTitleIsHasEffectNode(sheetStyle)) {
+    bool isSafeAreaPadding = sheetStyle.titleBarHoverMode.value_or(SheetTitleBarHoverMode::STANDARD) ==
+                             SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    if (CheckTitleIsStackMode(sheetStyle) || CheckTitleIsHasEffectNode(sheetStyle) || isSafeAreaPadding) {
         zIndex = std::max(zIndex, SHEET_TITLE_STACK_Z_INDEX);
     }
     auto dragBarRenderContext = sheetDragBar->GetRenderContext();
