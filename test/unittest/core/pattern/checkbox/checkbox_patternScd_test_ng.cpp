@@ -415,6 +415,14 @@ HWTEST_F(CheckBox2TestNG, GetGroupNameWithNavId001, TestSize.Level1)
     EXPECT_EQ(checkBoxPattern->GetGroupNameWithNavId(), GROUP_NAME + CURRENT_NAV_ID);
 }
 
+// TDD覆盖：checkbox 美学换肤/深浅色切换/系统颜色变化时颜色动态更新修复
+// 修复点1：CheckBoxPaintProperty 拷贝构造补 Clone SelectedColorFlagByUser/
+//         UnSelectedColorFlagByUser/CheckMarkColorFlagByUser，避免克隆丢标志。
+// 修复点2：UpdateCheckboxColors 颜色应用条件改为按 FlagByUser 判定，
+//         使 OnColorConfigurationUpdate 主题色回填路径能正确刷新。
+// 下方 OnThemeScopeUpdate001~003 即覆盖 FlagByUser 置位后主题色刷新行为，
+// 验证 selected/unselected/checkMark 三色在系统色变化时的动态更新闭环。
+
 /**
  * @tc.name: OnThemeScopeUpdate001
  * @tc.desc: test function OnThemeScopeUpdate
