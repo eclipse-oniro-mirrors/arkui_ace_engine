@@ -1042,8 +1042,20 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
         measuringForAnimStart_ = false;
     }
 
-    UpdateFloatingBarTransform(layoutWrapper);
-    ClampFloatingBarOffset(layoutWrapper);
+    auto host = layoutWrapper->GetHostNode();
+    if (host) {
+        auto tabsNode = AceType::DynamicCast<TabsNode>(host);
+        if (tabsNode) {
+            auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+            if (tabBar) {
+                auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+                if (!tabBarPattern || !tabBarPattern->HasUserDefinedTranslate()) {
+                    UpdateFloatingBarTransform(layoutWrapper);
+                    ClampFloatingBarOffset(layoutWrapper);
+                }
+            }
+        }
+    }
 }
 
 void TabsLayoutAlgorithm::UpdateFloatingBarTransform(LayoutWrapper* layoutWrapper) const

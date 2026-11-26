@@ -427,6 +427,7 @@ void TabBarPattern::SetTabBarTranslate(const TranslateOptions& options, bool isU
     renderContext->UpdateTransformTranslate(options);
     if (isUserDefined) {
         userDefinedTranslateY_ = options.y.ConvertToPx();
+        hasUserDefinedTranslate_ = true;
     }
     auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
     CHECK_NULL_VOID(tabsNode);

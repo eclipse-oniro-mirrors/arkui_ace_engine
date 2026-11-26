@@ -1117,4 +1117,28 @@ HWTEST_F(TabsFloatingBarLayoutTestNg, TabBarPatternColorInvertColorMode002, Test
     EXPECT_FALSE(tabBarPattern_->IsColorInvertActive());
 }
 
+/**
+ * @tc.name: HasUserDefinedTranslateDefault001
+ * @tc.desc: Test HasUserDefinedTranslate returns false by default (no SetTabBarTranslate call)
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarLayoutTestNg, HasUserDefinedTranslateDefault001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a Tabs instance without calling SetTabBarTranslate
+     * @tc.expected: step1. TabBarPattern is created
+     */
+    TabsModelNG model = CreateTabs(BarPosition::END);
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    /**
+     * @tc.steps: step2. Check HasUserDefinedTranslate without any SetTabBarTranslate call
+     * @tc.expected: step2. Returns false (no user translate set yet)
+     */
+    EXPECT_FALSE(tabBarPattern_->HasUserDefinedTranslate());
+}
 } // namespace OHOS::Ace::NG
