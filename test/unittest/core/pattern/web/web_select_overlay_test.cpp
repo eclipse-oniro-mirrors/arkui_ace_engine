@@ -7646,6 +7646,30 @@ HWTEST_F(WebTranslateInputActionTest, MenuOptionsShowsSupportedTranslationInput,
 }
 
 /**
+ * @tc.name: MenuOptionsHidesUnsupportedTranslationInput
+ * @tc.desc: Unsupported translation input stays hidden even with a single caret and the native capability.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebTranslateInputActionTest, MenuOptionsHidesUnsupportedTranslationInput, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto params = std::make_shared<NWebQuickMenuParamsSelectImpl>();
+    SelectOverlayInfo info;
+    info.isSingleHandle = true;
+    info.menuInfo.showTranslateInput = true;
+    overlay_->supported_ = false;
+    auto oldFlags = g_editStateFlags;
+    g_editStateFlags = NWebQuickMenuParams::QM_EF_CAN_TRANSLATE_INPUT | NWebQuickMenuParams::QM_EF_CAN_PASTE;
+    overlay_->SetMenuOptions(info, params, callback_);
+    g_editStateFlags = oldFlags;
+    EXPECT_FALSE(info.menuInfo.showTranslateInput);
+    EXPECT_TRUE(info.menuInfo.showPaste);
+    EXPECT_EQ(overlay_->eligibilityQueries_, 1);
+    EXPECT_EQ(callback_->calls_, 0);
+#endif
+}
+
+/**
  * @tc.name: ContinueUsesTranslationCommandAndConsumesEntry
  * @tc.desc: A supported click dispatches once with the native command and mouse flag.
  * @tc.type: FUNC
