@@ -36,7 +36,10 @@ if (is_host_product) {
 ace_unittest("drag_animation_helper_test_ng") {
   module_name = "Drag-CommonDrag"
   type = "new"
-  sources = [ "drag_animation_helper_test_ng.cpp" ]
+  sources = [
+    "drag_animation_helper_test_ng.cpp",
+    "drag_animation_helper_test_two_ng.cpp",
+  ]
 }
 
 ace_unittest("drag_drop_controller_func_wrapper_test_ng") {
@@ -202,6 +205,14 @@ if (!is_host_product) {
     module_name = "TextSet-Text"
     type = "new"
     sources = [ "force_split_manager_test_ng.cpp" ]
+  }
+}
+
+if (!is_host_product) {
+  ace_unittest("ui_info_collection_manager_test_ng") {
+    module_name = "CommonProperties-InteractionProperties"
+    type = "new"
+    sources = [ "ui_info_collection_manager_test_ng.cpp" ]
   }
 }
 
@@ -502,6 +513,7 @@ group("core_manager_unittest") {
     deps += [
       ":force_split_manager_test_ng",
       ":handedness_manager_test_ng",
+      ":ui_info_collection_manager_test_ng",
     ]
   }
 }
