@@ -8131,6 +8131,16 @@ typedef struct Opt_VerticalAlign {
     Ark_Tag tag;
     Ark_VerticalAlign value;
 } Opt_VerticalAlign;
+typedef enum Ark_VibrancyMode {
+    ARK_VIBRANCY_MODE_DISABLED = 0,
+    ARK_VIBRANCY_MODE_AUTO = 1,
+    ARK_VIBRANCY_MODE_BRIGHTEN = 2,
+    ARK_VIBRANCY_MODE_DARKEN = 3,
+} Ark_VibrancyMode;
+typedef struct Opt_VibrancyMode {
+    Ark_Tag tag;
+    Ark_VibrancyMode value;
+} Opt_VibrancyMode;
 typedef enum Ark_ViewportFit {
     ARK_VIEWPORT_FIT_AUTO = 0,
     ARK_VIEWPORT_FIT_CONTAINS = 1,
@@ -24440,6 +24450,7 @@ typedef struct Ark_SheetOptions {
     Opt_SheetTitleBarHoverMode titleBarHoverMode;
     Opt_HandednessFollowMode adaptToHandedness;
     Opt_ColorFilter colorFilterEffect;
+    Opt_VibrancyMode titleBarVibrancyMode;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;

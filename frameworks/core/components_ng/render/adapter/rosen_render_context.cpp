@@ -462,6 +462,23 @@ std::string FormatColorFilterMatrix(const std::vector<float>& filter)
     }
     return result + "]";
 }
+
+std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> MakeVibrancyBlender(bool isDarken)
+{
+    auto blender = std::make_shared<Rosen::RSNGColorfulBrightnessBlender>();
+    blender->Setter<ColorfulBrightnessBlenderDarkenWeightTag>(isDarken ? 1.0f : 0.0f);
+    blender->Setter<ColorfulBrightnessBlenderFractionTag>(0.0f); // fraction 0.0f
+    blender->Setter<ColorfulBrightnessBlenderCubicRateTag>(0.0f);
+    blender->Setter<ColorfulBrightnessBlenderQuadRateTag>(0.0f);
+    blender->Setter<ColorfulBrightnessBlenderLinearRateTag>(1.0f);
+    blender->Setter<ColorfulBrightnessBlenderDegreeTag>(0.0f);
+    blender->Setter<ColorfulBrightnessBlenderSaturationTag>(1.0f);
+    blender->Setter<ColorfulBrightnessBlenderVibrancyStrengthTag>(0.0f);
+    blender->Setter<ColorfulBrightnessBlenderLumaDiffTag>(0.0f);
+    blender->Setter<ColorfulBrightnessBlenderHdrEnabledTag>(false);
+    blender->Setter<ColorfulBrightnessBlenderTintedColorPercentTag>(1.0f);
+    return blender;
+}
 } // namespace
 
 std::timed_mutex RosenRenderContext::taskMtx_;
@@ -5994,7 +6011,7 @@ void RosenRenderContext::UpdateBlender(const OHOS::Rosen::Blender* blender)
     FREE_RS_CONTEXT_CHECK(UpdateBlender, blender);
     CHECK_NULL_VOID(rsNode_);
     CHECK_NULL_VOID(blender);
-    propVibrancyMode_.reset(); // invalidate vibrancyMode attribute: external blender overwrites rsNode blender
+    ClearVibrancyState();
     rsNode_->SetBlender(blender);
     RequestNextFrame();
 }
@@ -6003,10 +6020,29 @@ void RosenRenderContext::ResetBlender()
 {
     FREE_RS_CONTEXT_CHECK(ResetBlender);
     CHECK_NULL_VOID(rsNode_);
-    propVibrancyMode_.reset(); // invalidate vibrancyMode attribute: external reset overwrites rsNode blender
+    ClearVibrancyState();
     auto blender = OHOS::Rosen::BrightnessBlender();
     rsNode_->SetBlender(&blender);
     RequestNextFrame();
+}
+
+void RosenRenderContext::ClearVibrancyState()
+{
+    if (!propVibrancyMode_) {
+        return;
+    }
+    propVibrancyMode_.reset();
+    if (!vibrancyBlenderCache_) {
+        return;
+    }
+    CHECK_NULL_VOID(rsNode_);
+    if (vibrancyBlenderCache_->adaptiveBrightenBlender && vibrancyBlenderCache_->adaptiveDarkenBlender) {
+        rsNode_->SetAdaptiveBlender(nullptr, nullptr);
+        vibrancyBlenderCache_->adaptiveBrightenBlender = nullptr;
+        vibrancyBlenderCache_->adaptiveDarkenBlender = nullptr;
+    }
+    // keep cached blenders for reuse
+    vibrancyBlenderCache_->currentBlender = nullptr;
 }
 
 void RosenRenderContext::OnVibrancyModeUpdate(const VibrancyMode& mode)
@@ -6015,6 +6051,10 @@ void RosenRenderContext::OnVibrancyModeUpdate(const VibrancyMode& mode)
     CHECK_NULL_VOID(rsNode_);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    if (!vibrancyBlenderCache_) {
+        vibrancyBlenderCache_ = std::make_shared<VibrancyBlenderCache>();
+    }
+    auto& cache = *vibrancyBlenderCache_;
     VibrancyMode effectiveMode = mode;
     if (mode == VibrancyMode::AUTO) {
         // resolve AUTO based on effective color mode (WithTheme-aware)
@@ -6026,21 +6066,30 @@ void RosenRenderContext::OnVibrancyModeUpdate(const VibrancyMode& mode)
             effectiveColorMode = pipeline->GetColorMode();
         }
         effectiveMode = (effectiveColorMode == ColorMode::DARK) ? VibrancyMode::BRIGHTEN : VibrancyMode::DARKEN;
-    }
-    if (effectiveMode == VibrancyMode::DISABLED) {
-        auto blender = OHOS::Rosen::BrightnessBlender();
-        rsNode_->SetBlender(&blender);
-        RequestNextFrame();
-        return;
-    }
-    auto blender = OHOS::Rosen::ColorfulBrightnessBlender();
-    if (effectiveMode == VibrancyMode::BRIGHTEN) {
-        blender.SetDarkenWeight(0.0f);
+        if (!cache.adaptiveDarkenBlender) {
+            cache.adaptiveDarkenBlender = MakeVibrancyBlender(true);
+        }
+        if (!cache.adaptiveBrightenBlender) {
+            cache.adaptiveBrightenBlender = MakeVibrancyBlender(false);
+        }
+        rsNode_->SetAdaptiveBlender(cache.adaptiveDarkenBlender, cache.adaptiveBrightenBlender);
     } else {
-        blender.SetDarkenWeight(1.0f);
+        rsNode_->SetAdaptiveBlender(nullptr, nullptr);
     }
-    blender.SetFraction(0.0f);
-    rsNode_->SetBlender(&blender);
+    if (effectiveMode == VibrancyMode::BRIGHTEN) {
+        if (!cache.brightenBlender) {
+            cache.brightenBlender = MakeVibrancyBlender(false);
+        }
+        cache.currentBlender = cache.brightenBlender;
+    } else if (effectiveMode == VibrancyMode::DARKEN) {
+        if (!cache.darkenBlender) {
+            cache.darkenBlender = MakeVibrancyBlender(true);
+        }
+        cache.currentBlender = cache.darkenBlender;
+    } else {
+        cache.currentBlender = nullptr;
+    }
+    rsNode_->SetNGBlender(cache.currentBlender);
     RequestNextFrame();
 }
 
@@ -6326,6 +6375,7 @@ void RosenRenderContext::OnBgDynamicBrightnessOptionUpdate(const std::optional<B
 
 void RosenRenderContext::OnFgDynamicBrightnessOptionUpdate(const std::optional<BrightnessOption>& brightnessOption)
 {
+    // no api till now
     FREE_RS_CONTEXT_CHECK(OnFgDynamicBrightnessOptionUpdate, brightnessOption);
     if (!brightnessOption.has_value()) {
         return;
@@ -6343,6 +6393,7 @@ void RosenRenderContext::OnFgDynamicBrightnessOptionUpdate(const std::optional<B
         brightnessOption->negRGB[0], brightnessOption->negRGB[1], brightnessOption->negRGB[INDEX_2]));
     brightnessBlender->SetFraction(static_cast<float>(brightnessOption->fraction));
     rsNode_->SetBlender(brightnessBlender.get());
+    ClearVibrancyState();
     RequestNextFrame();
 }
 

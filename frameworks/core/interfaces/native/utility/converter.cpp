@@ -4747,4 +4747,16 @@ void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& sr
         default: LOGE("Unexpected enum value in Ark_ShadowClipMode: %{public}d", src);
     }
 }
+
+template<>
+void AssignCast(std::optional<VibrancyMode>& dst, const Ark_VibrancyMode& src)
+{
+    switch (src) {
+        case ARK_VIBRANCY_MODE_DISABLED: dst = VibrancyMode::DISABLED; break;
+        case ARK_VIBRANCY_MODE_AUTO: dst = VibrancyMode::AUTO; break;
+        case ARK_VIBRANCY_MODE_BRIGHTEN: dst = VibrancyMode::BRIGHTEN; break;
+        case ARK_VIBRANCY_MODE_DARKEN: dst = VibrancyMode::DARKEN; break;
+        default: LOGE("Unexpected enum value in Ark_VibrancyMode: %{public}d", src);
+    }
+}
 } // namespace OHOS::Ace::NG::Converter

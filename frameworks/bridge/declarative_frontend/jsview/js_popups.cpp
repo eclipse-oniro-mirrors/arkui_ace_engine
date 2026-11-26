@@ -2722,7 +2722,7 @@ void JSViewPopups::ParseAdaptToHandedness(const JSRef<JSVal>& value, NG::SheetSt
 
 void JSViewPopups::ParseSheetTitleBarVibrancyMode(const JSRef<JSVal>& value, NG::SheetStyle& sheetStyle)
 {
-    if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::EXQUISITE) {
+    if (SystemProperties::GetUiMaterialLevel() == UiMaterialLevel::SMOOTH) {
         return;
     }
     if (value->IsNumber()) {

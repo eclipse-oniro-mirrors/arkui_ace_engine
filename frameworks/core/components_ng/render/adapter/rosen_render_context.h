@@ -41,6 +41,7 @@
 #include "render_service_client/core/ui/rs_node.h"
 #include "render_service_client/core/ui/rs_texture_export.h"
 #include "render_service_client/core/ui/rs_ui_context.h"
+#include "render_service_client/core/ui_effect/property/include/rs_ui_blender_base.h"
 
 #include "base/geometry/dimension_offset.h"
 #include "base/geometry/ng/offset_t.h"
@@ -1093,6 +1094,7 @@ private:
     std::vector<std::shared_ptr<Rosen::RSNode>> BuildMixedTargetRSNodes(FrameNode* frameNode);
     void ReCreateRsNodeTreeByTargetList(const std::vector<std::shared_ptr<Rosen::RSNode>>& targetRSNodes,
         std::unordered_map<Rosen::RSNode::SharedPtr, bool>& childNodeMap);
+    void ClearVibrancyState();
 
     uint32_t backgroundTaskId_ = 0;
     std::unique_ptr<RosenMixedRenderChildList> mixedRenderChildList_;
@@ -1101,6 +1103,15 @@ private:
     CancelableCallback<void()> pendingUITask_;
     std::shared_ptr<OHOS::Rosen::RSNGShapeBase> sdfShape_;
     std::shared_ptr<Rosen::RSNGShaderBase> appendOverlayShader_[APPEND_OVERLAY_SHADER_COUNT] = { nullptr };
+
+    struct VibrancyBlenderCache {
+        std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> darkenBlender;
+        std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> brightenBlender;
+        std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> currentBlender;
+        std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> adaptiveDarkenBlender;
+        std::shared_ptr<Rosen::RSNGColorfulBrightnessBlender> adaptiveBrightenBlender;
+    };
+    std::shared_ptr<VibrancyBlenderCache> vibrancyBlenderCache_;
 };
 } // namespace OHOS::Ace::NG
 
