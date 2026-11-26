@@ -12859,6 +12859,46 @@
       }
     },
     {
+      "id": "FrameChildrenCycleCrash",
+      "name": "Frame Children Cycle Crash",
+      "name_cn": "frameChildren_成环递归异常问题",
+      "kind": "issue",
+      "category": "rendering",
+      "keywords": [
+        "FrameChildrenCycleCrash",
+        "frameChildren成环",
+        "RebuildRenderContextTree",
+        "needRebuildFrameChildren",
+        "needSyncRenderTree",
+        "IsOutOfTouchTestRegion",
+        "CAPI父子反转",
+        "FlushRebuildRenderTree",
+        "ProcessRenderTreeDiff",
+        "递归无限循环",
+        "visibility修复"
+      ],
+      "aliases": [
+        "frameChildren递归异常",
+        "render tree成环crash",
+        "CAPI节点交换导致递归异常"
+      ],
+      "kb": "docs/kb/issues/rendering/frame-children-cycle-crash.md",
+      "func_ids": [
+        "04-04-01"
+      ],
+      "status": "active",
+      "last_verified": "2026-11-26",
+      "source_paths": {
+        "frame_node": "frameworks/core/components_ng/base/frame_node.cpp",
+        "frame_node_h": "frameworks/core/components_ng/base/frame_node.h",
+        "ui_node": "frameworks/core/components_ng/base/ui_node.cpp",
+        "layout_property": "frameworks/core/components_ng/layout/layout_property.cpp",
+        "pipeline_context": "frameworks/core/pipeline_ng/pipeline_context.cpp",
+        "rosen_render_context": "frameworks/core/components_ng/render/adapter/rosen_render_context.cpp",
+        "node_model": "interfaces/native/node/node_model.cpp"
+      }
+    },
+    {
       "id": "VisibleAreaChangeNodeIdLeak",
       "name": "Visible Area Change Node ID Leak",
       "name_cn": "可见区域变化事件注册组件id泄漏问题",
