@@ -9733,8 +9733,12 @@ const RefPtr<ParagraphManager>& TextPattern::GetParagraphManager() const
     return pManager_;
 }
 
-bool TextPattern::IsContentOverflowForSmartLayout(const SizeF& allocatedSize)
+bool TextPattern::IsContentOverflowForSmartLayout(LayoutWrapper* layoutWrapper)
 {
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    auto geometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, false);
+    const auto& allocatedSize = geometryNode->GetContentSize();
     auto hostNode = GetHost();
     CHECK_NULL_RETURN(hostNode, false);
     auto textLayoutProperty = hostNode->GetLayoutProperty<TextLayoutProperty>();
@@ -9752,6 +9756,24 @@ bool TextPattern::IsContentOverflowForSmartLayout(const SizeF& allocatedSize)
     auto actualTextHeight = pManager_->GetHeight();
     bool widthOverflow = GreatNotEqual(actualLayoutWidth, allocatedSize.Width());
     bool heightOverflow = GreatNotEqual(actualTextHeight, allocatedSize.Height());
+    if (heightOverflow) {
+        float baselineOffset = baselineOffset_;
+        const auto& wrapper = layoutWrapper->GetLayoutAlgorithm();
+        auto textLayoutAlgorithm = DynamicCast<TextLayoutAlgorithm>(wrapper->GetLayoutAlgorithm());
+        if (!wrapper->SkipMeasure() && textLayoutAlgorithm) {
+            baselineOffset = textLayoutAlgorithm->GetBaselineOffset();
+        }
+        float paintOffsetY = -std::min(baselineOffset, 0.0f);
+        const float contentHeight = allocatedSize.Height() + std::fabs(baselineOffset);
+        if (contentHeight < pManager_->GetHeight() && textLayoutProperty->HasTextContentAlign()) {
+            paintOffsetY += static_cast<int32_t>(textLayoutProperty->GetTextContentAlign().value()) *
+                (contentHeight - pManager_->GetHeight()) / 2.0;
+        }
+        RectF paintRect;
+        pManager_->GetPaintRegion(paintRect, 0.0f, paintOffsetY);
+        heightOverflow = LessNotEqual(paintRect.Top(), 0.0f) ||
+            GreatNotEqual(paintRect.Bottom(), allocatedSize.Height());
+    }
     bool contentClipped = pManager_->DidExceedMaxLinesInner();
     auto ellipsisRange = pManager_->GetEllipsisTextRange();
     bool ellipsisApplied = ellipsisRange.first < ellipsisRange.second;
