@@ -24,6 +24,24 @@
 namespace OHOS::Ace::NG {
 class ImageTestTwoNg : public ImageBases {};
 
+class MockImageData : public ImageData {
+public:
+    MOCK_METHOD(size_t, GetSize, (), (const, override));
+    MOCK_METHOD(const void*, GetData, (), (const, override));
+};
+
+class MockImageObject : public ImageObject {
+public:
+    MOCK_METHOD(void, MakeCanvasImage,
+        (const WeakPtr<ImageLoadingContext>& ctxWp, const SizeF& resizeTarget, bool forceResize, bool syncLoad),
+        (override));
+    MOCK_METHOD(RefPtr<ImageObject>, Clone, (), (override));
+    MockImageObject(const ImageSourceInfo& sourceInfo, const SizeF& imageSize, const RefPtr<ImageData>& data)
+        : ImageObject(sourceInfo, imageSize, data)
+    {}
+    ~MockImageObject() override = default;
+};
+
 /**
  * @tc.name: ImagePatternCreateCompleteCallBackInDataReady
  * @tc.desc: call CreateCompleteCallBackInDataReady.
@@ -2138,4 +2156,141 @@ HWTEST_F(ImageTestTwoNg, SetImageFillSetByUser001, TestSize.Level1)
     ImageModelNG::SetImageFillSetByUser(AceType::RawPtr(frameNode), false);
     EXPECT_FALSE(layoutProperty->GetImageFillSetByUserValue(false));
 }
+
+/**
+ * @tc.name: SetDecodeCacheActive_ReactivatedFlag
+ * @tc.desc: SetDecodeCacheActive(true) after recycle sets isDecodeCacheReactivated_
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImageTestTwoNg, SetDecodeCacheActive_ReactivatedFlag, TestSize.Level1)
+{
+    auto frameNode = CreateImageNode("", "", nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_FALSE(pattern->isDecodeCacheReactivated_);
+    pattern->SetDecodeCacheActive(false);
+    EXPECT_TRUE(pattern->isRecycledImage_);
+    pattern->SetDecodeCacheActive(true);
+    EXPECT_TRUE(pattern->isDecodeCacheReactivated_);
+}
+
+/**
+ * @tc.name: SetDecodeCacheActive_ReactivatedFlagNotSetWithoutRecycle
+ * @tc.desc: SetDecodeCacheActive(true) without prior recycle does not set isDecodeCacheReactivated_
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImageTestTwoNg, SetDecodeCacheActive_ReactivatedFlagNotSetWithoutRecycle, TestSize.Level1)
+{
+    auto frameNode = CreateImageNode("", "", nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->decodeCacheActive_ = false;
+    pattern->isRecycledImage_ = false;
+    pattern->SetDecodeCacheActive(true);
+    EXPECT_FALSE(pattern->isDecodeCacheReactivated_);
+}
+
+/**
+ * @tc.name: OnDirtyLayoutWrapperSwap_ClearsReactivatedFlag
+ * @tc.desc: OnDirtyLayoutWrapperSwap clears isDecodeCacheReactivated_
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImageTestTwoNg, OnDirtyLayoutWrapperSwap_ClearsReactivatedFlag, TestSize.Level1)
+{
+    auto frameNode = CreateImageNode("", "", nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isDecodeCacheReactivated_ = true;
+    DirtySwapConfig config;
+    config.skipMeasure = false;
+    config.skipLayout = false;
+    auto wrapper = frameNode->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    pattern->OnDirtyLayoutWrapperSwap(wrapper, config);
+    EXPECT_FALSE(pattern->isDecodeCacheReactivated_);
+}
+
+/**
+ * @tc.name: OnDirtyLayoutWrapperSwap_SkipMeasurePreservesReactivatedFlag
+ * @tc.desc: OnDirtyLayoutWrapperSwap does not clear isDecodeCacheReactivated_ when skipMeasure is true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImageTestTwoNg, OnDirtyLayoutWrapperSwap_SkipMeasurePreservesReactivatedFlag, TestSize.Level1)
+{
+    auto frameNode = CreateImageNode("", "", nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isDecodeCacheReactivated_ = true;
+    DirtySwapConfig config;
+    config.skipMeasure = true;
+    config.skipLayout = true;
+    auto wrapper = frameNode->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    pattern->OnDirtyLayoutWrapperSwap(wrapper, config);
+    EXPECT_TRUE(pattern->isDecodeCacheReactivated_);
+}
+
+/**
+ * @tc.name: OnImageDataReady_ReactivatedStartDecoding
+ * @tc.desc: OnImageDataReady with isDecodeCacheReactivated_ and positive content size triggers StartDecoding
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImageTestTwoNg, OnImageDataReady_ReactivatedStartDecoding, TestSize.Level1)
+{
+    auto frameNode = CreateImageNode(IMAGE_SRC_URL, ALT_SRC_URL, nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    ImageSourceInfo sourceInfo(IMAGE_SRC_URL);
+    LoadNotifier loadNotifier(nullptr, nullptr, nullptr);
+    pattern->loadingCtx_ = AceType::MakeRefPtr<ImageLoadingContext>(sourceInfo, std::move(loadNotifier));
+
+    auto mockImageData = AceType::MakeRefPtr<MockImageData>();
+    auto mockObj = AceType::MakeRefPtr<MockImageObject>(sourceInfo, SizeF(200.0f, 200.0f), mockImageData);
+    pattern->loadingCtx_->imageObj_ = mockObj;
+
+    auto geometryNode = frameNode->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    geometryNode->SetContentSize(SizeF(100, 100));
+    geometryNode->SetContentOffset(OffsetF(0, 0));
+
+    pattern->isDecodeCacheReactivated_ = true;
+    pattern->OnImageDataReady();
+    EXPECT_FALSE(pattern->isDecodeCacheReactivated_);
+}
+
+/**
+ * @tc.name: OnImageDataReady_ReactivatedZeroSize
+ * @tc.desc: OnImageDataReady with isDecodeCacheReactivated_ but zero content size does not StartDecoding
+ * @tc.type: FUNC
+ */
+HWTEST_F(ImageTestTwoNg, OnImageDataReady_ReactivatedZeroSize, TestSize.Level1)
+{
+    auto frameNode = CreateImageNode(IMAGE_SRC_URL, ALT_SRC_URL, nullptr);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<ImagePattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    ImageSourceInfo sourceInfo(IMAGE_SRC_URL);
+    LoadNotifier loadNotifier(nullptr, nullptr, nullptr);
+    pattern->loadingCtx_ = AceType::MakeRefPtr<ImageLoadingContext>(sourceInfo, std::move(loadNotifier));
+
+    auto mockImageData = AceType::MakeRefPtr<MockImageData>();
+    auto mockObj = AceType::MakeRefPtr<MockImageObject>(sourceInfo, SizeF(200.0f, 200.0f), mockImageData);
+    pattern->loadingCtx_->imageObj_ = mockObj;
+
+    auto geometryNode = frameNode->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    geometryNode->SetContentSize(SizeF(0, 0));
+
+    pattern->isDecodeCacheReactivated_ = true;
+    pattern->OnImageDataReady();
+    EXPECT_TRUE(pattern->isDecodeCacheReactivated_);
+}
+
 } // namespace OHOS::Ace::NG

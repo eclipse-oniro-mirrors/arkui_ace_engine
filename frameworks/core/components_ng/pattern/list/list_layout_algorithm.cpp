@@ -2579,24 +2579,31 @@ void ListLayoutAlgorithm::ProcessCacheCount(LayoutWrapper* layoutWrapper, int32_
     }
 }
 
-void ListLayoutAlgorithm::UpdateItemDecodeState(LayoutWrapper* layoutWrapper, int32_t idx, bool active)
+int32_t ListLayoutAlgorithm::UpdateItemDecodeState(LayoutWrapper* layoutWrapper, int32_t idx, bool active,
+    int32_t decodeForward, int32_t decodeBackward)
 {
     auto wrapper = GetListItem(layoutWrapper, idx, false, true);
-    CHECK_NULL_VOID(wrapper);
+    CHECK_NULL_RETURN(wrapper, 0);
     auto itemFrameNode = wrapper->GetHostNode();
-    CHECK_NULL_VOID(itemFrameNode);
-    if (itemPosition_.count(idx) > 0 && itemPosition_[idx].isGroup) {
-        auto groupAlgo = wrapper->GetLayoutAlgorithm(true);
-        if (groupAlgo) {
+    CHECK_NULL_RETURN(itemFrameNode, 0);
+    if (itemFrameNode->GetHostTag() == V2::LIST_ITEM_GROUP_ETS_TAG) {
+        const auto& algoWrapper = wrapper->GetLayoutAlgorithm();
+        if (algoWrapper) {
             auto group = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
-                groupAlgo->GetLayoutAlgorithm());
+                algoWrapper->GetLayoutAlgorithm());
             if (group) {
-                group->UpdateGroupDecodeCacheWindow(RawPtr(wrapper), active);
-                return;
+                return group->UpdateGroupDecodeCacheWindow(RawPtr(wrapper), active,
+                    decodeForward, decodeBackward);
             }
         }
+        if (!active) {
+            ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, false);
+        }
+        return 0;
     }
     ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+    bool visible = (idx >= GetStartIndex() && idx <= GetEndIndex());
+    return (active && !visible) ? 1 : 0;
 }
 
 void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapper, int32_t cacheCount)
@@ -2624,19 +2631,25 @@ void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapp
     const int32_t lanes = GetLanes();
     const int32_t firstCacheIdx = std::max(0, startIndex - cacheCount * lanes);
     const int32_t lastCacheIdx = std::min(totalItemCount_ - 1, endIndex + cacheCount * lanes);
-    const int32_t decodeStart = std::max(0, startIndex - decodeWindow * lanes);
-    const int32_t decodeEnd = std::min(totalItemCount_ - 1, endIndex + decodeWindow * lanes);
 
     TAG_LOGD(AceLogTag::ACE_LIST,
         "decode window: cacheCount=%{public}d, window=%{public}d, visible=[%{public}d,%{public}d], "
-        "decode=[%{public}d,%{public}d], cache=[%{public}d,%{public}d], lanes=%{public}d",
-        cacheCount, decodeWindow, startIndex, endIndex, decodeStart, decodeEnd,
-        firstCacheIdx, lastCacheIdx, lanes);
+        "cache=[%{public}d,%{public}d], lanes=%{public}d",
+        cacheCount, decodeWindow, startIndex, endIndex, firstCacheIdx, lastCacheIdx, lanes);
 
-    for (int32_t idx = firstCacheIdx; idx <= lastCacheIdx; ++idx) {
-        bool active = (idx >= startIndex && idx <= endIndex) ||
-                      (idx >= decodeStart && idx <= decodeEnd);
-        UpdateItemDecodeState(layoutWrapper, idx, active);
+    int32_t forwardBudget = decodeWindow * lanes;
+    for (int32_t idx = startIndex; idx <= lastCacheIdx; ++idx) {
+        bool visible = (idx <= endIndex);
+        bool active = visible || forwardBudget > 0;
+        int32_t consumed = UpdateItemDecodeState(layoutWrapper, idx, active, forwardBudget, 0);
+        forwardBudget -= consumed;
+    }
+
+    int32_t backwardBudget = decodeWindow * lanes;
+    for (int32_t idx = startIndex - 1; idx >= firstCacheIdx; --idx) {
+        bool active = backwardBudget > 0;
+        int32_t consumed = UpdateItemDecodeState(layoutWrapper, idx, active, 0, backwardBudget);
+        backwardBudget -= consumed;
     }
 }
 

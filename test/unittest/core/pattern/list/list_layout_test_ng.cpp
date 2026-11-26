@@ -7459,7 +7459,7 @@ TEST_F(ListDecodeWindowTest, IsLowMemoryDevice)
 }
 
 /**
- * ImagePattern::SetDecodeCacheActive 分支覆盖
+ * SetDecodeCacheActive 分支覆盖
  */
 namespace {
 RefPtr<FrameNode> CreateImageFrameNode()
@@ -7620,6 +7620,45 @@ TEST_F(ListDecodeWindowTest, UpdateGroupDecodeCacheWindow_GroupActiveFalse)
     auto wrapper = frameNode_->CreateLayoutWrapper();
     ASSERT_NE(wrapper, nullptr);
     layoutAlgorithm->UpdateListDecodeCacheWindow(AceType::RawPtr(wrapper), 5); // 5 : cacheCount
+}
+
+/**
+ * @tc.name: UpdateGroupDecodeCacheWindow_TotalCountZero
+ * @tc.desc: UpdateGroupDecodeCacheWindow returns 0 when pattern totalCount <= 0
+ */
+HWTEST_F(ListDecodeWindowTest, UpdateGroupDecodeCacheWindow_TotalCountZero, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    ListItemGroupModelNG groupModel = CreateListItemGroup(V2::ListItemGroupStyle::NONE);
+    CreateListItems(GROUP_ITEM_NUMBER);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->Measure(AceType::RawPtr(frameNode_));
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    auto result = layoutAlgorithm->UpdateItemDecodeState(AceType::RawPtr(wrapper), 0, true, 1, 0);
+    EXPECT_EQ(result, 0);
+}
+
+/**
+ * @tc.name: UpdateItemDecodeState_NonGroupVisibleReturnsZero
+ * @tc.desc: UpdateItemDecodeState for visible non-group item returns 0 (no budget consumed)
+ */
+HWTEST_F(ListDecodeWindowTest, UpdateItemDecodeState_NonGroupVisibleReturnsZero, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    auto layoutAlgorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_TRUE(layoutAlgorithm);
+    layoutAlgorithm->Measure(AceType::RawPtr(frameNode_));
+    auto wrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(wrapper, nullptr);
+    layoutAlgorithm->SetItemsPosition(layoutAlgorithm->GetItemPosition());
+    int32_t idx = layoutAlgorithm->GetStartIndex();
+    int32_t result = layoutAlgorithm->UpdateItemDecodeState(AceType::RawPtr(wrapper), idx, true, 1, 0);
+    EXPECT_EQ(result, 0);
 }
 
 } // namespace OHOS::Ace::NG

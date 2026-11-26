@@ -2172,50 +2172,76 @@ void ListItemGroupLayoutAlgorithm::ResetLayoutItem(LayoutWrapper* layoutWrapper)
     }
 }
 
-void ListItemGroupLayoutAlgorithm::UpdateGroupDecodeCacheWindow(LayoutWrapper* groupWrapper, bool groupActive)
+int32_t ListItemGroupLayoutAlgorithm::UpdateGroupDecodeCacheWindow(LayoutWrapper* groupWrapper, bool groupActive,
+    int32_t decodeForward, int32_t decodeBackward)
 {
-    CHECK_NULL_VOID(groupWrapper);
+    CHECK_NULL_RETURN(groupWrapper, 0);
+    auto groupFrameNode = groupWrapper->GetHostNode();
+    CHECK_NULL_RETURN(groupFrameNode, 0);
     if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
-        return;
+        return 0;
     }
     if (listLayoutProperty_ && listLayoutProperty_->GetShowCachedItemsValue(false)) {
-        return;
+        return 0;
     }
-    if (itemPosition_.empty()) {
-        return;
+    if (itemPosition_.empty() && cachedItemPosition_.empty()) {
+        return 0;
     }
-    auto cacheParam = GetCacheParam();
-    int32_t cacheForward = 0;
-    int32_t cacheBackward = 0;
-    if (cacheParam.has_value()) {
-        cacheForward = cacheParam->cacheCountForward;
-        cacheBackward = cacheParam->cacheCountBackward;
-    }
-    if (cacheForward <= 0 && cacheBackward <= 0) {
-        return;
+    auto pattern = groupFrameNode->GetPattern<ListItemGroupPattern>();
+    const int32_t totalCount = pattern ? pattern->GetTotalItemCount() : 0;
+    if (totalCount <= 0) {
+        return 0;
     }
     const int32_t startIdx = GetStartIndex();
     const int32_t endIdx = GetEndIndex();
-    const int32_t lanes = GetLanes();
-    const int32_t firstCacheIdx = std::max(0, startIdx - cacheBackward * lanes);
-    const int32_t lastCacheIdx = std::min(totalItemCount_ - 1, endIdx + cacheForward * lanes);
-    const int32_t decodeForward = ScrollableUtils::CalcDecodeWindowCount(cacheForward) * lanes;
-    const int32_t decodeBackward = ScrollableUtils::CalcDecodeWindowCount(cacheBackward) * lanes;
-    const int32_t decodeStart = std::max(0, startIdx - decodeBackward);
-    const int32_t decodeEnd = std::min(totalItemCount_ - 1, endIdx + decodeForward);
+    bool hasVisible = !itemPosition_.empty();
+    int32_t decodeStart;
+    int32_t decodeEnd;
+    int32_t forwardBeyond;
+    int32_t backwardBeyond;
+    if (hasVisible) {
+        decodeStart = std::max(0, startIdx - decodeBackward);
+        decodeEnd = std::min(totalCount - 1, endIdx + decodeForward);
+        forwardBeyond = std::max(0, totalCount - 1 - endIdx);
+        backwardBeyond = std::max(0, startIdx);
+    } else {
+        if (decodeForward > 0) {
+            decodeStart = 0;
+            decodeEnd = std::min(totalCount - 1, decodeForward - 1);
+        } else {
+            decodeStart = std::max(0, totalCount - decodeBackward);
+            decodeEnd = totalCount - 1;
+        }
+        forwardBeyond = totalCount;
+        backwardBeyond = totalCount;
+    }
+    NotifyGroupDecodeState(groupWrapper, groupActive, decodeStart, decodeEnd);
+    return std::min(forwardBeyond, decodeForward) + std::min(backwardBeyond, decodeBackward);
+}
 
-    for (int32_t idx = firstCacheIdx; idx <= lastCacheIdx; ++idx) {
-        bool active = groupActive && ((idx >= startIdx && idx <= endIdx) ||
-                                      (idx >= decodeStart && idx <= decodeEnd));
+void ListItemGroupLayoutAlgorithm::NotifyGroupDecodeState(LayoutWrapper* groupWrapper, bool groupActive,
+    int32_t decodeStart, int32_t decodeEnd)
+{
+    auto notifyItem = [&](int32_t idx, bool active) {
         auto wrapper = GetListItem(groupWrapper, idx, false, true);
         if (!wrapper) {
-            continue;
+            return;
         }
         auto itemFrameNode = wrapper->GetHostNode();
         if (!itemFrameNode) {
-            continue;
+            return;
         }
         ScrollableUtils::UpdateCachedItemDecodeState(itemFrameNode, active);
+    };
+    for (const auto& [idx, pos] : itemPosition_) {
+        notifyItem(idx, groupActive);
+    }
+    for (const auto& [idx, pos] : cachedItemPosition_) {
+        if (itemPosition_.count(idx) > 0) {
+            continue;
+        }
+        bool active = groupActive && (idx >= decodeStart && idx <= decodeEnd);
+        notifyItem(idx, active);
     }
 }
 

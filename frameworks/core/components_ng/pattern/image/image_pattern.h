@@ -465,6 +465,7 @@ private:
     bool loadFailed_ = false;
     bool isLoadAlt_ = false;
     bool decodeCacheActive_ = true;
+    bool isDecodeCacheReactivated_ = false;
     ImageType imageType_ = ImageType::BASE;
     ContentTransitionType contentTransitionType_ = ContentTransitionType::IDENTITY;
     std::shared_ptr<CancelableCallback<void()>> navDestRecycleCallback_;
