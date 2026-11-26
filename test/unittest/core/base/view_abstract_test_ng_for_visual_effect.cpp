@@ -1444,6 +1444,31 @@ HWTEST_F(ViewAbstractTestNg, SetVibrancyMode004, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetVibrancyMode005
+ * @tc.desc: Test SetVibrancyMode stores DISABLED and AUTO modes on EXQUISITE device
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetVibrancyMode005, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    auto& rc = node->GetRenderContext();
+    ASSERT_NE(rc, nullptr);
+
+    auto backupLevel = g_uiMaterialLevel;
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+
+    ViewAbstract::SetVibrancyMode(AceType::RawPtr(node), VibrancyMode::DISABLED);
+    EXPECT_TRUE(rc->HasVibrancyMode());
+    EXPECT_EQ(rc->GetVibrancyModeValue(VibrancyMode::BRIGHTEN), VibrancyMode::DISABLED);
+
+    ViewAbstract::SetVibrancyMode(AceType::RawPtr(node), VibrancyMode::AUTO);
+    EXPECT_EQ(rc->GetVibrancyModeValue(VibrancyMode::DISABLED), VibrancyMode::AUTO);
+
+    g_uiMaterialLevel = backupLevel;
+}
+
+/**
  * @tc.name: SetColorFilterEffect001
  * @tc.desc: Test SetColorFilterEffect with valid 20-element matrix
  * @tc.type: FUNC
