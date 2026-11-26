@@ -3,6 +3,7 @@
 
 adapter/ @arkui-feature-manager
 advanced_ui_component/ @arkui-feature-manager
+advanced_ui_component/imageGeneratorDialog/ @arkui001
 component_ext/ @arkui-feature-manager
 examples/ @arkui-feature-manager
 frameworks/ @arkui-feature-manager
@@ -252,7 +253,7 @@ advanced_ui_component/foldsplitcontainer/ @arkuilayout1
 advanced_ui_component/formmenu/ @form_framework
 advanced_ui_component/fullscreenlaunchcomponent/ @ArkUI_ability_group
 advanced_ui_component/gridobjectsortcomponent/ @arkuiadvancedcomponent
-advanced_ui_component/imageGeneratorDialog/source/image_generator_dialog_project/image_generator_dialog/src/main/ets/common/utils/ @ArkUI_ability_group
+advanced_ui_component/imageGeneratorDialog/source/image_generator_dialog_project/image_generator_dialog/src/main/ets/common/utils/ @arkui001
 advanced_ui_component/interstitialdialogaction/ @giteewzp
 advanced_ui_component/popup/ @arkuipopupwindow_all
 advanced_ui_component/progressbutton/ @arkuiadvancedcomponent
@@ -617,6 +618,7 @@ frameworks/bridge/declarative_frontend/ark_component/src/ArkColumnSplit.ts @arku
 frameworks/bridge/declarative_frontend/ark_component/src/ArkCommonShape.ts @arkuilayout1
 frameworks/bridge/declarative_frontend/ark_component/src/ArkComponent.ts @arkui_architecture
 frameworks/bridge/declarative_frontend/ark_component/src/ArkComponent3D.ts @arkui_component3d
+frameworks/bridge/declarative_frontend/ark_component/src/ArkContainerPicker.ts @arkui001
 frameworks/bridge/declarative_frontend/ark_component/src/ArkContainerSpan.ts @huawei_g_five
 frameworks/bridge/declarative_frontend/ark_component/src/ArkDatePicker.ts @arkui001
 frameworks/bridge/declarative_frontend/ark_component/src/ArkDivider.ts @arkuilayout1
@@ -1655,8 +1657,8 @@ frameworks/bridge/js_frontend/engine/jsi/jsi_engine_loader.cpp @arkui_framework_
 frameworks/bridge/js_frontend/engine/jsi/jsi_engine_loader.h @arkui_framework_xnode
 frameworks/bridge/js_frontend/engine/jsi/jsi_group_js_bridge.cpp @arkui_framework_xnode
 frameworks/bridge/js_frontend/engine/jsi/jsi_group_js_bridge.h @arkui_framework_xnode
-frameworks/bridge/js_frontend/engine/jsi/jsi_image_animator_bridge.cpp @arkui_navigation
-frameworks/bridge/js_frontend/engine/jsi/jsi_image_animator_bridge.h @arkui_navigation
+frameworks/bridge/js_frontend/engine/jsi/jsi_image_animator_bridge.cpp @arkui001
+frameworks/bridge/js_frontend/engine/jsi/jsi_image_animator_bridge.h @arkui001
 frameworks/bridge/js_frontend/engine/jsi/jsi_input_bridge.cpp @huawei_g_five
 frameworks/bridge/js_frontend/engine/jsi/jsi_input_bridge.h @huawei_g_five
 frameworks/bridge/js_frontend/engine/jsi/jsi_list_bridge.cpp @arkuiscroll
@@ -2605,6 +2607,7 @@ frameworks/core/components_ng/pattern/sheet/sheet_wrapper_layout_algorithm.h @ar
 frameworks/core/components_ng/pattern/sheet/sheet_wrapper_paint_method.cpp @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/sheet/sheet_wrapper_paint_method.h @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/sheet/sheet_wrapper_pattern.h @arkuipopupwindow_all
+frameworks/core/components_ng/pattern/sheet/image_generator_style.h @arkui001
 frameworks/core/components_ng/pattern/side_bar/ @arkui_navigation
 frameworks/core/components_ng/pattern/slider/ @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/smart_layout/ @arkuilayout1
@@ -3184,6 +3187,8 @@ interfaces/native/node/waterflow_section_option.cpp @arkuiscroll
 interfaces/native/node/waterflow_section_option.h @arkuiscroll
 interfaces/native/node_attributes/embedded_component.h @ArkUI_ability_group
 interfaces/native/node_attributes/xcomponent.h @ArkUI_ability_group
+interfaces/native/node_attributes/image.h @arkui001
+interfaces/native/node_attributes/picker.h @arkui001
 interfaces/native/ui_input_event.h @ArkUI_Event
 
 [ANI Interfaces]
