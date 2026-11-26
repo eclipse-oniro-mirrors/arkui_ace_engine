@@ -6038,12 +6038,6 @@ void WebDelegate::OnLoadStarted(const std::string& param)
             CHECK_NULL_VOID(webEventHub);
             webEventHub->FireOnLoadStartedEvent(std::make_shared<LoadStartedEvent>(param));
             delegate->RecordWebEvent(Recorder::EventType::LOAD_STARTED, param);
-            if (webPattern->ShouldEnableAgentManager()) {
-                auto agentManager = delegate->GetNWebAgentManager();
-                if (agentManager && !agentManager->IsAgentEnabled()) {
-                    webPattern->EnableAgentManager();
-                }
-            }
         },
         TaskExecutor::TaskType::JS, "ArkUIWebLoadStarted");
 }
