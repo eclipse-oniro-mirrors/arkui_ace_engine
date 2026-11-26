@@ -3,7 +3,6 @@
 
 adapter/ @arkui-feature-manager
 advanced_ui_component/ @arkui-feature-manager
-advanced_ui_component/imageGeneratorDialog/ @arkui001
 component_ext/ @arkui-feature-manager
 examples/ @arkui-feature-manager
 frameworks/ @arkui-feature-manager
@@ -253,7 +252,7 @@ advanced_ui_component/foldsplitcontainer/ @arkuilayout1
 advanced_ui_component/formmenu/ @form_framework
 advanced_ui_component/fullscreenlaunchcomponent/ @ArkUI_ability_group
 advanced_ui_component/gridobjectsortcomponent/ @arkuiadvancedcomponent
-advanced_ui_component/imageGeneratorDialog/source/image_generator_dialog_project/image_generator_dialog/src/main/ets/common/utils/ @arkui001
+advanced_ui_component/imageGeneratorDialog/ @arkui001
 advanced_ui_component/interstitialdialogaction/ @giteewzp
 advanced_ui_component/popup/ @arkuipopupwindow_all
 advanced_ui_component/progressbutton/ @arkuiadvancedcomponent
