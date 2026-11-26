@@ -23,6 +23,7 @@ namespace OHOS::Ace::NG::GeneratedModifier {
 #ifdef WINDOW_SCENE_SUPPORTED
 void UIExtensionProxyPeerHost::SendData(const AAFwk::WantParams& wantParams)
 {
+    std::shared_lock<std::shared_mutex> lock(proxyMutex_);
     if (proxy_ == nullptr) {
         return;
     }
@@ -32,6 +33,7 @@ void UIExtensionProxyPeerHost::SendData(const AAFwk::WantParams& wantParams)
 int32_t UIExtensionProxyPeerHost::SendDataSync(
     const AAFwk::WantParams& wantParams, AAFwk::WantParams& reWantParams)
 {
+    std::shared_lock<std::shared_mutex> lock(proxyMutex_);
     if (proxy_ == nullptr) {
         return 0;
     }
