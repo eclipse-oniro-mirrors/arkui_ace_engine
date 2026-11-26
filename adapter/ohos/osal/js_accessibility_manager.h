@@ -120,6 +120,8 @@ struct AccessibilityFocusInfo {
     int64_t currentFocusNodeId;
     int64_t currentFocusVirtualNodeParentId;
     bool isFocusMoveAction = false;
+    // When true, the accessibility focus box is neither cleared on the previous node nor painted on the target.
+    bool isFocusBoxPaintSuppressed = false;
 
     explicit AccessibilityFocusInfo(int64_t nodeId = -1, int64_t parentId = -1, bool isFocusMove = false)
         : currentFocusNodeId(nodeId), currentFocusVirtualNodeParentId(parentId), isFocusMoveAction(isFocusMove) {}
@@ -925,6 +927,11 @@ private:
         int64_t elementId,
         RefPtr<NG::PipelineContext>& context,
         const std::map<std::string, std::string>& actionArguments);
+    bool ExecuteAccessibilityFocusAction(bool isNeedClear, RefPtr<NG::FrameNode>& frameNode, int64_t elementId,
+        RefPtr<NG::PipelineContext>& context, AccessibilityFocusInfo& focusInfo);
+    bool ExecuteAccessibilityFocusActionForFrameNode(const RefPtr<NG::FrameNode>& frameNode,
+        Accessibility::ActionType action, const std::map<std::string, std::string>& actionArguments,
+        const RefPtr<NG::PipelineContext>& context);
 
     void SetSearchElementInfoByAccessibilityIdResult(Accessibility::AccessibilityElementOperatorCallback& callback,
         std::list<Accessibility::AccessibilityElementInfo>&& infos, const int32_t requestId, bool checkEmbed = false);
