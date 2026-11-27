@@ -588,4 +588,84 @@ HWTEST_F(CustomNodeAsyncLoadTestNg, PlaceholderSuggestedSize002, TestSize.Level1
     EXPECT_EQ(ideal.Height()->GetDimension(), Dimension(30.0, DimensionUnit::VP));
     manager->UnregisterTemplate("async_load_unusable_template");
 }
+
+/**
+ * @tc.name: MeasureHostSetJSViewActivePropagatesToChild001
+ * @tc.desc: the measure host stays transparent to the native active walk:
+ *           a CustomNode child directly below it receives active/inactive
+ *           (flag and JS callback both), restoring the pre-override descent.
+ */
+HWTEST_F(CustomNodeAsyncLoadTestNg, MeasureHostSetJSViewActivePropagatesToChild001, TestSize.Level1)
+{
+    auto measureNode = CustomMeasureLayoutNode::CreateCustomMeasureLayoutNode(TEST_NODE_ID + 50, "MeasureHostView");
+    auto child = CustomNode::CreateCustomNode(TEST_NODE_ID + 51, "AsyncLoadTestView");
+    ASSERT_NE(measureNode, nullptr);
+    ASSERT_NE(child, nullptr);
+    measureNode->AddChild(child);
+    int32_t childFired = 0;
+    child->SetSetActiveFunc([&childFired](bool, bool, bool) {
+        ++childFired;
+    });
+
+    measureNode->SetJSViewActive(false);
+    EXPECT_FALSE(measureNode->GetJsActive());
+    EXPECT_FALSE(child->GetJsActive());
+    EXPECT_EQ(childFired, 1);
+
+    measureNode->SetJSViewActive(true);
+    EXPECT_TRUE(measureNode->GetJsActive());
+    EXPECT_TRUE(child->GetJsActive());
+    EXPECT_EQ(childFired, 2);
+}
+
+/**
+ * @tc.name: MeasureHostSetJSViewActiveDescendsThroughInterior002
+ * @tc.desc: the walk passes through a regular FrameNode interior below the
+ *           measure host, so nested custom components keep receiving the
+ *           active state (the pre-override behavior the override regressed).
+ */
+HWTEST_F(CustomNodeAsyncLoadTestNg, MeasureHostSetJSViewActiveDescendsThroughInterior002, TestSize.Level1)
+{
+    auto measureNode = CustomMeasureLayoutNode::CreateCustomMeasureLayoutNode(TEST_NODE_ID + 52, "MeasureHostView");
+    auto interior = FrameNode::CreateFrameNode("interior", TEST_NODE_ID + 53, AceType::MakeRefPtr<Pattern>());
+    auto nested = CustomNode::CreateCustomNode(TEST_NODE_ID + 54, "AsyncLoadTestView");
+    ASSERT_NE(measureNode, nullptr);
+    ASSERT_NE(interior, nullptr);
+    ASSERT_NE(nested, nullptr);
+    interior->AddChild(nested);
+    measureNode->AddChild(interior);
+
+    measureNode->SetJSViewActive(false);
+    EXPECT_FALSE(measureNode->GetJsActive());
+    EXPECT_FALSE(interior->GetChildren().empty());
+    EXPECT_FALSE(nested->GetJsActive());
+
+    measureNode->SetJSViewActive(true);
+    EXPECT_TRUE(nested->GetJsActive());
+}
+
+/**
+ * @tc.name: MeasureHostSetJSViewActiveTracksOwnFlag003
+ * @tc.desc: the host still tracks jsActive_ for the async-load scheduler's
+ *           freeze gate, but transparency means its own JS callback is NOT
+ *           fired from the native walk (its JS view is notified through the
+ *           JS view tree by its JS parent, as before the override existed).
+ */
+HWTEST_F(CustomNodeAsyncLoadTestNg, MeasureHostSetJSViewActiveTracksOwnFlag003, TestSize.Level1)
+{
+    auto measureNode = CustomMeasureLayoutNode::CreateCustomMeasureLayoutNode(TEST_NODE_ID + 55, "MeasureHostView");
+    ASSERT_NE(measureNode, nullptr);
+    int32_t selfFired = 0;
+    measureNode->SetSetActiveFunc([&selfFired](bool, bool, bool) {
+        ++selfFired;
+    });
+
+    EXPECT_TRUE(measureNode->GetJsActive());
+    measureNode->SetJSViewActive(false);
+    EXPECT_FALSE(measureNode->GetJsActive());
+    measureNode->SetJSViewActive(true);
+    EXPECT_TRUE(measureNode->GetJsActive());
+    // transparent: the native walk never notifies this host's own JS view
+    EXPECT_EQ(selfFired, 0);
+}
 } // namespace OHOS::Ace::NG
