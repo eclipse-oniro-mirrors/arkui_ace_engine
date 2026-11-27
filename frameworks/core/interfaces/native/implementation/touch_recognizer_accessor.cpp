@@ -78,10 +78,11 @@ Ark_EventTargetInfo GetEventTargetInfoImpl(Ark_TouchRecognizer peer)
         scrollableTargetInfoPeer->uniqueId = attachNode->GetId();
         result = scrollableTargetInfoPeer;
     } else {
-        auto scrollableTargetInfoPeer = GetScrollableTargetInfoAccessor()->construct();
-        scrollableTargetInfoPeer->id = attachNode->GetInspectorIdValue("");
-        scrollableTargetInfoPeer->uniqueId = attachNode->GetId();
-        result = scrollableTargetInfoPeer;
+        auto eventTargetInfoPeer = GetEventTargetInfoAccessor()->construct();
+        eventTargetInfoPeer->id = attachNode->GetInspectorIdValue("");
+        eventTargetInfoPeer->uniqueId = attachNode->GetId();
+        eventTargetInfoPeer->isScrollableComponent_ = false;
+        result = eventTargetInfoPeer;
     }
     return result;
 }
