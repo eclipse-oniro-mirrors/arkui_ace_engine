@@ -33,10 +33,13 @@ namespace OHOS::Ace {
 // Trace output is outside this suite; all session registration and query code is production code.
 UiSessionScopedTrace::UiSessionScopedTrace(const char*, ...) {}
 UiSessionScopedTrace::~UiSessionScopedTrace() = default;
+void UiSessionCommandRequestTraceBegin(const char*) {}
+void UiSessionCommandResultTraceEnd(uint64_t) {}
 
 namespace {
 constexpr int32_t CALLER_PID = 23001;
 constexpr int32_t OTHER_PID = 23002;
+constexpr int CONNECTION_WORKERS = 8;
 constexpr size_t TEXT_RULE_COUNT = 2;
 constexpr size_t SINGLE_TEXT_RESULT_COUNT = 1;
 constexpr size_t INITIAL_SCENE_REQUEST_COUNT = 2;
@@ -244,6 +247,10 @@ class TestPageSceneReportStub : public UiReportStub {
 public:
     bool AddDeathRecipient(const sptr<IRemoteObject::DeathRecipient>& recipient) override
     {
+        ++deathRecipientCalls_;
+        if (!addDeathRecipientResult_) {
+            return false;
+        }
         deathRecipients_.emplace_back(recipient);
         return true;
     }
@@ -257,6 +264,9 @@ public:
         }
     }
 
+    int deathRecipientCalls_ = 0;
+    bool addDeathRecipientResult_ = true;
+
 private:
     std::vector<sptr<IRemoteObject::DeathRecipient>> deathRecipients_;
 };
@@ -267,7 +277,7 @@ protected:
     void SetUp() override
     {
         report_ = std::make_shared<TestPageSceneReportStub>();
-        manager_.SaveReportProxy(report_, CALLER_PID);
+        ASSERT_EQ(manager_.SaveReportProxy(report_, CALLER_PID), NO_ERROR);
         manager_.SavePageSceneDetectFunction(
             [this](int32_t, const std::string& json, bool query) { (query ? queries_ : detections_).push_back(json); });
     }
@@ -652,18 +662,23 @@ HWTEST_F(UiSessionPageSceneTest, UnifiedQueryStateRejectsEmptySplitOwnership, Te
 HWTEST_F(UiSessionPageSceneTest, RepeatedConnectPreservesRegistration, TestSize.Level1)
 {
     ASSERT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MIXED_JSON), NO_ERROR);
-    sptr<UiReportStub> replacement = std::make_shared<UiReportStub>();
-    manager_.SaveReportProxy(replacement, CALLER_PID);
+    sptr<TestPageSceneReportStub> replacement = std::make_shared<TestPageSceneReportStub>();
+    EXPECT_EQ(manager_.SaveReportProxy(replacement, CALLER_PID), FAILED);
+    EXPECT_EQ(manager_.reportObjectMap_.at(CALLER_PID).GetRefPtr(), report_.GetRefPtr());
+    EXPECT_EQ(replacement->deathRecipientCalls_, 0);
     EXPECT_TRUE(manager_.HasSplitPageSceneRuleSet(CALLER_PID, MIXED_ID));
     EXPECT_EQ(manager_.GetPageScene(CALLER_PID, MIXED_ID), NO_ERROR);
 }
 
-HWTEST_F(UiSessionPageSceneTest, ReplacedConnectionDeathKeepsPidCleanupAndRemovesSplit, TestSize.Level1)
+HWTEST_F(UiSessionPageSceneTest, RejectedConnectionDeathKeepsOriginalUntilItsDeath, TestSize.Level1)
 {
     InstallWebCallback();
     ASSERT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MakeMixedRule(MIXED_ID, true)), NO_ERROR);
-    sptr<UiReportStub> replacement = std::make_shared<UiReportStub>();
-    manager_.SaveReportProxy(replacement, CALLER_PID);
+    sptr<TestPageSceneReportStub> replacement = std::make_shared<TestPageSceneReportStub>();
+    ASSERT_EQ(manager_.SaveReportProxy(replacement, CALLER_PID), FAILED);
+    replacement->NotifyDeath();
+    EXPECT_EQ(manager_.reportObjectMap_.at(CALLER_PID).GetRefPtr(), report_.GetRefPtr());
+    EXPECT_TRUE(manager_.HasSplitPageSceneRuleSet(CALLER_PID, MIXED_ID));
     ASSERT_EQ(manager_.GetPageScene(CALLER_PID, MIXED_ID), NO_ERROR);
     report_->NotifyDeath();
     EXPECT_TRUE(manager_.pageSceneQueries_.empty());
@@ -673,6 +688,69 @@ HWTEST_F(UiSessionPageSceneTest, ReplacedConnectionDeathKeepsPidCleanupAndRemove
     EXPECT_EQ(manager_.pageSceneRuleSets_.count(CALLER_PID), 0u);
     EXPECT_TRUE(webOwner_.empty());
     EXPECT_EQ(manager_.RegisterPageSceneRules(CALLER_PID, MIXED_JSON), NOT_CONNECTED);
+}
+
+HWTEST_F(UiSessionPageSceneTest, DuplicateReportDoesNotAddDeathRecipient, TestSize.Level1)
+{
+    EXPECT_EQ(report_->deathRecipientCalls_, 1);
+    EXPECT_EQ(manager_.SaveReportProxy(report_, CALLER_PID), FAILED);
+    EXPECT_EQ(report_->deathRecipientCalls_, 1);
+    EXPECT_EQ(manager_.reportObjectMap_.at(CALLER_PID).GetRefPtr(), report_.GetRefPtr());
+}
+
+HWTEST_F(UiSessionPageSceneTest, DeathRecipientFailureKeepsPidAvailableForRetry, TestSize.Level1)
+{
+    sptr<TestPageSceneReportStub> other = std::make_shared<TestPageSceneReportStub>();
+    other->addDeathRecipientResult_ = false;
+    EXPECT_EQ(manager_.SaveReportProxy(other, OTHER_PID), FAILED);
+    EXPECT_EQ(manager_.reportObjectMap_.count(OTHER_PID), 0u);
+    other->addDeathRecipientResult_ = true;
+    ASSERT_EQ(manager_.SaveReportProxy(other, OTHER_PID), NO_ERROR);
+    EXPECT_EQ(other->deathRecipientCalls_, 2);
+    other->NotifyDeath();
+    EXPECT_EQ(manager_.reportObjectMap_.count(OTHER_PID), 0u);
+    EXPECT_EQ(manager_.reportObjectMap_.at(CALLER_PID).GetRefPtr(), report_.GetRefPtr());
+}
+
+HWTEST_F(UiSessionPageSceneTest, ConcurrentConnectKeepsOneReportAndOneDeathRecipient, TestSize.Level1)
+{
+    std::vector<sptr<TestPageSceneReportStub>> reports;
+    for (int index = 0; index < CONNECTION_WORKERS; ++index) {
+        reports.emplace_back(std::make_shared<TestPageSceneReportStub>());
+    }
+    std::promise<void> start;
+    auto ready = start.get_future().share();
+    std::vector<int32_t> results(CONNECTION_WORKERS, REPLY_ERROR);
+    std::vector<std::thread> workers;
+    for (int index = 0; index < CONNECTION_WORKERS; ++index) {
+        workers.emplace_back([&, index]() {
+            ready.wait();
+            results[index] = manager_.SaveReportProxy(reports[index], OTHER_PID);
+        });
+    }
+    start.set_value();
+    for (auto& worker : workers) {
+        worker.join();
+    }
+    int accepted = 0;
+    sptr<TestPageSceneReportStub> winner;
+    for (int index = 0; index < CONNECTION_WORKERS; ++index) {
+        if (results[index] == NO_ERROR) {
+            ++accepted;
+            winner = reports[index];
+            EXPECT_EQ(reports[index]->deathRecipientCalls_, 1);
+        } else {
+            EXPECT_EQ(results[index], FAILED);
+            EXPECT_EQ(reports[index]->deathRecipientCalls_, 0);
+            reports[index]->NotifyDeath();
+        }
+    }
+    ASSERT_EQ(accepted, 1);
+    ASSERT_TRUE(winner != nullptr);
+    EXPECT_EQ(manager_.reportObjectMap_.at(OTHER_PID).GetRefPtr(), winner.GetRefPtr());
+    winner->NotifyDeath();
+    EXPECT_EQ(manager_.reportObjectMap_.count(OTHER_PID), 0u);
+    EXPECT_EQ(manager_.reportObjectMap_.at(CALLER_PID).GetRefPtr(), report_.GetRefPtr());
 }
 
 HWTEST_F(UiSessionPageSceneTest, DeathCleanupRemovesRulesAndQueryForOnlyOneCaller, TestSize.Level1)

@@ -418,62 +418,133 @@ TEST_F(SendCommandTest, NewConnectionAfterProxyReleaseIgnoresPreviousRequest)
     EXPECT_EQ(count, 1);
 }
 
-TEST_F(SendCommandTest, ConnectFailureKeepsInitialDisconnectedState)
+TEST_F(SendCommandTest, ConnectFailureKeepsDisconnectedStateAndAllowsRetry)
 {
     proxy->report_ = nullptr;
-    remote->send = [this](uint32_t code, MessageParcel&, MessageParcel&, MessageOption&) {
+    int sendCount = 0;
+    remote->send = [this, &sendCount](uint32_t code, MessageParcel&, MessageParcel&, MessageOption&) {
         EXPECT_EQ(code, IUiContentService::UI_CONTENT_CONNECT);
-        EXPECT_TRUE(proxy->report_ != nullptr);
-        return -1;
+        EXPECT_TRUE(proxy->report_ == nullptr);
+        return ++sendCount == 1 ? FAILED : NO_ERROR;
     };
     int callbackCount = 0;
     EXPECT_EQ(proxy->Connect([&callbackCount](std::string) { ++callbackCount; }, handler), REPLY_ERROR);
-    EXPECT_TRUE(proxy->report_ != nullptr);
-    EXPECT_FALSE(proxy->isConnected_);
-    proxy->report_->SendBaseInfo("after failed connect");
+    EXPECT_TRUE(proxy->report_ == nullptr);
+    EXPECT_FALSE(proxy->IsConnect());
+    EXPECT_EQ(callbackCount, 0);
+    ASSERT_EQ(proxy->Connect([&callbackCount](std::string) { ++callbackCount; }, handler), NO_ERROR);
+    EXPECT_EQ(sendCount, EXPECTED_REQUEST_SENDS);
+    EXPECT_TRUE(proxy->IsConnect());
+    proxy->report_->SendBaseInfo("after successful retry");
     EXPECT_EQ(callbackCount, 1);
 }
 
-TEST_F(SendCommandTest, ConnectFailureReplacesReportBeforeRequest)
+TEST_F(SendCommandTest, RepeatedConnectPreservesReportAndPendingCallbacks)
 {
-    proxy->isConnected_ = true;
     int oldCallbackCount = 0;
     int newCallbackCount = 0;
+    int commandCallbackCount = 0;
     report->RegisterGetBaseInfoCallback([&oldCallbackCount](std::string) { ++oldCallbackCount; });
-    wptr<UiReportStub> oldReport = report;
-    remote->send = [this, &oldReport](uint32_t code, MessageParcel&, MessageParcel&, MessageOption&) {
-        EXPECT_EQ(code, IUiContentService::UI_CONTENT_CONNECT);
-        EXPECT_NE(proxy->report_.GetRefPtr(), oldReport.promote().GetRefPtr());
-        return -1;
+    ASSERT_EQ(proxy->SendCommand("{}", [&commandCallbackCount](const std::string&) {
+        ++commandCallbackCount;
+    }), NO_ERROR);
+    const auto requestId = report->sendCommandRequestId_;
+    int sendCount = 0;
+    remote->send = [&sendCount](uint32_t, MessageParcel&, MessageParcel&, MessageOption&) {
+        ++sendCount;
+        return NO_ERROR;
     };
-    EXPECT_EQ(proxy->Connect([&newCallbackCount](std::string) { ++newCallbackCount; }, handler), REPLY_ERROR);
-    EXPECT_NE(proxy->report_.GetRefPtr(), report.GetRefPtr());
-    EXPECT_TRUE(proxy->isConnected_);
-    proxy->report_->SendBaseInfo("new connection");
-    EXPECT_EQ(newCallbackCount, 1);
-    EXPECT_EQ(oldCallbackCount, 0);
+    EXPECT_EQ(proxy->Connect([&newCallbackCount](std::string) { ++newCallbackCount; }, handler), FAILED);
+    EXPECT_EQ(sendCount, 0);
+    EXPECT_EQ(proxy->report_.GetRefPtr(), report.GetRefPtr());
+    EXPECT_TRUE(proxy->IsConnect());
     report->SendBaseInfo("previous connection");
     EXPECT_EQ(oldCallbackCount, 1);
-    EXPECT_EQ(newCallbackCount, 1);
+    EXPECT_EQ(newCallbackCount, 0);
+    report->ReportCommandResult(requestId, "previous command result");
+    EXPECT_EQ(commandCallbackCount, 1);
 }
 
-TEST_F(SendCommandTest, ConnectSuccessReplacesReportBeforeRequest)
+TEST_F(SendCommandTest, ConnectSuccessPublishesReportAfterRequest)
 {
-    wptr<UiReportStub> oldReport = report;
+    proxy->report_ = nullptr;
     report = nullptr;
     remote->send = [this](uint32_t code, MessageParcel&, MessageParcel&, MessageOption&) {
         EXPECT_EQ(code, IUiContentService::UI_CONTENT_CONNECT);
-        EXPECT_TRUE(proxy->report_ != nullptr);
-        EXPECT_FALSE(proxy->isConnected_);
+        EXPECT_TRUE(proxy->report_ == nullptr);
         return 0;
     };
     int callbackCount = 0;
     ASSERT_EQ(proxy->Connect([&callbackCount](std::string) { ++callbackCount; }, handler), NO_ERROR);
-    ASSERT_TRUE(proxy->report_ != nullptr);
-    EXPECT_TRUE(oldReport.promote() == nullptr);
-    EXPECT_TRUE(proxy->isConnected_);
-    EXPECT_EQ(proxy->report_->eventHandler_.lock(), handler);
-    proxy->report_->SendBaseInfo("new connection");
+    report = proxy->report_;
+    ASSERT_TRUE(report != nullptr);
+    EXPECT_TRUE(proxy->IsConnect());
+    EXPECT_EQ(report->eventHandler_.lock(), handler);
+    report->SendBaseInfo("new connection");
+    EXPECT_EQ(callbackCount, 1);
+}
+
+TEST_F(SendCommandTest, ConcurrentConnectAcceptsOnlyOneCallback)
+{
+    proxy->report_ = nullptr;
+    std::atomic<int> sendCount { 0 };
+    remote->send = [&sendCount](uint32_t code, MessageParcel&, MessageParcel&, MessageOption&) {
+        EXPECT_EQ(code, IUiContentService::UI_CONTENT_CONNECT);
+        ++sendCount;
+        return NO_ERROR;
+    };
+    std::atomic<int> ready { 0 };
+    std::atomic<bool> start { false };
+    std::vector<int32_t> results(CONCURRENT_WORKERS, REPLY_ERROR);
+    std::vector<int> callbackCounts(CONCURRENT_WORKERS, 0);
+    std::vector<std::thread> workers;
+    for (int index = 0; index < CONCURRENT_WORKERS; ++index) {
+        workers.emplace_back([&, index]() {
+            ++ready;
+            while (!start.load()) {
+                std::this_thread::yield();
+            }
+            results[index] = proxy->Connect([&, index](std::string) { ++callbackCounts[index]; }, handler);
+        });
+    }
+    while (ready.load() != CONCURRENT_WORKERS) {
+        std::this_thread::yield();
+    }
+    start.store(true);
+    for (auto& worker : workers) {
+        worker.join();
+    }
+    EXPECT_EQ(sendCount.load(), 1);
+    ASSERT_TRUE(proxy->IsConnect());
+    report = proxy->report_;
+    ASSERT_TRUE(report != nullptr);
+    report->SendBaseInfo("accepted connection");
+    int accepted = 0;
+    for (int index = 0; index < CONCURRENT_WORKERS; ++index) {
+        if (results[index] == NO_ERROR) {
+            ++accepted;
+            EXPECT_EQ(callbackCounts[index], 1);
+        } else {
+            EXPECT_EQ(results[index], FAILED);
+            EXPECT_EQ(callbackCounts[index], 0);
+        }
+    }
+    EXPECT_EQ(accepted, 1);
+}
+
+TEST_F(SendCommandTest, RegisteredCallbackCanQueryCompletedConnection)
+{
+    remote->send = [this](uint32_t code, MessageParcel&, MessageParcel&, MessageOption&) {
+        EXPECT_EQ(code, IUiContentService::REGISTER_CLICK_EVENT);
+        report->ReportClickEvent("click");
+        return NO_ERROR;
+    };
+    int callbackCount = 0;
+    EXPECT_EQ(proxy->RegisterClickEventCallback([this, &callbackCount](std::string) {
+        EXPECT_TRUE(proxy->IsConnect());
+        EXPECT_EQ(proxy->report_.GetRefPtr(), report.GetRefPtr());
+        ++callbackCount;
+        }), NO_ERROR);
     EXPECT_EQ(callbackCount, 1);
 }
 

@@ -22,6 +22,7 @@
 #include <cctype>
 #include <cinttypes>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -30,9 +31,11 @@
 #include <iomanip>
 #include <fstream>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <sys/time.h>
+#include <thread>
 #include <unistd.h>
 
 #include "ipc_skeleton.h"
@@ -117,6 +120,74 @@ const char NULL_CALLBACK_DUMP_OPTION[] = "-nullcb";
 const char EMPTY_ID_DUMP_OPTION[] = "-emptyid";
 const char DUAL_RULE_SET_DUMP_OPTION[] = "-dual";
 const std::string REPEAT_DUMP_OPTION_PREFIX = "-repeat:";
+
+struct ConnectDumpOptions {
+    int32_t threads = 1;
+    bool skipIsConnect = false;
+};
+
+struct ConnectAttemptResult {
+    int32_t result = FAILED;
+    bool skipped = false;
+    std::atomic<int32_t> callbacks { 0 };
+};
+
+bool ParseConnectDumpOptions(const std::vector<std::string>& params, ConnectDumpOptions& options)
+{
+    bool hasThreads = false;
+    for (size_t index = 1; index < params.size(); ++index) {
+        if (params[index] == "--skip-is-connect" && !options.skipIsConnect) {
+            options.skipIsConnect = true;
+        } else if (params[index] == "--threads" && !hasThreads && index + 1 < params.size()) {
+            const auto& value = params[++index];
+            errno = 0;
+            char* end = nullptr;
+            const auto count = std::strtol(value.c_str(), &end, 10);
+            if (end == value.c_str() || *end != '\0' || errno == ERANGE || count < 1 ||
+                count > std::numeric_limits<int32_t>::max()) {
+                return false;
+            }
+            options.threads = static_cast<int32_t>(count);
+            hasThreads = true;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+void RunConnectAttempts(int32_t count, const std::function<void(int32_t)>& connect)
+{
+    if (count == 1) {
+        connect(0);
+        return;
+    }
+    std::mutex startMutex;
+    std::condition_variable startCondition;
+    int32_t ready = 0;
+    bool start = false;
+    std::vector<std::thread> workers;
+    for (int32_t index = 0; index < count; ++index) {
+        workers.emplace_back([&, index]() {
+            {
+                std::unique_lock<std::mutex> lock(startMutex);
+                ++ready;
+                startCondition.notify_all();
+                startCondition.wait(lock, [&start]() { return start; });
+            }
+            connect(index);
+        });
+    }
+    {
+        std::unique_lock<std::mutex> lock(startMutex);
+        startCondition.wait(lock, [&]() { return ready == count; });
+        start = true;
+    }
+    startCondition.notify_all();
+    for (auto& worker : workers) {
+        worker.join();
+    }
+}
 
 struct DumpOption {
     bool useNullCallback = false;
@@ -581,7 +652,6 @@ std::string BuildBatchSetTextCommand(const std::vector<std::string>& params)
 } // namespace
 
 const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
-    { "Connect", &UiSaService::HandleConnect },
     { "GetVisibleInspectorTree", &UiSaService::HandleGetVisibleInspectorTree },
     { "GetInspectorTree", &UiSaService::HandleGetInspectorTree },
     { "GetCurrentPageName", &UiSaService::HandleGetCurrentPageName },
@@ -727,6 +797,10 @@ int32_t UiSaService::Dump(int32_t fd, const std::vector<std::u16string>& args)
     LOGI("through uiSa, dump focusedWindowId=%{public}d", focusedWindowId);
     auto service = getArkUIService(focusedWindowId);
     CHECK_NULL_RETURN(service, ERR_INVALID_DATA);
+    // Connect must handle its own optional IsConnect check before the generic precheck.
+    if (!params.empty() && params.front() == "Connect") {
+        return HandleConnect(fd, service, params);
+    }
     if (!service->IsConnect()) {
         LOGW("through uiSa, not connected.");
     }
@@ -744,14 +818,57 @@ int32_t UiSaService::Dump(int32_t fd, const std::vector<std::u16string>& args)
     return ERR_NONE;
 }
 
-void UiSaService::HandleConnect(sptr<IUiContentService> service, std::vector<std::string> params)
+int32_t UiSaService::HandleConnect(
+    int32_t fd, sptr<IUiContentService> service, const std::vector<std::string>& params)
 {
-    auto cb = [](std::string res) {
-        LOGI("through uiSa, connect success, foucs window info = %{public}s", res.c_str());
-    };
-    if (!service->IsConnect()) {
-        service->Connect(cb, eventHandler_);
+    ConnectDumpOptions options;
+    if (!ParseConnectDumpOptions(params, options)) {
+        dprintf(fd, "Usage: Connect [--threads N] [--skip-is-connect] (N must be a positive integer)\n");
+        return ERR_INVALID_DATA;
     }
+    static std::atomic<uint64_t> nextRunId { 0 };
+    const uint64_t runId = nextRunId.fetch_add(1) + 1;
+    auto attempts = std::make_shared<std::vector<ConnectAttemptResult>>(options.threads);
+    auto handler = eventHandler_;
+    LOGI("[ConnectTest] run=%{public}" PRIu64 " start threads=%{public}d skipIsConnect=%{public}d",
+        runId, options.threads, options.skipIsConnect);
+    RunConnectAttempts(options.threads, [service, handler, attempts, options, runId](int32_t index) {
+        auto& attempt = (*attempts)[index];
+        if (!options.skipIsConnect && service->IsConnect()) {
+            attempt.skipped = true;
+            return;
+        }
+        attempt.result = service->Connect([attempts, index, runId](std::string res) {
+            const auto callbacks = (*attempts)[index].callbacks.fetch_add(1) + 1;
+            LOGI("[ConnectTest] run=%{public}" PRIu64 " worker=%{public}d baseInfo callbacks=%{public}d",
+                runId, index, callbacks);
+            LOGI("through uiSa, connect success, foucs window info = %{public}s", res.c_str());
+        }, handler);
+    });
+    int32_t success = 0;
+    int32_t failed = 0;
+    int32_t skipped = 0;
+    int32_t callbacks = 0;
+    for (int32_t index = 0; index < options.threads; ++index) {
+        const auto& attempt = (*attempts)[index];
+        const auto callbackCount = attempt.callbacks.load();
+        callbacks += callbackCount;
+        if (attempt.skipped) {
+            ++skipped;
+            dprintf(fd, "[ConnectTest] run=%" PRIu64 " worker=%d skipped=already-connected\n", runId, index);
+        } else {
+            success += attempt.result == NO_ERROR;
+            failed += attempt.result != NO_ERROR;
+            dprintf(fd, "[ConnectTest] run=%" PRIu64 " worker=%d result=%d callbacks=%d\n",
+                runId, index, attempt.result, callbackCount);
+        }
+    }
+    dprintf(fd, "[ConnectTest] run=%" PRIu64 " threads=%d skipIsConnect=%d "
+        "success=%d failed=%d skipped=%d callbacks=%d\n",
+        runId, options.threads, options.skipIsConnect, success, failed, skipped, callbacks);
+    LOGI("[ConnectTest] run=%{public}" PRIu64 " success=%{public}d failed=%{public}d "
+        "skipped=%{public}d callbacks=%{public}d", runId, success, failed, skipped, callbacks);
+    return ERR_NONE;
 }
 
 void UiSaService::HandleGetVisibleInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params)
