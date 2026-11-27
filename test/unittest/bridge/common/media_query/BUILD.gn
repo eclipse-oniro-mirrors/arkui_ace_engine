@@ -22,6 +22,7 @@ if (is_host_product) {
       "$ace_root/frameworks/bridge/common/media_query/media_query_info.cpp",
       "$ace_root/frameworks/bridge/common/media_query/media_queryer.cpp",
       "media_query_test.cpp",
+      "media_query_test_two.cpp",
     ]
   }
 } else {
@@ -32,6 +33,7 @@ if (is_host_product) {
       "$ace_root/frameworks/bridge/common/media_query/media_query_info.cpp",
       "$ace_root/frameworks/bridge/common/media_query/media_queryer.cpp",
       "media_query_test.cpp",
+      "media_query_test_two.cpp",
     ]
 
     if (!ace_enable_full_test_suite) {
