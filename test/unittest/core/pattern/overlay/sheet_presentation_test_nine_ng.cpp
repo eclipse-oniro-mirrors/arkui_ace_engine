@@ -156,6 +156,60 @@ HWTEST_F(SheetPresentationTestNineNg, SafeAreaPaddingScrollClipMode002, TestSize
 }
 
 /**
+ * @tc.name: SafeAreaPaddingDragBarZIndex001
+ * @tc.desc: SAFE_AREA_PADDING mode keeps dragBar zIndex raised after UpdateDragBarStatus.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetPresentationTestNineNg, SafeAreaPaddingDragBarZIndex001, TestSize.Level1)
+{
+    SheetPresentationTestNineNg::SetUpTestCase();
+    auto builder = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto callback = [](const std::string&) {};
+    SheetStyle style;
+    style.isTitleBuilder = true;
+    style.sheetTitle = MESSAGE;
+    style.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    auto sheetNode = SheetView::CreateSheetPage(0, "", builder, builder, std::move(callback), style);
+    ASSERT_NE(sheetNode, nullptr);
+    auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
+    ASSERT_NE(sheetPattern, nullptr);
+    auto dragBarNode = sheetPattern->GetDragBarNode();
+    ASSERT_NE(dragBarNode, nullptr);
+    // Simulate the per-layout path (OnDirtyLayoutWrapperSwap -> DirtyLayoutProcess), which must not
+    // clobber the raised zIndex back to 0 in SAFE_AREA_PADDING mode.
+    sheetPattern->UpdateDragBarStatus();
+    EXPECT_EQ(dragBarNode->GetRenderContext()->GetZIndex().value_or(0), 0);
+    SheetPresentationTestNineNg::TearDownTestCase();
+}
+
+/**
+ * @tc.name: SafeAreaPaddingDragBarZIndex002
+ * @tc.desc: STANDARD mode keeps dragBar zIndex at 0 after UpdateDragBarStatus.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SheetPresentationTestNineNg, SafeAreaPaddingDragBarZIndex002, TestSize.Level1)
+{
+    SheetPresentationTestNineNg::SetUpTestCase();
+    auto builder = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto callback = [](const std::string&) {};
+    SheetStyle style;
+    style.isTitleBuilder = true;
+    style.sheetTitle = MESSAGE;
+    style.titleBarHoverMode = SheetTitleBarHoverMode::STANDARD;
+    auto sheetNode = SheetView::CreateSheetPage(0, "", builder, builder, std::move(callback), style);
+    ASSERT_NE(sheetNode, nullptr);
+    auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
+    ASSERT_NE(sheetPattern, nullptr);
+    auto dragBarNode = sheetPattern->GetDragBarNode();
+    ASSERT_NE(dragBarNode, nullptr);
+    sheetPattern->UpdateDragBarStatus();
+    EXPECT_EQ(dragBarNode->GetRenderContext()->GetZIndex().value_or(0), 0);
+    SheetPresentationTestNineNg::TearDownTestCase();
+}
+
+/**
  * @tc.name: ApplySheetImmersiveStrategyDefaults001
  * @tc.desc: Strategy set, no explicit hoverMode → default SAFE_AREA_PADDING (AC-3a).
  * @tc.type: FUNC
