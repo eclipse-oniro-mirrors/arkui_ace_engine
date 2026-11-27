@@ -2612,7 +2612,9 @@ void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapp
     if (!ScrollableUtils::IsLowMemoryDeviceRuntime()) {
         return;
     }
-    auto listProps = layoutWrapper->GetHostNode()->GetLayoutProperty<ListLayoutProperty>();
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto listProps = host->GetLayoutProperty<ListLayoutProperty>();
     if (listProps && listProps->GetShowCachedItemsValue(false)) {
         return;
     }
@@ -2623,8 +2625,6 @@ void ListLayoutAlgorithm::UpdateListDecodeCacheWindow(LayoutWrapper* layoutWrapp
     if (decodeWindow <= 0) {
         return;
     }
-    auto host = layoutWrapper->GetHostNode();
-    CHECK_NULL_VOID(host);
 
     const int32_t startIndex = GetStartIndex();
     const int32_t endIndex = GetEndIndex();
