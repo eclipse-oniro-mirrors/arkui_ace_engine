@@ -65,6 +65,24 @@ HWTEST_F(ParallelizeUIAdapterNodeTestNg, FrameCountTest001, TestSize.Level1)
 
     EXPECT_EQ(node->FrameCount(), 3);
 }
+/**
+ * @tc.name: ParallelizeUIAdapterNode_FrameCount
+ * @tc.desc: Test FrameCount before and after RegisterCallback with getCount
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelizeUIAdapterNodeTestNg, FrameCountTest004, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<ParallelizeUIAdapterNode>(1);
+    EXPECT_EQ(node->FrameCount(), 0);
+
+    node->RegisterCallback(
+        std::function<int32_t()>([]() { return 100; }),
+        std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>(
+            [](int32_t, int32_t, int32_t) -> ArkUINodeHandle { return nullptr; })
+    );
+
+    EXPECT_EQ(node->FrameCount(), 100);
+}
 
 /**
  * @tc.name: ParallelizeUIAdapterNode_GetFrameChild
@@ -117,25 +135,6 @@ HWTEST_F(ParallelizeUIAdapterNodeTestNg, ExceptionBranchTest003, TestSize.Level1
     auto result2 = node->GetFrameChildByIndex(0, true, false, true);
     EXPECT_EQ(result2, nullptr);
     EXPECT_EQ(node->GetChildren().size(), 0u);
-}
-
-/**
- * @tc.name: ParallelizeUIAdapterNode_FrameCount
- * @tc.desc: Test FrameCount before and after RegisterCallback with getCount
- * @tc.type: FUNC
- */
-HWTEST_F(ParallelizeUIAdapterNodeTestNg, FrameCountTest004, TestSize.Level1)
-{
-    auto node = AceType::MakeRefPtr<ParallelizeUIAdapterNode>(1);
-    EXPECT_EQ(node->FrameCount(), 0);
-
-    node->RegisterCallback(
-        std::function<int32_t()>([]() { return 100; }),
-        std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>(
-            [](int32_t, int32_t, int32_t) -> ArkUINodeHandle { return nullptr; })
-    );
-
-    EXPECT_EQ(node->FrameCount(), 100);
 }
 
 /**

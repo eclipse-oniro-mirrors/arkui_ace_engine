@@ -134,6 +134,27 @@ HWTEST_F(AppBarTestNg, TestGetAppBarRect002, TestSize.Level1)
     rect = appBar->GetAppBarRect();
     EXPECT_EQ(rect, std::nullopt);
 }
+/**
+ * @tc.name: TestGetAppBarRect003
+ * @tc.desc: Test GetAppBarRect
+ * @tc.type: FUNC
+ */
+HWTEST_F(AppBarTestNg, TestGetAppBarRect003, TestSize.Level1)
+{
+    auto stage = AceType::MakeRefPtr<FrameNode>("test", 1, AceType::MakeRefPtr<Pattern>());
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto atom = appBar->Create(stage);
+
+    auto pipeline = PipelineContext::GetCurrentContext();
+    pipeline->safeAreaManager_ = AceType::MakeRefPtr<SafeAreaManager>();
+    pipeline->SetInstallationFree(0);
+    auto rect = appBar->GetAppBarRect();
+    EXPECT_EQ(rect, std::nullopt);
+
+    pipeline->SetInstallationFree(1);
+    rect = appBar->GetAppBarRect();
+    EXPECT_EQ(rect, std::nullopt);
+}
 
 /**
  * @tc.name: TestBuildMenuBarRow003
@@ -996,6 +1017,39 @@ HWTEST_F(AppBarTestNg, TestAppBgColorCallBack029, TestSize.Level1)
     EXPECT_EQ(isExecute, true);
     EXPECT_EQ(name1, "arkui_app_bg_color");
 }
+/**
+ * @tc.name: TestAppBgColorCallBack030
+ * @tc.desc: Test AppBgColorCallBack
+ * @tc.type: FUNC
+ */
+HWTEST_F(AppBarTestNg, TestAppBgColorCallBack030, TestSize.Level1)
+{
+    auto stage = AceType::MakeRefPtr<FrameNode>("test", 1, AceType::MakeRefPtr<Pattern>());
+    EXPECT_NE(stage, nullptr);
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    EXPECT_NE(appBar, nullptr);
+    auto atom = appBar->Create(stage);
+    EXPECT_NE(atom, nullptr);
+    auto menuBar = appBar->BuildMenuBar();
+    atom->AddChild(menuBar);
+    auto pattern = atom->GetPattern<AtomicServicePattern>();
+
+    auto custom = CustomAppBarNode::CreateCustomAppBarNode(-1, "");
+    ViewStackProcessor::GetInstance()->SetCustomAppBarNode(custom);
+    pattern->SetCustomAppBarNode(custom);
+    auto pipeline = PipelineContext::GetCurrentContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->SetAppBgColor(Color::RED);
+
+    bool isExecute = false;
+    auto callback = [&isExecute](const std::string& name, const std::string& value) mutable {
+        isExecute = true;
+    };
+
+    custom->SetCustomCallback(std::move(callback));
+    pattern->AppBgColorCallBack();
+    EXPECT_EQ(isExecute, true);
+}
 
 /**
  * @tc.name: TestAppScreenCallBack030
@@ -1232,62 +1286,6 @@ HWTEST_F(AppBarTestNg, RectChangeListener003, TestSize.Level1)
 }
 
 /**
- * @tc.name: TestAppBgColorCallBack030
- * @tc.desc: Test AppBgColorCallBack
- * @tc.type: FUNC
- */
-HWTEST_F(AppBarTestNg, TestAppBgColorCallBack030, TestSize.Level1)
-{
-    auto stage = AceType::MakeRefPtr<FrameNode>("test", 1, AceType::MakeRefPtr<Pattern>());
-    EXPECT_NE(stage, nullptr);
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    EXPECT_NE(appBar, nullptr);
-    auto atom = appBar->Create(stage);
-    EXPECT_NE(atom, nullptr);
-    auto menuBar = appBar->BuildMenuBar();
-    atom->AddChild(menuBar);
-    auto pattern = atom->GetPattern<AtomicServicePattern>();
-
-    auto custom = CustomAppBarNode::CreateCustomAppBarNode(-1, "");
-    ViewStackProcessor::GetInstance()->SetCustomAppBarNode(custom);
-    pattern->SetCustomAppBarNode(custom);
-    auto pipeline = PipelineContext::GetCurrentContext();
-    CHECK_NULL_VOID(pipeline);
-    pipeline->SetAppBgColor(Color::RED);
-
-    bool isExecute = false;
-    auto callback = [&isExecute](const std::string& name, const std::string& value) mutable {
-        isExecute = true;
-    };
-
-    custom->SetCustomCallback(std::move(callback));
-    pattern->AppBgColorCallBack();
-    EXPECT_EQ(isExecute, true);
-}
-
-/**
- * @tc.name: TestGetAppBarRect003
- * @tc.desc: Test GetAppBarRect
- * @tc.type: FUNC
- */
-HWTEST_F(AppBarTestNg, TestGetAppBarRect003, TestSize.Level1)
-{
-    auto stage = AceType::MakeRefPtr<FrameNode>("test", 1, AceType::MakeRefPtr<Pattern>());
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto atom = appBar->Create(stage);
-
-    auto pipeline = PipelineContext::GetCurrentContext();
-    pipeline->safeAreaManager_ = AceType::MakeRefPtr<SafeAreaManager>();
-    pipeline->SetInstallationFree(0);
-    auto rect = appBar->GetAppBarRect();
-    EXPECT_EQ(rect, std::nullopt);
-
-    pipeline->SetInstallationFree(1);
-    rect = appBar->GetAppBarRect();
-    EXPECT_EQ(rect, std::nullopt);
-}
-
-/**
  * @tc.name: GetJSAppBarContainer001
  * @tc.desc: Test GetJSAppBarContainer
  * @tc.type: FUNC
@@ -1400,6 +1398,17 @@ HWTEST_F(AppBarTestNg, SetMenuBarVisible001, TestSize.Level1)
     appBar->SetMenuBarVisible(true);
     EXPECT_EQ(name1, "test");
 }
+/**
+ * @tc.name: SetMenuBarVisible002
+ * @tc.desc: Test SetMenuBarVisible with no atomicService set
+ * @tc.type: FUNC
+ */
+HWTEST_F(AppBarTestNg, SetMenuBarVisible002, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    appBar->SetMenuBarVisible(false);
+    EXPECT_NE(appBar, nullptr);
+}
 
 /**
  * @tc.name: ExtensionHostParamsCallBack001
@@ -1466,6 +1475,111 @@ HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow001, TestSize.Level1)
     ASSERT_TRUE(layoutProperty);
 
     EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
+    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
+    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::INVISIBLE);
+}
+/**
+ * @tc.name: UpdateVisibilityOfMenuBarRow002
+ * @tc.desc: Test UpdateVisibilityOfMenuBarRow with null menubarRow
+ * @tc.type: FUNC
+ */
+HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow002, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    appBar->UpdateVisibilityOfMenuBarRow(nullptr, container);
+    EXPECT_NE(appBar, nullptr);
+}
+/**
+ * @tc.name: UpdateVisibilityOfMenuBarRow003
+ * @tc.desc: Test UpdateVisibilityOfMenuBarRow with null container
+ * @tc.type: FUNC
+ */
+HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow003, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto menubarRow = appBar->BuildMenuBarRow();
+    ASSERT_NE(menubarRow, nullptr);
+    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, nullptr);
+    EXPECT_NE(appBar, nullptr);
+}
+/**
+ * @tc.name: UpdateVisibilityOfMenuBarRow004
+ * @tc.desc: Test UpdateVisibilityOfMenuBarRow when IsSubWindow returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow004, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto menubarRow = appBar->BuildMenuBarRow();
+    ASSERT_NE(menubarRow, nullptr);
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
+    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
+    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::VISIBLE);
+}
+/**
+  * @tc.name: UpdateVisibilityOfMenuBarRow005
+  * @tc.desc: Test UpdateVisibilityOfMenuBarRow in pip window, menubar row should be invisible
+  * @tc.type: FUNC
+  */
+HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow005, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto menubarRow = appBar->BuildMenuBarRow();
+    ASSERT_NE(menubarRow, nullptr);
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*container, IsPipWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
+    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
+    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::INVISIBLE);
+}
+/**
+  * @tc.name: UpdateVisibilityOfMenuBarRow006
+  * @tc.desc: Test UpdateVisibilityOfMenuBarRow when both IsSubWindow and IsPipWindow return false
+  * @tc.type: FUNC
+  */
+HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow006, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto menubarRow = appBar->BuildMenuBarRow();
+    ASSERT_NE(menubarRow, nullptr);
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*container, IsPipWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
+    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
+    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::VISIBLE);
+}
+/**
+  * @tc.name: UpdateVisibilityOfMenuBarRow007
+  * @tc.desc: Test UpdateVisibilityOfMenuBarRow when both IsSubWindow and IsPipWindow return true
+  * @tc.type: FUNC
+  */
+HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow007, TestSize.Level1)
+{
+    auto appBar = AceType::MakeRefPtr<AppBarView>();
+    auto menubarRow = appBar->BuildMenuBarRow();
+    ASSERT_NE(menubarRow, nullptr);
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*container, IsPipWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
+    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
     layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
     appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
     EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::INVISIBLE);
@@ -1945,117 +2059,6 @@ HWTEST_F(AppBarTestNg, AddInnerOnSizeChangeCallback001, TestSize.Level1)
 }
 
 /**
- * @tc.name: UpdateVisibilityOfMenuBarRow002
- * @tc.desc: Test UpdateVisibilityOfMenuBarRow with null menubarRow
- * @tc.type: FUNC
- */
-HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow002, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto container = MockContainer::Current();
-    ASSERT_NE(container, nullptr);
-    appBar->UpdateVisibilityOfMenuBarRow(nullptr, container);
-    EXPECT_NE(appBar, nullptr);
-}
-
-/**
- * @tc.name: UpdateVisibilityOfMenuBarRow003
- * @tc.desc: Test UpdateVisibilityOfMenuBarRow with null container
- * @tc.type: FUNC
- */
-HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow003, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto menubarRow = appBar->BuildMenuBarRow();
-    ASSERT_NE(menubarRow, nullptr);
-    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, nullptr);
-    EXPECT_NE(appBar, nullptr);
-}
-
-/**
- * @tc.name: UpdateVisibilityOfMenuBarRow004
- * @tc.desc: Test UpdateVisibilityOfMenuBarRow when IsSubWindow returns false
- * @tc.type: FUNC
- */
-HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow004, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto menubarRow = appBar->BuildMenuBarRow();
-    ASSERT_NE(menubarRow, nullptr);
-    auto container = MockContainer::Current();
-    ASSERT_NE(container, nullptr);
-    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
-    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
-    ASSERT_NE(layoutProperty, nullptr);
-    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
-    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
-    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::VISIBLE);
-}
-
-/**
-  * @tc.name: UpdateVisibilityOfMenuBarRow005
-  * @tc.desc: Test UpdateVisibilityOfMenuBarRow in pip window, menubar row should be invisible
-  * @tc.type: FUNC
-  */
-HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow005, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto menubarRow = appBar->BuildMenuBarRow();
-    ASSERT_NE(menubarRow, nullptr);
-    auto container = MockContainer::Current();
-    ASSERT_NE(container, nullptr);
-    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
-    EXPECT_CALL(*container, IsPipWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
-    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
-    ASSERT_NE(layoutProperty, nullptr);
-    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
-    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
-    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::INVISIBLE);
-}
-
-/**
-  * @tc.name: UpdateVisibilityOfMenuBarRow006
-  * @tc.desc: Test UpdateVisibilityOfMenuBarRow when both IsSubWindow and IsPipWindow return false
-  * @tc.type: FUNC
-  */
-HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow006, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto menubarRow = appBar->BuildMenuBarRow();
-    ASSERT_NE(menubarRow, nullptr);
-    auto container = MockContainer::Current();
-    ASSERT_NE(container, nullptr);
-    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
-    EXPECT_CALL(*container, IsPipWindow()).Times(AnyNumber()).WillRepeatedly(Return(false));
-    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
-    ASSERT_NE(layoutProperty, nullptr);
-    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
-    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
-    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::VISIBLE);
-}
-
-/**
-  * @tc.name: UpdateVisibilityOfMenuBarRow007
-  * @tc.desc: Test UpdateVisibilityOfMenuBarRow when both IsSubWindow and IsPipWindow return true
-  * @tc.type: FUNC
-  */
-HWTEST_F(AppBarTestNg, UpdateVisibilityOfMenuBarRow007, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    auto menubarRow = appBar->BuildMenuBarRow();
-    ASSERT_NE(menubarRow, nullptr);
-    auto container = MockContainer::Current();
-    ASSERT_NE(container, nullptr);
-    EXPECT_CALL(*container, IsSubWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*container, IsPipWindow()).Times(AnyNumber()).WillRepeatedly(Return(true));
-    auto layoutProperty = menubarRow->GetLayoutProperty<LinearLayoutProperty>();
-    ASSERT_NE(layoutProperty, nullptr);
-    layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
-    appBar->UpdateVisibilityOfMenuBarRow(menubarRow, container);
-    EXPECT_EQ(layoutProperty->GetVisibilityValue(), VisibleType::INVISIBLE);
-}
-
-/**
  * @tc.name: BuildDivider001
  * @tc.desc: Test BuildDivider returns valid node with correct properties
  * @tc.type: FUNC
@@ -2082,18 +2085,6 @@ HWTEST_F(AppBarTestNg, FireExtensionHostParams002, TestSize.Level1)
 {
     auto appBar = AceType::MakeRefPtr<AppBarView>();
     appBar->FireExtensionHostParams();
-    EXPECT_NE(appBar, nullptr);
-}
-
-/**
- * @tc.name: SetMenuBarVisible002
- * @tc.desc: Test SetMenuBarVisible with no atomicService set
- * @tc.type: FUNC
- */
-HWTEST_F(AppBarTestNg, SetMenuBarVisible002, TestSize.Level1)
-{
-    auto appBar = AceType::MakeRefPtr<AppBarView>();
-    appBar->SetMenuBarVisible(false);
     EXPECT_NE(appBar, nullptr);
 }
 

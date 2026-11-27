@@ -70,6 +70,37 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg501, TestSize.Level1)
     context_->ResSchedReportAxisEvent(event);
     EXPECT_NE(ResSchedReport::GetInstance().lastAxisEvent_.offset.GetX(), event.horizontalAxis);
 }
+/**
+ * @tc.name: PipelineContextTestNg502
+ * @tc.desc: Test Dump All UINode Info.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg502, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.
+     * @tc.expected: All pointer is non-null.
+     */
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+
+    std::unique_ptr<std::ostream> ostream = std::make_unique<std::ostringstream>();
+    ASSERT_NE(ostream, nullptr);
+    DumpLog::GetInstance().SetDumpFile(std::move(ostream));
+
+    /**
+     * @tc.steps2: init a vector with some string params and
+                call OnDumpInfo with every param array.
+     * @tc.expected: The return value is same as the expectation.
+     */
+    std::vector<std::vector<std::string>> params = {
+        { "-element", "-all" },
+        { "-default", "-all" }};
+    int turn = 0;
+    for (; turn < params.size(); turn++) {
+        EXPECT_TRUE(context_->OnDumpInfo(params[turn]));
+    }
+}
 
 /**
  * @tc.name: SetNeedRenderNodeByUniqueId001
@@ -119,38 +150,6 @@ HWTEST_F(PipelineContextTestNg, needRenderForLayoutChildrenNodes001, TestSize.Le
     EXPECT_EQ(context_->needRenderForLayoutChildrenNodes_.count(WeakPtr<FrameNode>(frameNode)), 1);
     context_->InspectLayoutChildren();
     EXPECT_EQ(context_->needRenderForLayoutChildrenNodes_.count(WeakPtr<FrameNode>(frameNode)), 0);
-}
-
-/**
- * @tc.name: PipelineContextTestNg502
- * @tc.desc: Test Dump All UINode Info.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNg502, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: initialize parameters.
-     * @tc.expected: All pointer is non-null.
-     */
-    ASSERT_NE(context_, nullptr);
-    context_->SetupRootElement();
-
-    std::unique_ptr<std::ostream> ostream = std::make_unique<std::ostringstream>();
-    ASSERT_NE(ostream, nullptr);
-    DumpLog::GetInstance().SetDumpFile(std::move(ostream));
-    
-    /**
-     * @tc.steps2: init a vector with some string params and
-                call OnDumpInfo with every param array.
-     * @tc.expected: The return value is same as the expectation.
-     */
-    std::vector<std::vector<std::string>> params = {
-        { "-element", "-all" },
-        { "-default", "-all" }};
-    int turn = 0;
-    for (; turn < params.size(); turn++) {
-        EXPECT_TRUE(context_->OnDumpInfo(params[turn]));
-    }
 }
 } // namespace NG
 } // namespace OHOS::Ace

@@ -2165,6 +2165,53 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg094, TestSize.Level1)
     context_->ChangeDarkModeBrightness();
     EXPECT_NE(context_->stageManager_, nullptr);
 }
+/**
+ * @tc.name: PipelineContextTestNg095
+ * @tc.desc: Test the function ChangeDarkModeBrightness.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg095, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.
+     * @tc.expected: All pointer is non-null.
+     */
+    ASSERT_NE(context_, nullptr);
+    context_->windowManager_ = AceType::MakeRefPtr<WindowManager>();
+
+    MockContainer::SetMockColorMode(ColorMode::DARK);
+    context_->SetAppBgColor(Color::BLACK);
+    context_->ChangeDarkModeBrightness();
+    context_->SetIsJsCard(true);
+    context_->ChangeDarkModeBrightness();
+    MockContainer::Current()->SetIsFormRender(true);
+    context_->ChangeDarkModeBrightness();
+    MockContainer::Current()->SetIsDynamicRender(true);
+    context_->ChangeDarkModeBrightness();
+    MockContainer::Current()->SetIsUIExtensionWindow(true);
+    context_->ChangeDarkModeBrightness();
+    auto rsUIDirector = context_->GetRSUIDirector();
+    context_->appBgColor_ = Color::TRANSPARENT;
+    context_->RSTransactionBeginAndCommit(rsUIDirector);
+    context_->ChangeDarkModeBrightness();
+    MockContainer::SetMockColorMode(ColorMode::COLOR_MODE_UNDEFINED);
+    context_->ChangeDarkModeBrightness();
+    EXPECT_NE(context_->stageManager_, nullptr);
+}
+/**
+ * @tc.name: PipelineContextTestNg096
+ * @tc.desc: Test get Focused windowId
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNg096, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: GetFocusWindowId
+     * @tc.expected: windowId equals 0
+     */
+    auto focusedWindowId = context_->GetFocusWindowId();
+    EXPECT_EQ(focusedWindowId, 0);
+}
 
 /**
  * @tc.name: PipelineContextTestNg101
@@ -2250,108 +2297,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg103, TestSize.Level1)
     context_->minPlatformVersion_ = static_cast<int32_t>(PlatformVersion::VERSION_THIRTEEN);
     bool isFormRender = context_->IsFormRenderExceptDynamicComponent();
     ASSERT_EQ(isFormRender, true);
-}
-
-/**
- * @tc.name: IsDirtyLayoutNodesEmpty
- * @tc.desc: Test IsDirtyLayoutNodesEmpty.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, IsDirtyLayoutNodesEmpty, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: Create taskScheduler.
-     */
-    UITaskScheduler taskScheduler;
-
-    /**
-     * @tc.steps2: Create some frameNode and configure the required parameters.
-     */
-    auto frameNode = FrameNode::GetOrCreateFrameNode(TEST_TAG, 1, nullptr);
-    frameNode->layoutProperty_ = nullptr;
-    auto frameNode2 = FrameNode::GetOrCreateFrameNode(TEST_TAG, 2, nullptr);
-
-    /**
-     * @tc.steps3: Call AddDirtyLayoutNode with different parameters.
-     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
-     */
-    taskScheduler.AddDirtyLayoutNode(frameNode);
-    taskScheduler.AddDirtyLayoutNode(frameNode2);
-    EXPECT_FALSE(taskScheduler.IsDirtyLayoutNodesEmpty());
-    context_->dirtyNodes_.clear();
-}
-
-/**
- * @tc.name: IsDirtyNodesEmpty
- * @tc.desc: Test IsDirtyNodesEmpty.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, IsDirtyNodesEmpty, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: initialize parameters.Create taskScheduler.
-     * @tc.expected: All pointer is non-null.
-     */
-    ASSERT_NE(context_, nullptr);
-    UITaskScheduler taskScheduler;
-
-    /**
-     * @tc.steps2: Call the function IsDirtyNodesEmpty.
-     * @tc.expected: The dirtyNodes is not empty.
-     */
-    auto customNode_1 = CustomNode::CreateCustomNode(customNodeId_ + 20, TEST_TAG);
-    context_->AddDirtyCustomNode(customNode_1);
-    EXPECT_FALSE(context_->IsDirtyNodesEmpty());
-    taskScheduler.dirtyLayoutNodes_.clear();
-}
-
-/**
- * @tc.name: FlushAnimationDirtysWhenExist
- * @tc.desc: Branch: !isDirtyLayoutNodesEmpty && !IsLayouting() && !isReloading_
- *           Condition: isDirtyLayoutNodesEmpty = false, IsLayouting() = false, isReloading_ = false
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, FlushAnimationDirtysWhenExist, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: initialize parameters.Create taskScheduler.
-     * @tc.expected: All pointer is non-null.
-     */
-    ASSERT_NE(context_, nullptr);
-    UITaskScheduler taskScheduler;
-
-    /**
-     * @tc.steps2: Create some frameNode and configure the required parameters.
-     */
-    auto propertyNode01 = FrameNode::GetOrCreateFrameNode(TEST_TAG, 1, nullptr);
-    auto propertyNode02 = FrameNode::GetOrCreateFrameNode(TEST_TAG, 2, nullptr);
-
-    /**
-     * @tc.steps3: Call AddDirtyPropertyNode with different parameters.
-     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
-     */
-    taskScheduler.AddDirtyLayoutNode(propertyNode01);
-    taskScheduler.AddDirtyLayoutNode(propertyNode02);
-    EXPECT_FALSE(context_->IsDirtyLayoutNodesEmpty());
-
-    /**
-     * @tc.steps4: Test FlushAnimationDirtysWhenExist when start animation.
-     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
-     */
-    AnimationOption option = AnimationOption();
-    option.SetDuration(10);
-    context_->FlushAnimationDirtysWhenExist(option);
-    EXPECT_FALSE(context_->IsDirtyLayoutNodesEmpty());
-
-    /**
-     * @tc.steps5: Test FlushAnimationDirtysWhenExist when start infinite animation.
-     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
-     */
-    context_->isReloading_ = false;
-    taskScheduler.isLayouting_ = false;
-    option.SetIteration(-1);
-    context_->FlushAnimationDirtysWhenExist(option);
-    EXPECT_TRUE(context_->IsDirtyLayoutNodesEmpty());
 }
 
 /**
@@ -2549,37 +2494,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg121, TestSize.Level1)
 }
 
 /**
- * @tc.name: PipelineContextTestNgForBundleName
- * @tc.desc: Test GetBundleName.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNgForBundleName, TestSize.Level1)
-{
-    auto bundleName = context_->GetBundleName();
-    EXPECT_EQ(bundleName, "");
-    bundleName = MockContainer::CurrentBundleName();
-    EXPECT_EQ(bundleName, "");
-    MockContainer::Current()->SetBundleName("test");
-    bundleName = MockContainer::CurrentBundleName();
-    EXPECT_EQ(bundleName, "test");
-}
-
-/**
- * @tc.name: PipelineContextTestNgForWindowRect
- * @tc.desc: Test GetCurrentWindowRect.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNgForWindowRect, TestSize.Level1)
-{
-    static const uint32_t length = 666;
-    context_->width_ = length;
-    context_->height_ = length;
-    auto rect = context_->GetCurrentWindowRect();
-    EXPECT_EQ(rect.Width(), length);
-    EXPECT_EQ(rect.Height(), length);
-}
-
-/**
  * @tc.name: PipelineContextTestNg122
  * @tc.desc: Test FlushMouseEventForHover.
  * @tc.type: FUNC
@@ -2596,23 +2510,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg122, TestSize.Level1)
     context_->SetIsTransFlag(true);
     context_->FlushMouseEventForHover();
     EXPECT_FALSE(context_->lastMouseEvent_->pointerEvent);
-}
-
-/**
- * @tc.name: PipelineContextTestNg123
- * @tc.desc: Test SetIsTransFlag.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, SetIsTransFlagTest, TestSize.Level1)
-{
-    context_->SetIsTransFlag(true);
-    context_->SetIsTransFlag(false);
-    context_->SetIsTransFlag(true);
-    EXPECT_TRUE(context_->isTransFlag_);
-    context_->SetIsTransFlag(false);
-    context_->SetIsTransFlag(true);
-    context_->SetIsTransFlag(false);
-    EXPECT_FALSE(context_->isTransFlag_);
 }
 
 /**
@@ -2646,7 +2543,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg124, TestSize.Level1)
     context_->FlushTSUpdates();
     EXPECT_TRUE(callbackCalled);
 }
-
 
 /**
  * @tc.name: PipelineContextTestNg125
@@ -2796,6 +2692,150 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg129, TestSize.Level1)
     EXPECT_EQ(context_->dvsyncTimeUpdate_, false);
     context_->UpdateDVSyncTime(nanoTimestamp, abilityName, vsyncPeriod);
     EXPECT_EQ(context_->dvsyncTimeUpdate_, false);
+}
+/**
+ * @tc.name: IsDirtyLayoutNodesEmpty
+ * @tc.desc: Test IsDirtyLayoutNodesEmpty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, IsDirtyLayoutNodesEmpty, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: Create taskScheduler.
+     */
+    UITaskScheduler taskScheduler;
+
+    /**
+     * @tc.steps2: Create some frameNode and configure the required parameters.
+     */
+    auto frameNode = FrameNode::GetOrCreateFrameNode(TEST_TAG, 1, nullptr);
+    frameNode->layoutProperty_ = nullptr;
+    auto frameNode2 = FrameNode::GetOrCreateFrameNode(TEST_TAG, 2, nullptr);
+
+    /**
+     * @tc.steps3: Call AddDirtyLayoutNode with different parameters.
+     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
+     */
+    taskScheduler.AddDirtyLayoutNode(frameNode);
+    taskScheduler.AddDirtyLayoutNode(frameNode2);
+    EXPECT_FALSE(taskScheduler.IsDirtyLayoutNodesEmpty());
+    context_->dirtyNodes_.clear();
+}
+/**
+ * @tc.name: IsDirtyNodesEmpty
+ * @tc.desc: Test IsDirtyNodesEmpty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, IsDirtyNodesEmpty, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.Create taskScheduler.
+     * @tc.expected: All pointer is non-null.
+     */
+    ASSERT_NE(context_, nullptr);
+    UITaskScheduler taskScheduler;
+
+    /**
+     * @tc.steps2: Call the function IsDirtyNodesEmpty.
+     * @tc.expected: The dirtyNodes is not empty.
+     */
+    auto customNode_1 = CustomNode::CreateCustomNode(customNodeId_ + 20, TEST_TAG);
+    context_->AddDirtyCustomNode(customNode_1);
+    EXPECT_FALSE(context_->IsDirtyNodesEmpty());
+    taskScheduler.dirtyLayoutNodes_.clear();
+}
+/**
+ * @tc.name: FlushAnimationDirtysWhenExist
+ * @tc.desc: Branch: !isDirtyLayoutNodesEmpty && !IsLayouting() && !isReloading_
+ *           Condition: isDirtyLayoutNodesEmpty = false, IsLayouting() = false, isReloading_ = false
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FlushAnimationDirtysWhenExist, TestSize.Level1)
+{
+    /**
+     * @tc.steps1: initialize parameters.Create taskScheduler.
+     * @tc.expected: All pointer is non-null.
+     */
+    ASSERT_NE(context_, nullptr);
+    UITaskScheduler taskScheduler;
+
+    /**
+     * @tc.steps2: Create some frameNode and configure the required parameters.
+     */
+    auto propertyNode01 = FrameNode::GetOrCreateFrameNode(TEST_TAG, 1, nullptr);
+    auto propertyNode02 = FrameNode::GetOrCreateFrameNode(TEST_TAG, 2, nullptr);
+
+    /**
+     * @tc.steps3: Call AddDirtyPropertyNode with different parameters.
+     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
+     */
+    taskScheduler.AddDirtyLayoutNode(propertyNode01);
+    taskScheduler.AddDirtyLayoutNode(propertyNode02);
+    EXPECT_FALSE(context_->IsDirtyLayoutNodesEmpty());
+
+    /**
+     * @tc.steps4: Test FlushAnimationDirtysWhenExist when start animation.
+     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
+     */
+    AnimationOption option = AnimationOption();
+    option.SetDuration(10);
+    context_->FlushAnimationDirtysWhenExist(option);
+    EXPECT_FALSE(context_->IsDirtyLayoutNodesEmpty());
+
+    /**
+     * @tc.steps5: Test FlushAnimationDirtysWhenExist when start infinite animation.
+     * @tc.expected: IsDirtyLayoutNodesEmpty return false.
+     */
+    context_->isReloading_ = false;
+    taskScheduler.isLayouting_ = false;
+    option.SetIteration(-1);
+    context_->FlushAnimationDirtysWhenExist(option);
+    EXPECT_TRUE(context_->IsDirtyLayoutNodesEmpty());
+}
+/**
+ * @tc.name: PipelineContextTestNgForBundleName
+ * @tc.desc: Test GetBundleName.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNgForBundleName, TestSize.Level1)
+{
+    auto bundleName = context_->GetBundleName();
+    EXPECT_EQ(bundleName, "");
+    bundleName = MockContainer::CurrentBundleName();
+    EXPECT_EQ(bundleName, "");
+    MockContainer::Current()->SetBundleName("test");
+    bundleName = MockContainer::CurrentBundleName();
+    EXPECT_EQ(bundleName, "test");
+}
+/**
+ * @tc.name: PipelineContextTestNgForWindowRect
+ * @tc.desc: Test GetCurrentWindowRect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextTestNgForWindowRect, TestSize.Level1)
+{
+    static const uint32_t length = 666;
+    context_->width_ = length;
+    context_->height_ = length;
+    auto rect = context_->GetCurrentWindowRect();
+    EXPECT_EQ(rect.Width(), length);
+    EXPECT_EQ(rect.Height(), length);
+}
+/**
+ * @tc.name: PipelineContextTestNg123
+ * @tc.desc: Test SetIsTransFlag.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, SetIsTransFlagTest, TestSize.Level1)
+{
+    context_->SetIsTransFlag(true);
+    context_->SetIsTransFlag(false);
+    context_->SetIsTransFlag(true);
+    EXPECT_TRUE(context_->isTransFlag_);
+    context_->SetIsTransFlag(false);
+    context_->SetIsTransFlag(true);
+    context_->SetIsTransFlag(false);
+    EXPECT_FALSE(context_->isTransFlag_);
 }
 
 /**
@@ -3056,56 +3096,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg_TouchEvent_NoNeedTpFlush_T
 
     testing::Mock::VerifyAndClearExpectations(mockWindow);
 }
-
-/**
- * @tc.name: PipelineContextTestNg095
- * @tc.desc: Test the function ChangeDarkModeBrightness.
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNg095, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: initialize parameters.
-     * @tc.expected: All pointer is non-null.
-     */
-    ASSERT_NE(context_, nullptr);
-    context_->windowManager_ = AceType::MakeRefPtr<WindowManager>();
-
-    MockContainer::SetMockColorMode(ColorMode::DARK);
-    context_->SetAppBgColor(Color::BLACK);
-    context_->ChangeDarkModeBrightness();
-    context_->SetIsJsCard(true);
-    context_->ChangeDarkModeBrightness();
-    MockContainer::Current()->SetIsFormRender(true);
-    context_->ChangeDarkModeBrightness();
-    MockContainer::Current()->SetIsDynamicRender(true);
-    context_->ChangeDarkModeBrightness();
-    MockContainer::Current()->SetIsUIExtensionWindow(true);
-    context_->ChangeDarkModeBrightness();
-    auto rsUIDirector = context_->GetRSUIDirector();
-    context_->appBgColor_ = Color::TRANSPARENT;
-    context_->RSTransactionBeginAndCommit(rsUIDirector);
-    context_->ChangeDarkModeBrightness();
-    MockContainer::SetMockColorMode(ColorMode::COLOR_MODE_UNDEFINED);
-    context_->ChangeDarkModeBrightness();
-    EXPECT_NE(context_->stageManager_, nullptr);
-}
-
-
-/**
- * @tc.name: PipelineContextTestNg096
- * @tc.desc: Test get Focused windowId
- * @tc.type: FUNC
- */
-HWTEST_F(PipelineContextTestNg, PipelineContextTestNg096, TestSize.Level1)
-{
-    /**
-     * @tc.steps1: GetFocusWindowId
-     * @tc.expected: windowId equals 0
-     */
-    auto focusedWindowId = context_->GetFocusWindowId();
-    EXPECT_EQ(focusedWindowId, 0);
-}
 /**
  * @tc.name: PipelineContextTestNg_FirstFrameSetupRootElement_Test
  * @tc.desc: Test FlushVsync without creating rootNode_
@@ -3125,7 +3115,6 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg_FirstFrameSetupRootElement
      */
     context_->contentChangeMgr_ = AceType::MakeRefPtr<ContentChangeManager>();
     ASSERT_NE(context_->contentChangeMgr_, nullptr);
-
 
     /**
      * @tc.steps: Text flushvsync without creating rootNode_.

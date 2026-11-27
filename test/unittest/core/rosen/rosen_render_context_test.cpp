@@ -159,100 +159,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest005, TestSize.Level1)
 }
 
 /**
- * @tc.name: SyncGeometryFrameWithFrameOffset001
- * @tc.desc: SyncGeometryFrame() with render frame offset.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, SyncGeometryFrameWithFrameOffset001, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    RectF paintRect = { 10.0f, 20.0f, 30.0f, 40.0f };
-    OffsetF frameOffset = { 3.0f, 4.0f };
-
-    rosenRenderContext->SetRenderFrameOffset(frameOffset);
-    rosenRenderContext->SyncGeometryFrame(paintRect);
-
-    const auto& stagingProperties = rosenRenderContext->GetRSNode()->GetStagingProperties();
-    auto bounds = stagingProperties.GetBounds();
-    auto frame = stagingProperties.GetFrame();
-    EXPECT_EQ(bounds[0], paintRect.GetX());
-    EXPECT_EQ(bounds[1], paintRect.GetY());
-    EXPECT_EQ(bounds[2], paintRect.Width());
-    EXPECT_EQ(bounds[3], paintRect.Height());
-    EXPECT_EQ(frame[0], paintRect.GetX() + frameOffset.GetX());
-    EXPECT_EQ(frame[1], paintRect.GetY() + frameOffset.GetY());
-    EXPECT_EQ(frame[2], paintRect.Width());
-    EXPECT_EQ(frame[3], paintRect.Height());
-}
-
-/**
- * @tc.name: SyncGeometryFrameWithFrameOffsetPriority001
- * @tc.desc: SyncGeometryFrame() uses render frame offset before content rect.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, SyncGeometryFrameWithFrameOffsetPriority001, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    auto geometryNode = frameNode->GetGeometryNode();
-    ASSERT_NE(geometryNode, nullptr);
-    RectF paintRect = { 10.0f, 20.0f, 30.0f, 40.0f };
-    OffsetF frameOffset = { 3.0f, 4.0f };
-
-    geometryNode->SetContentOffset(OffsetF(50.0f, 60.0f));
-    geometryNode->SetContentSize(SizeF(70.0f, 80.0f));
-    rosenRenderContext->SetUsingContentRectForRenderFrame(true, true);
-    rosenRenderContext->SetRenderFrameOffset(frameOffset);
-    rosenRenderContext->SyncGeometryFrame(paintRect);
-
-    const auto& stagingProperties = rosenRenderContext->GetRSNode()->GetStagingProperties();
-    auto bounds = stagingProperties.GetBounds();
-    auto frame = stagingProperties.GetFrame();
-    EXPECT_EQ(bounds[0], paintRect.GetX());
-    EXPECT_EQ(bounds[1], paintRect.GetY());
-    EXPECT_EQ(bounds[2], paintRect.Width());
-    EXPECT_EQ(bounds[3], paintRect.Height());
-    EXPECT_EQ(frame[0], paintRect.GetX() + frameOffset.GetX());
-    EXPECT_EQ(frame[1], paintRect.GetY() + frameOffset.GetY());
-    EXPECT_EQ(frame[2], paintRect.Width());
-    EXPECT_EQ(frame[3], paintRect.Height());
-}
-
-/**
- * @tc.name: SyncGeometryFrameWithContentRect001
- * @tc.desc: SyncGeometryFrame() uses content rect as render frame.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, SyncGeometryFrameWithContentRect001, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    auto geometryNode = frameNode->GetGeometryNode();
-    ASSERT_NE(geometryNode, nullptr);
-    RectF paintRect = { 10.0f, 20.0f, 100.0f, 120.0f };
-    OffsetF contentOffset = { 5.0f, 6.0f };
-    SizeF contentSize = { 70.0f, 80.0f };
-
-    geometryNode->SetContentOffset(contentOffset);
-    geometryNode->SetContentSize(contentSize);
-    rosenRenderContext->SetUsingContentRectForRenderFrame(true, true);
-    rosenRenderContext->SyncGeometryFrame(paintRect);
-
-    const auto& stagingProperties = rosenRenderContext->GetRSNode()->GetStagingProperties();
-    auto bounds = stagingProperties.GetBounds();
-    auto frame = stagingProperties.GetFrame();
-    EXPECT_EQ(bounds[0], paintRect.GetX());
-    EXPECT_EQ(bounds[1], paintRect.GetY());
-    EXPECT_EQ(bounds[2], paintRect.Width());
-    EXPECT_EQ(bounds[3], paintRect.Height());
-    EXPECT_EQ(frame[0], paintRect.GetX() + contentOffset.GetX());
-    EXPECT_EQ(frame[1], paintRect.GetY() + contentOffset.GetY());
-    EXPECT_EQ(frame[2], contentSize.Width());
-    EXPECT_EQ(frame[3], contentSize.Height());
-}
-
-/**
  * @tc.name: RosenRenderContextTest006
  * @tc.desc: SetChildBounds().
  * @tc.type: FUNC
@@ -341,43 +247,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest013, TestSize.Level1)
 }
 
 /**
- * @tc.name: GetOrCreateRSUIContext001
- * @tc.desc: Test GetOrCreateRSUIContext creates RSUIDirector when RSUIContext is null.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, GetOrCreateRSUIContext001, TestSize.Level1)
-{
-    auto pipeline = MockPipelineContext::GetCurrentContext();
-    auto rosenRenderContext = AceType::MakeRefPtr<RosenRenderContext>();
-    auto rsUIContext = rosenRenderContext->GetRSUIContext(AceType::RawPtr(pipeline));
-    EXPECT_EQ(rsUIContext, nullptr);
-    EXPECT_EQ(rosenRenderContext->rsUIDirector_, nullptr);
-
-    rsUIContext = rosenRenderContext->GetOrCreateRSUIContext(AceType::RawPtr(pipeline));
-    ASSERT_NE(rosenRenderContext->rsUIDirector_, nullptr);
-    EXPECT_NE(rsUIContext, nullptr);
-    EXPECT_EQ(rsUIContext, rosenRenderContext->rsUIDirector_->GetRSUIContext());
-}
-
-/**
- * @tc.name: GetOrCreateRSUIContext002
- * @tc.desc: Test GetOrCreateRSUIContext does not replace existing RSUIDirector.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, GetOrCreateRSUIContext002, TestSize.Level1)
-{
-    auto pipeline = MockPipelineContext::GetCurrentContext();
-    auto rosenRenderContext = AceType::MakeRefPtr<RosenRenderContext>();
-    auto rsUIDirector = OHOS::Rosen::RSUIDirector::Create(nullptr);
-    ASSERT_NE(rsUIDirector, nullptr);
-    rosenRenderContext->rsUIDirector_ = rsUIDirector;
-
-    auto rsUIContext = rosenRenderContext->GetOrCreateRSUIContext(AceType::RawPtr(pipeline));
-    EXPECT_EQ(rosenRenderContext->rsUIDirector_, rsUIDirector);
-    EXPECT_EQ(rsUIContext, rsUIDirector->GetRSUIContext());
-}
-
-/**
  * @tc.name: RosenRenderContextTest015
  * @tc.desc: SyncGeometryProperties().
  * @tc.type: FUNC
@@ -420,108 +289,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest017, TestSize.Level1)
     rosenRenderContext->OnBackgroundImageUpdate(src);
     EXPECT_TRUE(rosenRenderContext->bgImage_ == nullptr);
     EXPECT_TRUE(rosenRenderContext->bgLoadingCtx_ != nullptr);
-}
-
-/**
- * @tc.name: ReloadBackgroundImage001
- * @tc.desc: ReloadBackgroundImage() is a no-op when no background image is set.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, ReloadBackgroundImage001, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    EXPECT_FALSE(rosenRenderContext->GetBackgroundImage().has_value());
-    EXPECT_EQ(rosenRenderContext->bgLoadingCtx_, nullptr);
-    // No background image: ReloadBackgroundImage should skip OnBackgroundImageUpdate and not crash.
-    rosenRenderContext->ReloadBackgroundImage();
-    EXPECT_FALSE(rosenRenderContext->GetBackgroundImage().has_value());
-    EXPECT_EQ(rosenRenderContext->bgLoadingCtx_, nullptr);
-}
-
-/**
- * @tc.name: ReloadBackgroundImage002
- * @tc.desc: ReloadBackgroundImage() reloads the existing background image via OnBackgroundImageUpdate.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, ReloadBackgroundImage002, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    ImageSourceInfo src;
-    src.SetSrc("test");
-    rosenRenderContext->UpdateBackgroundImage(src);
-    EXPECT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
-    ASSERT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
-    // Reset the loading context to verify ReloadBackgroundImage re-triggers loading.
-    rosenRenderContext->bgLoadingCtx_ = nullptr;
-    rosenRenderContext->ReloadBackgroundImage();
-    EXPECT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
-}
-
-/**
- * @tc.name: OnSkinConfigurationUpdate001
- * @tc.desc: Pattern::OnSkinConfigurationUpdate() dispatches ReloadBackgroundImage on the host render context.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, OnSkinConfigurationUpdate001, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    frameNode->renderContext_ = rosenRenderContext;
-    ImageSourceInfo src;
-    src.SetSrc("test");
-    rosenRenderContext->UpdateBackgroundImage(src);
-    ASSERT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
-    rosenRenderContext->bgLoadingCtx_ = nullptr;
-    auto pattern = frameNode->GetPattern();
-    ASSERT_NE(pattern, nullptr);
-    pattern->OnSkinConfigurationUpdate();
-    EXPECT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
-}
-
-/**
- * @tc.name: OnSkinConfigurationUpdate002
- * @tc.desc: FrameNode::OnConfigurationUpdate with skinUpdate dispatches to Pattern::OnSkinConfigurationUpdate.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, OnSkinConfigurationUpdate002, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    frameNode->renderContext_ = rosenRenderContext;
-    ImageSourceInfo src;
-    src.SetSrc("test");
-    rosenRenderContext->UpdateBackgroundImage(src);
-    ASSERT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
-    rosenRenderContext->bgLoadingCtx_ = nullptr;
-    ConfigurationChange configurationChange;
-    configurationChange.skinUpdate = true;
-    frameNode->OnConfigurationUpdate(configurationChange);
-    EXPECT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
-}
-
-/**
- * @tc.name: OnSkinConfigurationUpdate003
- * @tc.desc: FrameNode::OnConfigurationUpdate with skinUpdate=false does not dispatch OnSkinConfigurationUpdate.
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, OnSkinConfigurationUpdate003, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    frameNode->renderContext_ = rosenRenderContext;
-    ImageSourceInfo src;
-    src.SetSrc("test");
-    rosenRenderContext->UpdateBackgroundImage(src);
-    ASSERT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
-    // Reset so any accidental reload would be observable.
-    rosenRenderContext->bgLoadingCtx_ = nullptr;
-    // skinUpdate is false: the skin reload path must not run, so the loading context stays null.
-    ConfigurationChange configurationChange;
-    configurationChange.skinUpdate = false;
-    frameNode->OnConfigurationUpdate(configurationChange);
-    EXPECT_EQ(rosenRenderContext->bgLoadingCtx_, nullptr);
 }
 
 /**
@@ -1481,6 +1248,229 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest048, TestSize.Level1)
     rosenRenderContext->ResetBlendBgColor();
     backgroundColorVal = rosenRenderContext->rsNode_->GetStagingProperties().GetBackgroundColor();
     EXPECT_EQ(backgroundColorVal.GetColorSpace(), originBackgroundColorVal.GetColorSpace());
+}
+/**
+ * @tc.name: SyncGeometryFrameWithFrameOffset001
+ * @tc.desc: SyncGeometryFrame() with render frame offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, SyncGeometryFrameWithFrameOffset001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    RectF paintRect = { 10.0f, 20.0f, 30.0f, 40.0f };
+    OffsetF frameOffset = { 3.0f, 4.0f };
+
+    rosenRenderContext->SetRenderFrameOffset(frameOffset);
+    rosenRenderContext->SyncGeometryFrame(paintRect);
+
+    const auto& stagingProperties = rosenRenderContext->GetRSNode()->GetStagingProperties();
+    auto bounds = stagingProperties.GetBounds();
+    auto frame = stagingProperties.GetFrame();
+    EXPECT_EQ(bounds[0], paintRect.GetX());
+    EXPECT_EQ(bounds[1], paintRect.GetY());
+    EXPECT_EQ(bounds[2], paintRect.Width());
+    EXPECT_EQ(bounds[3], paintRect.Height());
+    EXPECT_EQ(frame[0], paintRect.GetX() + frameOffset.GetX());
+    EXPECT_EQ(frame[1], paintRect.GetY() + frameOffset.GetY());
+    EXPECT_EQ(frame[2], paintRect.Width());
+    EXPECT_EQ(frame[3], paintRect.Height());
+}
+/**
+ * @tc.name: SyncGeometryFrameWithFrameOffsetPriority001
+ * @tc.desc: SyncGeometryFrame() uses render frame offset before content rect.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, SyncGeometryFrameWithFrameOffsetPriority001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    auto geometryNode = frameNode->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    RectF paintRect = { 10.0f, 20.0f, 30.0f, 40.0f };
+    OffsetF frameOffset = { 3.0f, 4.0f };
+
+    geometryNode->SetContentOffset(OffsetF(50.0f, 60.0f));
+    geometryNode->SetContentSize(SizeF(70.0f, 80.0f));
+    rosenRenderContext->SetUsingContentRectForRenderFrame(true, true);
+    rosenRenderContext->SetRenderFrameOffset(frameOffset);
+    rosenRenderContext->SyncGeometryFrame(paintRect);
+
+    const auto& stagingProperties = rosenRenderContext->GetRSNode()->GetStagingProperties();
+    auto bounds = stagingProperties.GetBounds();
+    auto frame = stagingProperties.GetFrame();
+    EXPECT_EQ(bounds[0], paintRect.GetX());
+    EXPECT_EQ(bounds[1], paintRect.GetY());
+    EXPECT_EQ(bounds[2], paintRect.Width());
+    EXPECT_EQ(bounds[3], paintRect.Height());
+    EXPECT_EQ(frame[0], paintRect.GetX() + frameOffset.GetX());
+    EXPECT_EQ(frame[1], paintRect.GetY() + frameOffset.GetY());
+    EXPECT_EQ(frame[2], paintRect.Width());
+    EXPECT_EQ(frame[3], paintRect.Height());
+}
+/**
+ * @tc.name: SyncGeometryFrameWithContentRect001
+ * @tc.desc: SyncGeometryFrame() uses content rect as render frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, SyncGeometryFrameWithContentRect001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    auto geometryNode = frameNode->GetGeometryNode();
+    ASSERT_NE(geometryNode, nullptr);
+    RectF paintRect = { 10.0f, 20.0f, 100.0f, 120.0f };
+    OffsetF contentOffset = { 5.0f, 6.0f };
+    SizeF contentSize = { 70.0f, 80.0f };
+
+    geometryNode->SetContentOffset(contentOffset);
+    geometryNode->SetContentSize(contentSize);
+    rosenRenderContext->SetUsingContentRectForRenderFrame(true, true);
+    rosenRenderContext->SyncGeometryFrame(paintRect);
+
+    const auto& stagingProperties = rosenRenderContext->GetRSNode()->GetStagingProperties();
+    auto bounds = stagingProperties.GetBounds();
+    auto frame = stagingProperties.GetFrame();
+    EXPECT_EQ(bounds[0], paintRect.GetX());
+    EXPECT_EQ(bounds[1], paintRect.GetY());
+    EXPECT_EQ(bounds[2], paintRect.Width());
+    EXPECT_EQ(bounds[3], paintRect.Height());
+    EXPECT_EQ(frame[0], paintRect.GetX() + contentOffset.GetX());
+    EXPECT_EQ(frame[1], paintRect.GetY() + contentOffset.GetY());
+    EXPECT_EQ(frame[2], contentSize.Width());
+    EXPECT_EQ(frame[3], contentSize.Height());
+}
+/**
+ * @tc.name: GetOrCreateRSUIContext001
+ * @tc.desc: Test GetOrCreateRSUIContext creates RSUIDirector when RSUIContext is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, GetOrCreateRSUIContext001, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    auto rosenRenderContext = AceType::MakeRefPtr<RosenRenderContext>();
+    auto rsUIContext = rosenRenderContext->GetRSUIContext(AceType::RawPtr(pipeline));
+    EXPECT_EQ(rsUIContext, nullptr);
+    EXPECT_EQ(rosenRenderContext->rsUIDirector_, nullptr);
+
+    rsUIContext = rosenRenderContext->GetOrCreateRSUIContext(AceType::RawPtr(pipeline));
+    ASSERT_NE(rosenRenderContext->rsUIDirector_, nullptr);
+    EXPECT_NE(rsUIContext, nullptr);
+    EXPECT_EQ(rsUIContext, rosenRenderContext->rsUIDirector_->GetRSUIContext());
+}
+/**
+ * @tc.name: GetOrCreateRSUIContext002
+ * @tc.desc: Test GetOrCreateRSUIContext does not replace existing RSUIDirector.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, GetOrCreateRSUIContext002, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    auto rosenRenderContext = AceType::MakeRefPtr<RosenRenderContext>();
+    auto rsUIDirector = OHOS::Rosen::RSUIDirector::Create(nullptr);
+    ASSERT_NE(rsUIDirector, nullptr);
+    rosenRenderContext->rsUIDirector_ = rsUIDirector;
+
+    auto rsUIContext = rosenRenderContext->GetOrCreateRSUIContext(AceType::RawPtr(pipeline));
+    EXPECT_EQ(rosenRenderContext->rsUIDirector_, rsUIDirector);
+    EXPECT_EQ(rsUIContext, rsUIDirector->GetRSUIContext());
+}
+/**
+ * @tc.name: ReloadBackgroundImage001
+ * @tc.desc: ReloadBackgroundImage() is a no-op when no background image is set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, ReloadBackgroundImage001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    EXPECT_FALSE(rosenRenderContext->GetBackgroundImage().has_value());
+    EXPECT_EQ(rosenRenderContext->bgLoadingCtx_, nullptr);
+    // No background image: ReloadBackgroundImage should skip OnBackgroundImageUpdate and not crash.
+    rosenRenderContext->ReloadBackgroundImage();
+    EXPECT_FALSE(rosenRenderContext->GetBackgroundImage().has_value());
+    EXPECT_EQ(rosenRenderContext->bgLoadingCtx_, nullptr);
+}
+/**
+ * @tc.name: ReloadBackgroundImage002
+ * @tc.desc: ReloadBackgroundImage() reloads the existing background image via OnBackgroundImageUpdate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, ReloadBackgroundImage002, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ImageSourceInfo src;
+    src.SetSrc("test");
+    rosenRenderContext->UpdateBackgroundImage(src);
+    EXPECT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
+    ASSERT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
+    // Reset the loading context to verify ReloadBackgroundImage re-triggers loading.
+    rosenRenderContext->bgLoadingCtx_ = nullptr;
+    rosenRenderContext->ReloadBackgroundImage();
+    EXPECT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
+}
+/**
+ * @tc.name: OnSkinConfigurationUpdate001
+ * @tc.desc: Pattern::OnSkinConfigurationUpdate() dispatches ReloadBackgroundImage on the host render context.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, OnSkinConfigurationUpdate001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    frameNode->renderContext_ = rosenRenderContext;
+    ImageSourceInfo src;
+    src.SetSrc("test");
+    rosenRenderContext->UpdateBackgroundImage(src);
+    ASSERT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
+    rosenRenderContext->bgLoadingCtx_ = nullptr;
+    auto pattern = frameNode->GetPattern();
+    ASSERT_NE(pattern, nullptr);
+    pattern->OnSkinConfigurationUpdate();
+    EXPECT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
+}
+/**
+ * @tc.name: OnSkinConfigurationUpdate002
+ * @tc.desc: FrameNode::OnConfigurationUpdate with skinUpdate dispatches to Pattern::OnSkinConfigurationUpdate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, OnSkinConfigurationUpdate002, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    frameNode->renderContext_ = rosenRenderContext;
+    ImageSourceInfo src;
+    src.SetSrc("test");
+    rosenRenderContext->UpdateBackgroundImage(src);
+    ASSERT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
+    rosenRenderContext->bgLoadingCtx_ = nullptr;
+    ConfigurationChange configurationChange;
+    configurationChange.skinUpdate = true;
+    frameNode->OnConfigurationUpdate(configurationChange);
+    EXPECT_NE(rosenRenderContext->bgLoadingCtx_, nullptr);
+}
+/**
+ * @tc.name: OnSkinConfigurationUpdate003
+ * @tc.desc: FrameNode::OnConfigurationUpdate with skinUpdate=false does not dispatch OnSkinConfigurationUpdate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, OnSkinConfigurationUpdate003, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    frameNode->renderContext_ = rosenRenderContext;
+    ImageSourceInfo src;
+    src.SetSrc("test");
+    rosenRenderContext->UpdateBackgroundImage(src);
+    ASSERT_TRUE(rosenRenderContext->GetBackgroundImage().has_value());
+    // Reset so any accidental reload would be observable.
+    rosenRenderContext->bgLoadingCtx_ = nullptr;
+    // skinUpdate is false: the skin reload path must not run, so the loading context stays null.
+    ConfigurationChange configurationChange;
+    configurationChange.skinUpdate = false;
+    frameNode->OnConfigurationUpdate(configurationChange);
+    EXPECT_EQ(rosenRenderContext->bgLoadingCtx_, nullptr);
 }
 
 /**
