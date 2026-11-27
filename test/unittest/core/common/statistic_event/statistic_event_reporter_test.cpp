@@ -25,6 +25,9 @@
 #include "core/common/statistic_event_reporter.h"
 #include "core/components_ng/base/frame_node.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
+#include "adapter/ohos/services/uiservice/include/material_statistic_event.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -786,5 +789,297 @@ HWTEST_F(StatisticEventReporterTest, AtomicCountReadWithoutLock001, TestSize.Lev
     reporter->SendEventSafe(StatisticEventType::SEARCH_ONDIDINSERT);
     countValue = reporter->concurrentEventCount_;
     EXPECT_EQ(countValue, 3);
+}
+
+namespace {
+constexpr int32_t MAX_PENDING_MATERIAL_EVENT_COUNT = 20;
+} // namespace
+
+class StatisticEventReporterGapTest : public testing::Test {
+public:
+    static void SetUpTestSuite()
+    {
+        MockContainer::SetUp();
+        NG::MockPipelineContext::SetUp();
+        NG::MockPipelineContext::GetCurrent()->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>());
+    }
+
+    static void TearDownTestSuite()
+    {
+        NG::MockPipelineContext::GetCurrent()->SetTaskExecutor(nullptr);
+        NG::MockPipelineContext::TearDown();
+        MockContainer::TearDown();
+    }
+};
+
+/**
+ * @tc.name: StatisticEventReporterGapConvert001
+ * @tc.desc: Test ConvertToEvent cold enum cases.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapConvert001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: convert cold enum values that no existing test visits.
+     * @tc.expected: each maps to its {eventName, subEventName} pair.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+
+    struct ColdCase {
+        StatisticEventType type;
+        const char* eventName;
+        const char* subEventName;
+    };
+    std::vector<ColdCase> coldCases = {
+        { StatisticEventType::NAPI_SCOPE_ERROR, "FRAMEWORK", "NAPI_SCOPE_ERROR" },
+        { StatisticEventType::WEB_LIKE_FRONTEND, "FRAMEWORK", "WEB_LIKE_FRONTEND" },
+        { StatisticEventType::JS_CARD_FRONTEND, "FRAMEWORK", "JS_CARD_FRONTEND" },
+        { StatisticEventType::FOCUSBOXSTYLE_MARGIN_STROKEWIDTH_MODIFIER, "FRAMEWORK",
+            "FOCUSBOXSTYLE_MARGIN_STROKEWIDTH_MODIFIER" },
+        { StatisticEventType::GESTURE_TWO_FINGER_LONGPRESS_TRIGGER_INFO, "FRAMEWORK",
+            "GESTURE_TWO_FINGER_LONGPRESS_TRIGGER_INFO" },
+        { StatisticEventType::FA_AND_DECLARATIVE_APP_START, "FRAMEWORK", "FA_AND_DECLARATIVE_APP_START" },
+        { StatisticEventType::NAVIGATION_HOME_DESTINATION, "NAVIGATION", "HOME_DESTINATION" },
+        { StatisticEventType::SHEETPAGE_ATTACH_ERR, "SHEETPAGE", "ATTACH_ERR" },
+    };
+    for (const auto& cold : coldCases) {
+        StatisticEventInfo event = reporter->ConvertToEvent(cold.type);
+        EXPECT_EQ(event.eventName, cold.eventName);
+        EXPECT_EQ(event.subEventName, cold.subEventName);
+    }
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapInvalidType001
+ * @tc.desc: Test SendEvent/SendEventSafe reject unknown event types.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapInvalidType001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: send an undefined enum value through both entry points.
+     * @tc.expected: both maps and counters stay empty.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+
+    const auto invalidType = static_cast<StatisticEventType>(999);
+    reporter->SendEvent(invalidType);
+    EXPECT_TRUE(reporter->statisitcEventMap_.empty());
+    EXPECT_EQ(reporter->totalEventCount_, 0);
+
+    reporter->SendEventSafe(invalidType);
+    EXPECT_TRUE(reporter->concurrentEventMap_.empty());
+    EXPECT_EQ(reporter->concurrentEventCount_, 0);
+
+    // a valid event right after still works
+    reporter->SendEvent(StatisticEventType::FA_APP_START);
+    EXPECT_EQ(reporter->statisitcEventMap_.size(), 1u);
+    EXPECT_EQ(reporter->totalEventCount_, 1);
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapMaterialAppend001
+ * @tc.desc: Test SendMaterialNodeStat/SendOverlayMaterialArea append and reject.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapMaterialAppend001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: append node stat and overlay area events up to and beyond the limit.
+     * @tc.expected: appends succeed until size 21, further appends are rejected.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+
+    RichMaterialNodeStatData nodeData;
+    for (int32_t i = 0; i <= MAX_PENDING_MATERIAL_EVENT_COUNT; ++i) {
+        reporter->SendMaterialNodeStat(nodeData);
+    }
+    EXPECT_EQ(reporter->pendingMaterialEvents_.size(),
+        static_cast<size_t>(MAX_PENDING_MATERIAL_EVENT_COUNT + 1));
+    EXPECT_EQ(reporter->pendingMaterialEvents_[0].type, MaterialStatisticEventType::MATERIAL_NODE_STAT);
+    // size 21 > 20: rejected
+    reporter->SendMaterialNodeStat(nodeData);
+    EXPECT_EQ(reporter->pendingMaterialEvents_.size(),
+        static_cast<size_t>(MAX_PENDING_MATERIAL_EVENT_COUNT + 1));
+
+    reporter->pendingMaterialEvents_.clear();
+    RichOverlayMaterialAreaData areaData;
+    for (int32_t i = 0; i <= MAX_PENDING_MATERIAL_EVENT_COUNT; ++i) {
+        reporter->SendOverlayMaterialArea(areaData);
+    }
+    EXPECT_EQ(reporter->pendingMaterialEvents_.size(),
+        static_cast<size_t>(MAX_PENDING_MATERIAL_EVENT_COUNT + 1));
+    EXPECT_EQ(reporter->pendingMaterialEvents_[0].type, MaterialStatisticEventType::MATERIAL_OVERLAY_AREA);
+    reporter->SendOverlayMaterialArea(areaData);
+    EXPECT_EQ(reporter->pendingMaterialEvents_.size(),
+        static_cast<size_t>(MAX_PENDING_MATERIAL_EVENT_COUNT + 1));
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapTryReportMaterial001
+ * @tc.desc: Test TryReportMaterialEvents threshold behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapTryReportMaterial001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: fill pending material events below and at the threshold.
+     * @tc.expected: below the threshold nothing is drained; at the threshold
+     *               exactly the batch is swapped out.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+
+    RichMaterialNodeStatData nodeData;
+    for (int32_t i = 0; i < MAX_PENDING_MATERIAL_EVENT_COUNT - 1; ++i) {
+        reporter->SendMaterialNodeStat(nodeData);
+    }
+    auto earlyBatch = reporter->TryReportMaterialEvents();
+    EXPECT_TRUE(earlyBatch.empty());
+    EXPECT_EQ(reporter->pendingMaterialEvents_.size(),
+        static_cast<size_t>(MAX_PENDING_MATERIAL_EVENT_COUNT - 1));
+
+    reporter->SendMaterialNodeStat(nodeData);
+    auto batch = reporter->TryReportMaterialEvents();
+    EXPECT_EQ(batch.size(), static_cast<size_t>(MAX_PENDING_MATERIAL_EVENT_COUNT));
+    EXPECT_TRUE(reporter->pendingMaterialEvents_.empty());
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapReportMaterial001
+ * @tc.desc: Test ReportMaterialStatisticEvents empty and non-empty paths.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapReportMaterial001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: report an empty vector then a filled one.
+     * @tc.expected: empty input returns without touching the adapter.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+
+    reporter->ReportMaterialStatisticEvents({});
+    EXPECT_TRUE(reporter->pendingMaterialEvents_.empty());
+
+    MaterialStatisticEventInfo info;
+    info.type = MaterialStatisticEventType::MATERIAL_NODE_STAT;
+    reporter->ReportMaterialStatisticEvents({ info });
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapForceReportMaterial001
+ * @tc.desc: Test ForceReportMaterialEvents drains pending material events.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapForceReportMaterial001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: fill pending material events then force report.
+     * @tc.expected: all pending events are drained through the report path.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+
+    RichOverlayMaterialAreaData areaData;
+    for (int32_t i = 0; i < 5; ++i) {
+        reporter->SendOverlayMaterialArea(areaData);
+    }
+    reporter->ForceReportMaterialEvents();
+    EXPECT_TRUE(reporter->pendingMaterialEvents_.empty());
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapTryReport001
+ * @tc.desc: Test TryReportStatisticEvents early return without pending work.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapTryReport001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: call TryReportStatisticEvents with a valid pipeline but no
+     *            pending statistic or material events.
+     * @tc.expected: the threshold early return keeps every map untouched.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+    auto pipeline = NG::MockPipelineContext::GetCurrent();
+    ASSERT_TRUE(pipeline);
+
+    reporter->TryReportStatisticEvents(pipeline.GetRawPtr());
+    EXPECT_TRUE(reporter->statisitcEventMap_.empty());
+    EXPECT_TRUE(reporter->concurrentEventMap_.empty());
+    EXPECT_TRUE(reporter->pendingMaterialEvents_.empty());
+    EXPECT_EQ(reporter->totalEventCount_, 0);
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapTryReport002
+ * @tc.desc: Test TryReportStatisticEvents threshold flush and posted lambda.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapTryReport002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: accumulate 20 statistic and 20 material events, then flush.
+     * @tc.expected: maps are swapped out and counters reset; the posted lambda
+     *               reports both statistic and material events without crash.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+    auto pipeline = NG::MockPipelineContext::GetCurrent();
+    ASSERT_TRUE(pipeline);
+
+    auto executor = AceType::DynamicCast<MockTaskExecutor>(pipeline->GetTaskExecutor());
+    ASSERT_TRUE(executor);
+
+    for (int32_t i = 0; i < MAX_PENDING_EVENT_COUNT; ++i) {
+        reporter->SendEvent(StatisticEventType::FA_APP_START);
+    }
+    reporter->SendEventSafe(StatisticEventType::XCOMPONENT_TYPE_USE_STRING);
+    RichMaterialNodeStatData nodeData;
+    for (int32_t i = 0; i < MAX_PENDING_MATERIAL_EVENT_COUNT; ++i) {
+        reporter->SendMaterialNodeStat(nodeData);
+    }
+
+    reporter->TryReportStatisticEvents(pipeline.GetRawPtr());
+    EXPECT_TRUE(reporter->statisitcEventMap_.empty());
+    EXPECT_EQ(reporter->totalEventCount_, 0);
+    EXPECT_TRUE(reporter->concurrentEventMap_.empty());
+    EXPECT_EQ(reporter->concurrentEventCount_, 0);
+    EXPECT_TRUE(reporter->pendingMaterialEvents_.empty());
+}
+
+/**
+ * @tc.name: StatisticEventReporterGapTryReport003
+ * @tc.desc: Test TryReportStatisticEvents flush driven by material events only.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StatisticEventReporterGapTest, StatisticEventReporterGapTryReport003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: accumulate only material events up to the swap threshold and
+     *            call TryReportStatisticEvents below the statistic threshold.
+     * @tc.expected: material batch is drained and reported by the lambda while
+     *               the statistic maps stay untouched.
+     */
+    auto reporter = std::make_shared<StatisticEventReporter>();
+    ASSERT_TRUE(reporter != nullptr);
+    auto pipeline = NG::MockPipelineContext::GetCurrent();
+    ASSERT_TRUE(pipeline);
+
+    auto executor = AceType::DynamicCast<MockTaskExecutor>(pipeline->GetTaskExecutor());
+    ASSERT_TRUE(executor);
+
+    RichOverlayMaterialAreaData areaData;
+    for (int32_t i = 0; i < MAX_PENDING_MATERIAL_EVENT_COUNT; ++i) {
+        reporter->SendOverlayMaterialArea(areaData);
+    }
+    reporter->TryReportStatisticEvents(pipeline.GetRawPtr());
+    EXPECT_TRUE(reporter->pendingMaterialEvents_.empty());
+    EXPECT_EQ(reporter->totalEventCount_, 0);
 }
 } // namespace OHOS::Ace
