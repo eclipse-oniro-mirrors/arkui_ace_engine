@@ -134,7 +134,7 @@ void LazyForEachUtils::ToggleParentSyncCacheLayout(const RefPtr<UINode>& node, b
         return;
     }
     // only a direct Grid / WaterFlow parent runs the sync-cache-in-layout strategy
-    auto parent = AceType::DynamicCast<FrameNode>(node->GetParent());
+    auto parent = node->GetParentFrameNode();
     if (!parent) {
         return;
     }

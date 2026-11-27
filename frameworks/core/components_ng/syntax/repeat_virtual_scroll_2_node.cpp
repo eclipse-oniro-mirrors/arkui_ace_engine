@@ -286,15 +286,6 @@ void RepeatVirtualScroll2Node::SetFrameNodeInactive(
     frameNode->SetActive(false);
 }
 
-// Cancel a deferred SetActive(false) (see SetFrameNodeInactive) when the node returns to
-// the render tree (scroll back into view or reuse): the transition-out that armed it may
-// still finish later and would deactivate a node that is visible again.
-void RepeatVirtualScroll2Node::CancelPendingInactiveAfterTransitionOut(const RefPtr<UINode>& node)
-{
-    CHECK_NULL_VOID(node);
-    node->NeedSetInActiveAfterTransitionOut(false);
-}
-
 bool RepeatVirtualScroll2Node::RebuildL1(int32_t start, int32_t end, int32_t nStart, int32_t nEnd)
 {
     return caches_.RebuildL1(
@@ -586,8 +577,10 @@ RefPtr<UINode> RepeatVirtualScroll2Node::GetFrameChildByIndexImpl(
     }
 
     if (addToRenderTree && !isCache) {
-        // back on the render tree (scroll back into view or reuse)
-        CancelPendingInactiveAfterTransitionOut(cacheItem4Index->node_);
+        // back on the render tree (scroll back into view or reuse); a pending deferred
+        // SetActive(false) need not be cancelled here: every node re-entering the active
+        // range also passes RebuildL1's in-range branch in the same frame, which clears
+        // the flag on the frame child
         cacheItem4Index->node_->SetActive(true);
         cacheItem4Index->isActive_ = true;
     }

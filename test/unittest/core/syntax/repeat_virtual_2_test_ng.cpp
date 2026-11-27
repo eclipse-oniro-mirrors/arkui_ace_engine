@@ -2184,6 +2184,26 @@ HWTEST_F(RepeatVirtual2TestNg, RepeatControllerPattern004, TestSize.Level1)
 }
 
 /**
+ * @tc.name: UINodeResetOffscreenProcessOnDetach001
+ * @tc.desc: DetachFromMainTree resets useOffscreenProcess_ to false
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, UINodeResetOffscreenProcessOnDetach001, TestSize.Level1)
+{
+    auto uiNode = CreateTestUINode(1);
+    ASSERT_NE(uiNode, nullptr);
+    // simulate a node on the main tree that has been offscreen-processed
+    uiNode->onMainTree_ = true;
+    uiNode->useOffscreenProcess_ = true;
+    EXPECT_TRUE(uiNode->UseOffscreenProcess());
+
+    // DetachFromMainTree resets useOffscreenProcess_ (ui_node.cpp:1168)
+    uiNode->DetachFromMainTree();
+    EXPECT_FALSE(uiNode->onMainTree_);
+    EXPECT_FALSE(uiNode->UseOffscreenProcess());
+}
+
+/**
  * @tc.name: RepeatVirtualScroll2NodeSetAllowReuseInAnimation001
  * @tc.desc: SetAllowReuseInAnimation stores the tri-state value
  * @tc.type: FUNC
@@ -2530,12 +2550,13 @@ HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeRebuildL1CancelDeferredDe
 }
 
 /**
- * @tc.name: RepeatVirtualScroll2NodeGetFrameChildCancelDeferredDeactivation001
- * @tc.desc: GetFrameChildByIndex with addToRenderTree cancels a pending deferred
- *           SetActive(false) on the reused node
+ * @tc.name: RepeatVirtualScroll2NodeGetFrameChildKeepsDeferredFlag001
+ * @tc.desc: GetFrameChildByIndex does not cancel a pending deferred SetActive(false);
+ *           cancellation is owned by RebuildL1's in-range branch, which every node
+ *           re-entering the active range passes through in the same frame
  * @tc.type: FUNC
  */
-HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeGetFrameChildCancelDeferredDeactivation001, TestSize.Level1)
+HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeGetFrameChildKeepsDeferredFlag001, TestSize.Level1)
 {
     auto repeatNode = CreateRepeatVirtualNode(10, 10);
     repeatNode->children_.clear();
@@ -2547,18 +2568,20 @@ HWTEST_F(RepeatVirtual2TestNg, RepeatVirtualScroll2NodeGetFrameChildCancelDeferr
     repeatNode->caches_.cacheItem4Rid_[TEST_RID] = RepeatVirtualScroll2CacheItem::MakeCacheItem(uiNode, true);
     repeatNode->caches_.l1Rid4Index_[0] = TEST_RID;
 
-    // a deferred deactivation is pending when the node is fetched back onto the render tree
+    // fetching the node back onto the render tree activates it but leaves a pending
+    // deferred flag alone: the cancel point is RebuildL1, running in the same frame for
+    // every node re-entering the active range, before any transition-out finish
+    // callback can run
     frameNode->NeedSetInActiveAfterTransitionOut(true);
     EXPECT_TRUE(frameNode->needSetInActiveAfterTransitionOut_);
 
     auto child = repeatNode->GetFrameChildByIndex(0, true, false, true);
     ASSERT_NE(child, nullptr);
     EXPECT_TRUE(frameNode->IsActive());
-    EXPECT_FALSE(frameNode->needSetInActiveAfterTransitionOut_);
+    EXPECT_TRUE(frameNode->needSetInActiveAfterTransitionOut_);
 
     // isCache fetch keeps the deferred flag untouched: the node is not going back on the
     // render tree
-    frameNode->NeedSetInActiveAfterTransitionOut(true);
     auto cacheChild = repeatNode->GetFrameChildByIndex(0, true, true, true);
     ASSERT_NE(cacheChild, nullptr);
     EXPECT_TRUE(frameNode->needSetInActiveAfterTransitionOut_);
@@ -3097,6 +3120,42 @@ HWTEST_F(RepeatVirtual2TestNg, LazyForEachUtilsToggleParentSyncCacheLayoutDisqua
     LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), true, host);
     EXPECT_FALSE(gridPattern->IsSyncCacheLayoutEnabled());
     EXPECT_TRUE(host.Invalid());
+}
+
+/**
+ * @tc.name: LazyForEachUtilsToggleParentSyncCacheLayoutAncestorTest057
+ * @tc.desc: Enable branch resolves the nearest ancestor FrameNode: the sync-cache
+ *           reference is also held when the Repeat sits under a non-FrameNode
+ *           intermediate below a Grid, and is not held when the nearest ancestor
+ *           FrameNode is neither Grid nor WaterFlow
+ * @tc.type: FUNC
+ */
+HWTEST_F(RepeatVirtual2TestNg, LazyForEachUtilsToggleParentSyncCacheLayoutAncestorTest057, TestSize.Level1)
+{
+    auto gridNode = FrameNode::CreateFrameNode(
+        V2::GRID_ETS_TAG, TEST_GRID_PARENT_ID, AceType::MakeRefPtr<GridPattern>());
+    auto gridPattern = gridNode->GetPattern<GridPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto repeatNode = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID);
+    auto intermediate = RepeatNode::GetOrCreateRepeatNode(TEST_REPEAT_NODE_ID_2);
+    gridNode->AddChild(intermediate);
+    intermediate->AddChild(repeatNode);
+
+    // direct parent is the intermediate syntax node; the Grid grandparent is found via
+    // the ancestor walk
+    WeakPtr<FrameNode> host;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), true, host);
+    EXPECT_TRUE(gridPattern->IsSyncCacheLayoutEnabled());
+    EXPECT_FALSE(host.Invalid());
+
+    // nearest ancestor FrameNode is a Column: neither Grid nor WaterFlow pattern
+    // matches, no reference is taken and the walk does not continue past it
+    auto columnNode = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, TEST_COLUMN_PARENT_ID, AceType::MakeRefPtr<Pattern>());
+    columnNode->AddChild(intermediate);
+    WeakPtr<FrameNode> columnHost;
+    LazyForEachUtils::ToggleParentSyncCacheLayout(repeatNode, true, std::optional<bool>(false), true, columnHost);
+    EXPECT_TRUE(columnHost.Invalid());
 }
 
 /**
