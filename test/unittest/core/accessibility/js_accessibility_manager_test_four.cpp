@@ -21,6 +21,7 @@
 
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "adapter/ohos/osal/js_accessibility_manager.h"
@@ -1258,6 +1259,154 @@ HWTEST_F(JsAccessibilityManagerTestFour, SendCommandUnsupportedHostsAndActions, 
     EXPECT_EQ(ExecuteUiSessionAccessibilityAction(nullptr, std::nullopt,
         Accessibility::ActionType::ACCESSIBILITY_ACTION_CLICK, {}),
         UiSessionAccessibilityResult::NODE_NOT_FOUND);
+}
+
+/**
+ * @tc.name: SendCommandAccessibilityFocusDoesNotPaintFocusBox
+ * @tc.desc: Accessibility focus sent to a collected FrameNode updates the focus state but does not paint the focus box.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandAccessibilityFocusDoesNotPaintFocusBox, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto node = FrameNode::CreateFrameNode("testNode", 1234611, AceType::MakeRefPtr<Pattern>(), true);
+    auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
+    ASSERT_NE(renderContext, nullptr);
+    node->renderContext_ = renderContext;
+    auto property = node->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    int32_t focusCallbackCount = 0;
+    bool callbackFocus = false;
+    property->SetOnAccessibilityFocusCallback([&focusCallbackCount, &callbackFocus](bool isFocus) {
+        ++focusCallbackCount;
+        callbackFocus = isFocus;
+    });
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+
+    EXPECT_TRUE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS, {}, context));
+
+    // The focus box is not painted on the target.
+    EXPECT_FALSE(renderContext->GetAccessibilityFocus().value_or(false));
+    // The other logic is unchanged: focus state, callback and manager bookkeeping are updated.
+    EXPECT_TRUE(property->GetAccessibilityFocusState());
+    EXPECT_EQ(focusCallbackCount, 1);
+    EXPECT_TRUE(callbackFocus);
+    EXPECT_EQ(manager->currentFocusNodeId_, node->GetAccessibilityId());
+    EXPECT_EQ(manager->lastElementId_, node->GetAccessibilityId());
+}
+
+/**
+ * @tc.name: SendCommandAccessibilityFocusDoesNotClearPreviousFocusBox
+ * @tc.desc: Accessibility focus sent to a collected FrameNode does not clear the focus box of the previous node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandAccessibilityFocusDoesNotClearPreviousFocusBox, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto previous = FrameNode::CreateFrameNode("testNode", 1234612, AceType::MakeRefPtr<Pattern>(), true);
+    auto previousRenderContext = AceType::MakeRefPtr<MockRenderContext>();
+    ASSERT_NE(previousRenderContext, nullptr);
+    previous->renderContext_ = previousRenderContext;
+    auto node = FrameNode::CreateFrameNode("testNode", 1234613, AceType::MakeRefPtr<Pattern>(), true);
+    auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
+    ASSERT_NE(renderContext, nullptr);
+    node->renderContext_ = renderContext;
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+
+    // The system accessibility path owns the focus box on the previous node.
+    RefPtr<FrameNode> previousTarget = previous;
+    RefPtr<PipelineContext> pipeline = context;
+    ASSERT_TRUE(manager->ConvertActionTypeToBoolen(
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS, previousTarget,
+        previous->GetAccessibilityId(), pipeline, {}));
+    ASSERT_TRUE(previousRenderContext->GetAccessibilityFocus().value_or(false));
+
+    EXPECT_TRUE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS, {}, context));
+
+    // The focus box of the previous node is kept and no focus box is painted on the target.
+    EXPECT_TRUE(previousRenderContext->GetAccessibilityFocus().value_or(false));
+    EXPECT_FALSE(renderContext->GetAccessibilityFocus().value_or(false));
+    // The other logic is unchanged: the target becomes the current accessibility focus node.
+    EXPECT_TRUE(node->GetAccessibilityProperty<AccessibilityProperty>()->GetAccessibilityFocusState());
+    EXPECT_EQ(manager->currentFocusNodeId_, node->GetAccessibilityId());
+}
+
+/**
+ * @tc.name: SendCommandClearAccessibilityFocusDoesNotClearFocusBox
+ * @tc.desc: Clearing accessibility focus on a collected FrameNode resets the focus state but keeps the focus box.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandClearAccessibilityFocusDoesNotClearFocusBox, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto node = FrameNode::CreateFrameNode("testNode", 1234614, AceType::MakeRefPtr<Pattern>(), true);
+    auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
+    ASSERT_NE(renderContext, nullptr);
+    node->renderContext_ = renderContext;
+    auto property = node->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    ASSERT_TRUE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS, {}, context));
+    // The focus box on the node is painted by the system accessibility path.
+    renderContext->UpdateAccessibilityFocus(true);
+    ASSERT_TRUE(property->GetAccessibilityFocusState());
+
+    // Clearing a node that is not the current accessibility focus node still fails.
+    auto other = FrameNode::CreateFrameNode("testNode", 1234615, AceType::MakeRefPtr<Pattern>(), true);
+    other->renderContext_ = AceType::MakeRefPtr<MockRenderContext>();
+    EXPECT_FALSE(manager->ExecuteActionForFrameNode(
+        other, Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS, {}, context));
+    EXPECT_EQ(manager->currentFocusNodeId_, node->GetAccessibilityId());
+
+    EXPECT_TRUE(manager->ExecuteActionForFrameNode(
+        node, Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS, {}, context));
+
+    // The focus box is not removed from the node.
+    EXPECT_TRUE(renderContext->GetAccessibilityFocus().value_or(false));
+    // The other logic is unchanged: focus state and manager bookkeeping are reset.
+    EXPECT_FALSE(property->GetAccessibilityFocusState());
+    EXPECT_EQ(manager->currentFocusNodeId_, -1);
+    EXPECT_EQ(manager->lastElementId_, node->GetAccessibilityId());
+}
+
+/**
+ * @tc.name: SendCommandAccessibilityFocusKeepsFocusBoxForSystemPath
+ * @tc.desc: The system accessibility path still paints and clears the focus box.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsAccessibilityManagerTestFour, SendCommandAccessibilityFocusKeepsFocusBoxForSystemPath, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto node = FrameNode::CreateFrameNode("testNode", 1234616, AceType::MakeRefPtr<Pattern>(), true);
+    auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
+    ASSERT_NE(renderContext, nullptr);
+    node->renderContext_ = renderContext;
+    auto property = node->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    RefPtr<FrameNode> target = node;
+    RefPtr<PipelineContext> pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+
+    // ExecuteActionNG and ExecuteActionFromRoot share this path.
+    EXPECT_TRUE(manager->ConvertActionTypeToBoolen(
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_ACCESSIBILITY_FOCUS, target, node->GetAccessibilityId(),
+        pipeline, {}));
+    EXPECT_TRUE(renderContext->GetAccessibilityFocus().value_or(false));
+    EXPECT_TRUE(property->GetAccessibilityFocusState());
+    EXPECT_EQ(manager->currentFocusNodeId_, node->GetAccessibilityId());
+
+    EXPECT_TRUE(manager->ConvertActionTypeToBoolen(
+        Accessibility::ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS, target, node->GetAccessibilityId(),
+        pipeline, {}));
+    EXPECT_FALSE(renderContext->GetAccessibilityFocus().value_or(false));
+    EXPECT_FALSE(property->GetAccessibilityFocusState());
+    EXPECT_EQ(manager->currentFocusNodeId_, -1);
 }
 
 } // namespace OHOS::Ace::NG
