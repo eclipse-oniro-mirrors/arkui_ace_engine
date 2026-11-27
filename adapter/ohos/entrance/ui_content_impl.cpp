@@ -4819,6 +4819,32 @@ void UIContentImpl::SetHostParams(const OHOS::AAFwk::WantParams& params)
     uIExtensionContainerHandler->SetHostParams(hostWindowInfo_.hostWantParams);
 }
 
+void UIContentImpl::UpdateHostWindowInfo(uint32_t hostWindowId)
+{
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: UpdateHostWindowInfo, hostWindowId=%{public}u",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, hostWindowId);
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto taskExecutor = container->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    taskExecutor->PostTask(
+        [this, hostWindowId]() {
+            hostWindowInfo_.focusWindowId = hostWindowId;
+            auto realHostWindowId = window_->GetRealParentId();
+            hostWindowInfo_.realHostWindowId = realHostWindowId != 0 ?
+                realHostWindowId : hostWindowInfo_.realHostWindowId;
+            auto container = Platform::AceContainer::GetContainer(instanceId_);
+            CHECK_NULL_VOID(container);
+            container->SetFocusWindowId(hostWindowId);
+            container->SetRealHostWindowId(hostWindowInfo_.realHostWindowId);
+            auto pipeline = container->GetPipelineContext();
+            CHECK_NULL_VOID(pipeline);
+            pipeline->FlushHostWindowInfoChangedCallback(
+                hostWindowInfo_.realHostWindowId, hostWindowInfo_.focusWindowId);
+        }, TaskExecutor::TaskType::UI, "ArkUIUpdateHostWindowInfo");
+}
+
 void UIContentImpl::SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy)
 {
     // The call may arrive before Initialize assigns instanceId_ (the container is not

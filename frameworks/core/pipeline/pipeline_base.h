@@ -986,6 +986,9 @@ public:
 
     virtual void FlushReloadTransition() {}
     virtual void RebuildFontNode() {}
+
+    using HostWindowInfoChangedCallback = std::function<void(uint32_t, uint32_t)>;
+    virtual void FlushHostWindowInfoChangedCallback(uint32_t realHostWindowId, uint32_t focusWindowId) {}
     FrontendType GetFrontendType() const
     {
         return frontendType_;

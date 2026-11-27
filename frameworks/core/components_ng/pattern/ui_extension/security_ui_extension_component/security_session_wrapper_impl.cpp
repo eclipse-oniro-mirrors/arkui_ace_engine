@@ -41,12 +41,14 @@
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/render/adapter/rosen_window.h"
 #include "render_service_client/core/ui/rs_ui_director.h"
 #include "render_service_client/core/ui/rs_ui_context.h"
 
 namespace OHOS::Ace::NG {
 namespace {
 // Defines all error names and messages.
+constexpr int32_t INVALID_WINDOW_ID = -1;
 constexpr char START_FAIL_NAME[] = "start_ability_fail";
 constexpr char START_FAIL_MESSAGE[] = "Start ui extension ability failed, please check the want of UIextensionAbility.";
 constexpr char BACKGROUND_FAIL_NAME[] = "background_fail";
@@ -391,6 +393,7 @@ void SecuritySessionWrapperImpl::CreateSession(const AAFwk::Want& want, const Se
         extensionSessionInfo.connectToRenderToken_  = rsUIContext->GetConnectToRender();
     };
     setConnectToRender();
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId();
     session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session_);
     pattern->SetLastSentBrandColorStr(brandColorStr);
@@ -423,6 +426,37 @@ void SecuritySessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wan
     AAFwk::WantParams wantParam(wantPtr->GetParams());
     wantParam.SetParam(UIEXTENSION_CONFIG_FIELD, AAFwk::WantParamWrapper::Box(configParam));
     wantPtr->SetParams(wantParam);
+}
+
+int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
+{
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_RETURN(container, 0);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_RETURN(pipeline, 0);
+    if (container->IsDynamicRender() &&
+        container->GetUIContentType() == UIContentType::DYNAMIC_COMPONENT) {
+        return static_cast<int32_t>(pipeline->GetFocusWindowId());
+    }
+    if (container->IsSceneBoardWindow()) {
+        return GetWindowSceneId();
+    }
+    return pipeline->GetWindowId();
+}
+
+int32_t SecuritySessionWrapperImpl::GetWindowSceneId()
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_RETURN(pattern, 0);
+    auto hostWindowNode = WindowSceneHelper::FindWindowScene(pattern->GetHost());
+    CHECK_NULL_RETURN(hostWindowNode, 0);
+    auto hostNode = AceType::DynamicCast<FrameNode>(hostWindowNode);
+    CHECK_NULL_RETURN(hostNode, 0);
+    auto hostPattern = hostNode->GetPattern<SystemWindowScene>();
+    CHECK_NULL_RETURN(hostPattern, 0);
+    auto hostSession = hostPattern->GetSession();
+    CHECK_NULL_RETURN(hostSession, 0);
+    return hostSession->GetPersistentId();
 }
 
 void SecuritySessionWrapperImpl::ReDispatchWantParams()
@@ -466,7 +500,80 @@ void SecuritySessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 
     PLATFORM_LOGI("Update patternInstanceId %{public}d to %{public}d.", patternInstanceId_, instanceId);
     patternInstanceId_ = instanceId;
+    if (IsSessionValid()) {
+        NotifyExtensionParentChanged();
+    }
     PLATFORM_LOGI("Update instanceId success.");
+}
+
+void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId)
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+
+    uint32_t parentWindowType = 0;
+    if (container->IsUIExtensionWindow()) {
+        parentWindowType = container->GetParentWindowType();
+    } else {
+        parentWindowType = container->GetWindowType();
+    }
+    auto callerToken = container->GetToken();
+    auto parentToken = container->GetParentToken();
+
+    Rosen::SessionInfo sessionInfo = session_->GetSessionInfo();
+    sessionInfo.callerToken_ = callerToken;
+    sessionInfo.rootToken_ = (isTransferringCaller_ && parentToken) ? parentToken : callerToken;
+    sessionInfo.parentWindowType_ = parentWindowType;
+    sessionInfo.realParentId_ = static_cast<int32_t>(pipeline->GetRealHostWindowId());
+    sessionInfo.brandColorStr_ = pattern->GetBrandColorStr();
+    sessionInfo.callerPersistentId_ = GetCallerPersistentId();
+
+    PLATFORM_LOGI("UpdateExtensionParent, persistentId=%{public}d, newHostWindowId=%{public}u, "
+        "callerPersistentId=%{public}d.",
+        session_->GetPersistentId(), newHostWindowId, sessionInfo.callerPersistentId_);
+    Rosen::ExtensionSessionManager::GetInstance().UpdateExtensionSessionParent(
+        session_, newHostWindowId, sessionInfo);
+}
+
+void SecuritySessionWrapperImpl::NotifyExtensionParentChanged()
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto newHostWindowId = static_cast<uint32_t>(pipeline->GetRealHostWindowId());
+    auto focusWindowId = static_cast<uint32_t>(pipeline->GetFocusWindowId());
+    int32_t windowSceneId = GetWindowSceneId();
+    if (container->IsSceneBoardWindow() && windowSceneId != INVALID_WINDOW_ID) {
+        focusWindowId = static_cast<uint32_t>(windowSceneId);
+    }
+    UpdateExtensionParent(newHostWindowId, focusWindowId);
+    ReDispatchWantParams();
+}
+
+void SecuritySessionWrapperImpl::UpdateWindowSceneId()
+{
+    if (!IsSessionValid()) {
+        return;
+    }
+    auto container = Platform::AceContainer::GetContainer(GetInstanceIdFromHost());
+    CHECK_NULL_VOID(container);
+    if (!container->IsSceneBoardWindow()) {
+        return;
+    }
+    auto newWindowSceneId = static_cast<uint32_t>(GetWindowSceneId());
+    PLATFORM_LOGI("UpdateWindowSceneId newWindowSceneId=%{public}u, oldWindowSceneId=%{public}u.",
+        newWindowSceneId, windowSceneId_);
+    if (newWindowSceneId != windowSceneId_) {
+        NotifyExtensionParentChanged();
+        windowSceneId_ = newWindowSceneId;
+    }
 }
 /******************************* End: About session ***************************************/
 

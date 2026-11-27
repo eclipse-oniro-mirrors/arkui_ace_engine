@@ -169,6 +169,11 @@ int32_t SessionWrapperImpl::GetWindowSceneId()
     return 1;
 }
 
+int32_t SessionWrapperImpl::GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline)
+{
+    return 1;
+}
+
 Rosen::WSRect SessionWrapperImpl::GetWindowSceneRect()
 {
     Rosen::WSRect rect = {0, 0, 0, 0};
@@ -300,6 +305,10 @@ bool SessionWrapperImpl::SendBusinessData(
 }
 
 void SessionWrapperImpl::NotifyHostWindowMode(int32_t mode) {}
+
+void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) {}
+void SessionWrapperImpl::NotifyExtensionParentChanged() {}
+void SessionWrapperImpl::UpdateWindowSceneId() {}
 
 void SessionWrapperImpl::ReDispatchWantParams() {}
 

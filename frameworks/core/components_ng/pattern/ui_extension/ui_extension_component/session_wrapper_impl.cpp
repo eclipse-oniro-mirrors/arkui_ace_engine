@@ -54,6 +54,7 @@
 #include "string_wrapper.h"
 #include "render_service_client/core/ui/rs_ui_director.h"
 #include "render_service_client/core/ui/rs_ui_context.h"
+#include "core/components_ng/render/adapter/rosen_window.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -651,6 +652,9 @@ void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
     instanceId_ = instanceId;
     taskExecutor_ = taskExecutor;
     InitAllCallback();
+    if (IsSessionValid()) {
+        NotifyExtensionParentChanged();
+    }
     UIEXT_LOGI("Update instanceId success.");
 }
 /************************************************ End: Initialization *************************************************/
@@ -666,6 +670,85 @@ Rosen::SessionViewportConfig ConvertToRosenSessionViewportConfig(const SessionVi
         .transform_ = config.transform_,
     };
     return config_;
+}
+
+void SessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId)
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+
+    uint32_t parentWindowType = 0;
+    if (container->IsUIExtensionWindow()) {
+        parentWindowType = container->GetParentWindowType();
+    } else {
+        parentWindowType = container->GetWindowType();
+    }
+    auto callerToken = container->GetToken();
+    auto parentToken = container->GetParentToken();
+
+    SessionViewportConfig sessionViewportConfig;
+    sessionViewportConfig.dpiFollowStrategy_ = pattern->GetEffectiveDpiFollowStrategy();
+    sessionViewportConfig.density_ = pipeline->GetCurrentDensity();
+    sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
+    sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
+    sessionViewportConfig.transform_ = pipeline->GetTransformHint();
+    pattern->SetSessionViewportConfig(sessionViewportConfig);
+
+    Rosen::SessionInfo sessionInfo = session_->GetSessionInfo();
+    sessionInfo.callerToken_ = callerToken;
+    sessionInfo.rootToken_ = (isTransferringCaller_ && parentToken) ? parentToken : callerToken;
+    sessionInfo.parentWindowType_ = parentWindowType;
+    sessionInfo.realParentId_ = static_cast<int32_t>(pipeline->GetRealHostWindowId());
+    sessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
+    sessionInfo.brandColorStr_ = pattern->GetBrandColorStr();
+    sessionInfo.callerPersistentId_ = GetCallerPersistentId(pipeline);
+
+    UIEXT_LOGI("UpdateExtensionParent, persistentId=%{public}d, newHostWindowId=%{public}u, "
+        "callerPersistentId=%{public}d, componentId=%{public}d.",
+        persistentId_, newHostWindowId, sessionInfo.callerPersistentId_, GetFrameNodeId());
+    Rosen::ExtensionSessionManager::GetInstance().UpdateExtensionSessionParent(
+        session_, newHostWindowId, sessionInfo);
+}
+
+void SessionWrapperImpl::NotifyExtensionParentChanged()
+{
+    CHECK_NULL_VOID(session_);
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto newHostWindowId = static_cast<uint32_t>(pipeline->GetRealHostWindowId());
+    auto focusWindowId = static_cast<uint32_t>(pipeline->GetFocusWindowId());
+    int32_t windowSceneId = GetWindowSceneId();
+    if (container->IsSceneBoardWindow() && windowSceneId != INVALID_WINDOW_ID) {
+        focusWindowId = static_cast<uint32_t>(windowSceneId);
+    }
+    UpdateExtensionParent(newHostWindowId, focusWindowId);
+    ReDispatchWantParams();
+}
+
+void SessionWrapperImpl::UpdateWindowSceneId()
+{
+    if (!IsSessionValid()) {
+        return;
+    }
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    if (!container->IsSceneBoardWindow()) {
+        return;
+    }
+    auto newWindowSceneId = static_cast<uint32_t>(GetWindowSceneId());
+    UIEXT_LOGI("UpdateWindowSceneId newWindowSceneId=%{public}u, oldWindowSceneId=%{public}u.",
+        newWindowSceneId, windowSceneId_);
+    if (newWindowSceneId != windowSceneId_) {
+        NotifyExtensionParentChanged();
+        windowSceneId_ = newWindowSceneId;
+    }
 }
 
 void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
@@ -744,6 +827,7 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
     extensionSessionInfo.brandColorStr_ = brandColorStr;
+    extensionSessionInfo.callerPersistentId_ = GetCallerPersistentId(pipeline);
     SetConnectToRenderInner(pipeline, extensionSessionInfo);
     auto session = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
     CHECK_NULL_VOID(session);
@@ -766,6 +850,20 @@ void SessionWrapperImpl::SetConnectToRenderInner(
     CHECK_NULL_VOID(rsUIContext);
     extensionSessionInfo.connectToRenderToken_ = rsUIContext->GetConnectToRender();
     UIEXT_LOGI("SessionWrapperImpl get connectToRenderToken success.");
+}
+
+int32_t SessionWrapperImpl::GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline)
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_RETURN(container, 0);
+    if (container->IsDynamicRender() &&
+        container->GetUIContentType() == UIContentType::DYNAMIC_COMPONENT) {
+        return static_cast<int32_t>(pipeline->GetFocusWindowId());
+    }
+    if (container->IsSceneBoardWindow()) {
+        return GetWindowSceneId();
+    }
+    return pipeline->GetWindowId();
 }
 
 void SessionWrapperImpl::UpdateSessionConfig()

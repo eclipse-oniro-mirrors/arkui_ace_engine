@@ -46,6 +46,9 @@ public:
     int32_t GetSessionId() const override;
     const std::shared_ptr<AAFwk::Want> GetWant() override;
     void UpdateInstanceId(int32_t instanceId) override;
+    void UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) override;
+    void NotifyExtensionParentChanged() override;
+    void UpdateWindowSceneId() override;
 
     // Synchronous interface for event notify
     bool NotifyFocusEventSync(bool isFocus) override;
@@ -120,11 +123,14 @@ private:
         uint32_t customId, const AAFwk::Want& data, std::optional<AAFwk::Want>& reply);
     void DispatchExtensionDataToHostWindow(uint32_t customId, const AAFwk::Want& data);
     void UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr);
+    int32_t GetCallerPersistentId();
+    int32_t GetWindowSceneId();
     AceLogTag tag_ = AceLogTag::ACE_SECURITYUIEXTENSION;
     WeakPtr<SecurityUIExtensionPattern> hostPattern_;
     RefPtr<TaskExecutor> taskExecutor_;
     int32_t instanceId_;
     int32_t patternInstanceId_;
+    uint32_t windowSceneId_ = static_cast<uint32_t>(-1);
     bool isTransferringCaller_ = false;
     SessionType sessionType_ = SessionType::UI_EXTENSION_ABILITY;
     int32_t platformId_ = 0;

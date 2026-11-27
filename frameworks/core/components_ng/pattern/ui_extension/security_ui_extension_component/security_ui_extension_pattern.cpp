@@ -213,6 +213,9 @@ void SecurityUIExtensionPattern::OnAttachContext(PipelineContext *context)
         instanceId_ = newInstanceId;
         UpdateSessionInstanceId(newInstanceId);
     }
+    if (sessionWrapper_) {
+        sessionWrapper_->UpdateWindowSceneId();
+    }
     if (needReNotifyForeground_ && hasMountToParent_) {
         needReNotifyForeground_ = false;
         NotifyForeground();

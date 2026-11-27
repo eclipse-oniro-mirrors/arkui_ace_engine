@@ -162,6 +162,9 @@ public:
     virtual void ReDispatchWantParams() {}
 
     virtual void UpdateInstanceId(int32_t instanceId) {}
+    virtual void UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) {}
+    virtual void NotifyExtensionParentChanged() {}
+    virtual void UpdateWindowSceneId() {}
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_UI_EXTENSION_SESSION_WRAPPER_H

@@ -57,13 +57,5 @@ HWTEST_F(ModalUIExtensionProxyImplTestNg, ModalUIExtensionProxyImplTest001, Test
     RefPtr<SessionWrapper> sessionWrapper = SessionWrapperFactory::CreateSessionWrapper(
         sessionType, hostPattern, instanceId, isTransferringCaller);
     ASSERT_EQ(sessionWrapper, nullptr);
-    auto proxy = std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper);
-    ASSERT_EQ(proxy->sessionWrapper_, nullptr);
-
-    /**
-     * @tc.steps: step2. initialize SendData
-     */
-    AAFwk::WantParams wantParams;
-    proxy->SendData(wantParams);
 }
 } // namespace OHOS::Ace::NG

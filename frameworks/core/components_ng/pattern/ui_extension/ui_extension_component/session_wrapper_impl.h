@@ -44,6 +44,9 @@ public:
     int32_t GetSessionId() const override;
     const std::shared_ptr<AAFwk::Want> GetWant() override;
     void UpdateInstanceId(int32_t instanceId) override;
+    void UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) override;
+    void NotifyExtensionParentChanged() override;
+    void UpdateWindowSceneId() override;
 
     // Synchronous interface for event notify
     bool NotifyFocusEventSync(bool isFocus) override;
@@ -119,6 +122,7 @@ private:
     int32_t GetFrameNodeId() const;
     void InitAllCallback();
     void SetConnectToRenderInner(const RefPtr<PipelineBase>& context, Rosen::SessionInfo& sessionInfo);
+    int32_t GetCallerPersistentId(const RefPtr<PipelineBase>& pipeline);
     void InitForegroundCallback();
     void InitBackgroundCallback();
     void InitDestructionCallback();
@@ -158,6 +162,7 @@ private:
     int64_t lastOccupiedAreaTime_ = 0;
     sptr<Rosen::ExtensionSession> session_;
     int32_t persistentId_ = 0;
+    uint32_t windowSceneId_ = static_cast<uint32_t>(-1);
     mutable std::mutex sessionMutex_;
     Rect displayAreaWindow_;
     RectF displayArea_;

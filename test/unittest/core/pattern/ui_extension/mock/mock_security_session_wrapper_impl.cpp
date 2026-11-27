@@ -289,6 +289,20 @@ bool SecuritySessionWrapperImpl::SendBusinessData(
 
 void SecuritySessionWrapperImpl::ReDispatchWantParams() {}
 
+void SecuritySessionWrapperImpl::UpdateExtensionParent(uint32_t newHostWindowId, uint32_t windowSceneId) {}
+void SecuritySessionWrapperImpl::NotifyExtensionParentChanged() {}
+void SecuritySessionWrapperImpl::UpdateWindowSceneId() {}
+
+int32_t SecuritySessionWrapperImpl::GetCallerPersistentId()
+{
+    return 1;
+}
+
+int32_t SecuritySessionWrapperImpl::GetWindowSceneId()
+{
+    return 1;
+}
+
 void SecuritySessionWrapperImpl::DispatchExtensionDataToHostWindow(uint32_t customId, const AAFwk::Want& data)
 {
 }
