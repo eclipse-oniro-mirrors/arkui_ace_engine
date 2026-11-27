@@ -173,12 +173,13 @@ HWTEST_F(UIContentStubTest, UIContentStubTest002, TestSize.Level1)
 
     /**
      * @tc.steps: step2. simulate AccessToken check success.
-     * @tc.expected: step2. call UIContentServiceStubImpl OnRemoteRequest return success.
+     * @tc.expected: step2. a trusted caller without a report object receives FAILED.
      */
     Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ = Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
     data.WriteInterfaceToken(u"ohos.ace.UIContentService");
     res = ptr->OnRemoteRequest(IUiContentService::UI_CONTENT_CONNECT, data, reply, option);
-    EXPECT_EQ(res, 0);
+    // No report object was sent; the dispatch must preserve ConnectInner's failure.
+    EXPECT_EQ(res, FAILED);
 }
 
 /**

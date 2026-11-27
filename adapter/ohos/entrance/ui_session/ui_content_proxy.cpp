@@ -175,6 +175,11 @@ int32_t UIContentServiceProxy::GetLatestHitTestNodeInfosForTouch(
 int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
     std::shared_ptr<AppExecFwk::EventHandler> eventHandler)
 {
+    std::lock_guard<std::mutex> lock(connectMutex_);
+    if (report_ != nullptr) {
+        LOGW("connect rejected: reportStub already exists");
+        return FAILED;
+    }
     MessageParcel data;
     MessageParcel reply;
     MessageOption option;
@@ -182,26 +187,23 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("connect write interface token failed");
         return FAILED;
     }
-    if (report_ != nullptr) {
-        LOGW("connect again");
-    }
-    report_ = new (std::nothrow) UiReportStub();
-    if (report_ == nullptr) {
+    sptr<UiReportStub> report = new (std::nothrow) UiReportStub();
+    if (report == nullptr) {
         LOGW("connect failed,create reportStub failed");
         return FAILED;
     }
-    report_->RegisterGetBaseInfoCallback(eventCallback);
-    if (!data.WriteRemoteObject(report_)) {
+    report->RegisterGetBaseInfoCallback(eventCallback);
+    if (!data.WriteRemoteObject(report)) {
         LOGW("write reportStub failed");
         return FAILED;
     }
-    report_->SetEventHandler(eventHandler);
+    report->SetEventHandler(eventHandler);
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_CONNECT, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
-        LOGW("connect send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        LOGW("connect rejected or IPC failed, errorCode:%{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
-    isConnected_ = true;
+    report_ = report;
     return NO_ERROR;
 }
 
@@ -1073,7 +1075,8 @@ int32_t UIContentServiceProxy::UnregisterSelectTextEventCallback()
 
 bool UIContentServiceProxy::IsConnect()
 {
-    return isConnected_;
+    std::lock_guard<std::mutex> lock(connectMutex_);
+    return report_ != nullptr;
 }
 
 int32_t UIContentServiceProxy::SendPageTranslateRequest(uint32_t code, const char* caller, const std::string& request,

@@ -16,7 +16,8 @@
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
 
 namespace OHOS::Ace {
-void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
+int32_t UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
 {
+    return NO_ERROR;
 }
 } // namespace OHOS::Ace

@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_PROXY_H
 
 #include <atomic>
+#include <mutex>
 
 #include "iremote_proxy.h"
 #include "ui_content_errors.h"
@@ -152,8 +153,9 @@ private:
     void UnregisterQueryCallback(uint32_t code);
     bool PostQueryTimeoutTask(uint32_t code, int32_t timeout);
     static inline BrokerDelegator<UIContentServiceProxy> delegator_;
+    std::mutex connectMutex_;
+    // Callers synchronize successful Connect completion before other APIs access report_.
     sptr<UiReportStub> report_ = nullptr;
-    bool isConnected_ = false;
     std::atomic_bool currentAbilityLanguageInfoPending_ = false;
 };
 

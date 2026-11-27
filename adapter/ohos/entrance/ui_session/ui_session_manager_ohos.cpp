@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstring>
 
 #include "cJSON.h"
 
@@ -719,8 +720,17 @@ bool UiSessionManagerOhos::HasSplitPageSceneRuleSet(int32_t processId, const std
     return ConflictsWithSplitRegistrationLocked(processId, ruleSetId);
 }
 
-void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
+int32_t UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
 {
+    if (reportProxy == nullptr) {
+        LOGW("SaveReportProxy rejected null reportProxy, processId:%{public}d", processId);
+        return FAILED;
+    }
+    std::unique_lock<std::shared_mutex> reportMapLock(reportObjectMutex_);
+    if (reportObjectMap_.find(processId) != reportObjectMap_.end()) {
+        LOGW("SaveReportProxy rejected duplicate connection, processId:%{public}d", processId);
+        return FAILED;
+    }
     // add death callback
     auto uiReportProxyRecipient = new UiReportProxyRecipient([processId, this]() {
         LOGW("agent process dead,processId:%{public}d", processId);
@@ -798,12 +808,13 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
     });
     // In the application process, reportProxy refers to the SA-side UiReportStub.
     // Listen for remote SA death through this proxy and clean up local report registrations.
-    reportProxy->AddDeathRecipient(uiReportProxyRecipient);
-    std::unique_lock<std::shared_mutex> reportLock(reportObjectMutex_);
-    [[maybe_unused]] const bool overwritten = reportObjectMap_.find(processId) != reportObjectMap_.end();
-    reportObjectMap_[processId] = reportProxy;
-    LOGI("SaveReportProxy %{public}s reportProxy, processId:%{public}d",
-        overwritten ? "overwrote" : "saved new", processId);
+    if (!reportProxy->AddDeathRecipient(uiReportProxyRecipient)) {
+        LOGW("SaveReportProxy AddDeathRecipient failed, processId:%{public}d", processId);
+        return FAILED;
+    }
+    reportObjectMap_.emplace(processId, reportProxy);
+    LOGI("SaveReportProxy saved reportProxy, processId:%{public}d", processId);
+    return NO_ERROR;
 }
 
 int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const std::string& ruleJson)

@@ -78,8 +78,7 @@ int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messa
             break;
         }
         case UI_CONTENT_CONNECT: {
-            ConnectInner(data, reply, option);
-            break;
+            return ConnectInner(data, reply, option);
         }
         case REGISTER_CLICK_EVENT: {
             RegisterClickEventCallbackInner(data, reply, option);
@@ -331,7 +330,10 @@ int32_t UiContentStub::ConnectInner(MessageParcel& data, MessageParcel& reply, M
     }
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     UiSessionManagerOhos* uisession = reinterpret_cast<UiSessionManagerOhos*>(UiSessionManager::GetInstance());
-    uisession->SaveReportProxy(reportProxy, processId);
+    int32_t result = uisession->SaveReportProxy(reportProxy, processId);
+    if (result != NO_ERROR) {
+        return result;
+    }
     uisession->SendBaseInfo(processId);
     return NO_ERROR;
 }

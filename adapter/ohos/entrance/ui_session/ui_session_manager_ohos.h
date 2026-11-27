@@ -190,7 +190,7 @@ public:
     void ReportLazyForEachQueryResult(const std::string& data) override;
     void ReportNodesInRectQueryResult(const std::string& data) override;
 
-    void SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId);
+    int32_t SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId);
     // UI-thread validation of an internal detection request; does not change IPC.
     ACE_FORCE_EXPORT bool IsSearchPageSceneRuleCurrent(
         int32_t processId, const std::string& ruleSetId, const std::string& generation) override;

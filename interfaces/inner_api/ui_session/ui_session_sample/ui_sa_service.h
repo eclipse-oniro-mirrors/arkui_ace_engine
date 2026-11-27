@@ -39,7 +39,7 @@ public:
 
     sptr<Ace::IUiContentService> getArkUIService(int32_t windowId);
 
-    void HandleConnect(sptr<IUiContentService> service, std::vector<std::string> params);
+    int32_t HandleConnect(int32_t fd, sptr<IUiContentService> service, const std::vector<std::string>& params);
     void HandleGetVisibleInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleGetInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleInspectorTree(sptr<IUiContentService> service, const std::vector<std::string>& params, bool visible);
