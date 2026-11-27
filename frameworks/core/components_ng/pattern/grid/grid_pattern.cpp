@@ -2402,6 +2402,7 @@ void GridPattern::GetGridLayoutOptionsDumpInfo()
 
 void GridPattern::GetGridStateDumpInfo()
 {
+    DumpLog::GetInstance().AddDesc(std::string("multiSelectable:").append(multiSelectable_ ? "true" : "false"));
     supportAnimation_ ? DumpLog::GetInstance().AddDesc("supportAnimation:true")
                       : DumpLog::GetInstance().AddDesc("supportAnimation:false");
     isConfigScrollable_ ? DumpLog::GetInstance().AddDesc("isConfigScrollable:true")
@@ -3300,6 +3301,7 @@ void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json, const Par
     if (config.IsPublicTree()) {
         return;
     }
+    json->Put("multiSelectable", multiSelectable_);
     json->Put("supportAnimation", supportAnimation_);
     json->Put("isConfigScrollable", isConfigScrollable_);
     json->Put("lastCrossCount",
