@@ -7582,6 +7582,21 @@ bool TextFieldPattern::HandleCrossPlatformDeleteEvent(const std::shared_ptr<Text
 bool TextFieldPattern::HandleEditingEventCrossPlatform(const std::shared_ptr<TextEditingValue>& value)
 {
 #ifdef CROSS_PLATFORM
+#ifdef IOS_PLATFORM
+    if (value->appendText.empty() && !value->isDelete && value->unmarkText && value->compose.IsValid() &&
+        value->compose.GetEnd() > value->compose.GetStart() &&
+        value->selection.GetStart() == value->selection.GetEnd() &&
+        value->selection.GetEnd() == value->compose.GetStart() && !value->discardedMarkedText) {
+        InputCommandInfo info;
+        info.deleteRange = { value->compose.GetStart(), value->compose.GetEnd() };
+        info.insertOffset = value->compose.GetStart();
+        info.insertValue = u"";
+        info.reason = InputReason::IME;
+        AddInputCommand(info);
+        value->compose.Update(-1);
+        return true;
+    }
+#endif
     if (HandleCrossPlatformDeleteEvent(value)) {
         return true;
     }
