@@ -17,8 +17,13 @@
 
 #include "gtest/gtest.h"
 
+#define private public
+#define protected public
 #include "base/geometry/matrix4.h"
 #include "base/geometry/point.h"
+#undef private
+#undef protected
+
 
 using namespace testing;
 using namespace testing::ext;
@@ -503,5 +508,167 @@ HWTEST_F(Matrix4Test, Matrix4Test009, TestSize.Level1)
     EXPECT_EQ(ret9, false);
     bool ret10 = mtrixN4Obj.SetEntry(1.0, 10.0, 1.0f);
     EXPECT_EQ(ret10, false);
+}
+
+
+class Matrix4GapTest : public testing::Test {
+public:
+    static void SetUpTestSuite() {}
+    static void TearDownTestSuite() {}
+};
+
+/**
+ * @tc.name: Matrix4GapCreateInvert001
+ * @tc.desc: Test CreateInvert returns the adjugate matrix.
+ * @tc.type: FUNC
+ */
+HWTEST_F(Matrix4GapTest, Matrix4GapCreateInvert001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: compute adjugate of identity and a diagonal scale matrix.
+     * @tc.expected: adj(I) == I; adj(diag(2,3,4,1)) == diag(12,8,6,24).
+     */
+    auto adjIdentity = Matrix4::CreateInvert(Matrix4::CreateIdentity());
+    for (int32_t i = 0; i < 4; ++i) {
+        for (int32_t j = 0; j < 4; ++j) {
+            EXPECT_DOUBLE_EQ(adjIdentity(i, j), i == j ? 1.0 : 0.0) << "i=" << i << " j=" << j;
+        }
+    }
+
+    // adj(diag(a,b,c,d)) = diag(bcd, acd, abd, abc)
+    Matrix4 scale(2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    auto adjScale = Matrix4::CreateInvert(scale);
+    EXPECT_DOUBLE_EQ(adjScale(0, 0), 12.0);
+    EXPECT_DOUBLE_EQ(adjScale(1, 1), 8.0);
+    EXPECT_DOUBLE_EQ(adjScale(2, 2), 6.0);
+    EXPECT_DOUBLE_EQ(adjScale(3, 3), 24.0);
+    EXPECT_DOUBLE_EQ(adjScale(0, 1), 0.0);
+    EXPECT_DOUBLE_EQ(adjScale(2, 3), 0.0);
+}
+
+/**
+ * @tc.name: Matrix4GapInvert001
+ * @tc.desc: Test Invert for invertible and singular matrices.
+ * @tc.type: FUNC
+ */
+HWTEST_F(Matrix4GapTest, Matrix4GapInvert001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: invert a diagonal scale matrix and a singular matrix.
+     * @tc.expected: scale * inverse == identity; singular returns identity.
+     */
+    Matrix4 scale(2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    auto inverse = Matrix4::Invert(scale);
+    auto product = scale * inverse;
+    for (int32_t i = 0; i < 4; ++i) {
+        for (int32_t j = 0; j < 4; ++j) {
+            EXPECT_NEAR(product(i, j), i == j ? 1.0 : 0.0, 1e-9) << "i=" << i << " j=" << j;
+        }
+    }
+
+    // singular matrix (zero row) -> identity fallback
+    Matrix4 singular(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    auto singularInverse = Matrix4::Invert(singular);
+    EXPECT_TRUE(singularInverse == Matrix4::CreateIdentity());
+}
+
+/**
+ * @tc.name: Matrix4GapTransformPoint001
+ * @tc.desc: Test TransformPoint perspective divide branches.
+ * @tc.type: FUNC
+ */
+HWTEST_F(Matrix4GapTest, Matrix4GapTransformPoint001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: transform a point with identity, translate, perspective and
+     *            degenerate w=0 perspective matrices.
+     * @tc.expected: w==1 skips division; w!=1 divides; w==0 skips division.
+     */
+    // identity: w == 1, no divide
+    EXPECT_EQ(Matrix4::CreateIdentity().TransformPoint(Point(3.0, 4.0)), Point(3.0, 4.0));
+
+    // translate: w == 1, no divide
+    auto translate = Matrix4::CreateTranslate(1.0, 2.0, 3.0);
+    EXPECT_EQ(translate.TransformPoint(Point(1.0, 1.0)), Point(2.0, 3.0));
+
+    // perspective factor: w = 0.5*x + 1 -> divide by w
+    auto perspective = Matrix4::CreateFactorPerspective(0.5, 0.0);
+    auto transformed = perspective.TransformPoint(Point(2.0, 0.0));
+    EXPECT_DOUBLE_EQ(transformed.GetX(), 1.0); // (2 + 0) / (0.5*2 + 1)
+    EXPECT_DOUBLE_EQ(transformed.GetY(), 0.0);
+
+    // perspective factor leading to w == 0: skip division
+    auto degenerate = Matrix4::CreateFactorPerspective(-0.5, 0.0);
+    auto rawPoint = degenerate.TransformPoint(Point(2.0, 0.0));
+    EXPECT_DOUBLE_EQ(rawPoint.GetX(), 2.0);
+    EXPECT_DOUBLE_EQ(rawPoint.GetY(), 0.0);
+}
+
+/**
+ * @tc.name: Matrix4GapCreateFactor001
+ * @tc.desc: Test CreateFactorSkew and CreateFactorPerspective entries.
+ * @tc.type: FUNC
+ */
+HWTEST_F(Matrix4GapTest, Matrix4GapCreateFactor001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: build skew and perspective factor matrices and inspect entries.
+     * @tc.expected: skew stores x/y in transposed off-diagonal slots;
+     *               perspective stores x/y in the w row slots.
+     */
+    auto skew = Matrix4::CreateFactorSkew(0.5, 0.25);
+    EXPECT_DOUBLE_EQ(skew(1, 0), 0.5);
+    EXPECT_DOUBLE_EQ(skew(0, 1), 0.25);
+    EXPECT_DOUBLE_EQ(skew(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(skew(3, 3), 1.0);
+    EXPECT_DOUBLE_EQ(skew(2, 3), 0.0);
+
+    auto perspective = Matrix4::CreateFactorPerspective(0.5, 0.25);
+    EXPECT_DOUBLE_EQ(perspective(0, 3), 0.5);
+    EXPECT_DOUBLE_EQ(perspective(1, 3), 0.25);
+    EXPECT_DOUBLE_EQ(perspective(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(perspective(3, 3), 1.0);
+}
+
+/**
+ * @tc.name: Matrix4GapOperatorIndex001
+ * @tc.desc: Test operator[] bounds checking.
+ * @tc.type: FUNC
+ */
+HWTEST_F(Matrix4GapTest, Matrix4GapOperatorIndex001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: index valid and out-of-range positions on identity.
+     * @tc.expected: valid indices return stored values; negative and >= 16
+     *               return 0.0.
+     */
+    auto identity = Matrix4::CreateIdentity();
+    EXPECT_DOUBLE_EQ(identity[0], 1.0);
+    EXPECT_DOUBLE_EQ(identity[5], 1.0);   // [1][1]
+    EXPECT_DOUBLE_EQ(identity[15], 1.0);  // [3][3]
+    EXPECT_DOUBLE_EQ(identity[1], 0.0);
+    EXPECT_DOUBLE_EQ(identity[-1], 0.0);
+    EXPECT_DOUBLE_EQ(identity[16], 0.0);
+    EXPECT_DOUBLE_EQ(identity[100], 0.0);
+}
+
+/**
+ * @tc.name: Matrix4GapSelfAssign001
+ * @tc.desc: Test operator= self assignment guard.
+ * @tc.type: FUNC
+ */
+HWTEST_F(Matrix4GapTest, Matrix4GapSelfAssign001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: assign a matrix to itself through a reference.
+     * @tc.expected: content unchanged, no crash.
+     */
+    auto translate = Matrix4::CreateTranslate(1.0, 2.0, 3.0);
+    Matrix4& self = translate;
+    translate = self;
+    EXPECT_DOUBLE_EQ(translate(3, 0), 1.0);
+    EXPECT_DOUBLE_EQ(translate(3, 1), 2.0);
+    EXPECT_DOUBLE_EQ(translate(3, 2), 3.0);
+    EXPECT_TRUE(translate == Matrix4::CreateTranslate(1.0, 2.0, 3.0));
 }
 } // namespace OHOS::Ace

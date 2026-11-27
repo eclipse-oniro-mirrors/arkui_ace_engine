@@ -1872,3 +1872,97 @@ HWTEST_F(JsonUtilTest, BoundedJsonInvalidValueClearsOutput, TestSize.Level1)
     BoundedOutput(*object, false, TEST_JSON_BYTE_LIMIT, JsonWriteResult::INVALID_VALUE);
 }
 } // namespace OHOS::Ace
+
+namespace OHOS::Ace {
+
+class JsonUtilGapTest : public testing::Test {
+public:
+    static void SetUpTestSuite() {}
+    static void TearDownTestSuite() {}
+};
+
+/**
+ * @tc.name: JsonValueDuplicateGap001
+ * @tc.desc: Test Duplicate deep copies nested structures.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsonUtilGapTest, JsonValueDuplicateGap001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: build an object with scalars, a nested object and an array,
+     *            then duplicate it.
+     * @tc.expected: duplicate reads back identical values of every member.
+     */
+    auto source = JsonUtil::Create(true);
+    ASSERT_TRUE(source);
+    source->Put("name", "ace");
+    source->Put("count", static_cast<int32_t>(7));
+    source->Put("ratio", 0.5);
+    source->Put("flag", true);
+
+    auto nested = JsonUtil::Create(true);
+    nested->Put("inner", "value");
+    source->Put("nested", nested);
+
+    auto array = JsonUtil::CreateArray(true);
+    array->Put(static_cast<int32_t>(1));
+    array->Put(static_cast<int32_t>(2));
+    source->Put("array", array);
+
+    auto duplicate = source->Duplicate();
+    ASSERT_TRUE(duplicate);
+    EXPECT_TRUE(duplicate->IsObject());
+    EXPECT_EQ(duplicate->GetString("name"), "ace");
+    EXPECT_EQ(duplicate->GetInt("count"), 7);
+    EXPECT_DOUBLE_EQ(duplicate->GetDouble("ratio"), 0.5);
+    EXPECT_TRUE(duplicate->GetBool("flag"));
+    EXPECT_EQ(duplicate->GetObject("nested")->GetString("inner"), "value");
+    EXPECT_EQ(duplicate->GetValue("array")->GetArraySize(), 2);
+    EXPECT_EQ(duplicate->GetValue("array")->GetArrayItem(0)->GetInt(), 1);
+    EXPECT_EQ(duplicate->GetValue("array")->GetArrayItem(1)->GetInt(), 2);
+}
+
+/**
+ * @tc.name: JsonValueDuplicateGap002
+ * @tc.desc: Test Duplicate result is independent from the source.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsonUtilGapTest, JsonValueDuplicateGap002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: duplicate an object, then mutate the source and the duplicate.
+     * @tc.expected: neither mutation is visible in the other instance (deep copy).
+     */
+    auto source = JsonUtil::Create(true);
+    ASSERT_TRUE(source);
+    source->Put("stable", static_cast<int32_t>(1));
+
+    auto duplicate = source->Duplicate();
+    ASSERT_TRUE(duplicate);
+    // mutate source: duplicate keeps old value
+    source->Replace("stable", static_cast<int32_t>(2));
+    EXPECT_EQ(duplicate->GetInt("stable"), 1);
+    // mutate duplicate: source keeps its value
+    duplicate->Replace("stable", static_cast<int32_t>(3));
+    EXPECT_EQ(source->GetInt("stable"), 2);
+}
+
+/**
+ * @tc.name: JsonValueDuplicateGap003
+ * @tc.desc: Test Duplicate on a null-backed JsonValue.
+ * @tc.type: FUNC
+ */
+HWTEST_F(JsonUtilGapTest, JsonValueDuplicateGap003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: duplicate a JsonValue holding null cJSON object.
+     * @tc.expected: duplicate returns a JsonValue that is not a valid object.
+     */
+    auto source = JsonUtil::ParseJsonString("");
+    ASSERT_TRUE(source);
+    auto duplicate = source->Duplicate();
+    ASSERT_TRUE(duplicate);
+    EXPECT_FALSE(duplicate->IsObject());
+    EXPECT_FALSE(duplicate->IsValid());
+}
+} // namespace OHOS::Ace

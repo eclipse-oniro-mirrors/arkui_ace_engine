@@ -61,6 +61,7 @@ ace_unittest("util_test") {
   }
   sources = [
     "base_utils_test.cpp",
+    "date_util_test.cpp",
     "delay_task_test.cpp",
     "dump_recorder_test.cpp",
     "json_util_test.cpp",
@@ -68,6 +69,7 @@ ace_unittest("util_test") {
     "node_object_test.cpp",
     "sparse_fields_test.cpp",
     "sparse_ref_ptr_late_type.cpp",
+    "string_utils_test.cpp",
     "unique_valued_map_test.cpp",
     "uobject_test.cpp",
     "utf_helper_test_ng.cpp",
