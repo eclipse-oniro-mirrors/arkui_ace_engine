@@ -292,12 +292,21 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     auto newInstanceId = context->GetInstanceId();
     bool isMoving = IsMoving();
     bool detachContextHappened = hasDetachContext_;
+    bool instanceIdChanged = newInstanceId != instanceId_;
+    bool hasAccessibilityCallback = (accessibilityChildTreeCallback_ != nullptr);
     UIEXT_LOGI("OnAttachContext newInstanceId: %{public}d, oldInstanceId: %{public}d,"
         " isMoving: %{public}d, detachContextHappened: %{public}d.",
         newInstanceId, instanceId_, isMoving, detachContextHappened);
-    if (newInstanceId != instanceId_) {
+    if (instanceIdChanged) {
         UnRegisterEvent(instanceId_);
         RegisterEvent(newInstanceId);
+        if (hasAccessibilityCallback) {
+            // Cross-instance window migration: the accessibility child tree callback was
+            // registered on the old instance's accessibility manager, deregister it from the
+            // old window before rebinding. Must run before instanceId_ is updated: the
+            // instanceId overload resolves the old pipeline by container id.
+            ResetAccessibilityChildTreeCallback(instanceId_);
+        }
         instanceId_ = newInstanceId;
         UpdateSessionInstanceId(newInstanceId);
     } else if (detachContextHappened) {
@@ -305,6 +314,17 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     }
     if (sessionWrapper_) {
         sessionWrapper_->UpdateWindowSceneId();
+    }
+    if (instanceIdChanged && hasAccessibilityCallback) {
+        // Re-register the callback on the new instance's accessibility manager and notify UEA
+        // to re-register the accessibility child tree bound to the new host window.
+        // InitializeAccessibility re-reads the fresh host window id; an identical parent
+        // triple is skipped idempotently on UEA side.
+        InitializeAccessibility();
+        if (sessionWrapper_) {
+            // Refresh the UEA geometry info under the new host window.
+            TransferAccessibilityRectInfo(true);
+        }
     }
     AddWindowStateChangedCallback();
     RegisterAvoidInfoChangeListener(instanceId_);
@@ -751,6 +771,14 @@ void UIExtensionPattern::OnConnect()
         uiExtensionManager->RegisterUIExtensionInFocus(WeakClaim(this), sessionWrapper_);
     }
     ReDispatchWantParams();
+    if (accessibilityChildTreeCallback_ != nullptr) {
+        // Session (re)connected while an accessibility child tree callback from a previous
+        // session or cross-window migration already exists: rebuild the callback so UEA is
+        // notified to register again. The registration transfer is idempotent on UEA side
+        // (identical parent triple is skipped), which deterministically recovers a transfer
+        // lost when the previous session died, instead of relying only on the UEA ready event.
+        ResetAccessibilityChildTreeCallback();
+    }
     InitializeAccessibility();
     ReDispatchDisplayArea();
     InitBusinessDataHandleCallback();
@@ -1945,18 +1973,60 @@ void UIExtensionPattern::OnAccessibilityDumpChildInfo(
 void UIExtensionPattern::ResetAccessibilityChildTreeCallback()
 {
     CHECK_NULL_VOID(accessibilityChildTreeCallback_);
-    auto instanceId = GetInstanceIdFromHost();
+    auto accessibilityId = accessibilityChildTreeCallback_->GetAccessibilityId();
+    auto host = GetHost();
+    auto instanceId = host ? host->GetInstanceId() : instanceId_;
     ContainerScope scope(instanceId);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
-    CHECK_NULL_VOID(ngPipeline);
-    auto frontend = ngPipeline->GetFrontend();
-    CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
-    CHECK_NULL_VOID(accessibilityManager);
-    accessibilityManager->DeregisterAccessibilityChildTreeCallback(
-        accessibilityChildTreeCallback_->GetAccessibilityId());
+    if (ngPipeline) {
+        auto frontend = ngPipeline->GetFrontend();
+        auto mainAccessibilityManager = frontend ? frontend->GetAccessibilityManager() : nullptr;
+        // Align with the destructor: resolve the manager by node so a callback registered on a
+        // componentized sub accessibility manager is deregistered from the same manager.
+        auto accessibilityManager = (host && mainAccessibilityManager)
+            ? mainAccessibilityManager->GetAccessibilityManagerForNode(host)
+            : mainAccessibilityManager;
+        if (accessibilityManager) {
+            accessibilityManager->DeregisterAccessibilityChildTreeCallback(accessibilityId);
+        } else {
+            UIEXT_LOGW("accessibilityManager is nullptr, instanceId: %{public}d", instanceId);
+        }
+    } else {
+        UIEXT_LOGW("pipeline of instanceId: %{public}d is nullptr, skip deregister child tree callback",
+            instanceId);
+    }
+    // Always release the callback so the following InitializeAccessibility can rebuild it and
+    // re-notify UEA even when the owning manager is temporarily unresolvable.
     accessibilityChildTreeCallback_.reset();
-    accessibilityChildTreeCallback_ = nullptr;
+}
+
+void UIExtensionPattern::ResetAccessibilityChildTreeCallback(int32_t instanceId)
+{
+    CHECK_NULL_VOID(accessibilityChildTreeCallback_);
+    auto accessibilityId = accessibilityChildTreeCallback_->GetAccessibilityId();
+    auto host = GetHost();
+    ContainerScope scope(instanceId);
+    auto pipeline = PipelineContext::GetContextByContainerId(instanceId);
+    if (pipeline) {
+        auto frontend = pipeline->GetFrontend();
+        auto mainAccessibilityManager = frontend ? frontend->GetAccessibilityManager() : nullptr;
+        // Align with the destructor and the no-arg overload: resolve the owning manager by node so
+        // a callback registered on a componentized sub accessibility manager (possible for a UEC
+        // node inside an exported subtree of the old window) is deregistered from the same manager.
+        // The registry lookup falls back to this old main manager when no binding is found.
+        auto accessibilityManager = (host && mainAccessibilityManager)
+            ? mainAccessibilityManager->GetAccessibilityManagerForNode(host)
+            : mainAccessibilityManager;
+        if (accessibilityManager) {
+            accessibilityManager->DeregisterAccessibilityChildTreeCallback(accessibilityId);
+        } else {
+            UIEXT_LOGW("mainAccessibilityManager is nullptr, instanceId: %{public}d", instanceId);
+        }
+    } else {
+        UIEXT_LOGW("pipeline of instanceId: %{public}d is nullptr, skip deregister child tree callback",
+            instanceId);
+    }
+    accessibilityChildTreeCallback_.reset();
 }
 
 void UIExtensionPattern::OnMountToParentDone()

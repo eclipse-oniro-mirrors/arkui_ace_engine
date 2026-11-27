@@ -9356,7 +9356,20 @@ void JsAccessibilityManager::RegisterInteractionOperationAsChildTree(
     CHECK_NULL_VOID(pipelineContext);
     auto container = Platform::AceContainer::GetContainer(pipelineContext->GetInstanceId());
     if (container != nullptr && container->IsUIExtensionWindow()) {
-        windowId_ = pipelineContext->GetRealHostWindowId();
+        if (parentTreeId == 0) {
+            // Top-level child tree (parent is a host main/sub-window tree): after cross-window
+            // migration the host window id carried by the registration request is authoritative
+            // and fresher than the pipeline host info updated later by the window manager.
+            // parentTreeId == 0 reliably denotes a host main tree by construction: AAMS reserves
+            // SINGLE_TREE_ID 0 for main trees and allocates child tree ids >= 1, and host main
+            // windows register through the main-tree path which never receives SetBelongTreeId;
+            // a non-zero value denotes a nested child tree whose direct parent window is resolved
+            // from the local pipeline.
+            windowId_ = parentWindowId;
+        } else {
+            // Nested child tree keeps the direct parent window resolved by the pipeline.
+            windowId_ = pipelineContext->GetRealHostWindowId();
+        }
     } else if (pipelineContext->IsFormRender()) {
         windowId_ = parentWindowId;
     }

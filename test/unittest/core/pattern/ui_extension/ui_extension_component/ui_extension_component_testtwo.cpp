@@ -1200,6 +1200,96 @@ HWTEST_F(UIExtensionComponentTestTwoNg, OnAttachContext002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: OnAttachContext003
+ * @tc.desc: Test OnAttachContext releases the accessibility child tree callback bound to the
+ *           old window and re-initializes it when the component migrates to a new window
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, OnAttachContext003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    /**
+     * @tc.steps: step1. construct a UIExtensionComponent Node holding an accessibility child
+     *           tree callback, simulating the registered state on the old window
+     */
+    auto uiExtensionNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto uiExtensionNode = FrameNode::GetOrCreateFrameNode(
+        UI_EXTENSION_COMPONENT_ETS_TAG, uiExtensionNodeId, []() {
+            return AceType::MakeRefPtr<UIExtensionPattern>();
+        });
+    ASSERT_NE(uiExtensionNode, nullptr);
+    auto pattern = uiExtensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->instanceId_ = 999; // instance id of the old window
+    int64_t accessibilityId = uiExtensionNode->GetAccessibilityId();
+    pattern->accessibilityChildTreeCallback_ =
+        std::make_shared<UIExtensionAccessibilityChildTreeCallback>(pattern, accessibilityId);
+    ASSERT_NE(pattern->accessibilityChildTreeCallback_, nullptr);
+    auto* oldCallback = pattern->accessibilityChildTreeCallback_.get();
+
+    /**
+     * @tc.steps: step2. attach to a new pipeline context, simulating cross-window migration
+     */
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    pipelineContext->uiExtensionManager_ = nullptr;
+    auto newInstanceId = pipelineContext->GetInstanceId();
+    ASSERT_NE(newInstanceId, pattern->instanceId_);
+    pattern->OnAttachContext(AceType::RawPtr(pipelineContext));
+
+    /**
+     * @tc.expected: instanceId is updated to the new window, and the stale callback bound to
+     * the old window is released during migration re-initialization
+     */
+    EXPECT_EQ(pattern->instanceId_, newInstanceId);
+    EXPECT_NE(pattern->accessibilityChildTreeCallback_.get(), oldCallback);
+#endif
+}
+
+/**
+ * @tc.name: OnAttachContext004
+ * @tc.desc: Test OnAttachContext keeps the accessibility child tree callback unchanged when
+ *           the instance id is not changed (no window migration)
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, OnAttachContext004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    /**
+     * @tc.steps: step1. construct a UIExtensionComponent Node holding an accessibility child
+     *           tree callback, and align the pattern instance id with the pipeline context
+     */
+    auto uiExtensionNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto uiExtensionNode = FrameNode::GetOrCreateFrameNode(
+        UI_EXTENSION_COMPONENT_ETS_TAG, uiExtensionNodeId, []() {
+            return AceType::MakeRefPtr<UIExtensionPattern>();
+        });
+    ASSERT_NE(uiExtensionNode, nullptr);
+    auto pattern = uiExtensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    pattern->instanceId_ = pipelineContext->GetInstanceId();
+    int64_t accessibilityId = uiExtensionNode->GetAccessibilityId();
+    pattern->accessibilityChildTreeCallback_ =
+        std::make_shared<UIExtensionAccessibilityChildTreeCallback>(pattern, accessibilityId);
+    ASSERT_NE(pattern->accessibilityChildTreeCallback_, nullptr);
+    auto* oldCallback = pattern->accessibilityChildTreeCallback_.get();
+
+    /**
+     * @tc.steps: step2. attach to the same pipeline context (no window migration)
+     */
+    pipelineContext->uiExtensionManager_ = nullptr;
+    pattern->OnAttachContext(AceType::RawPtr(pipelineContext));
+
+    /**
+     * @tc.expected: the accessibility child tree callback is kept unchanged
+     */
+    EXPECT_EQ(pattern->accessibilityChildTreeCallback_.get(), oldCallback);
+#endif
+}
+
+/**
  * @tc.name: UIExtensionComponentTestTwoNg
  * @tc.desc: Test the method of pattern UpdateSessionInstanceId
  * @tc.type: FUNC

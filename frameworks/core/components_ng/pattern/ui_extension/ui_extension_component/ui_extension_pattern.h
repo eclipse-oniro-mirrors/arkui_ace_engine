@@ -446,6 +446,7 @@ private:
     UIExtensionUsage GetUIExtensionUsage(const AAFwk::Want& want);
     void ReDispatchDisplayArea();
     void ResetAccessibilityChildTreeCallback();
+    void ResetAccessibilityChildTreeCallback(int32_t instanceId);
     bool GetForceProcessOnKeyEventInternal() const
     {
         return forceProcessOnKeyEventInternal_;
