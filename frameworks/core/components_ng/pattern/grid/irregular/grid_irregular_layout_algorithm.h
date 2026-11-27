@@ -47,12 +47,18 @@ public:
 
     void Layout(LayoutWrapper* layoutWrapper) override;
 
+    // Apply the prepared target during the relocation layout batch.
+    void SetFastScrollTargetForLayout(const GridFastScrollTarget& target);
+
     void SetEnableSkip(bool value)
     {
         enableSkip_ = value;
     }
 
 private:
+    void PrepareFastScroll(float mainSize);
+    std::optional<RectF> GetFastScrollTargetRect(int32_t targetIndex);
+
     /**
      * @brief Measures the size of Grid based on the given GridLayoutProperty.
      * @param props The GridLayoutProperty object containing the layout properties.
@@ -169,6 +175,7 @@ private:
 
     // ========================================== MeasureOnJump functions =====================================
 
+    std::optional<float> GetFastScrollAlignmentCorrection(float mainSize, int32_t target, ScrollAlign requestedAlign);
     void MeasureOnJump(float mainSize);
     void Jump(float mainSize, bool considerContentOffset = false);
 
@@ -254,6 +261,10 @@ private:
 
     float postJumpOffset_ = 0.0f; /**< The offset to be applied after performing a jump. */
     float overscrollOffsetBeforeJump_ = 0.0f;
+
+    bool fastScrollLayout_ = false;
+    bool fastScrollAutoAlign_ = false;
+    bool fastScrollPreparationOnly_ = false;
 
     bool enableSkip_ = true;
     bool canOverScrollStart_ = false;

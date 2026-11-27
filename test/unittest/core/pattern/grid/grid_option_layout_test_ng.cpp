@@ -14,6 +14,7 @@
  */
 
 #include "grid_test_ng.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 
@@ -28,10 +29,35 @@
 
 namespace OHOS::Ace::NG {
 
-namespace {} // namespace
+namespace {
+constexpr int32_t REVERSE_ITEM_COUNT = 120;
+constexpr int32_t REVERSE_TARGET_INDEX = 18;
+constexpr int32_t VARIABLE_HEIGHT_PERIOD = 5;
+} // namespace
 
 class GridOptionLayoutTestNg : public GridTestNg {
 public:
+
+protected:
+    void BuildReverseColdGrid(const std::shared_ptr<std::vector<int32_t>>& created,
+        const std::shared_ptr<WeakPtr<FrameNode>>& lastTarget)
+    {
+        auto model = CreateGrid();
+        model.SetColumnsTemplate("1fr 1fr 1fr");
+        model.SetCachedCount(0);
+        GridLayoutOptions options;
+        options.irregularIndexes = { 39, 40 };
+        options.getSizeByIndex = [](int32_t) { return GridItemSize { 1, 2 }; };
+        model.SetLayoutOptions(options);
+        CreateItemsInLazyForEach(REVERSE_ITEM_COUNT, [created, lastTarget](uint32_t index) {
+            created->push_back(static_cast<int32_t>(index));
+            if (index == REVERSE_TARGET_INDEX) {
+                *lastTarget = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+            }
+            return 80.0f + static_cast<float>(index % VARIABLE_HEIGHT_PERIOD) * 15.0f;
+        });
+        CreateDone();
+    }
 };
 
 /**
@@ -1340,4 +1366,208 @@ HWTEST_F(GridOptionLayoutTestNg, ContentOffset003, TestSize.Level1)
     EXPECT_EQ(pattern_->GetTotalOffset(), -20.0f);
     EXPECT_EQ(pattern_->info_.currentOffset_, contentOffset);
 }
+namespace {
+class ScopedWithOptionsAlgorithm final {
+public:
+    ScopedWithOptionsAlgorithm() : previous_(SystemProperties::gridIrregularLayoutEnable_)
+    {
+        SystemProperties::gridIrregularLayoutEnable_ = false;
+    }
+    ~ScopedWithOptionsAlgorithm()
+    {
+        SystemProperties::gridIrregularLayoutEnable_ = previous_;
+    }
+private:
+    bool previous_;
+};
+} // namespace
+
+/**
+ * @tc.name: FastScrollOptionsPreparation
+ * @tc.desc: Complete GridLayoutOptions supplies spans before cold GridItems are created.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridOptionLayoutTestNg, FastScrollOptionsPreparation, TestSize.Level1)
+{
+    ScopedWithOptionsAlgorithm scope;
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto measured = std::make_shared<std::vector<int32_t>>();
+    auto queried = std::make_shared<std::vector<int32_t>>();
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(0);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 39, 40 };
+    options.getSizeByIndex = [queried](int32_t index) {
+        queried->push_back(index);
+        return GridItemSize { 1, 2 };
+    };
+    model.SetLayoutOptions(options);
+    CreateItemsInLazyForEach(120, [created, measured](uint32_t index) {
+        created->push_back(static_cast<int32_t>(index));
+        auto node = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+        node->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+            [measured, index](RefPtr<Kit::FrameNode>&) { measured->push_back(static_cast<int32_t>(index)); });
+        return 80.0f + static_cast<float>(index % 5) * 15.0f;
+    });
+    CreateDone();
+    ASSERT_NE(AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm()), nullptr);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 39), 0);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 40), 0);
+    created->clear();
+    measured->clear();
+    pattern_->ScrollToIndexFastScroll(90, true, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks(frameNode_);
+    const auto& prepared = pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+    ASSERT_TRUE(prepared.has_value());
+    EXPECT_TRUE(prepared->ready);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Left(), 0.0f);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Top() - prepared->targetOffsetPx, 0.0f);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Width(), WIDTH / 3.0f);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Height(), 80.0f);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 0);
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 39), queried->end());
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 40), queried->end());
+    EXPECT_NE(std::find(measured->begin(), measured->end(), 90), measured->end());
+    const auto middle = [](int32_t index) { return index >= 24 && index < 84; };
+    EXPECT_EQ(std::count_if(created->begin(), created->end(), middle), 0);
+    EXPECT_EQ(std::count_if(measured->begin(), measured->end(), middle), 0);
+}
+
+/**
+ * @tc.name: FastScrollOptionsPreparationMode1
+ * @tc.desc: Complete GridLayoutOptions supplies spans before cold GridItems are created.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridOptionLayoutTestNg, FastScrollOptionsPreparationMode1, TestSize.Level1)
+{
+    ScopedWithOptionsAlgorithm scope;
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto measured = std::make_shared<std::vector<int32_t>>();
+    auto queried = std::make_shared<std::vector<int32_t>>();
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(0);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 39, 40 };
+    options.getSizeByIndex = [queried](int32_t index) {
+        queried->push_back(index);
+        return GridItemSize { 1, 2 };
+    };
+    model.SetLayoutOptions(options);
+    CreateItemsInLazyForEach(120, [created, measured](uint32_t index) {
+        created->push_back(static_cast<int32_t>(index));
+        auto node = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+        node->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+            [measured, index](RefPtr<Kit::FrameNode>&) { measured->push_back(static_cast<int32_t>(index)); });
+        return 80.0f + static_cast<float>(index % 5) * 15.0f;
+    });
+    CreateDone();
+    ASSERT_NE(AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm()), nullptr);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 39), 0);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 40), 0);
+    created->clear();
+    measured->clear();
+    pattern_->ScrollToIndexFastScroll(90, true, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_MEASURE);
+    FlushUITasks(frameNode_);
+    const auto& prepared = pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+    ASSERT_TRUE(prepared.has_value());
+    EXPECT_TRUE(prepared->ready);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Left(), 0.0f);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Top() - prepared->targetOffsetPx, 0.0f);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Width(), WIDTH / 3.0f);
+    EXPECT_FLOAT_EQ(prepared->targetRect.Height(), 80.0f);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 0);
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 39), queried->end());
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 40), queried->end());
+    EXPECT_NE(std::find(measured->begin(), measured->end(), 90), measured->end());
+    const auto middle = [](int32_t index) { return index >= 24 && index < 84; };
+    EXPECT_EQ(std::count_if(created->begin(), created->end(), middle), 0);
+    EXPECT_EQ(std::count_if(measured->begin(), measured->end(), middle), 0);
+}
+
+
+/**
+ * @tc.name: FastScrollOptionsReverseCold
+ * @tc.desc: Both modes rebuild a reverse cold target with valid options and preserve the current viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridOptionLayoutTestNg, FastScrollOptionsReverseCold, TestSize.Level1)
+{
+    ScopedWithOptionsAlgorithm scope;
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto lastTarget = std::make_shared<WeakPtr<FrameNode>>();
+    BuildReverseColdGrid(created, lastTarget);
+    ScrollToIndex(18, false, ScrollAlign::START);
+    const auto reference = pattern_->GetItemRect(18);
+    ASSERT_GT(reference.Width(), 0.0f);
+    auto lazy = AceType::DynamicCast<LazyForEachNode>(frameNode_->GetChildren().front());
+    ASSERT_NE(lazy, nullptr);
+    auto old = lastTarget->Upgrade();
+    ASSERT_NE(old, nullptr);
+    WeakPtr<FrameNode> weak(old);
+    old.Reset();
+    ScrollToIndex(90, false, ScrollAlign::START);
+    for (auto mode : { FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE }) {
+        SCOPED_TRACE(static_cast<int32_t>(mode));
+        lazy->CleanCache(true);
+        // A non-cache lookup would restore an expiring item to the active cache and change the test state.
+        ASSERT_EQ(lazy->GetFrameChildByIndex(18, false, true, false), nullptr);
+        created->clear();
+        pattern_->ScrollToIndexFastScroll(18, true, ScrollAlign::START, 0.0f, mode);
+        FlushUITasks(frameNode_);
+        const auto& prepared = pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+        ASSERT_TRUE(prepared.has_value());
+        EXPECT_TRUE(prepared->ready);
+        EXPECT_FLOAT_EQ(prepared->targetRect.Left(), reference.Left());
+        EXPECT_FLOAT_EQ(prepared->targetRect.Top() - prepared->targetOffsetPx, reference.Top());
+        EXPECT_FLOAT_EQ(prepared->targetRect.Width(), reference.Width());
+        EXPECT_FLOAT_EQ(prepared->targetRect.Height(), reference.Height());
+        auto rebuilt = lastTarget->Upgrade();
+        ASSERT_NE(rebuilt, nullptr);
+        EXPECT_NE(rebuilt, weak.Upgrade());
+        EXPECT_FALSE(rebuilt->IsActive());
+        EXPECT_EQ(std::count(created->begin(), created->end(), 18), 1);
+        EXPECT_EQ(std::count_if(created->begin(), created->end(), [](int32_t i) { return i >= 36 && i < 84; }), 0);
+        EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 90);
+        weak = rebuilt;
+    }
+}
+
+/**
+ * @tc.name: FastScrollOptionsHorizontalRtlOracle
+ * @tc.desc: Options-based horizontal preparation honors RTL, gaps and signed offset against ordinary layout.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridOptionLayoutTestNg, FastScrollOptionsHorizontalRtlOracle, TestSize.Level1)
+{
+    ScopedWithOptionsAlgorithm scope;
+    auto model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr 1fr");
+    model.SetColumnsGap(Dimension(10.0f));
+    model.SetCachedCount(0);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::RTL);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 39, 40 };
+    options.getSizeByIndex = [](int32_t) { return GridItemSize { 2, 1 }; };
+    model.SetLayoutOptions(options);
+    CreateGridItems(120, 100.0f, FILL_VALUE);
+    CreateDone();
+    ASSERT_NE(AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm()), nullptr);
+    ScrollToIndex(90, false, ScrollAlign::CENTER, -25.0f);
+    const auto reference = pattern_->GetItemRect(90);
+    ASSERT_GT(reference.Width(), 0.0f);
+    ScrollToIndex(0, false, ScrollAlign::START);
+    pattern_->ScrollToIndexFastScroll(90, true, ScrollAlign::CENTER, -25.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks(frameNode_);
+    const auto& prepared = pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+    ASSERT_TRUE(prepared.has_value());
+    EXPECT_FLOAT_EQ(prepared->targetRect.Left() + prepared->targetOffsetPx, reference.Left());
+    EXPECT_FLOAT_EQ(prepared->targetRect.Top(), reference.Top());
+    EXPECT_FLOAT_EQ(prepared->targetRect.Width(), reference.Width());
+    EXPECT_FLOAT_EQ(prepared->targetRect.Height(), reference.Height());
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 0);
+}
+
 } // namespace OHOS::Ace::NG

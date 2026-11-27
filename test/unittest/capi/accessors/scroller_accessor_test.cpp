@@ -123,6 +123,8 @@ public:
     MOCK_METHOD(void, ScrollToEdge, (ScrollEdgeType, bool));
     MOCK_METHOD(void, ScrollBy, (double, double, bool));
     MOCK_METHOD(void, ScrollToIndex, (int32_t, bool, ScrollAlign, std::optional<float>));
+    MOCK_METHOD(void, ScrollToIndexWithOptions,
+        (int32_t, bool, ScrollAlign, std::optional<float>, FastScrollMode), (override));
     MOCK_METHOD(int32_t, GetItemIndex, (double, double), (const override));
     MOCK_METHOD(Offset, GetCurrentOffset, (), (const override));
     MOCK_METHOD(Rect, GetItemRect, (int32_t), (const override));
@@ -579,6 +581,60 @@ HWTEST_F(ScrollerAccessorTest, scrollToIndexTestOptions, TestSize.Level1)
     accessor_->scrollToIndex(vmContext_, peer_, arkIndex, &optSmooth, &optAlign, &optOptionsEmpty1);
     accessor_->scrollToIndex(vmContext_, peer_, arkIndex, &optSmooth, &optAlign, &optOptionsEmpty2);
     accessor_->scrollToIndex(vmContext_, peer_, arkIndex, &optSmooth, &optAlign, nullptr);
+}
+
+/**
+ * @tc.name: FastScrollOptionsDispatch
+ * @tc.desc: Forward each enabled mode and signed pixel offset through the real accessor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollerAccessorTest, FastScrollOptionsDispatch, TestSize.Level1)
+{
+    const auto index = Converter::ArkValue<Ark_Int32>(90);
+    const auto smooth = Converter::ArkValue<Opt_Boolean>(true);
+    const auto align = Converter::ArkValue<Opt_ScrollAlign>(ARK_SCROLL_ALIGN_AUTO);
+    const auto length = Converter::ArkCreate<Ark_LengthMetricsProxy>(ARK_LENGTH_UNIT_PX, -13.0f);
+    for (int32_t mode = 1; mode <= 2; ++mode) {
+        const Ark_ScrollToIndexOptions options {
+            .extraOffset = Converter::ArkValue<Opt_LengthMetricsProxy>(length),
+            .fastScroll = Converter::ArkValue<Opt_FastScrollMode>(static_cast<Ark_FastScrollMode>(mode)),
+        };
+        const auto optional = Converter::ArkValue<Opt_ScrollToIndexOptions>(options);
+        EXPECT_CALL(*mockScrollerController_, ScrollToIndex(_, _, _, _)).Times(0);
+        EXPECT_CALL(*mockScrollerController_, ScrollToIndexWithOptions(
+            90, true, ScrollAlign::AUTO, std::optional<float>(-13.0f), static_cast<FastScrollMode>(mode))).Times(1);
+        accessor_->scrollToIndex(vmContext_, peer_, index, &smooth, &align, &optional);
+        Mock::VerifyAndClearExpectations(mockScrollerController_);
+    }
+}
+
+/**
+ * @tc.name: FastScrollOptionsLegacyIsolation
+ * @tc.desc: Disabled, invalid, non-animated and omitted modes preserve the old virtual call.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollerAccessorTest, FastScrollOptionsLegacyIsolation, TestSize.Level1)
+{
+    const auto index = Converter::ArkValue<Ark_Int32>(90);
+    const auto align = Converter::ArkValue<Opt_ScrollAlign>(Ark_Empty());
+    const std::optional<float> emptyOffset = std::nullopt;
+    for (int32_t mode : { 0, -1, 3, 1, 2 }) {
+        const auto smooth = Converter::ArkValue<Opt_Boolean>(mode <= 0 || mode == 3);
+        const Ark_ScrollToIndexOptions options {
+            .extraOffset = Converter::ArkValue<Opt_LengthMetricsProxy>(Ark_Empty()),
+            .fastScroll = Converter::ArkValue<Opt_FastScrollMode>(static_cast<Ark_FastScrollMode>(mode)),
+        };
+        const auto optional = Converter::ArkValue<Opt_ScrollToIndexOptions>(options);
+        EXPECT_CALL(*mockScrollerController_, ScrollToIndexWithOptions(_, _, _, _, _)).Times(0);
+        EXPECT_CALL(*mockScrollerController_, ScrollToIndex(
+            90, mode <= 0 || mode == 3, ScrollAlign::NONE, emptyOffset)).Times(1);
+        accessor_->scrollToIndex(vmContext_, peer_, index, &smooth, &align, &optional);
+        Mock::VerifyAndClearExpectations(mockScrollerController_);
+    }
+    const auto smooth = Converter::ArkValue<Opt_Boolean>(true);
+    EXPECT_CALL(*mockScrollerController_, ScrollToIndexWithOptions(_, _, _, _, _)).Times(0);
+    EXPECT_CALL(*mockScrollerController_, ScrollToIndex(90, true, ScrollAlign::NONE, emptyOffset)).Times(1);
+    accessor_->scrollToIndex(vmContext_, peer_, index, &smooth, &align, nullptr);
 }
 
 /**

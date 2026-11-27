@@ -27,6 +27,30 @@
 
 namespace OHOS::Ace::NG {
 
+// Per-call preparation inputs. No item nodes are retained by this handoff.
+struct GridFastScrollTarget {
+    int32_t index = -1;
+    ScrollAlign align = ScrollAlign::AUTO;
+    float extraOffsetPx = 0.0f;
+    FastScrollMode mode = FastScrollMode::NONE;
+    // Preserve AUTO's original rule after its working alignment is normalized for animation.
+    bool preserveAutoAlignment = align == ScrollAlign::AUTO;
+
+    bool operator==(const GridFastScrollTarget& other) const
+    {
+        return index == other.index && align == other.align && extraOffsetPx == other.extraOffsetPx &&
+            mode == other.mode && preserveAutoAlignment == other.preserveAutoAlignment;
+    }
+};
+
+struct GridFastScrollGeometry {
+    RectF targetRect;
+    float targetOffsetPx = 0.0f;
+    int32_t firstPreparedIndex = -1;
+    int32_t lastPreparedIndex = -1;
+    bool ready = false;
+};
+
 struct GridPredictLayoutParam {
     LayoutConstraintF layoutConstraint;
     std::map<int32_t, float> itemsCrossSizes;
@@ -59,6 +83,18 @@ constexpr float HALF = 0.5f;
 // Try not to add more variables in [GridLayoutInfo] because the more state variables, the more problematic and the
 // harder it is to maintain
 struct GridLayoutInfo {
+    std::optional<GridFastScrollTarget> fastScrollTarget_;
+    std::optional<GridFastScrollGeometry> fastScrollGeometry_;
+
+    // Existing measured rows take precedence; only unmeasured gaps use an estimate.
+    float GetFastScrollOffset(float mainGap, const std::map<int32_t, float>& knownHeights) const;
+
+    void ResetFastScroll()
+    {
+        fastScrollTarget_.reset();
+        fastScrollGeometry_.reset();
+    }
+
     /**
      * @param prune
      * @if true, try eliminate lines that are above viewport.

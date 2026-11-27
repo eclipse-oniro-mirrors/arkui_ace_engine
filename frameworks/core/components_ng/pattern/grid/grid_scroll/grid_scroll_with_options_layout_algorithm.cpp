@@ -97,6 +97,27 @@ void ApplyTargetIndexInfo(GridLayoutInfo& info, int32_t mainStartIndex, int32_t 
 }
 } // namespace
 
+std::unique_ptr<GridScrollLayoutAlgorithm> GridScrollWithOptionsLayoutAlgorithm::CreateFastScrollPreparation(
+    LayoutWrapper* layoutWrapper)
+{
+    auto property = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    if (!property || !property->HasLayoutOptions()) {
+        return nullptr;
+    }
+    return std::make_unique<GridScrollWithOptionsLayoutAlgorithm>(info_);
+}
+
+bool GridScrollWithOptionsLayoutAlgorithm::PrepareFastScrollAnchor(LayoutWrapper* layoutWrapper, int32_t targetIndex)
+{
+    auto property = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    if (!property || !property->HasLayoutOptions()) {
+        return false;
+    }
+    // The existing options benchmark reads span metadata, without obtaining any intermediate GridItem.
+    GetTargetIndexInfoWithBenchMark(layoutWrapper, false, targetIndex);
+    return info_.startIndex_ >= 0 && info_.startIndex_ <= targetIndex && info_.startMainLineIndex_ >= 0;
+}
+
 void GridScrollWithOptionsLayoutAlgorithm::AdjustRowColSpan(
     const RefPtr<LayoutWrapper>& itemLayoutWrapper, LayoutWrapper* layoutWrapper, int32_t itemIndex)
 {

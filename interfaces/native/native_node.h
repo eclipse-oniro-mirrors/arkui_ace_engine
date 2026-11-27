@@ -9811,22 +9811,61 @@ typedef enum {
     NODE_GRID_MULTI_SELECTABLE = 1013013,
         
     /**
-     * @brief Scroll to the specified index.
+     * @brief Scrolls to the item with the specified index.
+     * Without a fast scroll mode, animated scrolling may load and measure intermediate items, which may affect
+     * performance when the Grid component contains many items.
      *
-     * When activating the smooth animation, all items passed through will be loaded and layout calculated, which can
-     * lead to performance issues when loading a large number of items.\n
-     * \n
-     * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
-     * .value[0].i32: The index value of the target element to be slid to in the current container.\n
-     * .value[1].i32: Set whether there is an animation when sliding to the target element, where
-     * 1 indicates an animation and 0 indicates no animation. This parameter is optional. default value is 0. \n
-     * .value[2].i32: Specify the alignment of the target element with the current container. The parameter type is
-     * {@link ArkUI_ScrollAlignment}. This parameter is optional, default value is </b>ARKUI_SCROLL_ALIGNMENT_AUTO</b>. \n
-     * .value[3].f32: Extra offset after scrolling to a specified index, in vp. This parameter is optional, the default
-     * value is <b>0</b>. 
-     * If value[3] is positive, it will offset further towards the bottom.
-     * If value[3] is negative, it will offset further towards the top. \n
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>`.value[0].i32`: index of the target item. Valid indexes are from <b>0</b> to the number of items minus one.
+     * The native special value <b>-1</b> selects the last item when an item exists.
+     * Other indexes do not select an item for index scrolling.</li>
+     * <li>`.value[1].i32`: whether to animate the scroll. <b>1</b> enables animation; <b>0</b> disables it.
+     * This parameter is optional. Omitting it or passing another integer uses <b>0</b>.</li>
+     * <li>`.value[2].i32`: target alignment of type {@link ArkUI_ScrollAlignment}. This parameter is optional.
+     * Omitting it or passing an invalid alignment uses <b>ARKUI_SCROLL_ALIGNMENT_AUTO</b>.</li>
+     * <li>`.value[3].f32`: optional additional length offset after scrolling to the specified index, in <b>px</b>.
+     * The default value is <b>0</b>. The offset accepts negative, zero and positive values. It adjusts the final
+     * scroll position along the Grid's scroll axis. The offset is always in <b>px</b> and is not converted from the
+     * node's length unit, regardless of the animation and fast scroll mode settings.
+     * For a fast animation, the final position is limited by the start and end scroll boundaries.</li>
+     * <li>`.value[4].i32`: optional fast scroll mode of type {@link OH_ArkUI_FastScrollMode}, available since
+     * API version 26.1.0. <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b> (<b>0</b>) is the default.
+     * <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b> (<b>1</b>) and
+     * <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE</b> (<b>2</b>) take effect only when `.value[1]` is <b>1</b>.
+     * Omitting the mode, passing an invalid mode, or disabling animation uses the original scrolling behavior.
+     * The mode applies only to this call.</li>
+     * </ul>
+     * To set `.value[4]`, provide all slots from `.value[0]` through `.value[4]` and set the item size to at least 5.
+     * The defaults for slots 1, 2 and 3 are <b>0</b>, <b>ARKUI_SCROLL_ALIGNMENT_AUTO</b> and <b>0</b>, respectively.
+     * Use <b>1</b> in slot 1 to enable animation for a fast scroll mode.
      *
+     * For <b>Grid</b>, express special row or column placement through {@link ArkUI_GridLayoutOptions}.
+     * <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE</b> does not discover explicit placement specified
+     * only when creating a cold item. This does not change <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b>
+     * or <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b>.
+     *
+     * For <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE</b>, configure complete row and column spans
+     * through {@link ArkUI_GridLayoutOptions} before requesting the scroll if any uncreated item's spans are unknown.
+     * The information must be available before the corresponding item is created.
+     * Configure irregular indexes with {@link OH_ArkUI_GridLayoutOptions_SetIrregularIndexes} and their spans with
+     * {@link OH_ArkUI_GridLayoutOptions_RegisterGetIrregularSizeByIndexCallback}, following those APIs' requirements.
+     * For custom positioning, follow the position and span requirements of
+     * {@link OH_ArkUI_GridLayoutOptions_RegisterGetRectByIndexCallback}.
+     * Apply the options through {@link NODE_GRID_LAYOUT_OPTIONS} before setting {@link NODE_GRID_SCROLL_TO_INDEX}.
+     * Include every spanning item whose row or column occupancy affects the target position, even if the item
+     * is outside the target viewport. Providing only the target's spans is insufficient. Every span must match
+     * the actual content. This requirement concerns row and column occupancy, not measured pixel sizes.
+     *
+     * This mode supports only inputs that meet this span requirement. No scrolling result is guaranteed for
+     * missing or inconsistent spans. The mode does not automatically fall back to another mode.
+     * The scroll request does not synchronously report arrival or a missing-span error.
+     * <b>OH_ARKUI_FAST_SCROLL_MODE_NONE</b> and <b>OH_ARKUI_FAST_SCROLL_MODE_SKIP_MEASURE</b> do not add this requirement.
+     *
+     * A successful return from setting <b>NODE_GRID_SCROLL_TO_INDEX</b> means that the attribute request was
+     * accepted. It does not validate the target index or indicate completion of scrolling.
+     *
+     * @ingroup Scrollable Container Component
      * @since 23
      */
     NODE_GRID_SCROLL_TO_INDEX = 1013014,

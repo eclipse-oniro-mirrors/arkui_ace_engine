@@ -28,6 +28,9 @@ public:
     ~GridScrollWithOptionsLayoutAlgorithm() override = default;
 
 private:
+    std::unique_ptr<GridScrollLayoutAlgorithm> CreateFastScrollPreparation(LayoutWrapper* layoutWrapper) override;
+    bool PrepareFastScrollAnchor(LayoutWrapper* layoutWrapper, int32_t targetIndex) override;
+
     void SkipLargeOffset(float mainSize, LayoutWrapper* layoutWrapper) override;
     void SkipIrregularLines(LayoutWrapper* layoutWrapper, bool forward) override;
 

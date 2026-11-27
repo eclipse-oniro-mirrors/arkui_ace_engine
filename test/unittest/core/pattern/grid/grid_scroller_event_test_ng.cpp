@@ -1111,4 +1111,98 @@ HWTEST_F(GridScrollerEventTestNg, VerticalGridWithScrollBarWithoutAnimation002, 
     EXPECT_FALSE(isOnReachStartCallBack);
     EXPECT_TRUE(isOnReachEndCallBack);
 }
+/**
+ * @tc.name: FastScrollMeasuredEvents
+ * @tc.desc: Discovering real item sizes does not report coordinate recalibration as an extra scroll delta.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollerEventTestNg, FastScrollMeasuredEvents, TestSize.Level1)
+{
+    MockAnimationManager::GetInstance().SetTicks(8);
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    model.SetCachedCount(0);
+    CreateItemsInLazyForEach(150, [](uint32_t index) { return 80.0f + static_cast<float>(index % 5) * 20.0f; });
+    CreateDone();
+    auto accepted = std::make_shared<std::vector<float>>();
+    auto reported = std::make_shared<std::vector<float>>();
+    eventHub_->SetOnWillScroll([accepted](Dimension offset, ScrollState, ScrollSource) {
+        accepted->push_back(offset.ConvertToPx());
+        ScrollFrameResult result;
+        result.offset = offset;
+        return result;
+    });
+    eventHub_->SetOnDidScroll([reported](Dimension offset, ScrollState) {
+        reported->push_back(offset.ConvertToPx());
+    });
+    pattern_->ScrollToIndexFastScroll(120, true, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks(frameNode_);
+    for (int32_t tick = 0; tick < 40; ++tick) {
+        accepted->clear();
+        reported->clear();
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks(frameNode_);
+        float acceptedSum = 0.0f;
+        float reportedSum = 0.0f;
+        for (auto delta : *accepted) {
+            acceptedSum += delta;
+        }
+        for (auto delta : *reported) {
+            reportedSum += delta;
+        }
+        EXPECT_NEAR(reportedSum, acceptedSum, 0.1f) << "tick=" << tick;
+        if (!pattern_->AnimateRunning() && !pattern_->GetFastScrollRequest()) {
+            break;
+        }
+    }
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(pattern_->GetFastScrollRequest(), nullptr);
+    const auto rect = pattern_->GetItemRect(120);
+    ASSERT_GT(rect.Width(), 0.0f);
+    EXPECT_FLOAT_EQ(rect.Top(), 0.0f);
+}
+
+/**
+ * @tc.name: FastScrollZeroAcceptedMotion
+ * @tc.desc: A zero onWillScroll result cannot produce a skip or keep restarting after the animation stops.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollerEventTestNg, FastScrollZeroAcceptedMotion, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    model.SetCachedCount(0);
+    CreateItemsInLazyForEach(150, [](uint32_t) { return 100.0f; });
+    CreateDone();
+    eventHub_->SetOnWillScroll([](Dimension, ScrollState, ScrollSource) {
+        ScrollFrameResult result;
+        result.offset = Dimension(0.0f);
+        return result;
+    });
+    // Establish the existing callback behavior with the ordinary animation.
+    MockAnimationManager::GetInstance().SetTicks(8);
+    pattern_->ScrollToIndex(120, true, ScrollAlign::START, 0.0f);
+    FlushUITasks(frameNode_);
+    for (int32_t tick = 0; tick < 8; ++tick) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks(frameNode_);
+    }
+    ASSERT_FALSE(pattern_->AnimateRunning());
+    ASSERT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    const auto source = pattern_->GetItemRect(0);
+    MockAnimationManager::GetInstance().SetTicks(8);
+    pattern_->ScrollToIndexFastScroll(120, true, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks(frameNode_);
+    for (int32_t tick = 0; tick < 8; ++tick) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks(frameNode_);
+        EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f) << "tick=" << tick;
+        EXPECT_EQ(pattern_->GetItemRect(0), source) << "tick=" << tick;
+    }
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(pattern_->GetFastScrollRequest(), nullptr);
+}
+
 } // namespace OHOS::Ace::NG

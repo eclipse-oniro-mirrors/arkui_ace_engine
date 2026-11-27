@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 #define private public
 #define protected public
+#include "base/geometry/dimension.h"
 #include "native_interface.h"
 #include "native_node.h"
 #include "native_type.h"
@@ -25,6 +26,7 @@
 #include "interfaces/inner_api/ace/node_module_inner.h"
 #include "interfaces/native/node/node_extened.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/list_option.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
@@ -123,6 +125,193 @@ public:
     void SetUp() {}
     void TearDown() {}
 };
+
+namespace {
+struct GridFastScrollCall {
+    int32_t legacyCalls = 0;
+    int32_t optionsCalls = 0;
+    int32_t conversionCalls = 0;
+    int32_t index = 0;
+    int32_t originUnit = -1;
+    int32_t targetUnit = -1;
+    ArkUINodeHandle node = nullptr;
+    ArkUIScrollToIndexOptions options {};
+};
+
+GridFastScrollCall g_gridFastScrollCall;
+ArkUIGridModifier g_gridFastScrollModifier {};
+ArkUINodeModifiers g_gridFastScrollNodeModifiers {};
+ArkUIBasicAPI g_gridFastScrollBasicApi {};
+
+const ArkUIGridModifier* GetFastScrollGridModifier()
+{
+    return &g_gridFastScrollModifier;
+}
+
+const ArkUINodeModifiers* GetFastScrollNodeModifiers()
+{
+    return &g_gridFastScrollNodeModifiers;
+}
+
+const ArkUIBasicAPI* GetFastScrollBasicApi()
+{
+    return &g_gridFastScrollBasicApi;
+}
+} // namespace
+
+class GridFastScrollNodeStyleTest : public NodeStyleModifierTest {
+public:
+    void SetUp() override
+    {
+        ASSERT_TRUE(NodeModel::InitialFullImpl());
+        nodeApi_ = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+            OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+        ASSERT_NE(nodeApi_, nullptr);
+        node_ = nodeApi_->createNode(ARKUI_NODE_GRID);
+        ASSERT_NE(node_, nullptr);
+        fullImpl_ = NodeModel::GetFullImpl();
+        ASSERT_NE(fullImpl_, nullptr);
+        previousModifiers_ = fullImpl_->getNodeModifiers;
+        previousBasicApi_ = fullImpl_->getBasicAPI;
+        ASSERT_NE(previousModifiers_, nullptr);
+        ASSERT_NE(previousBasicApi_, nullptr);
+        ASSERT_NE(previousModifiers_(), nullptr);
+        ASSERT_NE(previousBasicApi_(), nullptr);
+        g_gridFastScrollNodeModifiers = *previousModifiers_();
+        g_gridFastScrollBasicApi = *previousBasicApi_();
+        g_gridFastScrollModifier = {};
+        g_gridFastScrollModifier.setScrollToIndex = [](ArkUINodeHandle node, ArkUI_Int32 index,
+            ArkUI_Int32 smooth, ArkUI_Int32 align, ArkUI_Float32 offset) {
+            ++g_gridFastScrollCall.legacyCalls;
+            g_gridFastScrollCall.node = node;
+            g_gridFastScrollCall.index = index;
+            g_gridFastScrollCall.options = { smooth != 0, align, offset, 0 };
+        };
+        g_gridFastScrollModifier.setScrollToIndexWithOptions = [](ArkUINodeHandle node, ArkUI_Int32 index,
+            const ArkUIScrollToIndexOptions* options) {
+            ASSERT_NE(options, nullptr);
+            ++g_gridFastScrollCall.optionsCalls;
+            g_gridFastScrollCall.node = node;
+            g_gridFastScrollCall.index = index;
+            g_gridFastScrollCall.options = *options;
+        };
+        g_gridFastScrollBasicApi.convertLengthMetricsUnit = [](double value, int32_t origin, int32_t target) {
+            ++g_gridFastScrollCall.conversionCalls;
+            g_gridFastScrollCall.originUnit = origin;
+            g_gridFastScrollCall.targetUnit = target;
+            constexpr double TEST_LENGTH_SCALE = 2.0;
+            return value * TEST_LENGTH_SCALE;
+        };
+        g_gridFastScrollNodeModifiers.getGridModifier = GetFastScrollGridModifier;
+        fullImpl_->getNodeModifiers = GetFastScrollNodeModifiers;
+        fullImpl_->getBasicAPI = GetFastScrollBasicApi;
+        g_gridFastScrollCall = {};
+    }
+
+    void TearDown() override
+    {
+        if (fullImpl_ && previousModifiers_ && previousBasicApi_) {
+            fullImpl_->getNodeModifiers = previousModifiers_;
+            fullImpl_->getBasicAPI = previousBasicApi_;
+        }
+        if (nodeApi_ && node_) {
+            nodeApi_->disposeNode(node_);
+        }
+    }
+
+protected:
+    ArkUI_NativeNodeAPI_1* nodeApi_ = nullptr;
+    ArkUI_NodeHandle node_ = nullptr;
+    ArkUIFullNodeAPI* fullImpl_ = nullptr;
+    decltype(ArkUIFullNodeAPI::getNodeModifiers) previousModifiers_ = nullptr;
+    decltype(ArkUIFullNodeAPI::getBasicAPI) previousBasicApi_ = nullptr;
+};
+
+/**
+ * @tc.name: FastScrollGridPublicOptions
+ * @tc.desc: Public Grid setAttribute forwards modes 1/2 and keeps the extra offset in px for every node unit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicOptions, TestSize.Level1)
+{
+    for (const auto unit : { ARKUI_LENGTH_METRIC_UNIT_VP, ARKUI_LENGTH_METRIC_UNIT_PX,
+             ARKUI_LENGTH_METRIC_UNIT_FP }) {
+        ASSERT_EQ(nodeApi_->setLengthMetricUnit(node_, unit), ERROR_CODE_NO_ERROR);
+        for (int32_t mode : { 1, 2 }) {
+            g_gridFastScrollCall = {};
+            ArkUI_NumberValue values[] = { { .i32 = 90 }, { .i32 = 1 },
+                { .i32 = ARKUI_SCROLL_ALIGNMENT_NONE }, { .f32 = -11.0f }, { .i32 = mode } };
+            ArkUI_AttributeItem item { values, 5 };
+            EXPECT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+            EXPECT_EQ(g_gridFastScrollCall.legacyCalls, 0);
+            EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 1);
+            EXPECT_EQ(g_gridFastScrollCall.node, node_->uiNodeHandle);
+            EXPECT_EQ(g_gridFastScrollCall.index, 90);
+            EXPECT_TRUE(g_gridFastScrollCall.options.smooth);
+            EXPECT_EQ(g_gridFastScrollCall.options.align, ARKUI_SCROLL_ALIGNMENT_AUTO);
+            EXPECT_EQ(g_gridFastScrollCall.options.fastScrollMode, mode);
+            // The offset is px regardless of the node unit: it is forwarded as is and never converted.
+            EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, -11.0f);
+            EXPECT_EQ(g_gridFastScrollCall.conversionCalls, 0);
+        }
+    }
+}
+
+/**
+ * @tc.name: FastScrollGridPublicLegacyIsolation
+ * @tc.desc: Omitted/invalid mode preserves the old slot; the extra offset stays in px in every slot.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicLegacyIsolation, TestSize.Level1)
+{
+    ASSERT_EQ(nodeApi_->setLengthMetricUnit(node_, ARKUI_LENGTH_METRIC_UNIT_VP), ERROR_CODE_NO_ERROR);
+    ArkUI_NumberValue values[] = { { .i32 = 90 }, { .i32 = 1 },
+        { .i32 = ARKUI_SCROLL_ALIGNMENT_AUTO }, { .f32 = -11.0f }, { .i32 = 2 } };
+    ArkUI_AttributeItem item { values, 5 };
+    ASSERT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 1);
+    EXPECT_EQ(g_gridFastScrollCall.conversionCalls, 0);
+    EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, -11.0f);
+    for (int32_t mode : { 0, -1, 3 }) {
+        g_gridFastScrollCall = {};
+        values[4].i32 = mode;
+        EXPECT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+        EXPECT_EQ(g_gridFastScrollCall.legacyCalls, 1);
+        EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 0);
+        EXPECT_EQ(g_gridFastScrollCall.conversionCalls, 0);
+        EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, -11.0f);
+    }
+    g_gridFastScrollCall = {};
+    item.size = 4;
+    EXPECT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(g_gridFastScrollCall.legacyCalls, 1);
+    EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 0);
+    item.size = 5;
+    values[1].i32 = 0;
+    for (int32_t mode : { 1, 2 }) {
+        g_gridFastScrollCall = {};
+        values[4].i32 = mode;
+        EXPECT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &item), ERROR_CODE_NO_ERROR);
+        EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 1);
+        EXPECT_FALSE(g_gridFastScrollCall.options.smooth);
+        EXPECT_EQ(g_gridFastScrollCall.conversionCalls, 0);
+        EXPECT_FLOAT_EQ(g_gridFastScrollCall.options.extraOffset, -11.0f);
+    }
+}
+
+/**
+ * @tc.name: FastScrollGridPublicInvalidItem
+ * @tc.desc: Null and empty attribute items keep the public parameter error and never dispatch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridFastScrollNodeStyleTest, FastScrollGridPublicInvalidItem, TestSize.Level1)
+{
+    EXPECT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, nullptr), ERROR_CODE_PARAM_INVALID);
+    ArkUI_AttributeItem empty {};
+    EXPECT_EQ(nodeApi_->setAttribute(node_, NODE_GRID_SCROLL_TO_INDEX, &empty), ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(g_gridFastScrollCall.legacyCalls, 0);
+    EXPECT_EQ(g_gridFastScrollCall.optionsCalls, 0);
+}
 
 /**
  * @tc.name: SetDashGapTest001

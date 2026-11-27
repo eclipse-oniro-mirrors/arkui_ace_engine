@@ -22,9 +22,64 @@
 #include "core/components_ng/pattern/grid/irregular/grid_irregular_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/irregular/grid_layout_range_solver.h"
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
 
 namespace OHOS::Ace::NG {
-class GridIrregularLayoutTest : public GridTestNg {};
+namespace {
+constexpr int32_t COLD_ITEM_COUNT = 150;
+constexpr int32_t REVERSE_ITEM_COUNT = 120;
+constexpr int32_t REVERSE_TARGET_INDEX = 18;
+constexpr int32_t VARIABLE_HEIGHT_PERIOD = 5;
+} // namespace
+
+class GridIrregularLayoutTest : public GridTestNg {
+protected:
+    void BuildColdSpanGrid(const std::shared_ptr<std::vector<int32_t>>& created,
+        const std::shared_ptr<std::vector<int32_t>>& measured,
+        const std::shared_ptr<std::vector<int32_t>>& queried)
+    {
+        auto model = CreateGrid();
+        model.SetColumnsTemplate("1fr 1fr 1fr");
+        model.SetRowsGap(Dimension(5.0f));
+        model.SetCachedCount(0);
+        GridLayoutOptions options;
+        options.irregularIndexes = { 39, 40, 90 };
+        options.getSizeByIndex = [queried](int32_t index) {
+            queried->push_back(index);
+            return GridItemSize { 2, 2 };
+        };
+        model.SetLayoutOptions(options);
+        CreateItemsInLazyForEach(COLD_ITEM_COUNT, [created, measured](uint32_t index) {
+            created->push_back(static_cast<int32_t>(index));
+            auto node = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+            node->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+                [measured, index](RefPtr<Kit::FrameNode>&) { measured->push_back(static_cast<int32_t>(index)); });
+            return 80.0f + static_cast<float>(index % VARIABLE_HEIGHT_PERIOD) * 15.0f;
+        });
+        CreateDone();
+    }
+
+protected:
+    void BuildReverseColdGrid(const std::shared_ptr<std::vector<int32_t>>& created,
+        const std::shared_ptr<WeakPtr<FrameNode>>& lastTarget)
+    {
+        auto model = CreateGrid();
+        model.SetColumnsTemplate("1fr 1fr 1fr");
+        model.SetCachedCount(0);
+        GridLayoutOptions options;
+        options.irregularIndexes = { 39, 40 };
+        options.getSizeByIndex = [](int32_t) { return GridItemSize { 2, 2 }; };
+        model.SetLayoutOptions(options);
+        CreateItemsInLazyForEach(REVERSE_ITEM_COUNT, [created, lastTarget](uint32_t index) {
+            created->push_back(static_cast<int32_t>(index));
+            if (index == REVERSE_TARGET_INDEX) {
+                *lastTarget = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+            }
+            return 80.0f + static_cast<float>(index % VARIABLE_HEIGHT_PERIOD) * 15.0f;
+        });
+        CreateDone();
+    }
+};
 
 /**
  * @tc.name: GridIrregularLayout::LayoutChildren001
@@ -1053,4 +1108,284 @@ HWTEST_F(GridIrregularLayoutTest, ReloadWhenOverScrollFromEnd, TestSize.Level1)
     FlushUITasks();
     EXPECT_EQ(pattern_->info_.gridMatrix_, matrix);
 }
+/**
+ * @tc.name: FastScrollIrregularColdPreparation
+ * @tc.desc: Two-dimensional cold spans use metadata without creating or measuring the intermediate path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTest, FastScrollIrregularColdPreparation, TestSize.Level1)
+{
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto measured = std::make_shared<std::vector<int32_t>>();
+    auto queried = std::make_shared<std::vector<int32_t>>();
+    BuildColdSpanGrid(created, measured, queried);
+    ASSERT_NE(AceType::DynamicCast<GridIrregularLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm()), nullptr);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 39), 0);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 40), 0);
+    const auto source = pattern_->GetItemRect(0);
+    created->clear();
+    measured->clear();
+    queried->clear();
+    pattern_->ScrollToIndexFastScroll(90, true, ScrollAlign::START, 15.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks(frameNode_);
+    ASSERT_TRUE(pattern_->GetGridLayoutInfo().fastScrollGeometry_.has_value());
+    const auto prepared = *pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+    EXPECT_TRUE(prepared.ready);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 0);
+    EXPECT_EQ(pattern_->GetItemRect(0), source);
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 39), queried->end());
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 40), queried->end());
+    EXPECT_NE(std::find(measured->begin(), measured->end(), 90), measured->end());
+    const auto middle = [](int32_t index) { return index >= 24 && index < 72; };
+    EXPECT_EQ(std::count_if(created->begin(), created->end(), middle), 0);
+    EXPECT_EQ(std::count_if(measured->begin(), measured->end(), middle), 0);
+    std::string createdIndices;
+    std::string measuredIndices;
+    for (auto index : *created) {
+        createdIndices += std::to_string(index) + ",";
+    }
+    for (auto index : *measured) {
+        measuredIndices += std::to_string(index) + ",";
+    }
+    RecordProperty("created_indices", createdIndices);
+    RecordProperty("measured_indices", measuredIndices);
+    RecordProperty("first_prepared_index", prepared.firstPreparedIndex);
+    RecordProperty("last_prepared_index", prepared.lastPreparedIndex);
+    pattern_->CancelFastScroll();
+    ScrollToIndex(90, false, ScrollAlign::START, 15.0f);
+    const auto reference = pattern_->GetItemRect(90);
+    ASSERT_GT(reference.Width(), 0.0f);
+    EXPECT_FLOAT_EQ(prepared.targetRect.Left(), reference.Left());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Top() - prepared.targetOffsetPx, reference.Top());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Width(), reference.Width());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Height(), reference.Height());
+}
+
+/**
+ * @tc.name: FastScrollIrregularColdMode1
+ * @tc.desc: Two-dimensional cold spans use metadata without creating or measuring the intermediate path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTest, FastScrollIrregularColdMode1, TestSize.Level1)
+{
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto measured = std::make_shared<std::vector<int32_t>>();
+    auto queried = std::make_shared<std::vector<int32_t>>();
+    BuildColdSpanGrid(created, measured, queried);
+    ASSERT_NE(AceType::DynamicCast<GridIrregularLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm()), nullptr);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 39), 0);
+    ASSERT_EQ(std::count(created->begin(), created->end(), 40), 0);
+    const auto source = pattern_->GetItemRect(0);
+    created->clear();
+    measured->clear();
+    queried->clear();
+    pattern_->ScrollToIndexFastScroll(90, true, ScrollAlign::START, 15.0f,
+        FastScrollMode::SKIP_MEASURE);
+    FlushUITasks(frameNode_);
+    ASSERT_TRUE(pattern_->GetGridLayoutInfo().fastScrollGeometry_.has_value());
+    const auto prepared = *pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+    EXPECT_TRUE(prepared.ready);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 0);
+    EXPECT_EQ(pattern_->GetItemRect(0), source);
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 39), queried->end());
+    EXPECT_NE(std::find(queried->begin(), queried->end(), 40), queried->end());
+    EXPECT_NE(std::find(measured->begin(), measured->end(), 90), measured->end());
+    const auto middle = [](int32_t index) { return index >= 24 && index < 72; };
+    EXPECT_EQ(std::count_if(created->begin(), created->end(), middle), 0);
+    EXPECT_EQ(std::count_if(measured->begin(), measured->end(), middle), 0);
+    std::string createdIndices;
+    std::string measuredIndices;
+    for (auto index : *created) {
+        createdIndices += std::to_string(index) + ",";
+    }
+    for (auto index : *measured) {
+        measuredIndices += std::to_string(index) + ",";
+    }
+    RecordProperty("created_indices", createdIndices);
+    RecordProperty("measured_indices", measuredIndices);
+    RecordProperty("first_prepared_index", prepared.firstPreparedIndex);
+    RecordProperty("last_prepared_index", prepared.lastPreparedIndex);
+    pattern_->CancelFastScroll();
+    ScrollToIndex(90, false, ScrollAlign::START, 15.0f);
+    const auto reference = pattern_->GetItemRect(90);
+    ASSERT_GT(reference.Width(), 0.0f);
+    EXPECT_FLOAT_EQ(prepared.targetRect.Left(), reference.Left());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Top() - prepared.targetOffsetPx, reference.Top());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Width(), reference.Width());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Height(), reference.Height());
+}
+
+/**
+ * @tc.name: FastScrollIrregularReverseCold
+ * @tc.desc: Both modes rebuild a reverse cold target with valid options and preserve the current viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTest, FastScrollIrregularReverseCold, TestSize.Level1)
+{
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto lastTarget = std::make_shared<WeakPtr<FrameNode>>();
+    BuildReverseColdGrid(created, lastTarget);
+    ScrollToIndex(18, false, ScrollAlign::START);
+    const auto reference = pattern_->GetItemRect(18);
+    ASSERT_GT(reference.Width(), 0.0f);
+    auto lazy = AceType::DynamicCast<LazyForEachNode>(frameNode_->GetChildren().front());
+    ASSERT_NE(lazy, nullptr);
+    auto old = lastTarget->Upgrade();
+    ASSERT_NE(old, nullptr);
+    WeakPtr<FrameNode> weak(old);
+    old.Reset();
+    ScrollToIndex(90, false, ScrollAlign::START);
+    const auto sourceIndex = pattern_->GetGridLayoutInfo().startIndex_;
+    for (auto mode : { FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE }) {
+        SCOPED_TRACE(static_cast<int32_t>(mode));
+        lazy->CleanCache(true);
+        // A non-cache lookup would restore an expiring item to the active cache and change the test state.
+        ASSERT_EQ(lazy->GetFrameChildByIndex(18, false, true, false), nullptr);
+        created->clear();
+        pattern_->ScrollToIndexFastScroll(18, true, ScrollAlign::START, 0.0f, mode);
+        FlushUITasks(frameNode_);
+        const auto& prepared = pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+        ASSERT_TRUE(prepared.has_value());
+        EXPECT_TRUE(prepared->ready);
+        EXPECT_FLOAT_EQ(prepared->targetRect.Left(), reference.Left());
+        EXPECT_FLOAT_EQ(prepared->targetRect.Top() - prepared->targetOffsetPx, reference.Top());
+        EXPECT_FLOAT_EQ(prepared->targetRect.Width(), reference.Width());
+        EXPECT_FLOAT_EQ(prepared->targetRect.Height(), reference.Height());
+        auto rebuilt = lastTarget->Upgrade();
+        ASSERT_NE(rebuilt, nullptr);
+        EXPECT_NE(rebuilt, weak.Upgrade());
+        EXPECT_FALSE(rebuilt->IsActive());
+        EXPECT_EQ(std::count(created->begin(), created->end(), 18), 1);
+        EXPECT_EQ(std::count_if(created->begin(), created->end(), [](int32_t i) { return i >= 36 && i < 84; }), 0);
+        EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, sourceIndex);
+        weak = rebuilt;
+    }
+}
+
+/**
+ * @tc.name: FastScrollIrregularHorizontalRtl
+ * @tc.desc: Spanning static items preserve RTL, padding, margins, alignment and signed offsets.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTest, FastScrollIrregularHorizontalRtl, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr 1fr");
+    model.SetColumnsGap(Dimension(10.0f));
+    model.SetRowsGap(Dimension(5.0f));
+    model.SetCachedCount(1, true);
+    ViewAbstract::SetPadding(CalcLength(10.0f));
+    layoutProperty_->UpdateLayoutDirection(TextDirection::RTL);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 39, 40, 90 };
+    options.getSizeByIndex = [](int32_t) { return GridItemSize { 2, 2 }; };
+    model.SetLayoutOptions(options);
+    for (int32_t i = 0; i < 150; ++i) {
+        CreateGridItem(100.0f, FILL_VALUE);
+        ViewAbstract::SetMargin(CalcLength(5.0f));
+        ViewStackProcessor::GetInstance()->Pop();
+    }
+    CreateDone();
+    ASSERT_NE(AceType::DynamicCast<GridIrregularLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm()), nullptr);
+    for (auto align : { ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END, ScrollAlign::AUTO }) {
+        SCOPED_TRACE(static_cast<int32_t>(align));
+        ScrollToIndex(0, false, ScrollAlign::START);
+        pattern_->ScrollToIndexFastScroll(90, true, align, -25.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        FlushUITasks(frameNode_);
+        ASSERT_TRUE(pattern_->GetGridLayoutInfo().fastScrollGeometry_.has_value());
+        const auto prepared = *pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+        EXPECT_EQ(pattern_->GetGridLayoutInfo().startIndex_, 0);
+        pattern_->CancelFastScroll();
+        ScrollToIndex(90, false, align, -25.0f);
+        const auto reference = pattern_->GetItemRect(90);
+        ASSERT_GT(reference.Width(), 0.0f);
+        float expectedLeft = reference.Left(); // START/AUTO retain their original layout rule.
+        const float padding = layoutProperty_->CreatePaddingAndBorder().left.value_or(0.0f);
+        if (align == ScrollAlign::CENTER) {
+            expectedLeft = padding + (pattern_->GetMainContentSize() - reference.Width()) / 2.0f - 25.0f;
+        } else if (align == ScrollAlign::END) {
+            expectedLeft = padding - 25.0f;
+        }
+        EXPECT_NEAR(prepared.targetRect.Left() + prepared.targetOffsetPx, expectedLeft, 0.1f);
+        EXPECT_FLOAT_EQ(prepared.targetRect.Top(), reference.Top());
+        EXPECT_FLOAT_EQ(prepared.targetRect.Width(), reference.Width());
+        EXPECT_FLOAT_EQ(prepared.targetRect.Height(), reference.Height());
+    }
+}
+
+/**
+ * @tc.name: FastScrollIrregularRelocation
+ * @tc.desc: A relocation batch measures and lays out the target and cache, then resumes ordinary offsets.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTest, FastScrollIrregularRelocation, TestSize.Level1)
+{
+    auto created = std::make_shared<std::vector<int32_t>>();
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(1, true);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 39, 40, 90 };
+    options.getSizeByIndex = [](int32_t) { return GridItemSize { 2, 2 }; };
+    model.SetLayoutOptions(options);
+    CreateItemsInLazyForEach(150, [created](uint32_t index) {
+        created->push_back(static_cast<int32_t>(index));
+        return 100.0f;
+    });
+    CreateDone();
+    created->clear();
+    auto algorithm = AceType::MakeRefPtr<GridIrregularLayoutAlgorithm>(pattern_->GetGridLayoutInfo());
+    algorithm->SetFastScrollTargetForLayout({ 90, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE });
+    algorithm->Measure(AceType::RawPtr(frameNode_));
+    algorithm->Layout(AceType::RawPtr(frameNode_));
+    auto target = frameNode_->GetChildByIndex(90, true);
+    ASSERT_NE(target, nullptr);
+    EXPECT_FLOAT_EQ(target->GetGeometryNode()->GetFrameOffset().GetY(), 0.0f);
+    EXPECT_GT(target->GetGeometryNode()->GetFrameSize().Width(), 0.0f);
+    const auto end = algorithm->info_.endIndex_;
+    EXPECT_NE(frameNode_->GetChildByIndex(end + 1, true), nullptr);
+    EXPECT_EQ(std::count_if(created->begin(), created->end(), [](int32_t i) { return i >= 24 && i < 72; }), 0);
+    algorithm->info_.currentOffset_ -= 30.0f;
+    algorithm->Measure(AceType::RawPtr(frameNode_));
+    algorithm->Layout(AceType::RawPtr(frameNode_));
+    EXPECT_FLOAT_EQ(target->GetGeometryNode()->GetFrameOffset().GetY(), -30.0f);
+}
+
+/**
+ * @tc.name: FastScrollIrregularLastBeforeFirstLayout
+ * @tc.desc: A pre-layout last-item request becomes ready after measuring real children and survives no stale result.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridIrregularLayoutTest, FastScrollIrregularLastBeforeFirstLayout, TestSize.Level1)
+{
+    auto model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr");
+    model.SetCachedCount(0);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 39, 40, 149 };
+    options.getSizeByIndex = [](int32_t) { return GridItemSize { 2, 2 }; };
+    model.SetLayoutOptions(options);
+    CreateItemsInLazyForEach(150, [](uint32_t index) { return 80.0f + static_cast<float>(index % 5) * 15.0f; });
+    pattern_->ScrollToIndexFastScroll(LAST_ITEM, true, ScrollAlign::END, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_FALSE(pattern_->GetGridLayoutInfo().fastScrollGeometry_.has_value());
+    CreateDone();
+    ASSERT_TRUE(pattern_->GetGridLayoutInfo().fastScrollGeometry_.has_value());
+    const auto prepared = *pattern_->GetGridLayoutInfo().fastScrollGeometry_;
+    EXPECT_TRUE(prepared.ready);
+    pattern_->CancelFastScroll();
+    EXPECT_FALSE(pattern_->GetGridLayoutInfo().fastScrollGeometry_.has_value());
+    ScrollToIndex(LAST_ITEM, false, ScrollAlign::END);
+    const auto reference = pattern_->GetItemRect(149);
+    ASSERT_GT(reference.Width(), 0.0f);
+    // The last item's frame can be shorter than its occupied rows; END aligns the measured frame bottom.
+    EXPECT_NEAR(prepared.targetRect.Top() - prepared.targetOffsetPx,
+        pattern_->GetMainContentSize() - reference.Height(), 0.1f);
+    EXPECT_FLOAT_EQ(prepared.targetRect.Left(), reference.Left());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Width(), reference.Width());
+    EXPECT_FLOAT_EQ(prepared.targetRect.Height(), reference.Height());
+}
+
 } // namespace OHOS::Ace::NG

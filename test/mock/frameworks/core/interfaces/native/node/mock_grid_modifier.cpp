@@ -123,12 +123,22 @@ bool IsGridItemPattern(const RefPtr<Pattern>& pattern)
 {
     return AceType::InstanceOf<GridItemPattern>(pattern);
 }
+
+ArkUINodeHandle CreateGridFrameNode(ArkUI_Int32 nodeId)
+{
+    auto frameNode = GridModelNG::CreateFrameNode(nodeId);
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    frameNode->IncRefCount();
+    return reinterpret_cast<ArkUINodeHandle>(frameNode.GetRawPtr());
+}
 } // namespace
 
 namespace NodeModifier {
 const ArkUIGridModifier* GetGridModifier()
 {
     static const ArkUIGridModifier modifier = {
+        .createFrameNode = CreateGridFrameNode,
+        .setScrollToIndexWithOptions = nullptr,
     };
     return &modifier;
 }

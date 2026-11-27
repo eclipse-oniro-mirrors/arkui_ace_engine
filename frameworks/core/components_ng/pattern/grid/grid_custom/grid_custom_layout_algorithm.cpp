@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/grid/grid_custom/grid_custom_layout_algorithm.h"
 
+#include <cmath>
+
 #include "base/utils/system_properties.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"
@@ -55,8 +57,69 @@ inline void PrepareJumpOnReset(GridLayoutInfo& info)
 }
 } // namespace
 
+void GridCustomLayoutAlgorithm::SetFastScrollTargetForLayout(const GridFastScrollTarget& target)
+{
+    const int32_t index = target.index == LAST_ITEM ? info_.GetChildrenCount() - 1 : target.index;
+    if (!IsFastScrollEnabled(target.mode) || !std::isfinite(target.extraOffsetPx) ||
+        index < 0 || index >= info_.GetChildrenCount()) {
+        return;
+    }
+    info_.targetIndex_.reset();
+    info_.jumpIndex_ = index;
+    info_.scrollAlign_ = target.align;
+    info_.extraOffset_ = -target.extraOffsetPx;
+    fastScrollLayout_ = true;
+    fastScrollAutoAlign_ = target.preserveAutoAlignment;
+}
+
+void GridCustomLayoutAlgorithm::PrepareFastScroll(float mainSize)
+{
+    if (!info_.fastScrollTarget_ || !std::isfinite(mainSize) || NonPositive(mainSize) || info_.crossCount_ <= 0) {
+        return;
+    }
+    const auto request = *info_.fastScrollTarget_;
+    const int32_t index = request.index == LAST_ITEM ? info_.GetChildrenCount() - 1 : request.index;
+    if (index < 0 || index >= info_.GetChildrenCount()) {
+        return;
+    }
+    GridCustomLayoutAlgorithm preparation(info_);
+    preparation.info_.ResetFastScroll();
+    preparation.SetFastScrollTargetForLayout(request);
+    preparation.fastScrollPreparationOnly_ = true;
+    preparation.contentClipMode_ = contentClipMode_;
+    preparation.clipShapeRect_ = clipShapeRect_;
+    preparation.safeAreaPad_ = safeAreaPad_;
+    preparation.Measure(wrapper_);
+    if (preparation.MeasureInNextFrame()) {
+        return;
+    }
+    auto rect = preparation.fastScrollTargetRect_;
+    const bool capturedAtTarget = rect.has_value();
+    if (!rect) {
+        rect = preparation.GetFastScrollTargetRect(index);
+    }
+    if (!rect || !std::isfinite(rect->Left()) || !std::isfinite(rect->Top()) ||
+        !std::isfinite(rect->Width()) || !std::isfinite(rect->Height())) {
+        return;
+    }
+    const float offset = preparation.info_.totalOffset_;
+    if (!std::isfinite(offset)) {
+        return;
+    }
+    const bool reverse = info_.axis_ == Axis::HORIZONTAL &&
+        wrapper_->GetLayoutProperty()->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    if (!capturedAtTarget) {
+        rect->SetOffset(rect->GetOffset() + OffsetF(0.0f, reverse ? -offset : offset, info_.axis_));
+    }
+    info_.fastScrollGeometry_ = GridFastScrollGeometry { *rect, offset,
+        std::min({ info_.startIndex_, index, preparation.info_.startIndex_ }),
+        std::max({ info_.endIndex_, index, preparation.info_.endIndex_ }), true };
+}
+
 void GridCustomLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 {
+    fastScrollTargetRect_.reset();
+    info_.fastScrollGeometry_.reset();
     if (info_.GetChildrenCount() <= 0) {
         return;
     }
@@ -94,6 +157,12 @@ void GridCustomLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     UpdateLayoutInfo();
     if (matchChildren) {
         AdaptToChildMainSize(props, mainSize, frameSize_);
+    }
+    if (fastScrollPreparationOnly_) {
+        return;
+    }
+    if (!fastScrollLayout_) {
+        PrepareFastScroll(mainSize);
     }
     const int32_t cacheCnt = props->GetCachedCountValue(info_.defCachedCount_) * info_.crossCount_;
     PreloadItems(cacheCnt);
@@ -138,6 +207,7 @@ void GridCustomLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     wrapper_->SetCacheCount(cachedItemCnt.first);
     UpdateGridDecodeCacheWindow(wrapper_, cacheLines);
     UpdateOverlay(wrapper_);
+    fastScrollLayout_ = false;
 }
 
 float GridCustomLayoutAlgorithm::MeasureSelf(const RefPtr<GridLayoutProperty>& props)
@@ -288,7 +358,7 @@ void GridCustomLayoutAlgorithm::MeasureForward(float mainSize)
 
 void GridCustomLayoutAlgorithm::MeasureBackward(float mainSize)
 {
-    if (NeedJump(mainSize) || reloadFlag_) {
+    if (NeedJump(mainSize) || reloadFlag_ || (fastScrollLayout_ && !NearZero(info_.currentDelta_))) {
         JumpToTargetOffset(mainSize);
         return;
     }
@@ -318,6 +388,10 @@ void GridCustomLayoutAlgorithm::JumpToTargetOffset(float mainSize)
     auto pattern = host->GetPattern<GridPattern>();
     CHECK_NULL_VOID(pattern);
     auto totalHeight = pattern->GetTotalHeight();
+    if (fastScrollLayout_) {
+        // Do not let an estimated end exclude content already reached by the current viewport.
+        totalHeight = std::max(totalHeight, static_cast<float>(pattern->GetTotalOffset()) + mainSize);
+    }
     if (LessNotEqual(info_.totalOffset_, totalHeight - mainSize) &&
         GreatNotEqual(targetOffset, totalHeight - mainSize)) {
         targetOffset = totalHeight - mainSize;
@@ -416,6 +490,27 @@ inline void UpdateTotalOffset(GridLayoutInfo& info, int32_t startLine, float mai
 }
 } // namespace
 
+float GridCustomLayoutAlgorithm::UpdateFastScrollTargetRect(float itemHeight)
+{
+    if (!fastScrollLayout_) {
+        return itemHeight;
+    }
+    // Preserve the measured content rectangle before offset seeking can discard the target's rows.
+    fastScrollTargetRect_ = GetFastScrollTargetRect(info_.jumpIndex_);
+    if (!fastScrollTargetRect_) {
+        return itemHeight;
+    }
+    if (!fastScrollAutoAlign_) {
+        itemHeight = info_.axis_ == Axis::VERTICAL ? fastScrollTargetRect_->Height() : fastScrollTargetRect_->Width();
+    }
+    const bool reverse = info_.axis_ == Axis::HORIZONTAL &&
+        wrapper_->GetLayoutProperty()->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    const float offset = info_.totalOffset_;
+    fastScrollTargetRect_->SetOffset(fastScrollTargetRect_->GetOffset() +
+        OffsetF(0.0f, reverse ? -offset : offset, info_.axis_));
+    return itemHeight;
+}
+
 void GridCustomLayoutAlgorithm::MeasureOnJump(float mainSize)
 {
     if (info_.jumpIndex_ == JUMP_TO_BOTTOM_EDGE || info_.jumpIndex_ == LAST_ITEM) {
@@ -439,6 +534,7 @@ void GridCustomLayoutAlgorithm::MeasureOnJump(float mainSize)
 
     // Not in cache, perform jump
     float itemHeight = JumpToTargetIndex(mainSize, info_.jumpIndex_);
+    itemHeight = UpdateFastScrollTargetRect(itemHeight);
 
     // 4. Adjust currentOffset_ based on scrollAlign, extraOffset and contentStartOffset or contentEndOffset
     info_.prevOffset_ = info_.currentOffset_;
@@ -572,6 +668,41 @@ void AdjustStartOffset(const std::map<int32_t, float>& lineHeights, int32_t star
     }
 }
 } // namespace
+
+std::optional<RectF> GridCustomLayoutAlgorithm::GetFastScrollTargetRect(int32_t targetIndex)
+{
+    const auto [cross, line] = info_.GetItemPos(targetIndex);
+    if (cross < 0 || cross >= static_cast<int32_t>(crossLens_.size()) ||
+        info_.lineHeightMap_.find(line) == info_.lineHeightMap_.end()) {
+        return std::nullopt;
+    }
+    auto child = wrapper_->GetChildByIndex(targetIndex, true);
+    CHECK_NULL_RETURN(child, std::nullopt);
+    auto props = DynamicCast<GridLayoutProperty>(wrapper_->GetLayoutProperty());
+    CHECK_NULL_RETURN(props, std::nullopt);
+    const auto& padding = *wrapper_->GetGeometryNode()->GetPadding();
+    const auto crossPos = CalculateCrossPositions(padding);
+    const float mainPos = line >= info_.startMainLineIndex_
+        ? info_.GetHeightInRange(info_.startMainLineIndex_, line, mainGap_)
+        : -info_.GetHeightInRange(line, info_.startMainLineIndex_, mainGap_);
+    float mainOffset = info_.currentOffset_ + mainPos;
+    if (info_.axis_ == Axis::VERTICAL) {
+        mainOffset += padding.top.value_or(0.0f);
+    }
+    const auto& geometry = child->GetGeometryNode();
+    const auto childSize = geometry->GetMarginFrameSize();
+    OffsetF offset(crossPos[cross], mainOffset, info_.axis_);
+    auto frameSize = wrapper_->GetGeometryNode()->GetFrameSize();
+    MinusPaddingToSize(padding, frameSize);
+    if (props->GetNonAutoLayoutDirection() == TextDirection::RTL) {
+        offset.SetX(frameSize.Width() - offset.GetX() - childSize.Width());
+    }
+    offset += OffsetF(padding.left.value_or(0.0f), 0.0f);
+    const SizeF block(crossLens_[cross], info_.lineHeightMap_.at(line), info_.axis_);
+    offset += Alignment::GetAlignPosition(block, childSize, GetAlignment(info_.axis_, props));
+    offset += geometry->GetFrameOffset() - geometry->GetMarginFrameOffset();
+    return RectF(offset, geometry->GetFrameSize());
+}
 
 std::pair<int32_t, int32_t> GridCustomLayoutAlgorithm::LayoutChildren(float mainOffset, int32_t cacheLine)
 {
