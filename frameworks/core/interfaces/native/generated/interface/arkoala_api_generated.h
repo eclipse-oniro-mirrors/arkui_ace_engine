@@ -25395,6 +25395,8 @@ typedef struct GENERATED_ArkUIButtonModifier {
                             const Opt_Union_F64_Resource* value);
     void (*setMaxFontScale)(Ark_NativePointer node,
                             const Opt_Union_F64_Resource* value);
+    void (*setVibrancyMode)(Ark_NativePointer node,
+                            const Opt_VibrancyMode* value);
 } GENERATED_ArkUIButtonModifier;
 
 typedef struct GENERATED_ArkUICalendarPickerModifier {

@@ -267,6 +267,17 @@ void SetMaxFontScaleImpl(Ark_NativePointer node,
     Validator::ValidateGreatOrEqual(convValue, SCALE_LIMIT);
     ButtonModelStatic::SetMaxFontScale(frameNode, convValue);
 }
+void SetVibrancyModeImpl(Ark_NativePointer node,
+                         const Opt_VibrancyMode* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    std::optional<VibrancyMode> modeOpt;
+    if (value != nullptr && value->tag != INTEROP_TAG_UNDEFINED) {
+        modeOpt = static_cast<VibrancyMode>(static_cast<int>(value->value));
+    }
+    ButtonModelStatic::SetVibrancyMode(frameNode, modeOpt);
+}
 } // ButtonAttributeModifier
 const GENERATED_ArkUIButtonModifier* GetButtonStaticModifier()
 {
@@ -287,6 +298,7 @@ const GENERATED_ArkUIButtonModifier* GetButtonStaticModifier()
         ButtonAttributeModifier::SetLabelStyleImpl,
         ButtonAttributeModifier::SetMinFontScaleImpl,
         ButtonAttributeModifier::SetMaxFontScaleImpl,
+        ButtonAttributeModifier::SetVibrancyModeImpl,
     };
     return &ArkUIButtonModifierImpl;
 }
