@@ -1436,6 +1436,69 @@ HWTEST_F(NavDestinationModelTestNg, SetRecoverableTest002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: CreateRecoverableDefaultTest001
+ * @tc.desc: Create() writes PipelineContext navDestinationRecoverableDefault (true) into recoverable_
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavDestinationModelTestNg, CreateRecoverableDefaultTest001, TestSize.Level1)
+{
+    NavDestinationModelTestNg::SetUpTestCase();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->SetNavDestinationRecoverableDefault(true);
+    NavDestinationModelNG navdestinationModel;
+    navdestinationModel.Create();
+    auto navdestinationNode =
+        AceType::DynamicCast<NavDestinationGroupNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(navdestinationNode, nullptr);
+    EXPECT_EQ(navdestinationNode->recoverable_, true);
+}
+
+/**
+ * @tc.name: CreateRecoverableDefaultTest002
+ * @tc.desc: Create() writes PipelineContext navDestinationRecoverableDefault (false) into recoverable_
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavDestinationModelTestNg, CreateRecoverableDefaultTest002, TestSize.Level1)
+{
+    NavDestinationModelTestNg::SetUpTestCase();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->SetNavDestinationRecoverableDefault(false);
+    NavDestinationModelNG navdestinationModel;
+    navdestinationModel.Create();
+    auto navdestinationNode =
+        AceType::DynamicCast<NavDestinationGroupNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(navdestinationNode, nullptr);
+    EXPECT_EQ(navdestinationNode->recoverable_, false);
+    pipeline->SetNavDestinationRecoverableDefault(true);
+}
+
+/**
+ * @tc.name: CreateRecoverableDefaultTest003
+ * @tc.desc: Explicit SetRecoverable after Create() overrides the pipeline default
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavDestinationModelTestNg, CreateRecoverableDefaultTest003, TestSize.Level1)
+{
+    NavDestinationModelTestNg::SetUpTestCase();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->SetNavDestinationRecoverableDefault(false);
+    NavDestinationModelNG navdestinationModel;
+    navdestinationModel.Create();
+    auto navdestinationNode =
+        AceType::DynamicCast<NavDestinationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navdestinationNode, nullptr);
+    EXPECT_EQ(navdestinationNode->recoverable_, false);
+    navdestinationModel.SetRecoverable(true);
+    EXPECT_EQ(navdestinationNode->recoverable_, true);
+    navdestinationModel.SetRecoverable(false);
+    EXPECT_EQ(navdestinationNode->recoverable_, false);
+    pipeline->SetNavDestinationRecoverableDefault(true);
+}
+
+/**
  * @tc.name: CanRecoveryTest001
  * @tc.desc: Branch: if recoverable_ == true
  * @tc.type: FUNC

@@ -1319,6 +1319,14 @@ public:
     {
         isCustomNodeDeleteInTransition_ = isCustomNodeDeleteInTransition;
     }
+    inline void SetNavDestinationRecoverableDefault(bool navDestinationRecoverableDefault)
+    {
+        navDestinationRecoverableDefault_ = navDestinationRecoverableDefault;
+    }
+    inline bool GetNavDestinationRecoverableDefault() const
+    {
+        return navDestinationRecoverableDefault_;
+    }
     void SetParentPipeline(const WeakPtr<PipelineBase>& pipeline) override;
     RefPtr<ContentChangeManager>& GetContentChangeManager();
     void GetAppInfo(std::shared_ptr<JsonValue>& root) const;
@@ -1785,6 +1793,7 @@ private:
     bool isFirstRootLayout_ = true;
     bool isFirstFlushMessages_ = true;
     bool isCustomNodeDeleteInTransition_ = false;
+    bool navDestinationRecoverableDefault_ = true;
     AxisEventChecker axisEventChecker_;
     std::set<WeakPtr<UINode>> attachedNodeSet_;
     std::list<std::function<void()>> afterReloadAnimationTasks_;

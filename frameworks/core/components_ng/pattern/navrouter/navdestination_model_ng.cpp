@@ -286,6 +286,9 @@ void NavDestinationModelNG::Create()
         navDestinationNode->SetContentNode(contentNode);
     }
     CreateToolBarNode(navDestinationNode);
+    auto pipelineContext = PipelineContext::GetCurrentContext();
+    bool recoverable = pipelineContext ? pipelineContext->GetNavDestinationRecoverableDefault() : true;
+    navDestinationNode->SetRecoverable(recoverable);
     stack->Push(navDestinationNode);
     RegisterBackgroundColorUpdateCallback(navDestinationNode);
 }
@@ -505,6 +508,9 @@ void NavDestinationModelNG::Create(std::function<void()>&& deepRenderFunc, RefPt
     CreateContentNode(navDestinationNode);
     // toolbar node
     CreateToolBarNode(navDestinationNode);
+    auto pipelineContext = PipelineContext::GetCurrentContext();
+    bool recoverable = pipelineContext ? pipelineContext->GetNavDestinationRecoverableDefault() : true;
+    navDestinationNode->SetRecoverable(recoverable);
     stack->Push(navDestinationNode);
     RegisterBackgroundColorUpdateCallback(navDestinationNode);
 }

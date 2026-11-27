@@ -385,6 +385,10 @@ RefPtr<FrameNode> NavDestinationModelStatic::CreateFrameNode(
         navDestinationNode->SetContentNode(contentNode);
     }
     CreateToolBarNode(navDestinationNode);
+    auto pipelineContext = PipelineContext::GetCurrentContext();
+    if (pipelineContext) {
+        navDestinationNode->SetRecoverable(pipelineContext->GetNavDestinationRecoverableDefault());
+    }
     return navDestinationNode;
 }
 
