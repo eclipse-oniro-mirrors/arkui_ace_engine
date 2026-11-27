@@ -5963,8 +5963,9 @@ void WebDelegate::OnPageStarted(const std::string& param)
             delegate->RecordWebEvent(Recorder::EventType::WEB_PAGE_BEGIN, param);
             delegate->ResetStateOfDataDetectorJS();
             webPattern->InitDataDetector();
-            auto pageUrl = delegate->GetUrl();
-            if (pageUrl != "about:blank") {
+            // Use the callback URL instead of GetUrl(): at page-start time GetUrl()
+            // may still report the previous page's URL.
+            if (param != "about:blank") {
                 TAG_LOGI(AceLogTag::ACE_WEB, "OnPageStarted:Start to RunJsInit.");
                 webPattern->RunJsInit();
             }

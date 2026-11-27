@@ -19,9 +19,12 @@
 #include "gtest/gtest.h"
 #define protected public
 #define private public
+#include "core/pipeline/pipeline_base.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/components_ng/pattern/mock_nestable_scroll_container.h"
 #undef private
 #undef protected
+#include "core/accessibility/accessibility_manager.h"
 #include "test/mock/frameworks/core/common/mock_image_analyzer_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
@@ -3282,9 +3285,9 @@ HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_BothEmpty_EarlyReturn_011, T
     EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
-    // An empty batch must be prepared for submission (no early return).
-    ASSERT_TRUE(webPattern->delegate_->onDocumentStartScriptItems_.has_value());
-    EXPECT_TRUE(webPattern->delegate_->onDocumentStartScriptItems_->empty());
+    // An empty batch must be submitted (no early return).
+    ASSERT_TRUE(HasMockDocumentStartScriptItems());
+    EXPECT_EQ(GetMockDocumentStartScriptItemsSize(), 0u);
 #endif
 }
 
@@ -3570,8 +3573,9 @@ HWTEST_F(WebPatternTestNgSupplement, RemoveSystemDocumentStartJS_OnlySystem_Forc
     EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
 
-    // Keep nweb_ null so the delegate retains the prepared batch for inspection.
-    webPattern->delegate_->nweb_ = nullptr;
+    // The test target links a stub WebDelegate, so observe the submitted batch
+    // through the mock hook instead of the delegate's internal optional.
+    ResetMockDocumentStartScriptItems();
 
     // Step 2: Remove system JS — both stores become empty, but an empty batch is
     // still submitted so NWeb's replace semantics clear the previous registration.
@@ -3835,6 +3839,322 @@ HWTEST_F(WebPatternTestNgSupplement, MergeNonByOrderPath_ScriptKeyCollision_Appe
     EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
     // non-ByOrder path taken — ByOrder public vector stays empty.
     EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItemsByOrder_.empty());
+#endif
+}
+
+/**
+ * @tc.name: MergeAndInject_PublicOnlyAfterRemove_InjectsPublic_023
+ * @tc.desc: RemoveSystem with no system scripts but existing public scripts: forceInject is false and
+ *           system is empty, yet public is non-empty, so the public.empty() guard is false and the
+ *           public batch is re-injected through the non-ByOrder path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_PublicOnlyAfterRemove_InjectsPublic_023, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Step 1: register public JS via the non-ByOrder API. No system JS is registered.
+    ScriptItems appItems;
+    appItems["app_only"] = { "*" };
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(appItems);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::nullopt;
+    webPattern->UpdateJavaScriptOnDocumentStart();
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1u);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+
+    ResetMockDocumentStartScriptItems();
+
+    // Step 2: RemoveSystemDocumentStartJS with no system scripts -> hadSystemScripts is false,
+    // so forceInject is false; system stays empty while public is non-empty. The public.empty()
+    // operand of the early-return guard is false, so the public batch is re-injected.
+    webPattern->RemoveSystemDocumentStartJS();
+
+    EXPECT_TRUE(HasMockDocumentStartScriptItems());
+    EXPECT_EQ(GetMockDocumentStartScriptItemsSize(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItems_.size(), 1u);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+#endif
+}
+
+/**
+ * @tc.name: MergeAndInject_SystemItemsWithoutOrder_FallbackNonByOrder_024
+ * @tc.desc: System scripts registered with items but empty ByOrder info and no public scripts:
+ *           onlySystemWithByOrder is false because the system ByOrder store is empty, so the
+ *           non-ByOrder fallback path is taken and the batch is submitted.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_SystemItemsWithoutOrder_FallbackNonByOrder_024, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Register system JS with items but deliberately EMPTY ByOrder info; no public scripts.
+    ScriptItems sysItems;
+    sysItems["sys_js"] = { "*" };
+    ScriptRegexItems sysRegex;
+    ScriptItemsByOrder sysByOrder;
+    ResetMockDocumentStartScriptItems();
+    webPattern->RegisterSystemDocumentStartJS(sysItems, sysRegex, sysByOrder);
+
+    // onlySystemWithByOrder is false (system ByOrder empty) -> non-ByOrder fallback submits the batch.
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.size(), 1u);
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptItemsByOrder_.empty());
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+    EXPECT_TRUE(HasMockDocumentStartScriptItems());
+    EXPECT_EQ(GetMockDocumentStartScriptItemsSize(), 1u);
+#endif
+}
+
+/**
+ * @tc.name: RunJsInit_NeedTranslateFalse_EarlyReturn_025
+ * @tc.desc: RunJsInit returns before any registration when needTranslate is false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RunJsInit_NeedTranslateFalse_EarlyReturn_025, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    // Same environment as the passing WebPatternTestNg.RunJsInit_001: GetTranslateText
+    // posts its work through the pipeline's task executor, so wire a synchronous
+    // MockTaskExecutor and a MockContainer whose pipeline is the current mock context.
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Guard: GetTranslateText silently returns when the node has no context.
+    ASSERT_NE(webPattern->GetHost(), nullptr);
+    ASSERT_NE(webPattern->GetHost()->GetContext(), nullptr);
+
+    // Turn translation on first so needTranslate becomes true and system scripts are registered.
+    std::string jsonData = R"({
+        "registerObjectName":"obj",
+        "registerFunctionName":"func",
+        "translateScript":"script",
+        "initScript":"init"
+    })";
+    std::function<void(std::string)> dummyCallback = [](std::string) {};
+    webPattern->isRegisterJsObject_ = false;
+    webPattern->GetTranslateText(jsonData, dummyCallback, false);
+    ASSERT_TRUE(webPattern->isRegisterJsObject_);
+    ASSERT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+
+    // EndTranslate resets needTranslate to false and removes the system scripts.
+    webPattern->EndTranslate();
+    ASSERT_FALSE(webPattern->isRegisterJsObject_);
+    ASSERT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    ASSERT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+
+    // needTranslate is false -> RunJsInit must return before registering system scripts.
+    webPattern->RunJsInit();
+
+    EXPECT_FALSE(webPattern->isRegisterJsObject_);
+    EXPECT_FALSE(webPattern->hasInnerOnDocumentStartScripts_);
+    EXPECT_TRUE(webPattern->systemDocumentStartScripts_.empty());
+    EXPECT_TRUE(webPattern->systemDocumentStartScriptItemsByOrder_.empty());
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: RunJsInit_TranslateScriptEmpty_OnlyInitRegistered_026
+ * @tc.desc: When translateScript is empty but initScript is not, RunJsInit skips the empty script
+ *           and registers only the init script as system DocumentStart JS.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RunJsInit_TranslateScriptEmpty_OnlyInitRegistered_026, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    // Same environment as the passing WebPatternTestNg.RunJsInit_001.
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Guard: GetTranslateText silently returns when the node has no context.
+    ASSERT_NE(webPattern->GetHost(), nullptr);
+    ASSERT_NE(webPattern->GetHost()->GetContext(), nullptr);
+
+    // translateScript empty -> skipped; initScript non-empty -> registered.
+    std::string jsonData = R"({
+        "registerObjectName":"obj",
+        "registerFunctionName":"func",
+        "translateScript":"",
+        "initScript":"init_only"
+    })";
+    std::function<void(std::string)> dummyCallback = [](std::string) {};
+    webPattern->isRegisterJsObject_ = false;
+    webPattern->GetTranslateText(jsonData, dummyCallback, false);
+
+    EXPECT_TRUE(webPattern->isRegisterJsObject_);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.count("init_only"), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.count(""), 0u);
+    ASSERT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "init_only");
+
+    // Reset the translate global state so later cases are not polluted.
+    webPattern->EndTranslate();
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: RunJsInit_InitScriptEmpty_OnlyTranslateRegistered_027
+ * @tc.desc: When initScript is empty but translateScript is not, RunJsInit skips the empty script
+ *           and registers only the translate script as system DocumentStart JS.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, RunJsInit_InitScriptEmpty_OnlyTranslateRegistered_027, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    // Same environment as the passing WebPatternTestNg.RunJsInit_001.
+    MockPipelineContext::SetUp();
+    MockContainer::SetUp();
+    MockContainer::Current()->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    MockContainer::Current()->pipelineContext_->taskExecutor_ = MockContainer::Current()->taskExecutor_;
+
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // Guard: GetTranslateText silently returns when the node has no context.
+    ASSERT_NE(webPattern->GetHost(), nullptr);
+    ASSERT_NE(webPattern->GetHost()->GetContext(), nullptr);
+
+    // initScript empty -> skipped; translateScript non-empty -> registered.
+    std::string jsonData = R"({
+        "registerObjectName":"obj",
+        "registerFunctionName":"func",
+        "translateScript":"translate_only",
+        "initScript":""
+    })";
+    std::function<void(std::string)> dummyCallback = [](std::string) {};
+    webPattern->isRegisterJsObject_ = false;
+    webPattern->GetTranslateText(jsonData, dummyCallback, false);
+
+    EXPECT_TRUE(webPattern->isRegisterJsObject_);
+    EXPECT_TRUE(webPattern->hasInnerOnDocumentStartScripts_);
+    ASSERT_EQ(webPattern->systemDocumentStartScripts_.size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.count("translate_only"), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScripts_.count(""), 0u);
+    ASSERT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_.size(), 1u);
+    EXPECT_EQ(webPattern->systemDocumentStartScriptItemsByOrder_[0], "translate_only");
+
+    // Reset the translate global state so later cases are not polluted.
+    webPattern->EndTranslate();
+    MockContainer::TearDown();
+    MockPipelineContext::TearDown();
+#endif
+}
+
+/**
+ * @tc.name: MergeAndInject_PublicByOrderWithoutItems_AppByOrderPath_028
+ * @tc.desc: App registers ByOrder info with empty ScriptItems: public items are empty while the
+ *           public ByOrder store is not, so onlySystemWithByOrder evaluates its second operand to
+ *           false and the ByOrder path is selected through appUsesByOrder.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNgSupplement, MergeAndInject_PublicByOrderWithoutItems_AppByOrderPath_028, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+
+    // App registers ByOrder info with an EMPTY ScriptItems map but a non-empty order vector.
+    ScriptItems emptyItems;
+    ScriptRegexItems emptyRegex;
+    ScriptItemsByOrder appOrder;
+    appOrder.push_back("order_only");
+    webPattern->onDocumentStartScriptItems_ = std::make_optional<ScriptItems>(emptyItems);
+    webPattern->onDocumentStartScriptRegexItems_ = std::make_optional<ScriptRegexItems>(emptyRegex);
+    webPattern->onDocumentStartScriptItemsByOrder_ = std::make_optional<ScriptItemsByOrder>(appOrder);
+    webPattern->UpdateJavaScriptOnDocumentStartByOrder();
+
+    // Public items empty, public ByOrder non-empty.
+    EXPECT_TRUE(webPattern->publicOnDocumentStartScriptItems_.empty());
+    ASSERT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_.size(), 1u);
+    EXPECT_EQ(webPattern->publicOnDocumentStartScriptItemsByOrder_[0], "order_only");
+
+    ResetMockDocumentStartScriptItems();
+    ResetMockDocumentStartScriptItemsByOrder();
+    // forceInject bypasses the both-empty early return so the path selection below is reached.
+    webPattern->MergeAndInjectJavaScriptOnDocumentStart(true);
+
+    // appUsesByOrder is true, so the ByOrder path submits the batch; the non-ByOrder
+    // path must not be taken.
+    EXPECT_TRUE(HasMockDocumentStartScriptItemsByOrder());
+    EXPECT_EQ(GetMockDocumentStartScriptItemsByOrderSize(), 1u);
+    EXPECT_FALSE(HasMockDocumentStartScriptItems());
 #endif
 }
 } // namespace OHOS::Ace::NG
